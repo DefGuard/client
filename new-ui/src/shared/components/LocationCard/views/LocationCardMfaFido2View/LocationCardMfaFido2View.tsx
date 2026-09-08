@@ -1,112 +1,91 @@
-import { useCallback, useEffect, useState } from 'react';
-import { MfaMethod } from '../../../../rust-api/types';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
-import { CodeInput } from '../../../CodeInput/CodeInput';
 import { Controls } from '../../../Controls/Controls';
 import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { Input } from '../../../Input/Input';
 import { SizedBox } from '../../../SizedBox/SizedBox';
+import { Fido2TouchPrompt } from '../../components/Fido2TouchPrompt/Fido2TouchPrompt';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
-import { useMfaConnect } from '../../hooks/useMfaConnect';
-import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/LocationCardMfaStartLoader';
+import { useMfaFido2Connect } from '../../hooks/useMfaFido2Connect';
 
-const MIN_POSTURE_LOADER_MS = 500;
-
-export const LocationCardMfaTotpView = () => {
+export const LocationCardMfaFido2View = () => {
   const {
     setView,
     location,
-    setPostureError,
     stepLabel,
     canPickOtherMethod,
     stepPlan,
     mfaToken,
-    setMfaToken,
-    goToStep,
+    setPostureError,
   } = useLocationCardContext();
-  const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
+  const { verifyPin, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
     location,
-    MfaMethod.Totp,
     {
       stepPlan,
       mfaToken,
-      setMfaToken,
-      onStepAdvanced: goToStep,
-      debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),
-      onSessionExpired: () => setView(LocationCardViews.Default),
-      onPostureError: (msg) => {
-        setPostureError(msg);
+      onPostureError: (message) => {
+        setPostureError(message);
         setView(LocationCardViews.PostureCheckFail);
       },
       onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
     },
   );
 
-  const [totpCode, setTotpCode] = useState<string | null>(null);
+  const [pin, setPin] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleVerify = useCallback(
-    (argCode?: string | null) => {
-      const toCheck = argCode ?? totpCode;
+  const handleVerify = useCallback(() => {
+    if (!isPresent(pin) || pin.length === 0) {
+      setError('Enter PIN');
+      return;
+    }
+    verifyPin(pin);
+  }, [pin, verifyPin]);
 
-      if (!isPresent(toCheck)) {
-        setError('Enter code');
-        return;
-      }
-      if (toCheck.replaceAll(' ', '').length !== 6) {
-        setError('6 digits are required');
-        return;
-      }
-      verifyCode(toCheck);
-    },
-    [totpCode, verifyCode],
-  );
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
+  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of pin input
   useEffect(() => {
     setError(null);
-  }, [totpCode, setError]);
+  }, [pin, setError]);
 
-  // Reflect server-side verify errors into the local error state
+  // Reflect backend errors into the local error state
   useEffect(() => {
     if (verifyError) setError(verifyError);
   }, [verifyError]);
 
-  // Show loader when posture is being evaluated
-  const showLoader = location.posture_check_required && isStarting && !startError;
-  if (showLoader) {
-    return <LocationCardMfaStartLoader />;
-  }
-
   return (
     <div
-      className="location-card-mfa-totp-view"
+      className="location-card-mfa-fido2-view"
       onKeyDown={(e) => {
         if (e.key === 'Enter') handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
-        <p>Paste the code from your Authenticator Application.</p>
-      </LocationViewHeader>
-      <SizedBox height={ThemeSpacing.Xl} />
-      <CodeInput
-        length={6}
-        value={totpCode}
-        onChange={setTotpCode}
-        error={startError ?? error}
-        onSuccessPaste={(value) => {
-          handleVerify(value);
-        }}
-      />
+      {isAwaitingTouch ? (
+        <Fido2TouchPrompt />
+      ) : (
+        <Fragment>
+          <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
+            <p>Insert your security key and enter its PIN to continue.</p>
+          </LocationViewHeader>
+          <SizedBox height={ThemeSpacing.Xl} />
+          <Input
+            type="password"
+            label="PIN"
+            value={pin}
+            onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
+            error={error}
+          />
+        </Fragment>
+      )}
       <Controls>
         <IconButton
           variant={IconButtonVariant.BigSelected}
@@ -129,7 +108,7 @@ export const LocationCardMfaTotpView = () => {
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
-            onClick={() => handleVerify(totpCode)}
+            onClick={handleVerify}
             loading={isVerifying}
           />
         </div>

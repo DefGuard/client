@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/shallow';
 import { isPresent } from '../../../../../../shared/utils/isPresent';
-import { usableMfaMethods } from '../../../../../../shared/utils/mfa';
+import { mfaStepsOf, usableMfaMethods } from '../../../../../../shared/utils/mfa';
 import { useConnectModal } from './useConnectModal';
 
 export const useMfaStep = () => {
@@ -16,7 +16,7 @@ export const useMfaStep = () => {
       ]),
     );
 
-  const currentStep = location?.mfa_steps[stepIndex];
+  const currentStep = isPresent(location) ? mfaStepsOf(location)[stepIndex] : undefined;
 
   return {
     canPickOtherMethod:

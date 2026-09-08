@@ -1,7 +1,16 @@
 use core::fmt;
-use std::{collections::HashMap, env, str::FromStr};
+use std::{collections::HashMap, env, future::Future, str::FromStr};
 
+use base64::{
+    alphabet,
+    engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig},
+    prelude::BASE64_URL_SAFE_NO_PAD,
+    Engine,
+};
 use chrono::{DateTime, Duration, Utc};
+use ctap_hid_fido2::{
+    fidokey::get_assertion::get_assertion_params::Assertion, FidoKeyHidFactory, LibCfg,
+};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
@@ -20,9 +29,10 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_client_proto::defguard::{
     client_types::{
         mfa_step_result, AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse,
-        ClientMfaStartRequest, ClientMfaStepStartRequest, ClientMfaStepStartResponse,
-        CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
-        EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo, MfaMethod,
+        ClientMfaStartRequest, ClientMfaStartResponse, ClientMfaStepStartRequest,
+        ClientMfaStepStartResponse, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
+        DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        InstanceInfo as ProtoInstanceInfo, MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -1563,19 +1573,20 @@ pub struct MfaErrorPayload {
     pub error: String,
 }
 
-/// Bring up a location connection with a preshared key obtained from a
-/// completed MFA handshake. Keeps the preshared key inside the backend - it is
-/// never returned to or emitted at the frontend.
+/// Bring up a location connection once MFA has passed, with the preshared key
+/// obtained from the handshake. Keeps the preshared key inside the backend - it
+/// is never returned to or emitted at the frontend. None is for the methods the
+/// client verifies on its own, which have no proxy session to issue a key.
 async fn connect_after_mfa(
     location_id: Id,
-    preshared_key: String,
+    preshared_key: Option<String>,
     handle: &AppHandle,
 ) -> Result<(), String> {
     let location = Location::find_by_id(&*DB_POOL, location_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Location not found".to_string())?;
-    connect_location_with_psk(location, Some(preshared_key), handle)
+    connect_location_with_psk(location, preshared_key, handle)
         .await
         // Distinct prefix so the frontend can tell a post-MFA connection
         // failure apart from an MFA/auth failure.
@@ -1591,34 +1602,26 @@ fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
         "oidc" => Ok(MfaMethod::Oidc),
         "biometric" => Ok(MfaMethod::Biometric),
         "mobileapprove" => Ok(MfaMethod::MobileApprove),
+        "fido2" => Ok(MfaMethod::Fido2),
         other => Err(format!("Unsupported MFA method: {other}")),
     }
 }
 
-#[tauri::command(async)]
-pub async fn mfa_start(
+/// Build the start request for an MFA session: the per-step method plan plus
+/// the device data Edge needs to open it. Shared by the `mfa_start` command and
+/// the FIDO2 task, which opens its own session.
+async fn mfa_start_request(
     instance_id: Id,
     location_id: Id,
-    methods: Vec<String>,
-) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
-    debug!("Starting MFA session for location {location_id}");
-    let step_methods = methods
-        .iter()
-        .map(|method| parse_mfa_method(method))
-        .collect::<Result<Vec<MfaMethod>, String>>()?;
+    step_methods: &[MfaMethod],
+) -> Result<ClientMfaStartRequest, String> {
     let first_step_method = *step_methods
         .first()
         .ok_or_else(|| "MFA method plan is empty".to_string())?;
-    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Instance not found".to_string())?;
     let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "WireGuard keys not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let location = Location::find_by_id(&*DB_POOL, location_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1638,7 +1641,7 @@ pub async fn mfa_start(
         None
     };
     #[allow(deprecated)]
-    let request = ClientMfaStartRequest {
+    Ok(ClientMfaStartRequest {
         location_id: location.network_id,
         pubkey: keys.pubkey,
         method: first_step_method as i32,
@@ -1647,7 +1650,27 @@ pub async fn mfa_start(
             .iter()
             .map(|method| *method as i32)
             .collect::<Vec<i32>>(),
-    };
+    })
+}
+
+#[tauri::command(async)]
+pub async fn mfa_start(
+    instance_id: Id,
+    location_id: Id,
+    methods: Vec<String>,
+) -> Result<ClientMfaStartResponse, String> {
+    debug!("Starting MFA session for location {location_id}");
+    let step_methods = methods
+        .iter()
+        .map(|method| parse_mfa_method(method))
+        .collect::<Result<Vec<MfaMethod>, String>>()?;
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let request = mfa_start_request(instance_id, location_id, &step_methods).await?;
     mfa::mfa_start(proxy_url, request)
         .await
         .map_err(err_to_json)
@@ -1716,7 +1739,7 @@ pub async fn mfa_finish_code(
             Ok(Some(advanced.next_step))
         }
         Some(mfa_step_result::Outcome::Completed(completed)) => {
-            connect_after_mfa(location_id, completed.preshared_key, &handle).await?;
+            connect_after_mfa(location_id, Some(completed.preshared_key), &handle).await?;
             Ok(None)
         }
         Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {
@@ -1725,7 +1748,7 @@ pub async fn mfa_finish_code(
             }))
         }
         None => {
-            connect_after_mfa(location_id, legacy_preshared_key, &handle).await?;
+            connect_after_mfa(location_id, Some(legacy_preshared_key), &handle).await?;
             Ok(None)
         }
     }
@@ -1745,9 +1768,7 @@ fn spawn_mfa_task<F, R>(
 ) -> String
 where
     R: FnOnce(CancellationToken) -> F + Send + 'static,
-    F: std::future::Future<Output = Result<ClientMfaFinishResponse, mfa::MfaError>>
-        + Send
-        + 'static,
+    F: Future<Output = Result<ClientMfaFinishResponse, mfa::MfaError>> + Send + 'static,
 {
     let cancel = CancellationToken::new();
     let task_id = Uuid::new_v4().to_string();
@@ -1773,7 +1794,7 @@ where
                 info!("MFA completed for task {task_id_for_task}");
                 #[allow(deprecated)]
                 let preshared_key = response.preshared_key;
-                match connect_after_mfa(location_id, preshared_key, &listen_handle).await {
+                match connect_after_mfa(location_id, Some(preshared_key), &listen_handle).await {
                     Ok(()) => {
                         let _ = listen_handle.emit(complete_event.into(), ());
                     }
@@ -1814,7 +1835,7 @@ pub async fn mfa_poll_openid(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
     Ok(spawn_mfa_task(
         &handle,
         location_id,
@@ -1837,7 +1858,7 @@ pub async fn mfa_connect_mobile_approve(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
     let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
     let ws_url = mfa::derive_ws_url(&proxy_url, &token).map_err(|e| e.to_string())?;
     Ok(spawn_mfa_task(
         &handle,
@@ -1845,6 +1866,299 @@ pub async fn mfa_connect_mobile_approve(
         EventKey::MfaMobileComplete,
         EventKey::MfaMobileError,
         move |cancel| async move { mfa::connect_mobile_approve(&ws_url, cancel).await },
+    ))
+}
+
+/// Decode a base64 value handed out by Edge.
+///
+/// Core deals in `webauthn-rs` types, whose `Base64UrlSafeData` writes URL-safe
+/// base64 without padding but reads either alphabet, padded or not. Be equally
+/// forgiving rather than assuming one of them.
+fn decode_base64(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
+    /// Padding is accepted but not required, so one engine covers both the
+    /// padded and unpadded spelling of its alphabet.
+    fn engine(alphabet: alphabet::Alphabet) -> GeneralPurpose {
+        GeneralPurpose::new(
+            &alphabet,
+            GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+        )
+    }
+
+    engine(alphabet::URL_SAFE)
+        .decode(value)
+        .or_else(|err| engine(alphabet::STANDARD).decode(value).map_err(|_| err))
+}
+
+/// CTAP status codes worth telling the user apart, as defined by the spec and
+/// rendered into the crate's error text.
+const CTAP2_ERR_NO_CREDENTIALS: u8 = 0x2E;
+const CTAP2_ERR_USER_ACTION_TIMEOUT: u8 = 0x2F;
+const CTAP2_ERR_PIN_INVALID: u8 = 0x31;
+const CTAP2_ERR_PIN_BLOCKED: u8 = 0x32;
+const CTAP2_ERR_PIN_AUTH_BLOCKED: u8 = 0x34;
+const CTAP2_ERR_ACTION_TIMEOUT: u8 = 0x3A;
+
+/// The CTAP status behind a failed operation.
+///
+/// The crate surfaces status codes only inside its error text, rendered as
+/// `"0x31 CTAP2_ERR_PIN_INVALID   PIN Invalid."` - so read back the leading
+/// byte rather than matching on the name, which would conflate, say, a rejected
+/// PIN with one that was never set.
+fn ctap_status(err: &impl fmt::Display) -> Option<u8> {
+    let text = err.to_string();
+    let code = text.strip_prefix("0x")?.get(..2)?;
+    u8::from_str_radix(code, 16).ok()
+}
+
+/// Turn a failed assertion into something the user can act on.
+///
+/// Everything here is user-fixable, so it is reported as a rejection rather
+/// than an internal error.
+fn assertion_error(err: &impl fmt::Display) -> mfa::MfaError {
+    let message = match ctap_status(err) {
+        // The key was blinking for a touch that never came.
+        Some(CTAP2_ERR_USER_ACTION_TIMEOUT | CTAP2_ERR_ACTION_TIMEOUT) => {
+            "Security key timed out waiting to be touched".to_string()
+        }
+        Some(CTAP2_ERR_NO_CREDENTIALS) => {
+            "This security key is not registered for your account".to_string()
+        }
+        Some(CTAP2_ERR_PIN_INVALID | CTAP2_ERR_PIN_BLOCKED | CTAP2_ERR_PIN_AUTH_BLOCKED) => {
+            format!("Security key rejected the PIN: {err}")
+        }
+        _ => format!("Security key did not authorize the request: {err}"),
+    };
+    mfa::MfaError::MfaRejected { message }
+}
+
+/// Everything the key needs to produce an assertion, as handed out by Edge.
+struct Fido2Challenge {
+    /// MFA session token the resulting assertion is submitted against.
+    token: String,
+    /// Attempt id minted by step-start; absent on the legacy fused path.
+    step_attempt_id: Option<String>,
+    challenge: String,
+    /// Every credential registered for this user - the key answers for the one
+    /// it holds.
+    credential_ids: Vec<String>,
+}
+
+/// How the FIDO2 step is opened: either it starts a fresh MFA session, or it is
+/// one step of a session that is already open.
+enum Fido2Start {
+    Fresh(Box<ClientMfaStartRequest>),
+    Step(ClientMfaStepStartRequest),
+}
+
+/// Ask Edge for the FIDO2 challenge and the credentials the key may sign with.
+async fn fido2_challenge(
+    proxy_url: &Url,
+    start: Fido2Start,
+) -> Result<Fido2Challenge, mfa::MfaError> {
+    let (token, step_attempt_id, challenge, credential_ids) = match start {
+        Fido2Start::Fresh(request) => {
+            let response = mfa::mfa_start(proxy_url.clone(), *request).await?;
+            (
+                response.token,
+                None,
+                response.challenge,
+                response.credential_ids,
+            )
+        }
+        Fido2Start::Step(request) => {
+            let token = request.token.clone();
+            let response = mfa::mfa_step_start(proxy_url.clone(), request).await?;
+            (
+                token,
+                Some(response.step_attempt_id),
+                response.challenge,
+                response.credential_ids,
+            )
+        }
+    };
+
+    // Edge only sends these for a FIDO2 step, so a missing one means the server
+    // does not know the method rather than that the user did anything wrong.
+    let challenge = challenge.ok_or_else(|| mfa::MfaError::Other {
+        message: "Edge did not return a FIDO2 challenge".to_string(),
+    })?;
+    if credential_ids.is_empty() {
+        return Err(mfa::MfaError::Other {
+            message: "Edge did not return any FIDO2 credentials".to_string(),
+        });
+    }
+
+    Ok(Fido2Challenge {
+        token,
+        step_attempt_id,
+        challenge,
+        credential_ids,
+    })
+}
+
+/// Drive the security key over CTAP-HID, returning the assertion and the
+/// credential that produced it.
+///
+/// The key waits for the user to touch it, and the crate's API is blocking, so
+/// this runs on the blocking pool.
+async fn fido2_assertion(
+    rp_id: String,
+    challenge: Fido2Challenge,
+    pin: String,
+) -> Result<(Assertion, Vec<u8>), mfa::MfaError> {
+    let credential_ids = challenge
+        .credential_ids
+        .iter()
+        .map(|credential_id| decode_base64(credential_id))
+        .collect::<Result<Vec<Vec<u8>>, _>>()
+        .map_err(|err| mfa::MfaError::Other {
+            message: format!("Edge sent a malformed FIDO2 credential id: {err}"),
+        })?;
+
+    tokio::task::spawn_blocking(move || {
+        let mut cfg = LibCfg::init();
+        // Suppress the crate's keep-alive chatter on stdout.
+        cfg.enable_keep_alive_msg = false;
+
+        let device = FidoKeyHidFactory::create(&cfg).map_err(|err| mfa::MfaError::Other {
+            message: format!("No FIDO2 device detected: {err}"),
+        })?;
+
+        // The key picks the credential it holds out of the ones offered and
+        // names it back, so there is nothing to narrow beforehand.
+        let assertion = device
+            .get_assertion(
+                &rp_id,
+                challenge.challenge.as_bytes(),
+                &credential_ids,
+                Some(&pin),
+            )
+            .map_err(|err| assertion_error(&err))?;
+
+        // CTAP may leave the credential out when it was offered only one, so
+        // fall back to what we asked for.
+        let credential_id = if assertion.credential_id.is_empty() {
+            credential_ids.into_iter().next().unwrap_or_default()
+        } else {
+            assertion.credential_id.clone()
+        };
+        Ok((assertion, credential_id))
+    })
+    .await
+    .map_err(|err| mfa::MfaError::Other {
+        message: format!("FIDO2 task failed: {err}"),
+    })?
+}
+
+/// Full FIDO2 exchange: challenge from Edge, assertion from the key, proof back
+/// to Edge. Returns the preshared key of the completed MFA session.
+async fn run_fido2_mfa(
+    proxy_url: Url,
+    rp_id: String,
+    start: Fido2Start,
+    pin: String,
+    cancel: CancellationToken,
+    handle: AppHandle,
+) -> Result<ClientMfaFinishResponse, mfa::MfaError> {
+    let challenge = tokio::select! {
+        () = cancel.cancelled() => return Err(mfa::MfaError::Cancelled),
+        challenge = fido2_challenge(&proxy_url, start) => challenge?,
+    };
+    let token = challenge.token.clone();
+    let step_attempt_id = challenge.step_attempt_id.clone();
+
+    // The key blinks and waits for a touch from here on, and CTAP gives up if
+    // none comes, so tell the frontend to ask for one.
+    let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
+
+    // The key cannot be interrupted once it is waiting for a touch, so
+    // cancelling here abandons the assertion instead of aborting it.
+    let (assertion, credential_id) = tokio::select! {
+        () = cancel.cancelled() => return Err(mfa::MfaError::Cancelled),
+        assertion = fido2_assertion(rp_id, challenge, pin) => assertion?,
+    };
+
+    let request = ClientMfaFinishRequest {
+        token,
+        // `auth_pub_key` field carries the signature, as documented in client_types.proto.
+        code: None,
+        auth_pub_key: Some(BASE64_URL_SAFE_NO_PAD.encode(&assertion.signature)),
+        step_attempt_id,
+        auth_data: Some(assertion.auth_data),
+        // Names the key that answered, so Core can offer just this credential
+        // next time instead of every one the user registered.
+        credential_id: Some(credential_id),
+    };
+    mfa::mfa_finish_code(proxy_url, request).await
+}
+
+/// The relying party the assertion is bound to: the instance's own host.
+fn fido2_rp_id(instance: &Instance<Id>) -> Result<String, String> {
+    Url::parse(&instance.url)
+        .map_err(|err| format!("Invalid instance URL: {err}"))?
+        .host_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| format!("Instance URL {} has no host", instance.url))
+}
+
+/// Verify a location's FIDO2 step with a security key.
+///
+/// Spawns a task rather than doing the work inline: the exchange needs a round
+/// trip to Edge for the challenge and the credential id, and then a user touch
+/// on the key, which has no deadline. The task submits the assertion and, on
+/// success, brings the connection up; the outcome arrives at the frontend as
+/// `mfa-fido2-complete` / `mfa-fido2-error`, like the other long-running MFA
+/// methods. Returns the task id used to cancel it.
+///
+/// `methods` is the per-step method plan, and `token` the session token when a
+/// session is already open - together they pick the same start call the
+/// frontend's `startMfaStep` would make.
+#[tauri::command(async)]
+pub async fn mfa_fido2_pin(
+    instance_id: Id,
+    location_id: Id,
+    methods: Vec<String>,
+    token: Option<String>,
+    pin: String,
+    handle: AppHandle,
+) -> Result<String, String> {
+    debug!("Starting FIDO2 MFA for location {location_id} of instance {instance_id}");
+    // The PIN is never logged, here or anywhere below.
+    let pin = pin.trim().to_string();
+    if pin.is_empty() {
+        return Err("PIN is required".to_string());
+    }
+
+    let step_methods = methods
+        .iter()
+        .map(|method| parse_mfa_method(method))
+        .collect::<Result<Vec<MfaMethod>, String>>()?;
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
+    let rp_id = fido2_rp_id(&instance)?;
+
+    let start = match token {
+        // A session is already open and FIDO2 is one of its later steps.
+        Some(token) if step_methods.len() > 1 => Fido2Start::Step(ClientMfaStepStartRequest {
+            token,
+            method: MfaMethod::Fido2 as i32,
+        }),
+        _ => Fido2Start::Fresh(Box::new(
+            mfa_start_request(instance_id, location_id, &step_methods).await?,
+        )),
+    };
+
+    let task_handle = handle.clone();
+    Ok(spawn_mfa_task(
+        &handle,
+        location_id,
+        EventKey::MfaFido2Complete,
+        EventKey::MfaFido2Error,
+        move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, cancel, task_handle),
     ))
 }
 
@@ -1860,4 +2174,37 @@ pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(
     };
     cancel.cancel();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use base64::prelude::{BASE64_STANDARD, BASE64_STANDARD_NO_PAD, BASE64_URL_SAFE};
+
+    use super::*;
+
+    #[test]
+    fn test_decode_base64_accepts_every_alphabet() {
+        // Bytes whose url-safe encoding (`_-`) differs from the standard one
+        // (`/+`), so a decoder locked to one alphabet fails the other.
+        let raw = vec![0xff_u8, 0xfe, 0xfd, 0x00];
+
+        for encoded in [
+            // What webauthn-rs writes for a CredentialID.
+            BASE64_URL_SAFE_NO_PAD.encode(&raw),
+            BASE64_URL_SAFE.encode(&raw),
+            BASE64_STANDARD.encode(&raw),
+            BASE64_STANDARD_NO_PAD.encode(&raw),
+        ] {
+            assert_eq!(
+                decode_base64(&encoded).expect("should decode {encoded}"),
+                raw,
+                "failed to decode {encoded}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_decode_base64_rejects_garbage() {
+        assert!(decode_base64("not base64!!").is_err());
+    }
 }

@@ -214,6 +214,7 @@ pub fn run_app() {
             mfa_finish_code,
             mfa_poll_openid,
             mfa_connect_mobile_approve,
+            mfa_fido2_pin,
             cancel_mfa,
             session_state::get_session_state,
             session_state::patch_session_state,

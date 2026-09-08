@@ -14,6 +14,7 @@ import { ThemeSpacing } from '../../../../../../../shared/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import {
   mfaStepCount,
+  mfaStepsOf,
   pickableMfaMethods,
   resolveMfaStepPlan,
   usableMfaMethods,
@@ -32,7 +33,7 @@ export const ConnectModalMfaSettings = () => {
   );
 
   const isEditingDefaults = perviousView === null;
-  const mfaSteps = location?.mfa_steps ?? [];
+  const mfaSteps = isPresent(location) ? mfaStepsOf(location) : [];
   const isMultiStep = isPresent(location) && mfaStepCount(location) > 1;
   const defaultPlan = isPresent(location) ? resolveMfaStepPlan(location) : [];
 

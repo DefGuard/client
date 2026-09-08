@@ -68,6 +68,7 @@ export const MfaMethod = {
   Oidc: 'oidc',
   Biometric: 'biometric',
   MobileApprove: 'mobileapprove',
+  Fido2: 'fido2',
 } as const;
 
 export type MfaMethodValue = (typeof MfaMethod)[keyof typeof MfaMethod];
@@ -95,6 +96,7 @@ export const TauriCommand = {
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
+  MfaFido2Pin: 'mfa_fido2_pin',
   CancelMfa: 'cancel_mfa',
   // Instances
   AllInstances: 'all_instances',
@@ -167,6 +169,9 @@ export const TauriEvent = {
   MfaOpenIdError: 'mfa-openid-error',
   MfaMobileComplete: 'mfa-mobile-complete',
   MfaMobileError: 'mfa-mobile-error',
+  MfaFido2Complete: 'mfa-fido2-complete',
+  MfaFido2Error: 'mfa-fido2-error',
+  MfaFido2Touch: 'mfa-fido2-touch',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
   TunnelsEnabled: 'tunnel-enabled-by-policy',
 } as const;

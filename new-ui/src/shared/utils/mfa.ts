@@ -14,6 +14,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Oidc]: 'OpenID',
   [MfaMethod.Totp]: 'Authenticator app',
   [MfaMethod.Biometric]: 'Biometrics',
+  [MfaMethod.Fido2]: 'Security key (FIDO2)',
 };
 
 export const mfaToText = (factor: MfaMethodValue): string => mfaMethodLabels[factor];
@@ -24,11 +25,22 @@ export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
   [MfaMethod.Oidc]: 'Oidc',
   [MfaMethod.Totp]: 'Totp',
   [MfaMethod.Biometric]: 'Biometric',
+  [MfaMethod.Fido2]: 'Fido2',
 };
 
 export const mfaToApi = (factor: MfaMethodValue): string => mfaMethodApiValues[factor];
 
-const mfaSteps = (
+/**
+ * MFA steps the connect flow runs on, exactly as Core configured them - never
+ * for bare tunnels. Always read steps through this instead of
+ * `location.mfa_steps`.
+ *
+ * FIDO2 is listed here like any other method, including its `configured` flag:
+ * the key signs a challenge for a credential Core registered for this user, so
+ * a key that was never registered cannot pass the step, and offering it anyway
+ * only earns a rejected plan from Edge.
+ */
+export const mfaStepsOf = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
 ): MfaStep[] =>
   location.connection_type === ConnectionType.Tunnel ? [] : location.mfa_steps;
@@ -43,25 +55,25 @@ export const shouldStartMfa = (
 
 export const mfaStepCount = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): number => mfaSteps(location).length;
+): number => mfaStepsOf(location).length;
+
+/** Biometric is the mobile client's to drive; the desktop can run the rest. */
+const isDesktopDrivable = (entry: MfaStepMethod): boolean =>
+  entry.method !== MfaMethod.Biometric;
 
 export const usableMfaMethods = (step: MfaStep): MfaStepMethod[] =>
-  step.methods.filter(
-    (entry) => entry.configured && entry.method !== MfaMethod.Biometric,
-  );
+  step.methods.filter((entry) => entry.configured && isDesktopDrivable(entry));
 
 export const pickableMfaMethods = (step: MfaStep): MfaStepMethod[] => {
-  const withoutBiometric = step.methods.filter(
-    (entry) => entry.method !== MfaMethod.Biometric,
-  );
-  return withoutBiometric.length > 0 ? withoutBiometric : step.methods;
+  const drivable = step.methods.filter(isDesktopDrivable);
+  return drivable.length > 0 ? drivable : step.methods;
 };
 
 export const resolveMfaStepPlan = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps' | 'mfa_step_plan'>,
   oneOffPlan: MfaMethodValue[] = [],
 ): MfaMethodValue[] =>
-  mfaSteps(location).map((step, index) => {
+  mfaStepsOf(location).map((step, index) => {
     const usableMethods = usableMfaMethods(step);
     const isUsable = (method: MfaMethodValue) =>
       usableMethods.some((entry) => entry.method === method);
@@ -76,13 +88,17 @@ export const resolveMfaStepPlan = (
   });
 
 /**
- * A step with no usable factor cannot be passed on the desktop. This shouldn't happen
- * because such configuration won't be sent from core.
- * TODO: block connecting only until the user can configure the missing factors in place.
+ * A step the desktop cannot drive at all blocks connecting: every method in it
+ * needs the mobile client, so there is nothing the user could do here.
+ *
+ * A method Core reports as not yet configured does NOT block. Whether a factor
+ * can actually be used is Core's call, and Edge says so with a message the user
+ * can act on - "set it up first, or pick a different one" - which beats a mute
+ * disabled button that explains nothing.
  */
 export const hasUnpassableMfaStep = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): boolean => mfaSteps(location).some((step) => usableMfaMethods(step).length === 0);
+): boolean => mfaStepsOf(location).some((step) => !step.methods.some(isDesktopDrivable));
 
 export const mfaStepsToText = (stepCount: number): string =>
   `${stepCount}-step verification`;

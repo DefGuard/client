@@ -63,7 +63,7 @@ export const LocationCardMfaMobileView = () => {
   return (
     <div className="location-card-mfa-mobile">
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
+      <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
         {screen === 'loading' && <p>Preparing authentication...</p>}
         {screen === 'qr' && (
           <p>Open your Defguard mobile app and scan the QR code you see bellow.</p>

@@ -6,6 +6,7 @@ export const LocationCardViews = {
   MfaEmail: 'mfa-email',
   MfaOidc: 'mfa-oidc',
   MfaMobile: 'mfa-mobile',
+  MfaFido2: 'mfa-fido2',
   MfaSettings: 'mfa-settings',
   Connecting: 'connecting',
   Connected: 'connected',
@@ -26,6 +27,8 @@ export const mfaMethodToLocationCardView = (
       return LocationCardViews.MfaOidc;
     case MfaMethod.MobileApprove:
       return LocationCardViews.MfaMobile;
+    case MfaMethod.Fido2:
+      return LocationCardViews.MfaFido2;
     default:
       return LocationCardViews.MfaTotp;
   }
