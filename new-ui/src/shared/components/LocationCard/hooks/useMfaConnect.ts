@@ -132,7 +132,9 @@ export const useMfaConnect = (
         if (isAttemptLimit(err)) {
           setVerifyError(message);
         } else if (isStaleAttempt(message)) {
-          setVerifyError('This MFA attempt is no longer valid. Please try again.');
+          setVerifyError(
+            'Authentication request could not be started. Please try again.',
+          );
         } else if (isConnectFailure(message)) {
           setVerifyError('Failed to establish VPN connection');
         } else if (isInvalidCode(message)) {

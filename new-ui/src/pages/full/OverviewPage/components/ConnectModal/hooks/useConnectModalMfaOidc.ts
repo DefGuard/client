@@ -24,12 +24,14 @@ import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
 import { useConnectModal } from './useConnectModal';
 
 type Options = {
+  autoStart?: boolean;
   onPostureError?: (msg: string) => void;
   onSessionExpired?: () => void;
   onServiceUnavailable?: () => void;
 };
 
 export const useConnectModalMfaOidc = ({
+  autoStart = false,
   onPostureError,
   onSessionExpired,
   onServiceUnavailable,
@@ -185,7 +187,9 @@ export const useConnectModalMfaOidc = ({
           if (isAttemptLimit(event.payload.error)) {
             setPollError(message);
           } else if (isStaleAttempt(message)) {
-            setPollError('This MFA attempt is no longer valid. Please try again.');
+            setPollError(
+              'Authentication request could not be started. Please try again.',
+            );
           } else if (isTimeout(event.payload.error)) {
             setPollError('Authentication timed out. Please try again.');
           } else if (isConnectFailure(message)) {
@@ -236,6 +240,18 @@ export const useConnectModalMfaOidc = ({
     onSessionExpired,
     onServiceUnavailable,
   ]);
+
+  // FIXME: Replace this StrictMode workaround with a lifecycle-safe shared auto-start guard.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
+  useEffect(() => {
+    if (!autoStart) return;
+
+    const timer = window.setTimeout(() => {
+      void start();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [autoStart]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

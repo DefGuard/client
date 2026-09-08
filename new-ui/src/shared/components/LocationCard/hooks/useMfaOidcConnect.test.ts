@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMfaOidcConnect } from './useMfaOidcConnect';
 
@@ -57,6 +58,27 @@ describe('useMfaOidcConnect', () => {
     mocks.mfaPollOpenId.mockResolvedValue('task-1');
     mocks.openLink.mockResolvedValue(undefined);
     mocks.listen.mockResolvedValue(vi.fn());
+  });
+
+  it('starts OIDC once when StrictMode replays the auto-start effect', async () => {
+    renderHook(() => useMfaOidcConnect(true), { wrapper: StrictMode });
+
+    await waitFor(() => {
+      expect(mocks.mfaBeginStep).toHaveBeenCalledTimes(1);
+      expect(mocks.openLink).toHaveBeenCalledTimes(1);
+      expect(mocks.mfaPollOpenId).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('cancels the deferred auto-start on unmount', async () => {
+    const { unmount } = renderHook(() => useMfaOidcConnect(true));
+
+    unmount();
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
+
+    expect(mocks.mfaBeginStep).not.toHaveBeenCalled();
   });
 
   it('opens OIDC with the raw token and step attempt ID as separate parameters', async () => {

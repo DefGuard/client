@@ -20,7 +20,7 @@ import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
-export const useMfaOidcConnect = () => {
+export const useMfaOidcConnect = (autoStart = false) => {
   const {
     location,
     setPostureError,
@@ -180,7 +180,9 @@ export const useMfaOidcConnect = () => {
           if (isAttemptLimit(event.payload.error)) {
             setPollError(message);
           } else if (isStaleAttempt(message)) {
-            setPollError('This MFA attempt is no longer valid. Please try again.');
+            setPollError(
+              'Authentication request could not be started. Please try again.',
+            );
           } else if (isTimeout(event.payload.error)) {
             setPollError('Authentication timed out. Please try again.');
           } else if (isConnectFailure(message)) {
@@ -231,6 +233,18 @@ export const useMfaOidcConnect = () => {
     cancelTask,
     cleanup,
   ]);
+
+  // FIXME: Replace this StrictMode workaround with a lifecycle-safe shared auto-start guard.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
+  useEffect(() => {
+    if (!autoStart) return;
+
+    const timer = window.setTimeout(() => {
+      void start();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [autoStart]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };
