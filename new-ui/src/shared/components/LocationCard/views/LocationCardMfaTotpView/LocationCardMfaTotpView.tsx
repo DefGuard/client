@@ -94,7 +94,7 @@ export const LocationCardMfaTotpView = () => {
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
+      <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
         <p>Paste the code from your Authenticator Application.</p>
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />

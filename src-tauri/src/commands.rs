@@ -1946,7 +1946,7 @@ struct Fido2Challenge {
 /// How the FIDO2 step is opened: either it starts a fresh MFA session, or it is
 /// one step of a session that is already open.
 enum Fido2Start {
-    Fresh(ClientMfaStartRequest),
+    Fresh(Box<ClientMfaStartRequest>),
     Step(ClientMfaStepStartRequest),
 }
 
@@ -1957,7 +1957,7 @@ async fn fido2_challenge(
 ) -> Result<Fido2Challenge, mfa::MfaError> {
     let (token, step_attempt_id, challenge, credential_ids) = match start {
         Fido2Start::Fresh(request) => {
-            let response = mfa::mfa_start(proxy_url.clone(), request).await?;
+            let response = mfa::mfa_start(proxy_url.clone(), *request).await?;
             (
                 response.token,
                 None,
@@ -2147,7 +2147,9 @@ pub async fn mfa_fido2_pin(
             token,
             method: MfaMethod::Fido2 as i32,
         }),
-        _ => Fido2Start::Fresh(mfa_start_request(instance_id, location_id, &step_methods).await?),
+        _ => Fido2Start::Fresh(Box::new(
+            mfa_start_request(instance_id, location_id, &step_methods).await?,
+        )),
     };
 
     let task_handle = handle.clone();

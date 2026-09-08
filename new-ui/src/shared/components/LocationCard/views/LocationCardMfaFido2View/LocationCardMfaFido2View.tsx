@@ -73,7 +73,7 @@ export const LocationCardMfaFido2View = () => {
         <Fido2TouchPrompt />
       ) : (
         <Fragment>
-          <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
+          <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
             <p>Insert your security key and enter its PIN to continue.</p>
           </LocationViewHeader>
           <SizedBox height={ThemeSpacing.Xl} />

@@ -19,7 +19,7 @@
     "@stablelib/x25519": "^2.0.1",
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.102.8",
-    "@tanstack/react-router": "^1.170.32",
+    "@tanstack/react-router": "^1.170.33",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
     "@tauri-apps/plugin-dialog": "^2.7.3",
@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@tanstack/devtools-vite": "^0.8.5",
-    "@tanstack/router-plugin": "^1.168.35",
+    "@tanstack/router-plugin": "^1.168.36",
     "@types/byte-size": "^8.1.2",
     "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",

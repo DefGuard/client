@@ -29,11 +29,11 @@ export const mfaMethodToConnectModalView = (
 };
 
 export const ConnectModalTitle: Record<ConnectModalViewValue, string> = {
-  [ConnectModalView.MfaTotp]: 'Two-factor authentication',
-  [ConnectModalView.MfaEmail]: 'Two-factor authentication',
-  [ConnectModalView.MfaOidc]: 'Two-factor authentication',
-  [ConnectModalView.MfaMobile]: 'Two-factor authentication',
-  [ConnectModalView.MfaFido2]: 'Two-factor authentication',
+  [ConnectModalView.MfaTotp]: 'Multi-factor authentication',
+  [ConnectModalView.MfaEmail]: 'Multi-factor authentication',
+  [ConnectModalView.MfaOidc]: 'Multi-factor authentication',
+  [ConnectModalView.MfaMobile]: 'Multi-factor authentication',
+  [ConnectModalView.MfaFido2]: 'Multi-factor authentication',
   [ConnectModalView.MfaSettings]: 'Change MFA Method',
   [ConnectModalView.PostureCheckFail]: 'Access denied',
   [ConnectModalView.ConnectionError]: 'Connection error',
