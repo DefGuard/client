@@ -28,7 +28,7 @@ describe("enrollment", () => {
 
 	beforeEach(async () => {
 		core = await loggedInCoreApi();
-		networkId = (await core.listNetworks())[0].id;
+		networkId = await core.testNetworkId();
 	});
 
 	afterEach(async () => {
