@@ -58,7 +58,7 @@ jobs:
           apt-get update
           apt-get install -y git curl ca-certificates libatomic1 build-essential libgtk-3-dev \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
-            libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
+            libudev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
           git config --global --add safe.directory '*'
       - uses: actions/checkout@v7
         with:
@@ -187,7 +187,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
-            librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
+            librsvg2-dev patchelf libssl-dev libudev libxdo-dev unzip protobuf-compiler libprotobuf-dev rpm
       - uses: actions/setup-node@v6
         with:
           node-version-file: new-ui/.nvmrc
