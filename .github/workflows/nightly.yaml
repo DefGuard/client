@@ -10,17 +10,17 @@ env:
   AWS_DEFAULT_REGION: eu-central-1
 
 jobs:
-  release-2-1:
+  stable-2-x:
     uses: ./.github/workflows/nightly-build-2x.yaml
     with:
-      branch: release/2.1
+      branch: stable/2.x
       s3_bucket: nightly.defguard.net
       s3_prefix: defguard-client
       aws_region: eu-central-1
     secrets: inherit
 
   dev:
-    needs: release-2-1
+    needs: stable-2-x
     if: always()
     uses: ./.github/workflows/nightly-build-2x.yaml
     with:
@@ -43,7 +43,7 @@ jobs:
 
   update-index:
     needs:
-      - release-2-1
+      - stable-2-x
       - dev
       - main
     if: always()
@@ -61,15 +61,15 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_NIGHTLY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY_NIGHTLY }}
-          VERSION_RELEASE_2_1: ${{ needs.release-2-1.outputs.version }}
+          VERSION_STABLE_2_X: ${{ needs.stable-2-x.outputs.version }}
           VERSION_DEV: ${{ needs.dev.outputs.version }}
           VERSION_MAIN: ${{ needs.main.outputs.version }}
         run: |
           jq -n \
-            --arg release_2_1 "${VERSION_RELEASE_2_1:-unknown}" \
+            --arg stable_2_x "${VERSION_STABLE_2_X:-unknown}" \
             --arg dev "${VERSION_DEV:-unknown}" \
             --arg main "${VERSION_MAIN:-unknown}" \
-            '{"release-2.1": $release_2_1, "dev": $dev, "main": $main}' > versions.json
+            '{"stable-2.x": $stable_2_x, "dev": $dev, "main": $main}' > versions.json
 
           aws s3api list-objects-v2 \
             --bucket "${S3_BUCKET}" \
@@ -90,7 +90,7 @@ jobs:
               | sort_by(.[0].modified) | reverse
               | .[]
               | (.[0].key | split("/")[1]) as $directory
-              | ($versions[0][$directory] // "unknown") as $version
+              | ($versions[0][$directory] // "archived") as $version
               | "<h2>\($directory) (\($version))</h2>",
                 "<table><tr><th align=\"left\">File</th><th align=\"right\">Size</th><th align=\"left\">Uploaded on (UTC)</th></tr>",
                 (.[] | "<tr><td><a href=\"/\(.key)\">\(.key | split("/")[2])</a></td><td align=\"right\">\((.size / 104857.6 | round) / 10) MiB</td><td>\(.modified[0:10]) \(.modified[11:16])</td></tr>"),

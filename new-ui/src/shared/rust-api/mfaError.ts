@@ -37,6 +37,10 @@ export const isSessionExpired = (message: string): boolean =>
 export const isTimeout = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'timeout';
 
+/** The task was cancelled via `cancel_mfa`, not a user-facing failure. */
+export const isCancelled = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'cancelled';
+
 /** A submitted one-time code was rejected. */
 export const isInvalidCode = (message: string): boolean =>
   message.includes('Unauthorized');

@@ -5,6 +5,7 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import {
+  isCancelled,
   isConnectFailure,
   isMfaPostureError,
   isServiceUnavailable,
@@ -81,6 +82,8 @@ export const useMfaOidcConnect = () => {
       const errorUnlisten = await listen<MfaErrorPayload>(
         TauriEvent.MfaOpenIdError,
         (event) => {
+          // Emitted app-wide without a task id, so our own cancels land here.
+          if (isCancelled(event.payload.error)) return;
           cleanup();
           setIsPolling(false);
           error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
