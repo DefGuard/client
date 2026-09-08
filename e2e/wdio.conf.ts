@@ -98,6 +98,7 @@ export const config: WebdriverIO.Config = {
 				stdio: ["ignore", "inherit", "inherit"],
 				env: {
 					...process.env,
+					DEFGUARD_CLIENT_WELCOME_SKIP: "1",
 					XDG_DATA_HOME: path.join(dataDir, "share"),
 					XDG_CONFIG_HOME: path.join(dataDir, "config"),
 					XDG_CACHE_HOME: path.join(dataDir, "cache"),

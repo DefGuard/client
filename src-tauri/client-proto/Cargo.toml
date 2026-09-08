@@ -17,6 +17,7 @@ serde.workspace = true
 serde_with = "3.11"
 tonic.workspace = true
 tonic-prost.workspace = true
+tracing.workspace = true
 
 defguard_wireguard_rs.workspace = true
 

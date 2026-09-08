@@ -148,6 +148,11 @@ jobs:
           asset_content_type: application/octet-stream
 
   build-linux:
+    env:
+      CARGO_TERM_COLOR: always
+      # sccache
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
     needs:
       - create-release
     outputs:
@@ -214,6 +219,9 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Install tauri-cli
         run: cargo install tauri-cli --locked

@@ -22,12 +22,9 @@ import { api } from '../../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import {
-  patternValidIpV6WithMask,
-  patternValidIpWithMask,
-} from '../../../../../shared/utils/patterns';
-import {
   allowedIpsSchema,
   endpointSchema,
+  interfaceAddressesSchema,
   optionalWireguardKeySchema,
   wireguardKeySchema,
 } from '../../../../../shared/utils/zod';
@@ -67,15 +64,7 @@ export const UpdateTunnelModal = () => {
 
 const formSchema = z.object({
   name: z.string().trim().min(1, 'Field is required'),
-  address: z.string().refine((value) => {
-    if (!value) return false;
-    return value
-      .split(',')
-      .map((ip) => ip.trim())
-      .every(
-        (ip) => patternValidIpWithMask.test(ip) || patternValidIpV6WithMask.test(ip),
-      );
-  }, 'Field is invalid'),
+  address: interfaceAddressesSchema,
   prvkey: wireguardKeySchema,
   pubkey: wireguardKeySchema,
   server_pubkey: wireguardKeySchema,

@@ -16,7 +16,7 @@ use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
     connection::{
         active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
-        disconnect_interface,
+        disconnect_interface, ConnectionTarget,
     },
     enrollment::{self},
     mfa,
@@ -92,6 +92,8 @@ pub enum ConnectError {
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
     #[error("{0}")]
+    AllTrafficConflict(String),
+    #[error("{0}")]
     Other(String),
 }
 
@@ -100,6 +102,7 @@ impl From<Error> for ConnectError {
         match error {
             Error::PostureCheckFailed(message) => Self::PostureCheckFailed(message),
             Error::ServiceUnavailable(message) => Self::ServiceUnavailable(message),
+            Error::AllTrafficConflict(message) => Self::AllTrafficConflict(message),
             error => Self::Other(error.to_string()),
         }
     }
@@ -244,7 +247,7 @@ pub async fn disconnect(
             {connection_type} {name}({location_id})"
         );
         trace!("Connection: {connection:?}");
-        disconnect_interface(&connection).await?;
+        let teardown = disconnect_interface(&connection).await;
         debug!(
             "Emitting the event informing the frontend about the disconnection from \
             {connection_type} {name}({location_id})"
@@ -282,10 +285,11 @@ pub async fn disconnect(
                 }
             };
         }
-        info!("Disconnected from {connection_type} {name}(ID: {location_id})");
-
         // Update tray icon to reflect connection state.
         configure_tray_icon(&handle).await?;
+
+        teardown?;
+        info!("Disconnected from {connection_type} {name}(ID: {location_id})");
 
         Ok(())
     } else {
@@ -314,7 +318,10 @@ pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
             .remove_connection(*tunnel_id, ConnectionType::Tunnel)
             .await
         {
-            disconnect_interface(&connection).await?;
+            // Work through the whole batch; a failed removal is already logged in detail.
+            if let Err(err) = disconnect_interface(&connection).await {
+                error!("Failed to disconnect tunnel {name}(ID: {tunnel_id}): {err}");
+            }
             stop_log_watcher_task(handle, &connection.interface_name)?;
             info!("Tunnel {name}(ID: {tunnel_id}) disconnected (disabled by server administrator)");
             names.push(name);
@@ -362,7 +369,10 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
             .remove_connection(location_id, ConnectionType::Location)
             .await
         {
-            disconnect_interface(&connection).await?;
+            // Work through the whole batch; a failed removal is already logged in detail.
+            if let Err(err) = disconnect_interface(&connection).await {
+                error!("Failed to disconnect location {name}(ID: {location_id}): {err}");
+            }
             stop_log_watcher_task(&handle, &connection.interface_name)?;
             if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
                 match err {
@@ -1616,6 +1626,11 @@ async fn mfa_start_request(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Location not found".to_string())?;
+    // FIXME: ugly struct
+    ConnectionTarget::Location(location.clone())
+        .ensure_single_all_traffic_connection(&DB_POOL, None)
+        .await
+        .map_err(|err| err.to_string())?;
     let posture_data = if location.posture_check_required {
         Some(
             defguard_client_posture::get_posture_data()

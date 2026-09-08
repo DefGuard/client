@@ -6,8 +6,8 @@ default-members = ["cli", "client-cli", "daemon", "."]
 base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6", features = ["cargo", "derive", "env"] }
-ctap-hid-fido2 = "3.5"
-defguard_wireguard_rs = "0.11"
+ctap-hid-fido2 = "3.6"
+defguard_wireguard_rs = "0.12"
 dirs-next = "2.0"
 log = { version = "0.4", features = ["serde"] }
 prost = "0.14"
@@ -41,6 +41,7 @@ qrcode = { version = "0.14", features = ["image"] }
 tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
 tokio-util = "0.7"
 url = "2"
+uuid = { version = "1", features = ["v4"] }
 vergen-git2 = { version = "10.0", features = ["build"] }
 wiremock = "0.6"
 x25519-dalek = { version = "3.0", features = [
@@ -136,7 +137,7 @@ time = { version = "0.3", features = ["formatting", "macros"] }
 tokio.workspace = true
 tokio-util = "0.7"
 tonic.workspace = true
-uuid = { version = "1", features = ["v4"] }
+uuid.workspace = true
 tonic-prost.workspace = true
 tower = "0.5"
 tracing.workspace = true

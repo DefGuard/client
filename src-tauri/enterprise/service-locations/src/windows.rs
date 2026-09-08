@@ -9,8 +9,9 @@ use std::{
 };
 
 use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::defguard::client::v1::{
-    SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode,
+use defguard_client_proto::{
+    conversions::normalize_allowed_ips,
+    defguard::client::v1::{SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode},
 };
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
@@ -28,7 +29,8 @@ use windows_acl::acl::ACL;
 use windows_sys::Win32::NetworkManagement::IpHelper::NotifyAddrChange;
 
 use crate::{
-    is_unchanged_on_disk, load_service_locations_from_directory, load_service_locations_from_file,
+    instance_file_path, is_unchanged_on_disk, load_service_locations_from_directory,
+    load_service_locations_from_file,
     reconciler::{
         reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
         ReconcileSignal,
@@ -259,9 +261,7 @@ fn set_protected_acls(path: &str) -> Result<(), ServiceLocationError> {
 }
 
 fn get_instance_file_path(instance_id: &str) -> Result<PathBuf, ServiceLocationError> {
-    let mut path = get_shared_directory()?;
-    path.push(format!("{instance_id}.json"));
-    Ok(path)
+    instance_file_path(&get_shared_directory()?, instance_id)
 }
 
 pub(crate) fn is_user_logged_in() -> bool {
@@ -578,12 +578,13 @@ impl ServiceLocationManager {
         private_key: &str,
         preshared_key: Option<&str>,
     ) -> Result<(), ServiceLocationError> {
-        let config = interface_configuration(
+        let mut config = interface_configuration(
             location,
             private_key,
             preshared_key,
             find_free_tcp_port().unwrap_or(DEFAULT_WIREGUARD_PORT),
         )?;
+        normalize_allowed_ips(&mut config);
 
         let ifname = location.name.clone();
         let ifname = get_interface_name(&ifname);
@@ -750,7 +751,8 @@ impl ServiceLocationManager {
             )));
         };
         let port = wgapi.read_interface_data()?.listen_port;
-        let config = interface_configuration(location, private_key, preshared_key, port)?;
+        let mut config = interface_configuration(location, private_key, preshared_key, port)?;
+        normalize_allowed_ips(&mut config);
         wgapi.configure_interface(&config)?;
         self.record_posture_session(instance_id, &location.pubkey);
         info!(
