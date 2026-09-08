@@ -73,4 +73,23 @@ describe('useMfaOidcConnect', () => {
     expect(url.searchParams.get('token')).toBe('mfa-token');
     expect(url.searchParams.get('step_attempt_id')).toBe('attempt-1');
   });
+
+  it('keeps the legacy token-only URL when no step attempt ID is returned', async () => {
+    mocks.mfaBeginStep.mockResolvedValue({
+      challenge: null,
+      step_attempt_id: null,
+      token: 'mfa-token',
+    });
+
+    const { result } = renderHook(() => useMfaOidcConnect());
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const url = new URL(mocks.openLink.mock.calls[0]?.[0] as string);
+
+    expect(url.searchParams.get('token')).toBe('mfa-token');
+    expect(url.searchParams.has('step_attempt_id')).toBe(false);
+  });
 });

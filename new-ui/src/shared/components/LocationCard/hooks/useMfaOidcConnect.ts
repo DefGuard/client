@@ -81,7 +81,15 @@ export const useMfaOidcConnect = () => {
       );
       setMfaToken(session.token);
 
-      await api.openLink(`${instance.proxy_url}openid/mfa?token=${session.token}`);
+      const openIdUrl = new URL(
+        'openid/mfa',
+        instance.proxy_url.endsWith('/') ? instance.proxy_url : `${instance.proxy_url}/`,
+      );
+      openIdUrl.searchParams.set('token', session.token);
+      if (session.step_attempt_id) {
+        openIdUrl.searchParams.set('step_attempt_id', session.step_attempt_id);
+      }
+      await api.openLink(openIdUrl.toString());
 
       setIsStarting(false);
       setIsPolling(true);
