@@ -41,6 +41,7 @@ export const useMfaOidcConnect = () => {
 
   const taskIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const operationRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (unlistenRef.current !== null) {
@@ -49,16 +50,26 @@ export const useMfaOidcConnect = () => {
     }
   }, []);
 
+  const cancelTask = useCallback((taskId: string) => {
+    void api.cancelMfa(taskId).catch(() => {});
+  }, []);
+
+  const cancelCurrentTask = useCallback(() => {
+    const taskId = taskIdRef.current;
+    taskIdRef.current = null;
+    if (taskId) {
+      cancelTask(taskId);
+    }
+  }, [cancelTask]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      operationRef.current += 1;
       cleanup();
-      const taskId = taskIdRef.current;
-      if (taskId) {
-        void api.cancelMfa(taskId).catch(() => {});
-      }
+      cancelCurrentTask();
     };
-  }, [cleanup]);
+  }, [cancelCurrentTask, cleanup]);
 
   const start = useCallback(async () => {
     if (!instance) {
@@ -66,10 +77,12 @@ export const useMfaOidcConnect = () => {
       return;
     }
 
+    const operation = ++operationRef.current;
     setIsStarting(true);
     setStartError(null);
     setPollError(null);
     cleanup();
+    cancelCurrentTask();
 
     try {
       const session = await api.mfaBeginStep(
@@ -79,7 +92,7 @@ export const useMfaOidcConnect = () => {
         stepPlan,
         mfaToken,
       );
-      setMfaToken(session.token);
+      if (operationRef.current !== operation) return;
 
       const openIdUrl = new URL(
         'openid/mfa',
@@ -90,6 +103,8 @@ export const useMfaOidcConnect = () => {
         openIdUrl.searchParams.set('step_attempt_id', session.step_attempt_id);
       }
       await api.openLink(openIdUrl.toString());
+      if (operationRef.current !== operation) return;
+      setMfaToken(session.token);
 
       setIsStarting(false);
       setIsPolling(true);
@@ -100,30 +115,67 @@ export const useMfaOidcConnect = () => {
         session.token,
         session.step_attempt_id,
       );
+      if (operationRef.current !== operation) {
+        cancelTask(taskId);
+        return;
+      }
       taskIdRef.current = taskId;
+
+      const unlistenFns: UnlistenFn[] = [];
+      const removeListeners = () => {
+        unlistenFns.splice(0).forEach((unlisten) => {
+          unlisten();
+        });
+      };
+      const cleanupStaleListeners = () => {
+        removeListeners();
+        if (unlistenRef.current === removeListeners) {
+          unlistenRef.current = null;
+        }
+      };
+      unlistenRef.current = removeListeners;
+
+      const finishOperation = () => {
+        if (operationRef.current !== operation) return false;
+        operationRef.current += 1;
+        taskIdRef.current = null;
+        cleanup();
+        return true;
+      };
 
       // The backend brings up the connection itself; completion means connected.
       const completeUnlisten = await listen(TauriEvent.MfaOpenIdComplete, () => {
-        cleanup();
+        if (!finishOperation()) return;
         setIsPolling(false);
         setView(LocationCardViews.Connected);
       });
+      unlistenFns.push(completeUnlisten);
+      if (operationRef.current !== operation) {
+        cleanupStaleListeners();
+        return;
+      }
 
       const stepAdvancedUnlisten = await listen<MfaStepAdvancedPayload>(
         TauriEvent.MfaOpenIdStepAdvanced,
         (event) => {
-          cleanup();
+          if (!finishOperation()) return;
           setIsPolling(false);
           goToStep(event.payload.next_step);
         },
       );
+      unlistenFns.push(stepAdvancedUnlisten);
+
+      if (operationRef.current !== operation) {
+        cleanupStaleListeners();
+        return;
+      }
 
       const errorUnlisten = await listen<MfaErrorPayload>(
         TauriEvent.MfaOpenIdError,
         (event) => {
-          cleanup();
+          if (!finishOperation()) return;
           setIsPolling(false);
-          error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
+          error('OIDC MFA failed');
           const message = mfaErrorMessage(event.payload.error);
           if (isAttemptLimit(event.payload.error)) {
             setPollError(message);
@@ -140,14 +192,17 @@ export const useMfaOidcConnect = () => {
           }
         },
       );
+      unlistenFns.push(errorUnlisten);
 
-      unlistenRef.current = () => {
-        completeUnlisten();
-        stepAdvancedUnlisten();
-        errorUnlisten();
-      };
+      if (operationRef.current !== operation) {
+        cleanupStaleListeners();
+        return;
+      }
     } catch (e) {
-      void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
+      if (operationRef.current !== operation) return;
+      cleanup();
+      cancelCurrentTask();
+      void error('OIDC MFA start failed');
       if (isMfaPostureError(e, location)) {
         setPostureError(mfaErrorMessage(e));
         setView(LocationCardViews.PostureCheckFail);
@@ -159,7 +214,9 @@ export const useMfaOidcConnect = () => {
       }
       setStartError(mfaErrorMessage(e));
     } finally {
-      setIsStarting(false);
+      if (operationRef.current === operation) {
+        setIsStarting(false);
+      }
     }
   }, [
     instance,
@@ -170,6 +227,8 @@ export const useMfaOidcConnect = () => {
     setPostureError,
     setView,
     goToStep,
+    cancelCurrentTask,
+    cancelTask,
     cleanup,
   ]);
 

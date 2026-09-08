@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useConnectModalMfaOidc } from './useConnectModalMfaOidc';
 
@@ -87,5 +87,187 @@ describe('useConnectModalMfaOidc', () => {
 
     expect(url.searchParams.get('token')).toBe('mfa-token');
     expect(url.searchParams.has('step_attempt_id')).toBe(false);
+  });
+
+  it('does not continue starting MFA after unmount during session creation', async () => {
+    type Session = {
+      challenge: null;
+      step_attempt_id: string;
+      token: string;
+    };
+    let resolveStart!: (session: Session) => void;
+    mocks.mfaBeginStep.mockImplementation(
+      () =>
+        new Promise<Session>((resolve) => {
+          resolveStart = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useConnectModalMfaOidc());
+    let startPromise: Promise<void> | undefined;
+
+    await act(async () => {
+      startPromise = result.current.start();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mocks.mfaBeginStep).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await act(async () => {
+      resolveStart({ challenge: null, step_attempt_id: 'attempt-1', token: 'mfa-token' });
+      await startPromise;
+    });
+
+    expect(mocks.setMfaToken).not.toHaveBeenCalled();
+    expect(mocks.openLink).not.toHaveBeenCalled();
+    expect(mocks.mfaPollOpenId).not.toHaveBeenCalled();
+  });
+
+  it('cleans a listener registered after unmount', async () => {
+    const unlisten = vi.fn();
+    let resolveListener!: (unlisten: () => void) => void;
+    mocks.listen.mockResolvedValue(unlisten);
+    mocks.listen.mockImplementationOnce(
+      () =>
+        new Promise<() => void>((resolve) => {
+          resolveListener = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useConnectModalMfaOidc());
+    let startPromise: Promise<void> | undefined;
+
+    await act(async () => {
+      startPromise = result.current.start();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await act(async () => {
+      resolveListener(unlisten);
+      await startPromise;
+    });
+
+    expect(unlisten).toHaveBeenCalledTimes(1);
+    expect(mocks.listen).toHaveBeenCalledTimes(1);
+  });
+
+  it('cleans partial listener registration on unmount', async () => {
+    const firstUnlisten = vi.fn();
+    const secondUnlisten = vi.fn();
+    let resolveSecond!: (unlisten: () => void) => void;
+    mocks.listen.mockImplementationOnce(() => Promise.resolve(firstUnlisten));
+    mocks.listen.mockImplementationOnce(
+      () =>
+        new Promise<() => void>((resolve) => {
+          resolveSecond = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useConnectModalMfaOidc());
+    let startPromise: Promise<void> | undefined;
+
+    await act(async () => {
+      startPromise = result.current.start();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(2));
+
+    unmount();
+    expect(firstUnlisten).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSecond(secondUnlisten);
+      await startPromise;
+    });
+
+    expect(secondUnlisten).toHaveBeenCalledTimes(1);
+    expect(mocks.listen).toHaveBeenCalledTimes(2);
+    expect(mocks.cancelMfa).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelMfa).toHaveBeenCalledWith('task-1');
+  });
+
+  it('does not let stale listener cleanup cancel a newer retry', async () => {
+    const firstAUnlisten = vi.fn();
+    const staleAUnlisten = vi.fn();
+    const bUnlisten = vi.fn();
+    let resolveSecondA!: (unlisten: () => void) => void;
+    mocks.listen.mockResolvedValue(bUnlisten);
+    mocks.listen.mockImplementationOnce(() => Promise.resolve(firstAUnlisten));
+    mocks.listen.mockImplementationOnce(
+      () =>
+        new Promise<() => void>((resolve) => {
+          resolveSecondA = resolve;
+        }),
+    );
+    mocks.mfaPollOpenId.mockResolvedValueOnce('task-a').mockResolvedValueOnce('task-b');
+    const { result, unmount } = renderHook(() => useConnectModalMfaOidc());
+    let startA: Promise<void> | undefined;
+
+    await act(async () => {
+      startA = result.current.start();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(mocks.cancelMfa).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelMfa).toHaveBeenCalledWith('task-a');
+    expect(mocks.listen).toHaveBeenCalledTimes(5);
+
+    await act(async () => {
+      resolveSecondA(staleAUnlisten);
+      await startA;
+    });
+    expect(mocks.cancelMfa).toHaveBeenCalledTimes(1);
+    expect(bUnlisten).not.toHaveBeenCalled();
+
+    unmount();
+    expect(mocks.cancelMfa).toHaveBeenCalledTimes(2);
+    expect(mocks.cancelMfa).toHaveBeenCalledWith('task-b');
+    expect(bUnlisten).toHaveBeenCalledTimes(3);
+  });
+
+  it('cancels the active polling task and listeners on unmount', async () => {
+    const unlisten = vi.fn();
+    mocks.listen.mockResolvedValue(unlisten);
+    const { result, unmount } = renderHook(() => useConnectModalMfaOidc());
+
+    await act(async () => {
+      await result.current.start();
+    });
+    unmount();
+
+    expect(mocks.cancelMfa).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelMfa).toHaveBeenCalledWith('task-1');
+    expect(unlisten).toHaveBeenCalledTimes(3);
+  });
+
+  it('cancels a late polling task without installing listeners after unmount', async () => {
+    let resolvePoll!: (taskId: string) => void;
+    mocks.mfaPollOpenId.mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          resolvePoll = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useConnectModalMfaOidc());
+    let startPromise: Promise<void> | undefined;
+
+    await act(async () => {
+      startPromise = result.current.start();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mocks.mfaPollOpenId).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await act(async () => {
+      resolvePoll('late-task');
+      await startPromise;
+    });
+
+    expect(mocks.cancelMfa).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelMfa).toHaveBeenCalledWith('late-task');
+    expect(mocks.listen).not.toHaveBeenCalled();
   });
 });
