@@ -37,7 +37,7 @@ const defaults: StoreValues = {
 interface Store extends StoreValues {
   open: (init?: Partial<StoreValues>) => void;
   setView: (view: ConnectModalViewValue, values?: Partial<StoreValues>) => void;
-  setMfaToken: (token: string) => void;
+  setMfaToken: (token: string | null) => void;
   goToStep: (stepIndex: number) => void;
   reset: () => void;
 }
