@@ -90,7 +90,7 @@ jobs:
               | sort_by(.[0].modified) | reverse
               | .[]
               | (.[0].key | split("/")[1]) as $directory
-              | ($versions[0][$directory] // "unknown") as $version
+              | ($versions[0][$directory] // "archived") as $version
               | "<h2>\($directory) (\($version))</h2>",
                 "<table><tr><th align=\"left\">File</th><th align=\"right\">Size</th><th align=\"left\">Uploaded on (UTC)</th></tr>",
                 (.[] | "<tr><td><a href=\"/\(.key)\">\(.key | split("/")[2])</a></td><td align=\"right\">\((.size / 104857.6 | round) / 10) MiB</td><td>\(.modified[0:10]) \(.modified[11:16])</td></tr>"),
