@@ -1721,7 +1721,6 @@ pub async fn mfa_finish_code(
         auth_pub_key: None,
         step_attempt_id,
         auth_data: None,
-        // Code-based methods identify no hardware key.
         credential_id: None,
     };
     let response = mfa::mfa_finish_code(proxy_url, request)
@@ -2081,15 +2080,14 @@ async fn run_fido2_mfa(
 
     let request = ClientMfaFinishRequest {
         token,
-        // Field names predate FIDO2: `code` carries the RP ID hash and
-        // `auth_pub_key` the signature, as documented in client_types.proto.
-        code: Some(BASE64_URL_SAFE_NO_PAD.encode(&assertion.rpid_hash)),
+        // `auth_pub_key` field carries the signature, as documented in client_types.proto.
+        code: None,
         auth_pub_key: Some(BASE64_URL_SAFE_NO_PAD.encode(&assertion.signature)),
         step_attempt_id,
         auth_data: Some(assertion.auth_data),
         // Names the key that answered, so Core can offer just this credential
         // next time instead of every one the user registered.
-        credential_id: Some(BASE64_URL_SAFE_NO_PAD.encode(&credential_id)),
+        credential_id: Some(credential_id),
     };
     mfa::mfa_finish_code(proxy_url, request).await
 }
