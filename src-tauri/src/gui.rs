@@ -253,7 +253,12 @@ pub fn run_app() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_process::init());
+
+    #[cfg(feature = "e2e")]
+    let app = app.plugin(tauri_plugin_wdio_webdriver::init());
+
+    let app = app
         .setup(|app| {
             // Create Help menu on macOS.
             // https://github.com/tauri-apps/tauri/issues/9371

@@ -132,6 +132,8 @@ tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2"
+# Test-only, gated behind the `e2e` feature; no JS counterpart in package.json.
+tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 thiserror.workspace = true
 time = { version = "0.3", features = ["formatting", "macros"] }
 tokio.workspace = true
@@ -199,6 +201,9 @@ wmi = {version = "0.18", default-features = false}
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 macos_installer = ["dep:dispatch2", "dep:objc2-system-extensions"]
+# Embeds a W3C WebDriver server in the app so the e2e suite can drive it on any platform.
+# Never enable this for a shipped build.
+e2e = ["dep:tauri-plugin-wdio-webdriver"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
