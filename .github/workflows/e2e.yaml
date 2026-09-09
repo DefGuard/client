@@ -23,7 +23,6 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
       CLIENT_BINARY: ${{ github.workspace }}/src-tauri/target/release/defguard-client
-      NATIVE_DRIVER: /usr/bin/WebKitWebDriver
       SQLX_OFFLINE: '1'
       RUSTC_WRAPPER: sccache
       SCCACHE_GHA_ENABLED: 'true'
@@ -60,9 +59,6 @@ jobs:
       - name: Install sccache
         uses: mozilla-actions/sccache-action@v0.0.11
 
-      - name: Install tauri-driver
-        run: cargo install tauri-driver --locked
-
       - name: Install tauri-cli
         run: cargo install tauri-cli --locked
 
@@ -71,7 +67,7 @@ jobs:
         working-directory: new-ui
 
       - name: Build client
-        run: cargo tauri build
+        run: cargo tauri build --features e2e
 
       - name: Prepare e2e environment
         run: |

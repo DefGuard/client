@@ -11,15 +11,16 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.16",
-		"@types/node": "^25.9.2",
-		"@wdio/cli": "^9.30.0",
-		"@wdio/globals": "^9.29.1",
-		"@wdio/local-runner": "^9.30.0",
-		"@wdio/mocha-framework": "^9.30.0",
-		"@wdio/spec-reporter": "^9.29.1",
-		"@wdio/types": "^9.29.1",
-		"otpauth": "^9.4.1",
-		"tsx": "^4.20.6",
+		"@types/node": "^25.9.5",
+		"@wdio/cli": "^9.31.7",
+		"@wdio/globals": "^9.31.3",
+		"@wdio/local-runner": "^9.31.7",
+		"@wdio/mocha-framework": "^9.31.7",
+		"@wdio/spec-reporter": "^9.31.2",
+		"@wdio/tauri-service": "^1.4.0",
+		"@wdio/types": "^9.31.2",
+		"otpauth": "^9.5.2",
+		"tsx": "^4.23.13",
 		"typescript": "^5.9.3"
 	}
 }

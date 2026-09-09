@@ -10,6 +10,7 @@ import {
 	type LocationMfaMode,
 	loggedInCoreApi,
 } from "../helpers/coreApi.js";
+import { PRIMARY_MODIFIER } from "../helpers/platform.js";
 import { switchToFullView, switchToTrayView } from "../helpers/windows.js";
 import { provisionTunnel, type TunnelConfig } from "../helpers/wireguard.js";
 
@@ -19,7 +20,7 @@ const clearField = async (name: string) => {
 	const input = field(name);
 	await input.waitForClickable();
 	await input.click();
-	await browser.keys(["Control", "a"]);
+	await browser.keys([PRIMARY_MODIFIER, "a"]);
 	await browser.keys(["Backspace"]);
 	await expect(input).toHaveValue("");
 };
