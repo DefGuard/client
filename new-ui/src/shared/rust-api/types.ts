@@ -91,8 +91,6 @@ export const TauriCommand = {
   EnrollmentNetworkInfo: 'enrollment_network_info',
   EnrollmentFinish: 'enrollment_finish',
   // MFA
-  MfaStart: 'mfa_start',
-  MfaStepStart: 'mfa_step_start',
   MfaBeginStep: 'mfa_begin_step',
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
@@ -507,31 +505,12 @@ export type EnrollmentMfaFinishResult = {
   recovery_codes: string[];
 };
 
-/** Result from mfa_start Tauri command. */
-export type MfaStartResult = {
-  token: string;
-  challenge: string | null;
-};
-
-/** Result from mfa_step_start Tauri command. */
-export type MfaStepStartResult = {
-  step_attempt_id: string;
-  challenge: string | null;
-};
-
-/** Session state returned when starting an MFA step. */
-export type MfaStepSession = {
-  token: string;
-  challenge: string | null;
-  stepAttemptId: string | null;
-};
-
 /** Result from mfa_begin_step Tauri command. */
 export type MfaBeginStepResult = {
   token: string;
   challenge: string | null;
-  step_attempt_id: string | null;
-  credential_ids: string[];
+  stepAttemptId: string | null;
+  credentialIds: string[];
 };
 
 /** Payload for mfa-openid-error / mfa-mobile-error events. */
@@ -541,12 +520,12 @@ export type MfaErrorPayload = {
 
 /** Payload for mfa-openid-step-advanced / mfa-mobile-step-advanced events. */
 export type MfaStepAdvancedPayload = {
-  next_step: number;
+  nextStep: number;
 };
 
 /** Payload for the FIDO2 step-advanced event, including the session token. */
 export type MfaFido2StepAdvancedPayload = {
-  next_step: number;
+  nextStep: number;
   token: string;
 };
 

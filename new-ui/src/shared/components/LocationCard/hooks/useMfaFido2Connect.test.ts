@@ -106,12 +106,12 @@ describe('useMfaFido2Connect', () => {
     const stepAdvancedListener = mocks.listen.mock.calls.find(
       ([event]) => event === TauriEvent.MfaFido2StepAdvanced,
     )?.[1] as
-      | ((event: { payload: { next_step: number; token: string } }) => void)
+      | ((event: { payload: { nextStep: number; token: string } }) => void)
       | undefined;
     expect(stepAdvancedListener).toBeDefined();
 
     await act(async () => {
-      stepAdvancedListener?.({ payload: { next_step: 1, token: 'fido2-token' } });
+      stepAdvancedListener?.({ payload: { nextStep: 1, token: 'fido2-token' } });
     });
     await act(async () => {
       resolveTask('late-task');
@@ -147,12 +147,12 @@ describe('useMfaFido2Connect', () => {
     const stepAdvancedListener = mocks.listen.mock.calls.find(
       ([event]) => event === TauriEvent.MfaFido2StepAdvanced,
     )?.[1] as
-      | ((event: { payload: { next_step: number; token: string } }) => void)
+      | ((event: { payload: { nextStep: number; token: string } }) => void)
       | undefined;
     expect(stepAdvancedListener).toBeDefined();
 
     await act(async () => {
-      stepAdvancedListener?.({ payload: { next_step: 1, token: 'fido2-token' } });
+      stepAdvancedListener?.({ payload: { nextStep: 1, token: 'fido2-token' } });
     });
 
     expect(mocks.setMfaToken).toHaveBeenLastCalledWith('fido2-token');

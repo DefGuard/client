@@ -107,8 +107,8 @@ export const useConnectModalMfaOidc = ({
         instance.proxy_url.endsWith('/') ? instance.proxy_url : `${instance.proxy_url}/`,
       );
       openIdUrl.searchParams.set('token', session.token);
-      if (session.step_attempt_id) {
-        openIdUrl.searchParams.set('step_attempt_id', session.step_attempt_id);
+      if (session.stepAttemptId) {
+        openIdUrl.searchParams.set('step_attempt_id', session.stepAttemptId);
       }
       await api.openLink(openIdUrl.toString());
       if (operationRef.current !== operation) return;
@@ -121,7 +121,7 @@ export const useConnectModalMfaOidc = ({
         instance.id,
         location.id,
         session.token,
-        session.step_attempt_id,
+        session.stepAttemptId,
       );
       if (operationRef.current !== operation) {
         cancelTask(taskId);
@@ -167,7 +167,7 @@ export const useConnectModalMfaOidc = ({
         (event) => {
           if (!finishOperation()) return;
           setIsPolling(false);
-          goToStep(event.payload.next_step);
+          goToStep(event.payload.nextStep);
         },
       );
       unlistenFns.push(stepAdvancedUnlisten);

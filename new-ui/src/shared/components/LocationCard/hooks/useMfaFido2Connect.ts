@@ -138,7 +138,7 @@ export const useMfaFido2Connect = (
               (event) => {
                 if (!finishOperation()) return;
                 setMfaToken(event.payload.token);
-                onStepAdvanced?.(event.payload.next_step);
+                onStepAdvanced?.(event.payload.nextStep);
               },
             ),
           ),

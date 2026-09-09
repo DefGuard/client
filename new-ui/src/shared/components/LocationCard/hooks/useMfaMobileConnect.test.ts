@@ -129,7 +129,7 @@ describe('useMfaMobileConnect', () => {
     )?.[1] as (() => void) | undefined;
     const stepAdvancedListener = mocks.listen.mock.calls.find(
       ([event]) => event === TauriEvent.MfaMobileStepAdvanced,
-    )?.[1] as ((event: { payload: { next_step: number } }) => void) | undefined;
+    )?.[1] as ((event: { payload: { nextStep: number } }) => void) | undefined;
     expect(completeListener).toBeDefined();
     expect(stepAdvancedListener).toBeDefined();
 
@@ -142,7 +142,7 @@ describe('useMfaMobileConnect', () => {
       await Promise.resolve();
     });
     await act(async () => {
-      stepAdvancedListener?.({ payload: { next_step: 2 } });
+      stepAdvancedListener?.({ payload: { nextStep: 2 } });
       completeListener?.();
     });
 

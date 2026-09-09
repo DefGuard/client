@@ -120,7 +120,7 @@ export const useMfaMobileConnect = (
           (event) => {
             cleanupListeners();
             setIsConnecting(false);
-            onStepAdvancedRef.current(event.payload.next_step);
+            onStepAdvancedRef.current(event.payload.nextStep);
           },
         );
 
@@ -129,7 +129,9 @@ export const useMfaMobileConnect = (
           (event) => {
             cleanupListeners();
             setIsConnecting(false);
-            error('Mobile MFA failed');
+            void error(
+              `Mobile MFA failed for location ${location.id}: ${event.payload.error}`,
+            );
             const message = mfaErrorMessage(event.payload.error);
             setTokenData(null);
             setMfaTokenRef.current(null);
@@ -146,13 +148,13 @@ export const useMfaMobileConnect = (
           stepAdvancedUnlisten();
           errorUnlisten();
         };
-      } catch {
+      } catch (e) {
         if (!cancelled) {
           setIsConnecting(false);
           setTokenData(null);
           setMfaTokenRef.current(null);
           setConnectionError('Failed to start mobile approval. Please try again.');
-          error('Mobile MFA connect failed');
+          void error(`Mobile MFA connect failed for location ${location.id}: ${e}`);
         }
       }
     })();
@@ -203,7 +205,7 @@ export const useMfaMobileConnect = (
 
       setTokenData({ token: session.token, challenge: session.challenge });
     } catch (e) {
-      void error('Mobile MFA start failed');
+      void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
         onPostureError?.(mfaErrorMessage(e));
         return;

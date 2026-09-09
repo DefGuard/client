@@ -29,10 +29,9 @@ use defguard_client_proto::defguard::client::v1::{
 use defguard_client_proto::defguard::{
     client_types::{
         mfa_step_result, AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse,
-        ClientMfaStartRequest, ClientMfaStartResponse, ClientMfaStepStartRequest,
-        CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
-        EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo, MfaMethod,
-        MfaStepResult,
+        ClientMfaStartRequest, ClientMfaStepStartRequest, CodeMfaSetupFinishResponse,
+        CodeMfaSetupStartResponse, DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        InstanceInfo as ProtoInstanceInfo, MfaMethod, MfaStepResult,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -1584,6 +1583,7 @@ enum MfaTaskOutcome {
 }
 
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct MfaStepAdvancedPayload {
     next_step: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1668,6 +1668,7 @@ fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MfaBeginStepResponse {
     token: String,
     challenge: Option<String>,
@@ -1733,8 +1734,8 @@ async fn begin_mfa_step(
 }
 
 /// Build the start request for an MFA session: the per-step method plan plus
-/// the device data Edge needs to open it. Shared by the `mfa_start` command and
-/// the FIDO2 task, which opens its own session.
+/// the device data Edge needs to open it. Shared by the `mfa_begin_step` command
+/// and the FIDO2 task, which opens its own session.
 async fn mfa_start_request(
     instance_id: Id,
     location_id: Id,
@@ -1779,29 +1780,6 @@ async fn mfa_start_request(
 }
 
 #[tauri::command(async)]
-pub async fn mfa_start(
-    instance_id: Id,
-    location_id: Id,
-    methods: Vec<String>,
-) -> Result<ClientMfaStartResponse, String> {
-    debug!("Starting MFA session for location {location_id}");
-    let step_methods = methods
-        .iter()
-        .map(|method| parse_mfa_method(method))
-        .collect::<Result<Vec<MfaMethod>, String>>()?;
-    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Instance not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    let request = mfa_start_request(instance_id, location_id, &step_methods).await?;
-    mfa::mfa_start(proxy_url, request)
-        .await
-        .map_err(err_to_json)
-}
-
-#[tauri::command(async)]
 pub async fn mfa_begin_step(
     instance_id: Id,
     location_id: Id,
@@ -1826,37 +1804,7 @@ pub async fn mfa_begin_step(
             .iter()
             .map(|method| parse_mfa_method(method))
             .collect::<Result<Vec<MfaMethod>, String>>()?;
-        let first_step_method = *step_methods
-            .first()
-            .ok_or_else(|| "MFA method plan is empty".to_string())?;
-        let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
-            .await
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "WireGuard keys not found".to_string())?;
-        let location = Location::find_by_id(&*DB_POOL, location_id)
-            .await
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Location not found".to_string())?;
-        let posture_data = if location.posture_check_required {
-            Some(
-                defguard_client_posture::get_posture_data()
-                    .await
-                    .map_err(|e| format!("Failed to collect posture data: {e}"))?,
-            )
-        } else {
-            None
-        };
-        #[allow(deprecated)]
-        let request = ClientMfaStartRequest {
-            location_id: location.network_id,
-            pubkey: keys.pubkey,
-            method: first_step_method as i32,
-            posture_data,
-            selected_methods: step_methods
-                .iter()
-                .map(|method| *method as i32)
-                .collect::<Vec<i32>>(),
-        };
+        let request = mfa_start_request(instance_id, location_id, &step_methods).await?;
         MfaBeginStepInput::Start(Box::new(request))
     };
 

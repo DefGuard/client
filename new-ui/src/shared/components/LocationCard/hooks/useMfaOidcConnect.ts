@@ -99,8 +99,8 @@ export const useMfaOidcConnect = (autoStart = false) => {
         instance.proxy_url.endsWith('/') ? instance.proxy_url : `${instance.proxy_url}/`,
       );
       openIdUrl.searchParams.set('token', session.token);
-      if (session.step_attempt_id) {
-        openIdUrl.searchParams.set('step_attempt_id', session.step_attempt_id);
+      if (session.stepAttemptId) {
+        openIdUrl.searchParams.set('step_attempt_id', session.stepAttemptId);
       }
       await api.openLink(openIdUrl.toString());
       if (operationRef.current !== operation) return;
@@ -113,7 +113,7 @@ export const useMfaOidcConnect = (autoStart = false) => {
         instance.id,
         location.id,
         session.token,
-        session.step_attempt_id,
+        session.stepAttemptId,
       );
       if (operationRef.current !== operation) {
         cancelTask(taskId);
@@ -160,7 +160,7 @@ export const useMfaOidcConnect = (autoStart = false) => {
         (event) => {
           if (!finishOperation()) return;
           setIsPolling(false);
-          goToStep(event.payload.next_step);
+          goToStep(event.payload.nextStep);
         },
       );
       unlistenFns.push(stepAdvancedUnlisten);
@@ -175,7 +175,9 @@ export const useMfaOidcConnect = (autoStart = false) => {
         (event) => {
           if (!finishOperation()) return;
           setIsPolling(false);
-          error('OIDC MFA failed');
+          void error(
+            `OIDC MFA failed for location ${location.id}: ${event.payload.error}`,
+          );
           const message = mfaErrorMessage(event.payload.error);
           if (isAttemptLimit(event.payload.error)) {
             setPollError(message);
@@ -204,7 +206,7 @@ export const useMfaOidcConnect = (autoStart = false) => {
       if (operationRef.current !== operation) return;
       cleanup();
       cancelCurrentTask();
-      void error('OIDC MFA start failed');
+      void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
         setPostureError(mfaErrorMessage(e));
         setView(LocationCardViews.PostureCheckFail);

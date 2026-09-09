@@ -48,7 +48,7 @@ describe('useConnectModalMfaOidc', () => {
     mocks.cancelMfa.mockResolvedValue(undefined);
     mocks.mfaBeginStep.mockResolvedValue({
       challenge: null,
-      step_attempt_id: 'attempt-1',
+      stepAttemptId: 'attempt-1',
       token: 'mfa-token',
     });
     mocks.mfaPollOpenId.mockResolvedValue('task-1');
@@ -97,7 +97,7 @@ describe('useConnectModalMfaOidc', () => {
   it('keeps the legacy token-only URL when no step attempt ID is returned', async () => {
     mocks.mfaBeginStep.mockResolvedValue({
       challenge: null,
-      step_attempt_id: null,
+      stepAttemptId: null,
       token: 'mfa-token',
     });
 
@@ -116,7 +116,7 @@ describe('useConnectModalMfaOidc', () => {
   it('does not continue starting MFA after unmount during session creation', async () => {
     type Session = {
       challenge: null;
-      step_attempt_id: string;
+      stepAttemptId: string;
       token: string;
     };
     let resolveStart!: (session: Session) => void;
@@ -137,7 +137,7 @@ describe('useConnectModalMfaOidc', () => {
 
     unmount();
     await act(async () => {
-      resolveStart({ challenge: null, step_attempt_id: 'attempt-1', token: 'mfa-token' });
+      resolveStart({ challenge: null, stepAttemptId: 'attempt-1', token: 'mfa-token' });
       await startPromise;
     });
 

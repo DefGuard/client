@@ -86,7 +86,7 @@ export const useMfaConnect = (
         );
         await waitForMinimumDuration(startedAt, debounceMs);
         setToken(session.token);
-        setStepAttemptId(session.step_attempt_id);
+        setStepAttemptId(session.stepAttemptId);
         setMfaToken(session.token);
       } catch (err) {
         void error(`MFA start failed: ${err}`);
