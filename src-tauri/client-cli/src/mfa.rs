@@ -139,6 +139,11 @@ pub(crate) async fn authorize(
                 "Internal error: OIDC MFA must use authorize_oidc, not authorize".into(),
             ));
         }
+        MfaMethod::Fido2 => {
+            return Err(CliError::MfaFailed(
+                "FIDO2 MFA is not supported by the CLI. Use the desktop client.".into(),
+            ));
+        }
         _ => {}
     }
 
@@ -180,6 +185,8 @@ pub(crate) async fn authorize(
         code: Some(code.expose_secret().to_string()),
         auth_pub_key: None,
         step_attempt_id: None,
+        auth_data: None,
+        credential_id: None,
     };
     let psk = mfa::mfa_finish_code(proxy_url, finish_req)
         .await
@@ -360,6 +367,7 @@ fn infer_method(location: &Location<Id>) -> MfaMethod {
         Some(LocationMfaMethod::Oidc) => MfaMethod::Oidc,
         Some(LocationMfaMethod::Biometric) => MfaMethod::Biometric,
         Some(LocationMfaMethod::MobileApprove) => MfaMethod::MobileApprove,
+        Some(LocationMfaMethod::Fido2) => MfaMethod::Fido2,
         None => {
             // infer_mfa_method only returns None for Disabled mode, but this is
             // only called when MFA is enabled. Default to TOTP as a safe fallback.

@@ -86,7 +86,6 @@ enum MobileMfaResponse {
 fn build_client() -> Client {
     Client::new()
 }
-
 fn standard_headers() -> Vec<(&'static str, String)> {
     vec![
         (CLIENT_VERSION_HEADER, PKG_VERSION.to_string()),
@@ -225,7 +224,7 @@ pub async fn mfa_step_start(
     proxy_url: Url,
     request: ClientMfaStepStartRequest,
 ) -> Result<ClientMfaStepStartResponse, MfaError> {
-    let client = build_client();
+    let client = Client::new();
 
     let url = proxy_url
         .join("api/v1/client-mfa/step-start")
@@ -280,7 +279,7 @@ pub async fn mfa_finish_code(
     proxy_url: Url,
     request: ClientMfaFinishRequest,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let client = build_client();
+    let client = Client::new();
 
     let url = proxy_url
         .join("api/v1/client-mfa/finish")
@@ -319,7 +318,7 @@ const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Poll the proxy for OpenID MFA completion.
+/// Poll Defguard Edge for OpenID MFA completion.
 ///
 /// The caller must already have opened the browser to the OIDC provider
 /// URL (the token from `mfa_start` encodes the redirect).  This function
@@ -333,7 +332,7 @@ pub async fn poll_openid_mfa(
     step_attempt_id: Option<String>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let client = build_client();
+    let client = Client::new();
     let url = proxy_url
         .join("api/v1/client-mfa/finish")
         .map_err(|e| MfaError::Other {
@@ -347,6 +346,8 @@ pub async fn poll_openid_mfa(
         code: None,
         auth_pub_key: None,
         step_attempt_id,
+        auth_data: None,
+        credential_id: None,
     };
 
     loop {
@@ -367,8 +368,8 @@ pub async fn poll_openid_mfa(
                 return Err(MfaError::Cancelled);
             }
             result = req.send() => {
-                let response = result.map_err(|e| MfaError::NetworkError {
-                    message: format!("Failed to reach proxy: {e}"),
+                let response = result.map_err(|err| MfaError::NetworkError {
+                    message: format!("Failed to reach Edge: {err}"),
                 })?;
 
                 let status = response.status();
@@ -430,15 +431,15 @@ pub async fn connect_mobile_approve(
     let (ws_stream, _response) =
         connect_async(ws_url)
             .await
-            .map_err(|e| MfaError::NetworkError {
+            .map_err(|err| MfaError::NetworkError {
                 // Never interpolate the raw error: `ws_url` carries the MFA
                 // token as a query parameter and can appear in the error's
                 // Display, which is surfaced to the frontend and logs.
-                message: match &e {
+                message: match &err {
                     WsError::Io(io_err) => {
-                        format!("Failed to connect to proxy ({})", io_err.kind())
+                        format!("Failed to connect to Edge ({})", io_err.kind())
                     }
-                    _ => "Failed to connect to proxy".to_string(),
+                    _ => "Failed to connect to Edge".to_string(),
                 },
             })?;
 
@@ -458,7 +459,7 @@ pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> 
         "http" => "ws",
         other => {
             return Err(MfaError::Other {
-                message: format!("Invalid proxy URL scheme '{other}'; expected http or https"),
+                message: format!("Invalid Edge URL scheme '{other}'; expected http or https"),
             });
         }
     };
@@ -499,7 +500,7 @@ async fn wait_for_mfa_outcome(
                     Some(Ok(msg)) => msg,
                     Some(Err(_)) | None => {
                         return Err(MfaError::MfaRejected {
-                            message: "mobile approval failed: connection closed by proxy"
+                            message: "mobile approval failed: connection closed by Edge"
                                 .into(),
                         });
                     }

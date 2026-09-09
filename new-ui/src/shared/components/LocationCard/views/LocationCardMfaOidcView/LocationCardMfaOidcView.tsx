@@ -51,7 +51,7 @@ export const LocationCardMfaOidcView = () => {
   return (
     <div className="location-card-mfa-oidc">
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title={stepLabel ?? 'Two-factor authentication'}>
+      <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
         {screen === 'idle' && (
           <p>
             To connect to the VPN, authenticate via your OpenID provider. A browser window

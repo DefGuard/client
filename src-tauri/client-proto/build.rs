@@ -35,6 +35,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".defguard.client_types.ClientMfaStartResponse.rejections",
             "#[serde(default)]",
         )
+        .field_attribute(
+            ".defguard.client_types.ClientMfaStartResponse.credential_ids",
+            "#[serde(default)]",
+        )
+        .field_attribute(
+            ".defguard.client_types.ClientMfaStepStartResponse.credential_ids",
+            "#[serde(default)]",
+        )
         // Use proto defaults for missing fields in enrollment types that
         // may differ across proxy versions.
         .type_attribute(".defguard.client_types.AdminInfo", "#[serde(default)]")

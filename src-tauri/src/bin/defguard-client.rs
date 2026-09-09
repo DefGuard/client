@@ -24,8 +24,15 @@ fn main() {
     // Handle --version / -V before starting the client.
     check_version_flag("defguard-client");
 
-    // Without any arguments, launch the user interface.
-    if env::args().count() <= 1 {
+    // On Windows and Linux a deep-link launches a new process with the URL as its only
+    // argument. That must start the GUI, not the CLI.
+    let is_deep_link = if let Some(value) = env::args().nth(1) {
+        value.starts_with("defguard://")
+    } else {
+        false
+    };
+
+    if env::args().count() <= 1 || is_deep_link {
         #[cfg(target_os = "linux")]
         set_webkitgtk_variables();
         run_app();

@@ -4,7 +4,7 @@ use defguard_client_posture::{authorize_posture_session, get_posture_data};
 use defguard_client_proto::defguard::client_types::MfaMethod;
 use defguard_core::{
     connection::{active_state::active_state, bring_up, ConnectionTarget},
-    database::models::instance::Instance,
+    database::models::{instance::Instance, Id},
     ConnectionType,
 };
 use secrecy::ExposeSecret;
@@ -62,11 +62,12 @@ pub async fn handle(
         ResolvedTarget::Location(loc) => (loc.id, ConnectionType::Location, loc.name.as_str()),
         ResolvedTarget::Tunnel(tun) => (tun.id, ConnectionType::Tunnel, tun.name.as_str()),
     };
-    let active = active_state(&state.pool).await?;
-    if active
+    let active: Vec<(Id, ConnectionType)> = active_state(&state.pool)
+        .await?
         .iter()
-        .any(|c| c.connection_type == target_connection_type && c.target_id == target_id)
-    {
+        .map(|c| (c.target_id, c.connection_type))
+        .collect();
+    if active.contains(&(target_id, target_connection_type)) {
         return Ok(ConnectResult::AlreadyConnected {
             name: target_name.to_string(),
         });

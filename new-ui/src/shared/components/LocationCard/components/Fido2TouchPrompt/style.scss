@@ -1,0 +1,30 @@
+.fido2-touch-prompt {
+  display: flex;
+  min-height: 160px;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  row-gap: var(--spacing-md);
+
+  & > .key-mark {
+    display: grid;
+    place-items: center;
+
+    // Spinner and icon share one cell, so the key sits inside the ring.
+    & > * {
+      grid-area: 1 / 1;
+    }
+  }
+
+  & > p.prompt {
+    font: var(--t-body-sm-500);
+    color: var(--fg-white-100);
+    text-align: center;
+  }
+
+  & > p.hint {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-70);
+    text-align: center;
+  }
+}

@@ -223,6 +223,20 @@ const mfaConnectMobileApprove = (
 ): Promise<string> =>
   invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, locationId, token });
 
+// Starts FIDO2 verification. The backend runs it as a task - it fetches the
+// challenge and credential id from Edge, drives the security key, submits the
+// assertion and brings the connection up - so this resolves with the task id
+// and the outcome arrives as an MfaFido2Complete, MfaFido2StepAdvanced, or
+// MfaFido2Error event.
+const mfaFido2Pin = (
+  instanceId: number,
+  locationId: number,
+  methods: MfaMethodValue[],
+  token: string | null,
+  pin: string,
+): Promise<string> =>
+  invoke(TauriCommand.MfaFido2Pin, { instanceId, locationId, methods, token, pin });
+
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
 
@@ -301,5 +315,6 @@ export const api = {
   mfaFinishCode,
   mfaPollOpenId,
   mfaConnectMobileApprove,
+  mfaFido2Pin,
   cancelMfa,
 };

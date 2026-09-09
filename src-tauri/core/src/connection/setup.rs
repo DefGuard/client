@@ -130,7 +130,7 @@ pub async fn setup_interface_tunnel(
         "Parsing tunnel {tunnel} allowed ips: {:?}",
         tunnel.allowed_ips
     );
-    let route_all_traffic = route_all_traffic.unwrap_or(tunnel.route_all_traffic);
+    let route_all_traffic = tunnel.effective_route_all_traffic(route_all_traffic);
     let allowed_ips = if route_all_traffic {
         debug!("Using all traffic routing for tunnel {tunnel}");
         vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
@@ -246,6 +246,32 @@ pub async fn setup_interface_tunnel(
     Ok(interface_name)
 }
 
+/// Asks the background service to remove an interface.
+#[cfg(not(target_os = "macos"))]
+async fn request_interface_removal(interface_name: String, endpoint: String) -> Result<(), Error> {
+    debug!("Sending request to the background service to remove interface {interface_name}...");
+    let request = RemoveInterfaceRequest {
+        interface_name: interface_name.clone(),
+        endpoint,
+    };
+    if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
+        let msg = if error.code() == Code::Unavailable {
+            format!(
+                "Couldn't remove interface {interface_name}. Background service is unavailable. \
+                Please make sure the service is running. Error: {error}."
+            )
+        } else {
+            format!(
+                "Failed to remove interface {interface_name}. The interface and its routes may \
+                still be up. Error: {error}."
+            )
+        };
+        error!("{msg}");
+        return Err(Error::InternalError(msg));
+    }
+    Ok(())
+}
+
 pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Result<(), Error> {
     debug!(
         "Disconnecting interface {}.",
@@ -274,42 +300,20 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
                 debug!("stop_tunnel() for location {} succeeded", location.name);
             }
 
+            // Remove the network interface, but delay error handling until connection state is
+            // saved.
             #[cfg(not(target_os = "macos"))]
-            {
-                let request = RemoveInterfaceRequest {
-                    interface_name,
-                    endpoint: location.endpoint.clone(),
-                };
-                debug!(
-                    "Sending request to the background service to remove interface {} for \
-                    location {}...",
-                    active_connection.interface_name, location.name
-                );
-                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-                    let msg = if error.code() == Code::Unavailable {
-                        format!(
-                            "Couldn't remove interface {}. Background service is unavailable. \
-                            Please make sure the service is running. Error: {error}.",
-                            active_connection.interface_name
-                        )
-                    } else {
-                        format!(
-                            "Failed to send a request to the background service to remove \
-                            interface {}. Error: {error}.",
-                            active_connection.interface_name
-                        )
-                    };
-                    error!("{msg}");
-                }
-            }
-
-            let connection: Connection = active_connection.into();
-            let connection = connection.save(&*DB_POOL).await?;
+            let removal =
+                request_interface_removal(interface_name, location.endpoint.clone()).await;
+            let connection = Connection::from(active_connection).save(&*DB_POOL).await?;
             debug!(
                 "Saved location {} new connection status in the database",
                 location.name
             );
             trace!("Saved connection: {connection:?}");
+            // Now handle a potential error from interface removal.
+            #[cfg(not(target_os = "macos"))]
+            removal?;
             info!(
                 "Network interface {} for location {location} has been removed",
                 active_connection.interface_name
@@ -348,23 +352,10 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
                 debug!("stop_tunnel() for tunnel {} succeeded", tunnel.name);
             }
 
+            // Remove the network interface, but delay error handling until connection state is
+            // saved.
             #[cfg(not(target_os = "macos"))]
-            {
-                let request = RemoveInterfaceRequest {
-                    interface_name,
-                    endpoint: tunnel.endpoint.clone(),
-                };
-                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-                    error!(
-                        "Error while removing interface {}, error details: {error:?}",
-                        active_connection.interface_name
-                    );
-                    return Err(Error::InternalError(format!(
-                        "Failed to remove interface, error message: {}",
-                        error.message()
-                    )));
-                }
-            }
+            let removal = request_interface_removal(interface_name, tunnel.endpoint.clone()).await;
             if let Some(post_down) = &tunnel.post_down {
                 debug!(
                     "Executing defined PostDown command after removing the interface {} for \
@@ -378,13 +369,17 @@ pub async fn disconnect_interface(active_connection: &ActiveConnection) -> Resul
                     active_connection.interface_name
                 );
             }
-            let connection: TunnelConnection = active_connection.into();
-            let connection = connection.save(&*DB_POOL).await?;
+            let connection = TunnelConnection::from(active_connection)
+                .save(&*DB_POOL)
+                .await?;
             debug!(
                 "Saved new tunnel {} connection status in the database",
                 tunnel.name
             );
             trace!("Saved connection: {connection:#?}");
+            // Now handle a potential error from interface removal.
+            #[cfg(not(target_os = "macos"))]
+            removal?;
             info!(
                 "Network interface {} for tunnel {tunnel} has been removed",
                 active_connection.interface_name

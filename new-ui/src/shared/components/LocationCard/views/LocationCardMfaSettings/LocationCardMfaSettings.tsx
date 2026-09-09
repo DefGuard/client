@@ -7,6 +7,7 @@ import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import {
   mfaStepCount,
+  mfaStepsOf,
   pickableMfaMethods,
   resolveMfaStepPlan,
   usableMfaMethods,
@@ -43,7 +44,7 @@ export const LocationCardMfaSettings = () => {
     setStepPlanOnce,
   } = useLocationCardContext();
 
-  const mfaSteps = location.mfa_steps;
+  const mfaSteps = mfaStepsOf(location);
   const isMultiStep = mfaStepCount(location) > 1;
   const defaultPlan = resolveMfaStepPlan(location);
 
