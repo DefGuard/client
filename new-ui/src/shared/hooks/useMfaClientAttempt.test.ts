@@ -49,8 +49,7 @@ describe('useMfaClientAttempt', () => {
 
     expect(op.tryFinish()).toBe(true);
     expect(unlisten).toHaveBeenCalledTimes(1);
-    // A terminal event means the task already finished, so it is forgotten
-    // rather than cancelled.
+    // A final event means the task is done, so forget it instead of cancelling it.
     expect(mocks.cancelMfa).not.toHaveBeenCalled();
   });
 

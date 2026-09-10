@@ -3,39 +3,24 @@ import { useCallback, useEffect, useRef } from 'react';
 import { api } from '../rust-api/api';
 
 /**
- * One client-side attempt at driving a task-based MFA step, owning the Rust task and
- * the Tauri listeners so a late resolution cannot act after a retry or an unmount.
- *
- * Not the server's `step_attempt_id`: this never leaves the browser, so abandoning it
- * abandons nothing server-side.
+ * Tracks one MFA request and cleans up its background task and listeners when it
+ * finishes, is replaced, or unmounts. This is separate from the server's
+ * `step_attempt_id`.
  */
-export type ClientAttempt = {
+type ClientAttempt = {
   /** True while this is still the newest attempt. */
   isLive: () => boolean;
-  /**
-   * Claim the attempt's single outcome, retiring it. First caller wins; the rest get
-   * `false` and must bail, as does a stale attempt.
-   */
+  /** Takes the first final result for this attempt. Later calls fail. */
   tryFinish: () => boolean;
-  /**
-   * Attach a listener, unlistening it at once if the attempt went stale while
-   * `listen()` was in flight, so a half-registered listener cannot leak.
-   */
-  ownListener: (listener: Promise<UnlistenFn>) => Promise<UnlistenFn>;
-  /** Hand over the Rust task to cancel on cleanup, or at once if already stale. */
+  /** Adds a listener, or removes it immediately if the attempt is no longer current. */
+  ownListener: (listener: Promise<UnlistenFn>) => Promise<void>;
+  /** Tracks the task for cleanup, or cancels it immediately if the attempt is old. */
   ownTask: (taskId: string) => void;
-  /**
-   * Drop the listeners and cancel the task **without** retiring, for a caller
-   * unwinding its own state while staying live. No-op once stale.
-   */
+  /** Stops this attempt's listeners and task without marking it finished. Does nothing if it is no longer current. */
   abandon: () => void;
 };
 
-/**
- * Shared async lifecycle for the task-based MFA hooks. `startAttempt()` retires the
- * previous attempt, so a retry, a step advance and an unmount all resolve the same
- * way: whatever the old attempt awaited finds itself stale and stops.
- */
+/** Shared lifecycle for task-based MFA hooks. Starting a new attempt stops the previous one. */
 export const useMfaClientAttempt = () => {
   const liveAttemptRef = useRef(0);
   const taskIdRef = useRef<string | null>(null);
@@ -61,8 +46,7 @@ export const useMfaClientAttempt = () => {
   }, [cancelTask, dropListeners]);
 
   const startAttempt = useCallback((): ClientAttempt => {
-    // Retire first, release second: a terminal event arriving from the attempt
-    // being torn down must already read as stale.
+    // Mark the old request inactive before cleanup, so a final event cannot use it.
     const serial = ++liveAttemptRef.current;
     releaseHeld();
 
@@ -84,7 +68,6 @@ export const useMfaClientAttempt = () => {
         } else {
           unlisten();
         }
-        return unlisten;
       },
       ownTask: (taskId) => {
         if (isLive()) {

@@ -108,8 +108,7 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
         .unwrap_or_else(|| format!("HTTP {status}"));
 
     match status {
-        // A 403 can mean either a failed device posture check or the MFA
-        // attempt limit. The response message distinguishes the two cases.
+        // A 403 means either a posture failure or an attempt-limit error. The message tells them apart.
         StatusCode::FORBIDDEN if message == ATTEMPT_LIMIT_MESSAGE => {
             Err(MfaError::AttemptLimit { message })
         }
@@ -318,14 +317,8 @@ const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Poll Defguard Edge for OpenID MFA completion.
-///
-/// The caller must already have opened the browser to the OIDC provider
-/// URL (the token from `mfa_start` encodes the redirect).  This function
-/// POSTs a `ClientMfaFinishRequest` to `/api/v1/client-mfa/finish` every
-/// [`OIDC_POLL_INTERVAL`] until the server returns an advanced or completed
-/// 200 response, the deadline expires, or the [`CancellationToken`] is fired.
-/// Pending `AwaitingExternal` and legacy 428 responses continue polling.
+/// Polls Edge until OIDC MFA advances, completes, times out, or is cancelled.
+/// The browser must already be open. `AwaitingExternal` and legacy 428 responses keep polling.
 pub async fn poll_openid_mfa(
     proxy_url: Url,
     token: String,
@@ -416,14 +409,8 @@ pub async fn poll_openid_mfa(
     }
 }
 
-/// Connect to a WebSocket endpoint and wait for mobile-approve MFA
-/// completion.
-///
-/// The caller must have already displayed the QR code to the user
-/// (the token from `mfa_start` encodes the challenge). This function
-/// opens a WebSocket to `ws_url` and waits for a tagged mobile MFA outcome
-/// frame. Returns [`MfaError::Cancelled`] if the token fires or
-/// [`MfaError::Timeout`] if the deadline expires.
+/// Waits for mobile approval after the QR code is shown. Returns cancellation or
+/// timeout errors when applicable.
 pub async fn connect_mobile_approve(
     ws_url: &str,
     cancel: CancellationToken,
@@ -432,9 +419,7 @@ pub async fn connect_mobile_approve(
         connect_async(ws_url)
             .await
             .map_err(|err| MfaError::NetworkError {
-                // Never interpolate the raw error: `ws_url` carries the MFA
-                // token as a query parameter and can appear in the error's
-                // Display, which is surfaced to the frontend and logs.
+                // Avoid logging the URL: it contains the MFA token.
                 message: match &err {
                     WsError::Io(io_err) => {
                         format!("Failed to connect to Edge ({})", io_err.kind())
@@ -534,8 +519,7 @@ async fn wait_for_mfa_outcome(
                         result: Some(result),
                     });
                 }
-                // Edge may relay a frame this client does not model, so keep waiting rather than
-                // failing the approval. The body is not logged: it can carry a preshared key.
+                // Ignore unknown frames and keep waiting; they may contain a preshared key.
                 Err(err) => {
                     debug!("Ignoring unrecognized mobile MFA frame: {err}");
                 }

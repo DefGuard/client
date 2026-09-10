@@ -1,14 +1,13 @@
 import type { LocationInfo } from './types';
 
-/** Shape of the tagged `MfaError` the Rust backend serializes to JSON. */
+/** JSON error returned by the Rust backend. */
 export type ParsedMfaError = {
   type: string;
   message?: string;
   status?: number;
 };
 
-/** Parse a structured `MfaError` (JSON) thrown by a command or carried on an
- *  event payload. Returns null for plain-string errors. */
+/** Parses a JSON MFA error, or returns null for plain text. */
 export const parseMfaError = (err: unknown): ParsedMfaError | null => {
   try {
     const parsed = JSON.parse(String(err)) as ParsedMfaError;
@@ -18,14 +17,11 @@ export const parseMfaError = (err: unknown): ParsedMfaError | null => {
   }
 };
 
-/** Best-effort human-readable message: the structured `message` when present,
- *  otherwise the raw error string. */
+/** Returns the error message, or the original error text. */
 export const mfaErrorMessage = (err: unknown): string =>
   parseMfaError(err)?.message ?? String(err);
 
-/** True when the error is a posture rejection for a posture-gated location.
- *  The backend maps non-cap HTTP 403 responses to `posture_rejected`; ordinary
- *  MFA rejections stay `mfa_rejected`. */
+/** Returns true when MFA was rejected by the device posture check. */
 export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean =>
   location.posture_check_required && parseMfaError(err)?.type === 'posture_rejected';
 
@@ -41,7 +37,7 @@ export const isStaleAttempt = (message: string): boolean =>
 export const isSessionExpired = (message: string): boolean =>
   message.includes('invalid token') || message.includes('login session not found');
 
-/** The MFA operation timed out (the backend poll deadline was reached). */
+/** The MFA operation timed out. */
 export const isTimeout = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'timeout';
 
@@ -49,21 +45,18 @@ export const isTimeout = (err: unknown): boolean =>
 export const isInvalidCode = (message: string): boolean =>
   message.includes('Unauthorized');
 
-/** The proxy/edge service is unavailable (network error or 5xx response).
- *  Maps to `MfaError::NetworkError` (type: "network_error") and
- *  `MfaError::ProxyError` (type: "proxy_error") from the Rust backend. */
+/** Returns true when the proxy or Edge service is unavailable. */
 export const isServiceUnavailable = (err: unknown): boolean => {
   const parsed = parseMfaError(err);
   if (!parsed) return false;
   return parsed.type === 'network_error' || parsed.type === 'proxy_error';
 };
 
-/** MFA succeeded but bringing up the VPN connection afterwards failed
- *  (see `connect_after_mfa` in the Rust backend). */
+/** Returns true when MFA succeeded but the VPN connection failed. */
 export const isConnectFailure = (message: string): boolean =>
   message.includes('VPN connection failed');
 
-/** Why an external-OIDC poll failed, with the message to show for it. */
+/** Describes an OIDC polling error and its user-facing message. */
 export type OidcPollFailure = {
   kind:
     | 'attemptLimit'
@@ -75,9 +68,7 @@ export type OidcPollFailure = {
   message: string;
 };
 
-/** Classify an `mfa-openid-error` payload once, so both OIDC hooks agree on the check order
- *  and the wording. `kind` comes back alongside `message` because the hooks diverge on one
- *  case: the full view routes an expired session to `onSessionExpired` rather than showing it. */
+/** Maps an OIDC error event to a type and user-facing message. */
 export const classifyOidcPollFailure = (rawError: string): OidcPollFailure => {
   const message = mfaErrorMessage(rawError);
   if (isAttemptLimit(rawError)) {

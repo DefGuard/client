@@ -1733,9 +1733,7 @@ async fn begin_mfa_step(
     })
 }
 
-/// Build the start request for an MFA session: the per-step method plan plus
-/// the device data Edge needs to open it. Shared by the `mfa_begin_step` command
-/// and the FIDO2 task, which opens its own session.
+/// Builds the MFA start request from the method plan and device data.
 async fn mfa_start_request(
     instance_id: Id,
     location_id: Id,
@@ -1868,10 +1866,8 @@ pub async fn mfa_finish_code(
     }
 }
 
-/// Register a long-running MFA task, run its future in the background, and
-/// connect only after the final MFA outcome. Shared by the OpenID poll and
-/// mobile approve flows so the preshared key never leaves the backend. Returns
-/// the task id the frontend uses to cancel.
+/// Runs an MFA task in the background and connects after its final result.
+/// The VPN key stays in the backend. Returns the cancellation ID.
 fn spawn_mfa_task<F, R>(
     handle: &AppHandle,
     location_id: Id,
@@ -2063,19 +2059,18 @@ fn assertion_error(err: &impl fmt::Display) -> mfa::MfaError {
     mfa::MfaError::MfaRejected { message }
 }
 
-/// Everything the key needs to produce an assertion, as handed out by Edge.
+/// Data needed to complete a FIDO2 step.
 struct Fido2Challenge {
-    /// MFA session token the resulting assertion is submitted against.
+    /// Session token for submitting the result.
     token: String,
-    /// Attempt id minted by step-start; absent on the legacy fused path.
+    /// Step attempt ID, if this is a multi-step session.
     step_attempt_id: Option<String>,
     challenge: String,
-    /// Every credential registered for this user - the key answers for the one
-    /// it holds.
+    /// Credentials the key can use.
     credential_ids: Vec<String>,
 }
 
-/// The data needed to start the FIDO2 step through the local MFA flow.
+/// Data needed to start a FIDO2 step.
 struct Fido2Start {
     instance_id: Id,
     location_id: Id,
@@ -2083,7 +2078,7 @@ struct Fido2Start {
     token: Option<String>,
 }
 
-/// Ask Edge for the FIDO2 challenge and the credentials the key may sign with.
+/// Gets the FIDO2 challenge and available credentials from Edge.
 async fn fido2_challenge(
     proxy_url: &Url,
     start: Fido2Start,
@@ -2112,8 +2107,7 @@ async fn fido2_challenge(
     )
     .await?;
 
-    // Edge only sends these for a FIDO2 step, so a missing one means the server
-    // does not know the method rather than that the user did anything wrong.
+    // A missing challenge means Edge did not recognize this as a FIDO2 step.
     let challenge = response.challenge.ok_or_else(|| mfa::MfaError::Other {
         message: "Edge did not return a FIDO2 challenge".to_string(),
     })?;
@@ -2131,11 +2125,8 @@ async fn fido2_challenge(
     })
 }
 
-/// Drive the security key over CTAP-HID, returning the assertion and the
-/// credential that produced it.
-///
-/// The key waits for the user to touch it, and the crate's API is blocking, so
-/// this runs on the blocking pool.
+/// Gets an assertion from the security key and returns the credential it used.
+/// Runs on the blocking pool because the key waits for a user touch.
 async fn fido2_assertion(
     rp_id: String,
     challenge: Fido2Challenge,
@@ -2159,8 +2150,7 @@ async fn fido2_assertion(
             message: format!("No FIDO2 device detected: {err}"),
         })?;
 
-        // The key picks the credential it holds out of the ones offered and
-        // names it back, so there is nothing to narrow beforehand.
+        // The key chooses one of the offered credentials and reports it back.
         let assertion = device
             .get_assertion(
                 &rp_id,
@@ -2170,8 +2160,7 @@ async fn fido2_assertion(
             )
             .map_err(|err| assertion_error(&err))?;
 
-        // CTAP may leave the credential out when it was offered only one, so
-        // fall back to what we asked for.
+        // If the key omits the credential, use the first one we offered.
         let credential_id = if assertion.credential_id.is_empty() {
             credential_ids.into_iter().next().unwrap_or_default()
         } else {
@@ -2185,8 +2174,7 @@ async fn fido2_assertion(
     })?
 }
 
-/// Full FIDO2 exchange: challenge from Edge, assertion from the key, proof back
-/// to Edge. Returns the classified MFA outcome.
+/// Runs the FIDO2 exchange and returns the MFA result.
 async fn run_fido2_mfa(
     proxy_url: Url,
     rp_id: String,
@@ -2202,12 +2190,11 @@ async fn run_fido2_mfa(
     let session_token = challenge.token.clone();
     let step_attempt_id = challenge.step_attempt_id.clone();
 
-    // The key blinks and waits for a touch from here on, and CTAP gives up if
-    // none comes, so tell the frontend to ask for one.
+    // Tell the frontend to ask for a touch.
     let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
 
-    // The key cannot be interrupted once it is waiting for a touch, so
-    // cancelling here abandons the assertion instead of aborting it.
+    // The key cannot stop while waiting for touch, so cancellation only stops
+    // the client from waiting.
     let (assertion, credential_id) = tokio::select! {
         () = cancel.cancelled() => return Err(mfa::MfaError::Cancelled),
         assertion = fido2_assertion(rp_id, challenge, pin) => assertion?,
@@ -2215,20 +2202,19 @@ async fn run_fido2_mfa(
 
     let request = ClientMfaFinishRequest {
         token: session_token.clone(),
-        // `auth_pub_key` field carries the signature, as documented in client_types.proto.
+        // Send the signature in the legacy `auth_pub_key` field.
         code: None,
         auth_pub_key: Some(BASE64_URL_SAFE_NO_PAD.encode(&assertion.signature)),
         step_attempt_id,
         auth_data: Some(assertion.auth_data),
-        // Names the key that answered, so Core can offer just this credential
-        // next time instead of every one the user registered.
+        // Tell Core which credential answered so it can narrow the next request.
         credential_id: Some(credential_id),
     };
     let response = mfa::mfa_finish_code(proxy_url, request).await?;
     classify_fido2_response(response, session_token)
 }
 
-/// The relying party the assertion is bound to: the instance's own host.
+/// Returns the host the security key must use for this instance.
 fn fido2_rp_id(instance: &Instance<Id>) -> Result<String, String> {
     Url::parse(&instance.url)
         .map_err(|err| format!("Invalid instance URL: {err}"))?
@@ -2237,18 +2223,10 @@ fn fido2_rp_id(instance: &Instance<Id>) -> Result<String, String> {
         .ok_or_else(|| format!("Instance URL {} has no host", instance.url))
 }
 
-/// Verify a location's FIDO2 step with a security key.
+/// Starts FIDO2 verification in the background.
 ///
-/// Spawns a task rather than doing the work inline: the exchange needs a round
-/// trip to Edge for the challenge and the credential id, and then a user touch
-/// on the key, which has no deadline. The task submits the assertion and, on
-/// success, brings the connection up; the outcome arrives at the frontend as
-/// `mfa-fido2-complete`, `mfa-fido2-step-advanced`, or `mfa-fido2-error`, like
-/// the other long-running MFA methods. Returns the task id used to cancel it.
-///
-/// `methods` is the per-step method plan, and `token` the session token when a
-/// session is already open - together they pick the same start call the
-/// frontend's `startMfaStep` would make.
+/// Emits `mfa-fido2-complete`, `mfa-fido2-step-advanced`, or `mfa-fido2-error` events.
+/// Returns the task ID used to cancel it.
 #[tauri::command(async)]
 pub async fn mfa_fido2_pin(
     instance_id: Id,

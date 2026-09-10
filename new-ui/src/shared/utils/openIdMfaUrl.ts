@@ -1,8 +1,4 @@
-/** Build the Edge URL that starts an external-OIDC MFA step in the system browser.
- *
- *  `step_attempt_id` is snake_case because it is Edge's query-parameter name, not an object
- *  property, and is omitted for a legacy session. Pass the raw token: Edge composes the
- *  composite AuthInfo state, so a composite value must never be built here. */
+/** Builds the browser URL for an external OIDC MFA step. Legacy sessions omit `step_attempt_id`; Edge combines the token and attempt ID. */
 export const buildOpenIdMfaUrl = (
   proxyUrl: string,
   token: string,

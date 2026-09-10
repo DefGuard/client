@@ -28,10 +28,8 @@ type Options = {
 };
 
 /**
- * FIDO2 MFA. Submitting the PIN starts a backend task that asks Edge for the
- * challenge and the credential id, has the security key sign them, submits the
- * assertion and brings the connection up - so the outcome arrives as an event
- * rather than as the call's return value, like the other task-based methods.
+ * FIDO2 MFA. The PIN starts a background task that gets the challenge from Edge,
+ * signs it with the security key, and brings up the VPN. Results arrive as events.
  */
 export const useMfaFido2Connect = (
   location: LocationInfo,
@@ -51,18 +49,11 @@ export const useMfaFido2Connect = (
 
   const { startAttempt } = useMfaClientAttempt();
 
-  /// Separate from the attempt's own task handle: the primitive cancels the task, but
-  /// only this hook knows the token has to go with it.
+  // The attempt hook cancels the task; this hook must release its token too.
   const taskOutstandingRef = useRef(false);
 
-  /// The view state the primitive does not own.
-  const resetPinView = useCallback(() => {
-    setIsVerifying(false);
-    setIsAwaitingTouch(false);
-  }, []);
-
-  // Give up the token on unmount, so a view left mid-touch does not keep one the
-  // cancelled task would have consumed. Listeners and task are the primitive's job.
+  // Release the token on unmount so an abandoned view does not keep it for a cancelled task.
+  // The attempt hook handles task and listener cleanup.
   useEffect(() => {
     return () => {
       if (taskOutstandingRef.current) {
@@ -79,20 +70,20 @@ export const useMfaFido2Connect = (
       setIsAwaitingTouch(false);
       setVerifyError(null);
 
-      /// Take the attempt's single outcome, and bring the view back with it.
+      // Finish this attempt and update the view.
       const tryFinishAttempt = () => {
         if (!attempt.tryFinish()) return false;
         taskOutstandingRef.current = false;
-        resetPinView();
+        setIsVerifying(false);
+        setIsAwaitingTouch(false);
         return true;
       };
 
-      // Listen before starting: a task that fails fast (no key plugged in)
-      // would otherwise emit before the listeners are attached.
+      // Attach listeners before starting in case the task fails immediately.
       try {
         await Promise.all([
           attempt.ownListener(
-            // Progress, not an outcome, so it must not claim the attempt.
+            // A touch is progress, not the final result.
             listen(TauriEvent.MfaFido2Touch, () => {
               if (attempt.isLive()) setIsAwaitingTouch(true);
             }),
@@ -130,8 +121,7 @@ export const useMfaFido2Connect = (
                 return;
               }
               const message = mfaErrorMessage(event.payload.error);
-              // The backend's messages name what actually went wrong (no key, wrong
-              // PIN, no touch), so they are worth showing as they are.
+              // Show the server error; it tells the user whether the key, PIN, or touch failed.
               setVerifyError(
                 isConnectFailure(message)
                   ? 'Failed to establish VPN connection'
@@ -174,7 +164,6 @@ export const useMfaFido2Connect = (
       stepPlan,
       mfaToken,
       setMfaToken,
-      resetPinView,
       onConnected,
       onStepAdvanced,
       onPostureError,

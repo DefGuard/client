@@ -80,10 +80,9 @@ export const useMfaOidcConnect = (autoStart = false) => {
       attempt.ownTask(taskId);
       if (!attempt.isLive()) return;
 
-      // One at a time: `ownListener` drops a listener that resolved too late, and the
-      // check between each stops the chain rather than attaching the rest.
+      // Add listeners one at a time so a late listener cannot leave later listeners active.
       //
-      // The backend brings up the connection itself; completion means connected.
+      // The backend connects the VPN; completion means it is connected.
       await attempt.ownListener(
         listen(TauriEvent.MfaOpenIdComplete, () => {
           if (!attempt.tryFinish()) return;
@@ -143,9 +142,8 @@ export const useMfaOidcConnect = (autoStart = false) => {
     goToStep,
   ]);
 
-  // Deferring by a tick keeps a StrictMode replay to one attempt: the discarded effect
-  // clears its timer before it fires. It also lets a fast unmount cancel the start
-  // outright rather than merely supersede it.
+  // Wait one tick so React Strict Mode or an immediate unmount can cancel the
+  // start before it runs.
   // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
   useEffect(() => {
     if (!autoStart) return;
