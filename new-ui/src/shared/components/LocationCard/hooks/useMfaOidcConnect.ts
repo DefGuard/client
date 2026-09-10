@@ -1,22 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
 import {
-  isAttemptLimit,
-  isConnectFailure,
+  classifyOidcPollFailure,
   isMfaPostureError,
   isServiceUnavailable,
-  isSessionExpired,
-  isStaleAttempt,
-  isTimeout,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { MfaErrorPayload, MfaStepAdvancedPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
+import { buildOpenIdMfaUrl } from '../../../utils/openIdMfaUrl';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
@@ -39,37 +36,7 @@ export const useMfaOidcConnect = (autoStart = false) => {
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location.instance_id);
 
-  const taskIdRef = useRef<string | null>(null);
-  const unlistenRef = useRef<UnlistenFn | null>(null);
-  const operationRef = useRef(0);
-
-  const cleanup = useCallback(() => {
-    if (unlistenRef.current !== null) {
-      unlistenRef.current();
-      unlistenRef.current = null;
-    }
-  }, []);
-
-  const cancelTask = useCallback((taskId: string) => {
-    void api.cancelMfa(taskId).catch(() => {});
-  }, []);
-
-  const cancelCurrentTask = useCallback(() => {
-    const taskId = taskIdRef.current;
-    taskIdRef.current = null;
-    if (taskId) {
-      cancelTask(taskId);
-    }
-  }, [cancelTask]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      operationRef.current += 1;
-      cleanup();
-      cancelCurrentTask();
-    };
-  }, [cancelCurrentTask, cleanup]);
+  const { startAttempt } = useMfaClientAttempt();
 
   const start = useCallback(async () => {
     if (!instance) {
@@ -77,12 +44,10 @@ export const useMfaOidcConnect = (autoStart = false) => {
       return;
     }
 
-    const operation = ++operationRef.current;
+    const attempt = startAttempt();
     setIsStarting(true);
     setStartError(null);
     setPollError(null);
-    cleanup();
-    cancelCurrentTask();
 
     try {
       const session = await api.mfaBeginStep(
@@ -92,18 +57,15 @@ export const useMfaOidcConnect = (autoStart = false) => {
         stepPlan,
         mfaToken,
       );
-      if (operationRef.current !== operation) return;
+      if (!attempt.isLive()) return;
 
-      const openIdUrl = new URL(
-        'openid/mfa',
-        instance.proxy_url.endsWith('/') ? instance.proxy_url : `${instance.proxy_url}/`,
+      const openIdUrl = buildOpenIdMfaUrl(
+        instance.proxy_url,
+        session.token,
+        session.stepAttemptId,
       );
-      openIdUrl.searchParams.set('token', session.token);
-      if (session.stepAttemptId) {
-        openIdUrl.searchParams.set('step_attempt_id', session.stepAttemptId);
-      }
       await api.openLink(openIdUrl.toString());
-      if (operationRef.current !== operation) return;
+      if (!attempt.isLive()) return;
       setMfaToken(session.token);
 
       setIsStarting(false);
@@ -115,97 +77,45 @@ export const useMfaOidcConnect = (autoStart = false) => {
         session.token,
         session.stepAttemptId,
       );
-      if (operationRef.current !== operation) {
-        cancelTask(taskId);
-        return;
-      }
-      taskIdRef.current = taskId;
+      attempt.ownTask(taskId);
+      if (!attempt.isLive()) return;
 
-      const unlistenFns: UnlistenFn[] = [];
-      const removeListeners = () => {
-        unlistenFns.splice(0).forEach((unlisten) => {
-          unlisten();
-        });
-      };
-      const cleanupStaleListeners = () => {
-        removeListeners();
-        if (unlistenRef.current === removeListeners) {
-          unlistenRef.current = null;
-        }
-      };
-      unlistenRef.current = removeListeners;
-
-      const finishOperation = () => {
-        if (operationRef.current !== operation) return false;
-        operationRef.current += 1;
-        taskIdRef.current = null;
-        cleanup();
-        return true;
-      };
-
+      // Registered one at a time: a listener whose `listen()` resolves after the
+      // attempt went stale is dropped by `ownListener`, and the check between each
+      // stops the chain rather than attaching the rest.
+      //
       // The backend brings up the connection itself; completion means connected.
-      const completeUnlisten = await listen(TauriEvent.MfaOpenIdComplete, () => {
-        if (!finishOperation()) return;
-        setIsPolling(false);
-        setView(LocationCardViews.Connected);
-      });
-      unlistenFns.push(completeUnlisten);
-      if (operationRef.current !== operation) {
-        cleanupStaleListeners();
-        return;
-      }
+      await attempt.ownListener(
+        listen(TauriEvent.MfaOpenIdComplete, () => {
+          if (!attempt.tryFinish()) return;
+          setIsPolling(false);
+          setView(LocationCardViews.Connected);
+        }),
+      );
+      if (!attempt.isLive()) return;
 
-      const stepAdvancedUnlisten = await listen<MfaStepAdvancedPayload>(
-        TauriEvent.MfaOpenIdStepAdvanced,
-        (event) => {
-          if (!finishOperation()) return;
+      await attempt.ownListener(
+        listen<MfaStepAdvancedPayload>(TauriEvent.MfaOpenIdStepAdvanced, (event) => {
+          if (!attempt.tryFinish()) return;
           setIsPolling(false);
           goToStep(event.payload.nextStep);
-        },
+        }),
       );
-      unlistenFns.push(stepAdvancedUnlisten);
+      if (!attempt.isLive()) return;
 
-      if (operationRef.current !== operation) {
-        cleanupStaleListeners();
-        return;
-      }
-
-      const errorUnlisten = await listen<MfaErrorPayload>(
-        TauriEvent.MfaOpenIdError,
-        (event) => {
-          if (!finishOperation()) return;
+      await attempt.ownListener(
+        listen<MfaErrorPayload>(TauriEvent.MfaOpenIdError, (event) => {
+          if (!attempt.tryFinish()) return;
           setIsPolling(false);
           void error(
             `OIDC MFA failed for location ${location.id}: ${event.payload.error}`,
           );
-          const message = mfaErrorMessage(event.payload.error);
-          if (isAttemptLimit(event.payload.error)) {
-            setPollError(message);
-          } else if (isStaleAttempt(message)) {
-            setPollError(
-              'Authentication request could not be started. Please try again.',
-            );
-          } else if (isTimeout(event.payload.error)) {
-            setPollError('Authentication timed out. Please try again.');
-          } else if (isConnectFailure(message)) {
-            setPollError('Failed to establish VPN connection');
-          } else if (isSessionExpired(message)) {
-            setPollError('Session expired. Please try again.');
-          } else {
-            setPollError('Authentication failed. Please try again.');
-          }
-        },
+          setPollError(classifyOidcPollFailure(event.payload.error).message);
+        }),
       );
-      unlistenFns.push(errorUnlisten);
-
-      if (operationRef.current !== operation) {
-        cleanupStaleListeners();
-        return;
-      }
     } catch (e) {
-      if (operationRef.current !== operation) return;
-      cleanup();
-      cancelCurrentTask();
+      if (!attempt.isLive()) return;
+      attempt.abandon();
       void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
         setPostureError(mfaErrorMessage(e));
@@ -218,11 +128,12 @@ export const useMfaOidcConnect = (autoStart = false) => {
       }
       setStartError(mfaErrorMessage(e));
     } finally {
-      if (operationRef.current === operation) {
+      if (attempt.isLive()) {
         setIsStarting(false);
       }
     }
   }, [
+    startAttempt,
     instance,
     location,
     stepPlan,
@@ -231,12 +142,12 @@ export const useMfaOidcConnect = (autoStart = false) => {
     setPostureError,
     setView,
     goToStep,
-    cancelCurrentTask,
-    cancelTask,
-    cleanup,
   ]);
 
-  // FIXME: Replace this StrictMode workaround with a lifecycle-safe shared auto-start guard.
+  // Deferring by a tick is what keeps a StrictMode replay to a single attempt:
+  // the discarded effect clears its timer before it fires, so only the surviving
+  // mount starts. It also lets a fast unmount cancel the start outright rather
+  // than merely superseding it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
   useEffect(() => {
     if (!autoStart) return;

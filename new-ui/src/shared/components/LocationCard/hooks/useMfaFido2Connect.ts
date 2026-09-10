@@ -1,7 +1,7 @@
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
 import {
   isConnectFailure,
@@ -49,102 +49,78 @@ export const useMfaFido2Connect = (
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [isAwaitingTouch, setIsAwaitingTouch] = useState(false);
 
-  const operationRef = useRef(0);
-  const taskIdRef = useRef<string | null>(null);
-  const unlistenRef = useRef<UnlistenFn | null>(null);
+  const { startAttempt } = useMfaClientAttempt();
 
-  const cleanupListeners = useCallback(() => {
-    if (unlistenRef.current !== null) {
-      unlistenRef.current();
-      unlistenRef.current = null;
-    }
-  }, []);
+  /// Whether a backend task is still outstanding, which is what decides if an
+  /// abandoned attempt has to give up its token. This is deliberately separate
+  /// from the attempt's own task handle: the primitive cancels the task, but
+  /// only this hook knows the token has to go with it.
+  const taskOutstandingRef = useRef(false);
 
-  /// Every exit from a verification attempt lands here: listeners dropped, the
-  /// task forgotten, the view back to accepting a PIN.
-  const settle = useCallback(() => {
-    cleanupListeners();
-    taskIdRef.current = null;
+  /// The view state that comes back whenever an attempt ends. The primitive
+  /// handles the listeners and the task; this is the rest of it.
+  const resetPinView = useCallback(() => {
     setIsVerifying(false);
     setIsAwaitingTouch(false);
-  }, [cleanupListeners]);
+  }, []);
 
-  // Drop the listeners and abandon the key on unmount, so a view left mid-touch
-  // does not connect behind the user's back.
+  // Abandon the key's token on unmount, so a view left mid-touch does not keep a
+  // token the cancelled task would have consumed. Dropping the listeners and
+  // cancelling the task is the primitive's job.
   useEffect(() => {
     return () => {
-      operationRef.current += 1;
-      cleanupListeners();
-      const taskId = taskIdRef.current;
-      if (taskId) {
-        void api.cancelMfa(taskId).catch(() => {});
+      if (taskOutstandingRef.current) {
+        taskOutstandingRef.current = false;
         setMfaToken(null);
       }
     };
-  }, [cleanupListeners, setMfaToken]);
+  }, [setMfaToken]);
 
   const verifyPin = useCallback(
     async (pin: string) => {
-      const operation = ++operationRef.current;
-      cleanupListeners();
+      const attempt = startAttempt();
       setIsVerifying(true);
       setIsAwaitingTouch(false);
       setVerifyError(null);
 
-      // Listen before starting: a task that fails fast (no key plugged in)
-      // would otherwise emit before the listeners are attached.
-      const isCurrentOperation = () => operationRef.current === operation;
-      const finishOperation = () => {
-        if (!isCurrentOperation()) return false;
-        operationRef.current += 1;
-        settle();
+      /// Take the attempt's single outcome, and bring the view back with it.
+      const tryFinishAttempt = () => {
+        if (!attempt.tryFinish()) return false;
+        taskOutstandingRef.current = false;
+        resetPinView();
         return true;
       };
 
-      const registeredListeners: UnlistenFn[] = [];
-      const cleanupRegisteredListeners = () => {
-        for (const unlisten of registeredListeners.splice(0)) {
-          unlisten();
-        }
-      };
-      const registerListener = (listener: Promise<UnlistenFn>) =>
-        listener.then((unlisten) => {
-          if (isCurrentOperation()) {
-            registeredListeners.push(unlisten);
-          } else {
-            unlisten();
-          }
-          return unlisten;
-        });
-
-      unlistenRef.current = cleanupRegisteredListeners;
-      let listeners: [UnlistenFn, UnlistenFn, UnlistenFn, UnlistenFn];
+      // Listen before starting: a task that fails fast (no key plugged in)
+      // would otherwise emit before the listeners are attached.
       try {
-        listeners = await Promise.all([
-          registerListener(
+        await Promise.all([
+          attempt.ownListener(
+            // A touch prompt is progress, not an outcome, so it must not claim
+            // the attempt.
             listen(TauriEvent.MfaFido2Touch, () => {
-              if (isCurrentOperation()) setIsAwaitingTouch(true);
+              if (attempt.isLive()) setIsAwaitingTouch(true);
             }),
           ),
-          registerListener(
+          attempt.ownListener(
             listen(TauriEvent.MfaFido2Complete, () => {
-              if (!finishOperation()) return;
+              if (!tryFinishAttempt()) return;
               onConnected?.();
             }),
           ),
-          registerListener(
+          attempt.ownListener(
             listen<MfaFido2StepAdvancedPayload>(
               TauriEvent.MfaFido2StepAdvanced,
               (event) => {
-                if (!finishOperation()) return;
+                if (!tryFinishAttempt()) return;
                 setMfaToken(event.payload.token);
                 onStepAdvanced?.(event.payload.nextStep);
               },
             ),
           ),
-          registerListener(
+          attempt.ownListener(
             listen<MfaErrorPayload>(TauriEvent.MfaFido2Error, (event) => {
-              if (!finishOperation()) return;
+              if (!tryFinishAttempt()) return;
               setMfaToken(null);
               void error(
                 `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
@@ -170,28 +146,14 @@ export const useMfaFido2Connect = (
           ),
         ]);
       } catch (err) {
-        const isCurrent = finishOperation();
-        cleanupRegisteredListeners();
-        if (!isCurrent) return;
+        if (!tryFinishAttempt()) return;
         setMfaToken(null);
         void error(`FIDO2 MFA listener setup failed for location ${location.id}: ${err}`);
         setVerifyError(mfaErrorMessage(err));
         return;
       }
 
-      if (!isCurrentOperation()) {
-        cleanupRegisteredListeners();
-        return;
-      }
-
-      const [touchUnlisten, completeUnlisten, stepAdvancedUnlisten, errorUnlisten] =
-        listeners;
-      unlistenRef.current = () => {
-        touchUnlisten();
-        completeUnlisten();
-        stepAdvancedUnlisten();
-        errorUnlisten();
-      };
+      if (!attempt.isLive()) return;
 
       try {
         const taskId = await api.mfaFido2Pin(
@@ -201,25 +163,23 @@ export const useMfaFido2Connect = (
           mfaToken,
           pin,
         );
-        if (!isCurrentOperation()) {
-          void api.cancelMfa(taskId).catch(() => {});
-          return;
-        }
-        taskIdRef.current = taskId;
+        attempt.ownTask(taskId);
+        if (!attempt.isLive()) return;
+        taskOutstandingRef.current = true;
       } catch (err) {
-        if (!finishOperation()) return;
+        if (!tryFinishAttempt()) return;
         setMfaToken(null);
         void error(`FIDO2 MFA start failed for location ${location.id}: ${err}`);
         setVerifyError(mfaErrorMessage(err));
       }
     },
     [
+      startAttempt,
       location,
       stepPlan,
       mfaToken,
       setMfaToken,
-      cleanupListeners,
-      settle,
+      resetPinView,
       onConnected,
       onStepAdvanced,
       onPostureError,

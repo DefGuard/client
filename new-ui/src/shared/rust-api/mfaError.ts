@@ -62,3 +62,45 @@ export const isServiceUnavailable = (err: unknown): boolean => {
  *  (see `connect_after_mfa` in the Rust backend). */
 export const isConnectFailure = (message: string): boolean =>
   message.includes('VPN connection failed');
+
+/** Why an external-OIDC poll failed, with the message to show for it. */
+export type OidcPollFailure = {
+  kind:
+    | 'attemptLimit'
+    | 'staleAttempt'
+    | 'timeout'
+    | 'connectFailure'
+    | 'sessionExpired'
+    | 'unknown';
+  message: string;
+};
+
+/** Classify an `mfa-openid-error` payload once, so both OIDC hooks agree on the ordering of the
+ *  checks and on the wording.
+ *
+ *  The `kind` is returned alongside the message because the two hooks do not treat every case the
+ *  same way: the compact view shows a message for an expired session, while the full view hands
+ *  that case to its `onSessionExpired` callback. Callers switch on `kind` only where they diverge
+ *  and use `message` everywhere else. */
+export const classifyOidcPollFailure = (rawError: string): OidcPollFailure => {
+  const message = mfaErrorMessage(rawError);
+  if (isAttemptLimit(rawError)) {
+    return { kind: 'attemptLimit', message };
+  }
+  if (isStaleAttempt(message)) {
+    return {
+      kind: 'staleAttempt',
+      message: 'Authentication request could not be started. Please try again.',
+    };
+  }
+  if (isTimeout(rawError)) {
+    return { kind: 'timeout', message: 'Authentication timed out. Please try again.' };
+  }
+  if (isConnectFailure(message)) {
+    return { kind: 'connectFailure', message: 'Failed to establish VPN connection' };
+  }
+  if (isSessionExpired(message)) {
+    return { kind: 'sessionExpired', message: 'Session expired. Please try again.' };
+  }
+  return { kind: 'unknown', message: 'Authentication failed. Please try again.' };
+};
