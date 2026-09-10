@@ -9,6 +9,7 @@
     "biome": "biome",
     "lint": "biome check ./src/ && prettier src/**/*.scss --check --log-level error && stylelint \"src/**/*.scss\" -c ./.stylelintrc.json --fix && tsc -b",
     "fix": "biome check ./src/ --write --unsafe && prettier src/**/*.scss -w --log-level silent",
+    "test": "vitest run",
     "tsc": "tsc",
     "preview": "vite preview"
   },
