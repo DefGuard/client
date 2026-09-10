@@ -3,48 +3,38 @@ import { useCallback, useEffect, useRef } from 'react';
 import { api } from '../rust-api/api';
 
 /**
- * One client-side attempt at driving a task-based MFA step: the Rust task it owns
- * and the Tauri listeners it attached. Every hook that drives such a method has to
- * survive a late resolution landing after the user retried or navigated away, and
- * this is the shape of that guard.
+ * One client-side attempt at driving a task-based MFA step, owning the Rust task and
+ * the Tauri listeners so a late resolution cannot act after a retry or an unmount.
  *
- * Distinct from the server's `step_attempt_id`, which is minted by Core, travels on
- * the wire and binds a proof. This one never leaves the browser and Core knows
- * nothing about it: abandoning it locally does not abandon anything server-side.
+ * Not the server's `step_attempt_id`: this never leaves the browser, so abandoning it
+ * abandons nothing server-side.
  */
 export type ClientAttempt = {
-  /** True while this is still the newest attempt, so its work is worth doing. */
+  /** True while this is still the newest attempt. */
   isLive: () => boolean;
   /**
-   * Take the attempt's single outcome: retires it, drops the listeners and forgets
-   * the task. The first of several terminal listeners wins; every later one gets
-   * `false` and must bail. Returns `false` for an attempt that is already stale.
+   * Claim the attempt's single outcome, retiring it. First caller wins; the rest get
+   * `false` and must bail, as does a stale attempt.
    */
   tryFinish: () => boolean;
   /**
-   * Attach a listener to this attempt. If the attempt went stale while `listen()`
-   * was in flight the listener is unlistened at once rather than recorded, so a
-   * half-registered listener can never leak.
+   * Attach a listener, unlistening it at once if the attempt went stale while
+   * `listen()` was in flight, so a half-registered listener cannot leak.
    */
   ownListener: (listener: Promise<UnlistenFn>) => Promise<UnlistenFn>;
-  /**
-   * Hand the attempt the Rust task it should cancel on cleanup. A task that arrives
-   * after the attempt went stale is cancelled immediately instead.
-   */
+  /** Hand over the Rust task to cancel on cleanup, or at once if already stale. */
   ownTask: (taskId: string) => void;
   /**
-   * Drop this attempt's listeners and cancel its task **without** retiring it, for
-   * a caller that failed outright but still has state of its own to unwind while
-   * remaining the live attempt. A no-op once the attempt is stale.
+   * Drop the listeners and cancel the task **without** retiring, for a caller
+   * unwinding its own state while staying live. No-op once stale.
    */
   abandon: () => void;
 };
 
 /**
- * Shared async lifecycle for the task-based MFA hooks. `startAttempt()` opens a new
- * attempt and retires the previous one, so a retry, a step advance and an unmount
- * all resolve the same way: whatever the old attempt was still waiting on finds
- * itself stale and stops.
+ * Shared async lifecycle for the task-based MFA hooks. `startAttempt()` retires the
+ * previous attempt, so a retry, a step advance and an unmount all resolve the same
+ * way: whatever the old attempt awaited finds itself stale and stops.
  */
 export const useMfaClientAttempt = () => {
   const liveAttemptRef = useRef(0);

@@ -51,22 +51,18 @@ export const useMfaFido2Connect = (
 
   const { startAttempt } = useMfaClientAttempt();
 
-  /// Whether a backend task is still outstanding, which is what decides if an
-  /// abandoned attempt has to give up its token. This is deliberately separate
-  /// from the attempt's own task handle: the primitive cancels the task, but
+  /// Separate from the attempt's own task handle: the primitive cancels the task, but
   /// only this hook knows the token has to go with it.
   const taskOutstandingRef = useRef(false);
 
-  /// The view state that comes back whenever an attempt ends. The primitive
-  /// handles the listeners and the task; this is the rest of it.
+  /// The view state the primitive does not own.
   const resetPinView = useCallback(() => {
     setIsVerifying(false);
     setIsAwaitingTouch(false);
   }, []);
 
-  // Abandon the key's token on unmount, so a view left mid-touch does not keep a
-  // token the cancelled task would have consumed. Dropping the listeners and
-  // cancelling the task is the primitive's job.
+  // Give up the token on unmount, so a view left mid-touch does not keep one the
+  // cancelled task would have consumed. Listeners and task are the primitive's job.
   useEffect(() => {
     return () => {
       if (taskOutstandingRef.current) {
@@ -96,8 +92,7 @@ export const useMfaFido2Connect = (
       try {
         await Promise.all([
           attempt.ownListener(
-            // A touch prompt is progress, not an outcome, so it must not claim
-            // the attempt.
+            // Progress, not an outcome, so it must not claim the attempt.
             listen(TauriEvent.MfaFido2Touch, () => {
               if (attempt.isLive()) setIsAwaitingTouch(true);
             }),

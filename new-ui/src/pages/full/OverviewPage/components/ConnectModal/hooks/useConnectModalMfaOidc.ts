@@ -89,9 +89,8 @@ export const useConnectModalMfaOidc = ({
       attempt.ownTask(taskId);
       if (!attempt.isLive()) return;
 
-      // Registered one at a time: a listener whose `listen()` resolves after the
-      // attempt went stale is dropped by `ownListener`, and the check between each
-      // stops the chain rather than attaching the rest.
+      // One at a time: `ownListener` drops a listener that resolved too late, and the
+      // check between each stops the chain rather than attaching the rest.
       //
       // The backend brings up the connection itself; completion means connected.
       await attempt.ownListener(
@@ -159,7 +158,9 @@ export const useConnectModalMfaOidc = ({
     onServiceUnavailable,
   ]);
 
-  // FIXME: Replace this StrictMode workaround with a lifecycle-safe shared auto-start guard.
+  // Deferring by a tick keeps a StrictMode replay to one attempt: the discarded effect
+  // clears its timer before it fires. It also lets a fast unmount cancel the start
+  // outright rather than merely supersede it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
   useEffect(() => {
     if (!autoStart) return;

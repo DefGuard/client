@@ -75,13 +75,9 @@ export type OidcPollFailure = {
   message: string;
 };
 
-/** Classify an `mfa-openid-error` payload once, so both OIDC hooks agree on the ordering of the
- *  checks and on the wording.
- *
- *  The `kind` is returned alongside the message because the two hooks do not treat every case the
- *  same way: the compact view shows a message for an expired session, while the full view hands
- *  that case to its `onSessionExpired` callback. Callers switch on `kind` only where they diverge
- *  and use `message` everywhere else. */
+/** Classify an `mfa-openid-error` payload once, so both OIDC hooks agree on the check order
+ *  and the wording. `kind` comes back alongside `message` because the hooks diverge on one
+ *  case: the full view routes an expired session to `onSessionExpired` rather than showing it. */
 export const classifyOidcPollFailure = (rawError: string): OidcPollFailure => {
   const message = mfaErrorMessage(rawError);
   if (isAttemptLimit(rawError)) {

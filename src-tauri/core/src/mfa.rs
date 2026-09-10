@@ -534,9 +534,8 @@ async fn wait_for_mfa_outcome(
                         result: Some(result),
                     });
                 }
-                // Edge may relay a frame this client does not model. Keep waiting for a frame we
-                // understand rather than failing the approval, but do not do it silently. The
-                // frame body is not logged: it can carry a preshared key.
+                // Edge may relay a frame this client does not model, so keep waiting rather than
+                // failing the approval. The body is not logged: it can carry a preshared key.
                 Err(err) => {
                     debug!("Ignoring unrecognized mobile MFA frame: {err}");
                 }

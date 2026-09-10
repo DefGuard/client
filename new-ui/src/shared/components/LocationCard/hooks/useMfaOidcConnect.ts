@@ -80,9 +80,8 @@ export const useMfaOidcConnect = (autoStart = false) => {
       attempt.ownTask(taskId);
       if (!attempt.isLive()) return;
 
-      // Registered one at a time: a listener whose `listen()` resolves after the
-      // attempt went stale is dropped by `ownListener`, and the check between each
-      // stops the chain rather than attaching the rest.
+      // One at a time: `ownListener` drops a listener that resolved too late, and the
+      // check between each stops the chain rather than attaching the rest.
       //
       // The backend brings up the connection itself; completion means connected.
       await attempt.ownListener(
@@ -144,10 +143,9 @@ export const useMfaOidcConnect = (autoStart = false) => {
     goToStep,
   ]);
 
-  // Deferring by a tick is what keeps a StrictMode replay to a single attempt:
-  // the discarded effect clears its timer before it fires, so only the surviving
-  // mount starts. It also lets a fast unmount cancel the start outright rather
-  // than merely superseding it.
+  // Deferring by a tick keeps a StrictMode replay to one attempt: the discarded effect
+  // clears its timer before it fires. It also lets a fast unmount cancel the start
+  // outright rather than merely supersede it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
   useEffect(() => {
     if (!autoStart) return;
