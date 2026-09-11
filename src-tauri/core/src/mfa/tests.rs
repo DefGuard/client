@@ -1,4 +1,7 @@
-use reqwest::Url;
+use defguard_client_proto::defguard::client_types::{
+    MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaStepResult,
+};
+use reqwest::{StatusCode, Url};
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use wiremock::{
@@ -30,10 +33,47 @@ fn start_response_json(token: &str) -> serde_json::Value {
     })
 }
 
+fn start_response_template(
+    core_version: Option<&str>,
+    proxy_version: Option<&str>,
+) -> ResponseTemplate {
+    let mut response = ResponseTemplate::new(StatusCode::OK.as_u16())
+        .set_body_json(start_response_json("mfa-token"));
+    if let Some(version) = core_version {
+        response = response.insert_header(CORE_VERSION_HEADER, version);
+    }
+    if let Some(version) = proxy_version {
+        response = response.insert_header(PROXY_VERSION_HEADER, version);
+    }
+    response
+}
+
 fn finish_response_json(key: &str) -> serde_json::Value {
     json!({
         "preshared_key": key,
     })
+}
+
+#[allow(deprecated)]
+fn finish_response_json_with_result(outcome: mfa_step_result::Outcome) -> serde_json::Value {
+    serde_json::to_value(ClientMfaFinishResponse {
+        preshared_key: String::new(),
+        token: None,
+        result: Some(MfaStepResult {
+            outcome: Some(outcome),
+        }),
+    })
+    .expect("MFA finish response should serialize")
+}
+
+fn mobile_result_frame(outcome: mfa_step_result::Outcome) -> String {
+    serde_json::to_string(&json!({
+        "type": "mfa_result",
+        "result": MfaStepResult {
+            outcome: Some(outcome),
+        },
+    }))
+    .expect("MFA result frame should serialize")
 }
 
 #[tokio::test]
@@ -54,6 +94,68 @@ async fn test_mfa_start_success() {
 }
 
 #[tokio::test]
+async fn test_mfa_start_with_capability_accepts_supported_versions() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(start_response_template(Some("2.2.0"), Some("2.2.0")))
+        .mount(&server)
+        .await;
+
+    let result = mfa_start_with_capability(mock_url(&server), start_request())
+        .await
+        .unwrap();
+
+    assert_eq!(result.response.token, "mfa-token");
+    assert!(result.multi_step_mfa_capable);
+}
+
+#[tokio::test]
+async fn test_mfa_start_with_capability_accepts_prerelease_version() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(start_response_template(Some("2.2.0-alpha1"), Some("2.2.0")))
+        .mount(&server)
+        .await;
+
+    let result = mfa_start_with_capability(mock_url(&server), start_request())
+        .await
+        .unwrap();
+
+    assert!(result.multi_step_mfa_capable);
+}
+
+#[tokio::test]
+async fn test_mfa_start_with_capability_requires_supported_versions() {
+    let cases = [
+        ("missing core version", None, Some("2.2.0")),
+        ("missing proxy version", Some("2.2.0"), None),
+        ("invalid core version", Some("invalid"), Some("2.2.0")),
+        ("invalid proxy version", Some("2.2.0"), Some("invalid")),
+        ("old core version", Some("2.1.9"), Some("2.2.0")),
+        ("old proxy version", Some("2.2.0"), Some("2.1.9")),
+    ];
+
+    for (case, core_version, proxy_version) in cases {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/client-mfa/start"))
+            .respond_with(start_response_template(core_version, proxy_version))
+            .mount(&server)
+            .await;
+
+        let result = mfa_start_with_capability(mock_url(&server), start_request())
+            .await
+            .unwrap();
+
+        assert!(!result.multi_step_mfa_capable, "{case}");
+    }
+}
+
+#[tokio::test]
 async fn test_mfa_start_rejected() {
     let server = MockServer::start().await;
 
@@ -69,9 +171,28 @@ async fn test_mfa_start_rejected() {
 }
 
 #[tokio::test]
+async fn test_mfa_start_attempt_limit_on_403() {
+    let server = MockServer::start().await;
+    let message = "Too many failed MFA attempts. Please try connecting again.";
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({ "error": message })))
+        .mount(&server)
+        .await;
+
+    let err = mfa_start(mock_url(&server), start_request())
+        .await
+        .unwrap_err();
+    match err {
+        MfaError::AttemptLimit { message: actual } => assert_eq!(actual, message),
+        other => panic!("expected AttemptLimit, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn test_mfa_start_posture_rejected_on_403() {
-    // 403 is the proxy's posture-check-failure status; it must map to the
-    // dedicated PostureRejected variant, not the generic MfaRejected.
+    // A non-cap 403 must remain a dedicated posture rejection.
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))
@@ -252,6 +373,111 @@ async fn test_mfa_finish_code_rejected() {
 }
 
 #[tokio::test]
+async fn test_poll_openid_advanced_returns_empty_legacy_key() {
+    let server = MockServer::start().await;
+    let body = finish_response_json_with_result(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+        next_step: 1,
+    }));
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+        .mount(&server)
+        .await;
+
+    let response = poll_openid_mfa(
+        mock_url(&server),
+        "token".into(),
+        None,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+
+    assert!(response.preshared_key.is_empty());
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
+        }) if advanced.next_step == 1
+    ));
+}
+
+#[tokio::test]
+async fn test_poll_openid_awaiting_external_then_completed() {
+    let server = MockServer::start().await;
+    let awaiting_body = finish_response_json_with_result(
+        mfa_step_result::Outcome::AwaitingExternal(MfaAwaitingExternal {}),
+    );
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&awaiting_body))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    let completed_body =
+        finish_response_json_with_result(mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "oidc-psk".into(),
+        }));
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&completed_body))
+        .mount(&server)
+        .await;
+
+    let response = poll_openid_mfa(
+        mock_url(&server),
+        "token".into(),
+        None,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+        }) if completed.preshared_key == "oidc-psk"
+    ));
+}
+
+#[tokio::test]
+async fn test_poll_openid_sends_step_attempt_id() {
+    let server = MockServer::start().await;
+    let body =
+        finish_response_json_with_result(mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "oidc-psk".into(),
+        }));
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/finish"))
+        .and(body_partial_json(json!({
+            "step_attempt_id": "attempt-123",
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&body))
+        .mount(&server)
+        .await;
+
+    let response = poll_openid_mfa(
+        mock_url(&server),
+        "token".into(),
+        Some("attempt-123".into()),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+        }) if completed.preshared_key == "oidc-psk"
+    ));
+}
+
+#[tokio::test]
 async fn test_poll_openid_success() {
     let server = MockServer::start().await;
     let body = finish_response_json("oidc-psk");
@@ -264,7 +490,9 @@ async fn test_poll_openid_success() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let psk = poll_openid_mfa(url, "token".into(), cancel).await.unwrap();
+    let psk = poll_openid_mfa(url, "token".into(), None, cancel)
+        .await
+        .unwrap();
     assert_eq!(psk.preshared_key, "oidc-psk");
 }
 
@@ -288,7 +516,9 @@ async fn test_poll_openid_428_then_success() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let psk = poll_openid_mfa(url, "token".into(), cancel).await.unwrap();
+    let psk = poll_openid_mfa(url, "token".into(), None, cancel)
+        .await
+        .unwrap();
     assert_eq!(psk.preshared_key, "oidc-psk");
 }
 
@@ -304,7 +534,7 @@ async fn test_poll_openid_stops_on_error() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let err = poll_openid_mfa(url, "token".into(), cancel)
+    let err = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap_err();
     match err {
@@ -328,7 +558,7 @@ async fn test_poll_openid_timeout() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let err = poll_openid_mfa(url, "token".into(), cancel)
+    let err = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap_err();
     assert!(matches!(err, MfaError::Timeout));
@@ -347,10 +577,84 @@ async fn test_poll_openid_cancelled() {
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
     cancel.cancel();
-    let err = poll_openid_mfa(url, "token".into(), cancel)
+    let err = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap_err();
     assert!(matches!(err, MfaError::Cancelled));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_advanced_result() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(mobile_result_frame(
+        mfa_step_result::Outcome::Advanced(MfaAdvanced { next_step: 1 }),
+    )))
+    .unwrap();
+
+    let response = handle.await.unwrap().unwrap();
+    assert!(response.preshared_key.is_empty());
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
+        }) if advanced.next_step == 1
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_completed_result_uses_nested_key() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(mobile_result_frame(
+        mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "mobile-psk".into(),
+        }),
+    )))
+    .unwrap();
+
+    let response = handle.await.unwrap().unwrap();
+    assert!(response.preshared_key.is_empty());
+    assert!(matches!(
+        response.result,
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+        }) if completed.preshared_key == "mobile-psk"
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_empty_legacy_key_is_rejected() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(
+        r#"{"type":"mfa_success","preshared_key":""}"#.into(),
+    ))
+    .unwrap();
+
+    let err = handle.await.unwrap().unwrap_err();
+    assert!(matches!(
+        err,
+        MfaError::MfaRejected { message } if message.contains("empty preshared key")
+    ));
 }
 
 #[tokio::test]

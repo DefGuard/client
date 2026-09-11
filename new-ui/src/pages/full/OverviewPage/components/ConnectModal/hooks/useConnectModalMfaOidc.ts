@@ -1,36 +1,40 @@
 import { useQuery } from '@tanstack/react-query';
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
+import { useMfaClientAttempt } from '../../../../../../shared/hooks/useMfaClientAttempt';
 import { api } from '../../../../../../shared/rust-api/api';
 import {
-  isConnectFailure,
+  classifyOidcPollFailure,
   isMfaPostureError,
   isServiceUnavailable,
-  isSessionExpired,
-  isTimeout,
   mfaErrorMessage,
 } from '../../../../../../shared/rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../../../../shared/rust-api/query';
-import type { MfaErrorPayload } from '../../../../../../shared/rust-api/types';
+import type {
+  MfaErrorPayload,
+  MfaStepAdvancedPayload,
+} from '../../../../../../shared/rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../../../../shared/rust-api/types';
+import { buildOpenIdMfaUrl } from '../../../../../../shared/utils/openIdMfaUrl';
 import { useConnectModal } from './useConnectModal';
 
 type Options = {
+  autoStart?: boolean;
   onPostureError?: (msg: string) => void;
   onSessionExpired?: () => void;
   onServiceUnavailable?: () => void;
 };
 
 export const useConnectModalMfaOidc = ({
+  autoStart = false,
   onPostureError,
   onSessionExpired,
   onServiceUnavailable,
 }: Options = {}) => {
-  const [location, stepPlan, mfaToken, setMfaToken] = useConnectModal(
-    useShallow((s) => [s.location, s.stepPlan, s.mfaToken, s.setMfaToken]),
+  const [location, stepPlan, mfaToken, setMfaToken, goToStep] = useConnectModal(
+    useShallow((s) => [s.location, s.stepPlan, s.mfaToken, s.setMfaToken, s.goToStep]),
   );
 
   const [isStarting, setIsStarting] = useState(false);
@@ -41,25 +45,7 @@ export const useConnectModalMfaOidc = ({
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location?.instance_id);
 
-  const taskIdRef = useRef<string | null>(null);
-  const unlistenRef = useRef<UnlistenFn | null>(null);
-
-  const cleanup = useCallback(() => {
-    if (unlistenRef.current !== null) {
-      unlistenRef.current();
-      unlistenRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      cleanup();
-      const taskId = taskIdRef.current;
-      if (taskId) {
-        void api.cancelMfa(taskId).catch(() => {});
-      }
-    };
-  }, [cleanup]);
+  const { startAttempt } = useMfaClientAttempt();
 
   const start = useCallback(async () => {
     if (!instance || !location) {
@@ -67,59 +53,81 @@ export const useConnectModalMfaOidc = ({
       return;
     }
 
+    const attempt = startAttempt();
     setIsStarting(true);
     setStartError(null);
     setPollError(null);
-    cleanup();
 
     try {
-      const session = await api.startMfaStep(
+      const session = await api.mfaBeginStep(
         instance.id,
         location.id,
         MfaMethod.Oidc,
         stepPlan,
         mfaToken,
       );
-      setMfaToken(session.token);
+      if (!attempt.isLive()) return;
 
-      await api.openLink(`${instance.proxy_url}openid/mfa?token=${session.token}`);
+      const openIdUrl = buildOpenIdMfaUrl(
+        instance.proxy_url,
+        session.token,
+        session.stepAttemptId,
+      );
+      await api.openLink(openIdUrl.toString());
+      if (!attempt.isLive()) return;
+      setMfaToken(session.token);
 
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, location.id, session.token);
-      taskIdRef.current = taskId;
+      const taskId = await api.mfaPollOpenId(
+        instance.id,
+        location.id,
+        session.token,
+        session.stepAttemptId,
+      );
+      attempt.ownTask(taskId);
+      if (!attempt.isLive()) return;
 
-      // The backend brings up the connection itself; completion means connected.
-      const completeUnlisten = await listen(TauriEvent.MfaOpenIdComplete, () => {
-        cleanup();
-        setIsPolling(false);
-      });
-
-      const errorUnlisten = await listen<MfaErrorPayload>(
-        TauriEvent.MfaOpenIdError,
-        (event) => {
-          cleanup();
+      // Add listeners one at a time so a late listener cannot leave later listeners active.
+      //
+      // The backend connects the VPN; completion means it is connected.
+      await attempt.ownListener(
+        listen(TauriEvent.MfaOpenIdComplete, () => {
+          if (!attempt.tryFinish()) return;
           setIsPolling(false);
-          error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
-          const message = mfaErrorMessage(event.payload.error);
-          if (isTimeout(event.payload.error)) {
-            setPollError('Authentication timed out. Please try again.');
-          } else if (isConnectFailure(message)) {
-            setPollError('Failed to establish VPN connection');
-          } else if (isSessionExpired(message)) {
+        }),
+      );
+      if (!attempt.isLive()) return;
+
+      await attempt.ownListener(
+        listen<MfaStepAdvancedPayload>(TauriEvent.MfaOpenIdStepAdvanced, (event) => {
+          if (!attempt.tryFinish()) return;
+          setIsPolling(false);
+          goToStep(event.payload.nextStep);
+        }),
+      );
+      if (!attempt.isLive()) return;
+
+      await attempt.ownListener(
+        listen<MfaErrorPayload>(TauriEvent.MfaOpenIdError, (event) => {
+          if (!attempt.tryFinish()) return;
+          setIsPolling(false);
+          void error(
+            `OIDC MFA failed for location ${location.id}: ${event.payload.error}`,
+          );
+          const failure = classifyOidcPollFailure(event.payload.error);
+          // The full view handles an expired session itself; the compact view shows a message.
+          if (failure.kind === 'sessionExpired') {
             onSessionExpired?.();
           } else {
-            setPollError('Authentication failed. Please try again.');
+            setPollError(failure.message);
           }
-        },
+        }),
       );
-
-      unlistenRef.current = () => {
-        completeUnlisten();
-        errorUnlisten();
-      };
     } catch (e) {
+      if (!attempt.isLive()) return;
+      attempt.abandon();
       void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
         onPostureError?.(mfaErrorMessage(e));
@@ -131,19 +139,35 @@ export const useConnectModalMfaOidc = ({
       }
       setStartError(mfaErrorMessage(e));
     } finally {
-      setIsStarting(false);
+      if (attempt.isLive()) {
+        setIsStarting(false);
+      }
     }
   }, [
+    startAttempt,
     instance,
     location,
     stepPlan,
     mfaToken,
     setMfaToken,
-    cleanup,
+    goToStep,
     onPostureError,
     onSessionExpired,
     onServiceUnavailable,
   ]);
+
+  // Wait one tick so React Strict Mode or an immediate unmount can cancel the
+  // start before it runs.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
+  useEffect(() => {
+    if (!autoStart) return;
+
+    const timer = window.setTimeout(() => {
+      void start();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [autoStart]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

@@ -24,6 +24,7 @@ export const ConnectModalMfaOidc = () => {
   );
 
   const { start, isStarting, startError, isPolling, pollError } = useConnectModalMfaOidc({
+    autoStart: initAutoStart,
     onSessionExpired: () =>
       useConnectModal.getState().setView(perviousView ?? ConnectModalView.MfaSettings),
     onPostureError: (msg) => {
@@ -50,13 +51,6 @@ export const ConnectModalMfaOidc = () => {
   }, [start]);
 
   const errorMessage = startError ?? pollError;
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on mount side effect
-  useEffect(() => {
-    if (initAutoStart) {
-      handleStart();
-    }
-  }, [initAutoStart]);
 
   if (isStarting && location?.posture_check_required && !startError) {
     return <ConnectModalPostureCheckLoading />;

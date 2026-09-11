@@ -91,8 +91,7 @@ export const TauriCommand = {
   EnrollmentNetworkInfo: 'enrollment_network_info',
   EnrollmentFinish: 'enrollment_finish',
   // MFA
-  MfaStart: 'mfa_start',
-  MfaStepStart: 'mfa_step_start',
+  MfaBeginStep: 'mfa_begin_step',
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
@@ -167,9 +166,12 @@ export const TauriEvent = {
   SessionStateChanged: 'session-state-changed',
   MfaOpenIdComplete: 'mfa-openid-complete',
   MfaOpenIdError: 'mfa-openid-error',
+  MfaOpenIdStepAdvanced: 'mfa-openid-step-advanced',
   MfaMobileComplete: 'mfa-mobile-complete',
   MfaMobileError: 'mfa-mobile-error',
+  MfaMobileStepAdvanced: 'mfa-mobile-step-advanced',
   MfaFido2Complete: 'mfa-fido2-complete',
+  MfaFido2StepAdvanced: 'mfa-fido2-step-advanced',
   MfaFido2Error: 'mfa-fido2-error',
   MfaFido2Touch: 'mfa-fido2-touch',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
@@ -503,26 +505,28 @@ export type EnrollmentMfaFinishResult = {
   recovery_codes: string[];
 };
 
-/** Result from mfa_start Tauri command. */
-export type MfaStartResult = {
-  token: string;
-  challenge: string | null;
-};
-
-export type MfaStepStartResult = {
-  step_attempt_id: string;
-  challenge: string | null;
-};
-
-export type MfaStepSession = {
+/** Result from mfa_begin_step Tauri command. */
+export type MfaBeginStepResult = {
   token: string;
   challenge: string | null;
   stepAttemptId: string | null;
+  credentialIds: string[];
 };
 
 /** Payload for mfa-openid-error / mfa-mobile-error events. */
 export type MfaErrorPayload = {
   error: string;
+};
+
+/** Payload for mfa-openid-step-advanced / mfa-mobile-step-advanced events. */
+export type MfaStepAdvancedPayload = {
+  nextStep: number;
+};
+
+/** Payload for the FIDO2 step-advanced event, including the session token. */
+export type MfaFido2StepAdvancedPayload = {
+  nextStep: number;
+  token: string;
 };
 
 /** `network`: the request could not be sent, most likely a bad URL.
