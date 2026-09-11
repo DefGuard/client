@@ -498,9 +498,8 @@ async fn wait_for_mfa_outcome(
                 Ok(MobileMfaResponse::Legacy { preshared_key }) => {
                     if preshared_key.is_empty() {
                         return Err(MfaError::MfaRejected {
-                            message:
-                                "mobile approval failed: proxy returned an empty preshared key"
-                                    .into(),
+                            message: "mobile approval failed: Edge returned an empty preshared key"
+                                .into(),
                         });
                     }
 

@@ -33,7 +33,7 @@ export const isAttemptLimit = (err: unknown): boolean =>
 export const isStaleAttempt = (message: string): boolean =>
   message.includes('stale MFA attempt');
 
-/** The proxy session/token is no longer valid. */
+/** The Edge session/token is no longer valid. */
 export const isSessionExpired = (message: string): boolean =>
   message.includes('invalid token') || message.includes('login session not found');
 
@@ -45,7 +45,7 @@ export const isTimeout = (err: unknown): boolean =>
 export const isInvalidCode = (message: string): boolean =>
   message.includes('Unauthorized');
 
-/** Returns true when the proxy or Edge service is unavailable. */
+/** Returns true when the Edge service is unavailable. */
 export const isServiceUnavailable = (err: unknown): boolean => {
   const parsed = parseMfaError(err);
   if (!parsed) return false;
