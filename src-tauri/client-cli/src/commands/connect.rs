@@ -4,7 +4,7 @@ use defguard_client_posture::{authorize_posture_session, get_posture_data};
 use defguard_client_proto::defguard::client_types::MfaMethod;
 use defguard_core::{
     connection::{active_state::active_state, bring_up, ConnectionTarget},
-    database::models::{instance::Instance, Id},
+    database::models::{instance::Instance, location::Location, Id},
     ConnectionType,
 };
 use secrecy::ExposeSecret;
@@ -29,6 +29,7 @@ pub async fn handle(
     code: Option<&str>,
     code_command: Option<&str>,
     mfa_method: Option<&str>,
+    mfa_steps: &[String],
     qr_file: Option<&str>,
     all_traffic: bool,
     predefined_traffic: bool,
@@ -75,7 +76,74 @@ pub async fn handle(
 
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(location) => {
-            if location.mfa_enabled() {
+            if location.mfa_steps.len() > 1 {
+                // Multi-step MFA: one method per verification step.
+                if mfa_method.is_some() {
+                    return Err(CliError::InvalidInput(format!(
+                        "Location '{}' needs multi-step MFA; use --mfa-step per step instead of --mfa-method.",
+                        location.name
+                    )));
+                }
+                if code.is_some() {
+                    return Err(CliError::InvalidInput(
+                        "--code holds a single code; multi-step locations need one code per step. \
+                         Use --code-command or an interactive terminal."
+                            .into(),
+                    ));
+                }
+                if qr_file.is_some() {
+                    return Err(CliError::InvalidInput(
+                        "--qr-file is only valid with mobile-approve MFA".into(),
+                    ));
+                }
+
+                let instance = Instance::find_by_id(&state.pool, location.instance_id)
+                    .await
+                    .map_err(|e| CliError::Other(format!("Failed to load instance: {e}")))?
+                    .ok_or_else(|| {
+                        CliError::Other(format!("Instance {} not found", location.instance_id))
+                    })?;
+
+                let posture_data = if location.posture_check_required {
+                    Some(
+                        get_posture_data()
+                            .await
+                            .map_err(|e| CliError::Other(e.to_string()))?,
+                    )
+                } else {
+                    None
+                };
+
+                let (plan, interacted) =
+                    mfa::resolve_step_plan(location, mfa_steps, stdin().is_terminal())?;
+                let psk = mfa::authorize_multistep(
+                    location,
+                    code_command,
+                    &plan,
+                    &instance,
+                    posture_data,
+                    &state.pool,
+                )
+                .await?;
+                if interacted {
+                    // Mirror the desktop client: interactively picked methods
+                    // become the saved plan; --mfa-step one-offs do not.
+                    let saved = plan
+                        .iter()
+                        .map(|method| (*method).into())
+                        .collect::<Vec<_>>();
+                    if let Err(e) =
+                        Location::set_mfa_step_plan(&state.pool, location.id, saved).await
+                    {
+                        tracing::warn!("Failed to save MFA step plan: {e}");
+                    }
+                }
+                (
+                    location.name.clone(),
+                    Some(psk.expose_secret().to_string()),
+                    state.app_config.mtu(),
+                )
+            } else if location.mfa_enabled() {
                 // Resolve the effective MFA method.
                 let method = mfa::resolve_method(location, mfa_method)?;
 

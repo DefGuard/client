@@ -15,6 +15,7 @@ use defguard_client_core::{
     version::{MIN_CORE_VERSION, MIN_PROXY_VERSION},
 };
 use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
+use futures_util::future::join_all;
 use reqwest::{StatusCode, Url};
 use semver::Version;
 use serde::Serialize;
@@ -74,15 +75,15 @@ pub struct VersionMismatchPayload {
 }
 
 /// Talks to the proxy for a single instance: builds the request, POSTs it,
-/// handles 402 PAYMENT_REQUIRED by disabling enterprise features, parses the
+/// handles 402 PAYMENT_REQUIRED as [`Error::CoreNotEnterprise`], parses the
 /// response, and checks the version headers.
+///
+/// Pure network fetch: touches no database, so callers can run it concurrently.
+/// Persisting the 402 state is the caller's job (see [`poll_instance`]).
 ///
 /// Does **not** apply config changes or emit events - those are the caller's
 /// responsibility.
-pub async fn fetch_instance_config(
-    transaction: &mut Transaction<'_, Sqlite>,
-    instance: &mut Instance<Id>,
-) -> Result<FetchedConfig, Error> {
+pub async fn fetch_instance_config(instance: &Instance<Id>) -> Result<FetchedConfig, Error> {
     debug!("Getting config from core for instance {}", instance.name);
 
     let request = build_request(instance)?;
@@ -105,27 +106,13 @@ pub async fn fetch_instance_config(
         instance.name
     );
 
-    // Return early if the enterprise features are disabled in the core
+    // Enterprise features disabled in core; the caller persists that state
+    // serially (it owns the write transaction, this fetch does none).
     if response.status() == StatusCode::PAYMENT_REQUIRED {
         debug!(
-            "Instance {}({}) has enterprise features disabled, checking if this state is reflected \
-            on our end.",
+            "Instance {}({}) has enterprise features disabled in core.",
             instance.name, instance.id
         );
-        if instance.enterprise_enabled {
-            info!(
-                "Instance {}({}) has enterprise features disabled, but we have them enabled, \
-                disabling.",
-                instance.name, instance.id
-            );
-            disable_enterprise_features(instance, transaction.as_mut()).await?;
-        } else {
-            debug!(
-                "Instance {}({}) has enterprise features disabled, and we have them disabled as \
-                well, no action needed",
-                instance.name, instance.id
-            );
-        }
         return Err(Error::CoreNotEnterprise);
     }
 
@@ -175,7 +162,29 @@ pub async fn poll_instance(
     instance: &mut Instance<Id>,
     has_active_connections: bool,
 ) -> Result<PollInstanceResult, Error> {
-    let fetched = fetch_instance_config(transaction, instance).await?;
+    let fetched = fetch_instance_config(instance).await;
+    apply_fetched_config(transaction, instance, has_active_connections, fetched).await
+}
+
+/// Applies an already-fetched config to the database.
+async fn apply_fetched_config(
+    transaction: &mut Transaction<'_, Sqlite>,
+    instance: &mut Instance<Id>,
+    has_active_connections: bool,
+    fetch_result: Result<FetchedConfig, Error>,
+) -> Result<PollInstanceResult, Error> {
+    let fetched = match fetch_result {
+        Err(Error::CoreNotEnterprise) if instance.enterprise_enabled => {
+            info!(
+                "Instance {}({}) has enterprise features disabled, but we have them enabled, \
+                disabling.",
+                instance.name, instance.id
+            );
+            disable_enterprise_features(instance, transaction.as_mut()).await?;
+            return Err(Error::CoreNotEnterprise);
+        }
+        fetched => fetched?,
+    };
     let version_mismatch = fetched.version_mismatch;
 
     let device_config =
@@ -231,19 +240,29 @@ pub async fn poll_instance(
 
 /// Polls all instances that have a polling token and commits any safe configuration updates.
 ///
+/// Fetches run concurrently
+///
 /// The caller owns active-connection detection and all user-facing side effects.
 pub async fn poll_instances(
     pool: &DbPool,
     active_instance_ids: &HashSet<Id>,
 ) -> Result<Vec<PollInstanceOutcome>, Error> {
+    let mut instances = Instance::all_with_token(pool).await?;
+    let fetch_results = join_all(instances.iter().map(fetch_instance_config)).await;
+
     let mut transaction = pool.begin().await?;
-    let mut instances = Instance::all_with_token(&mut *transaction).await?;
     let mut outcomes = Vec::with_capacity(instances.len());
 
-    for instance in &mut instances {
+    for (instance, fetch_result) in instances.iter_mut().zip(fetch_results) {
         let has_active_connections = active_instance_ids.contains(&instance.id);
         let instance_id = instance.id;
-        let result = poll_instance(&mut transaction, instance, has_active_connections).await;
+        let result = apply_fetched_config(
+            &mut transaction,
+            instance,
+            has_active_connections,
+            fetch_result,
+        )
+        .await;
         outcomes.push(PollInstanceOutcome {
             instance_id,
             instance_name: instance.name.clone(),
@@ -832,5 +851,76 @@ mod tests {
             .find(|outcome| outcome.instance_id == instance_error.id)
             .unwrap();
         assert!(error_outcome.result.is_err());
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn test_poll_instances_updates_all_succeeding_instances(pool: SqlitePool) {
+        // Both instances change; a failure to apply one must not lose the other.
+        let mut first = seed_instance(&pool, "first", "https://proxy.example", Some("tok-1")).await;
+        seed_location(&pool, first.id, 1, "office", "1.2.3.4:51820").await;
+        let first_server = MockPollServer::new(vec![poll_response(device_config_response(
+            &first,
+            device_config(1, "office", "5.6.7.8:51820"),
+        ))]);
+        first.proxy_url = first_server.url();
+        first.save(&pool).await.unwrap();
+
+        let mut second =
+            seed_instance(&pool, "second", "https://proxy.example", Some("tok-2")).await;
+        seed_location(&pool, second.id, 1, "lab", "9.9.9.9:51820").await;
+        let second_server = MockPollServer::new(vec![poll_response(device_config_response(
+            &second,
+            device_config(1, "lab", "8.8.8.8:51820"),
+        ))]);
+        second.proxy_url = second_server.url();
+        second.save(&pool).await.unwrap();
+
+        let outcomes = poll_instances(&pool, &HashSet::new()).await.unwrap();
+
+        assert_eq!(outcomes.len(), 2);
+        for outcome in &outcomes {
+            assert!(
+                matches!(outcome.result, Ok(PollInstanceResult::Updated { .. })),
+                "unexpected outcome for {}: {:?}",
+                outcome.instance_name,
+                outcome.result.as_ref().map(|_| ()),
+            );
+        }
+        let first_location = Location::find_by_instance_id(&pool, first.id, true)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(first_location.endpoint, "5.6.7.8:51820");
+        let second_location = Location::find_by_instance_id(&pool, second.id, true)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(second_location.endpoint, "8.8.8.8:51820");
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn test_poll_instances_payment_required_disables_enterprise(pool: SqlitePool) {
+        let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+        // Make the 402 write observable: the handler resets the traffic policy.
+        instance.client_traffic_policy = ClientTrafficPolicy::DisableAllTraffic;
+        instance.save(&pool).await.unwrap();
+        let server = MockPollServer::new(vec![MockResponse {
+            status: 402,
+            body: String::new(),
+        }]);
+        instance.proxy_url = server.url();
+        instance.save(&pool).await.unwrap();
+
+        let outcomes = poll_instances(&pool, &HashSet::new()).await.unwrap();
+
+        assert_eq!(outcomes.len(), 1);
+        assert!(matches!(outcomes[0].result, Err(Error::CoreNotEnterprise)));
+        let reloaded = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(reloaded.client_traffic_policy, ClientTrafficPolicy::None);
     }
 }

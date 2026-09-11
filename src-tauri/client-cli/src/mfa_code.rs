@@ -47,6 +47,32 @@ pub struct MfaContext {
     pub instance: String,
     /// `DG_LOCATION` - the location name.
     pub location: String,
+    /// Present when the code belongs to one step of a multi-step location.
+    pub step: Option<MfaStepContext>,
+}
+
+/// Additional context displayed to the user when entering an MFA code.
+pub struct MfaStepContext {
+    /// Zero-based step index.
+    pub index: usize,
+    /// Total number of steps.
+    pub total: usize,
+    /// Human label of the step's method ("Authenticator app", "Email").
+    pub method_label: String,
+}
+
+/// Interactive prompt text.
+fn code_prompt(ctx: &MfaContext) -> String {
+    match &ctx.step {
+        Some(step) => format!(
+            "Enter {} code for '{}' (step {} of {}): ",
+            step.method_label,
+            ctx.location,
+            step.index + 1,
+            step.total
+        ),
+        None => format!("Enter MFA code for {}: ", ctx.location),
+    }
 }
 
 /// Obtain a TOTP/email code from the configured source.
@@ -92,7 +118,7 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
             }
 
             // N.B. stderr - stdout is reserved for data.
-            eprint!("Enter MFA code for {}: ", ctx.location);
+            eprint!("{}", code_prompt(ctx));
             stderr().flush().ok();
 
             let mut code = String::new();
@@ -115,7 +141,27 @@ mod tests {
         MfaContext {
             instance: "test-inst".into(),
             location: "test-loc".into(),
+            step: None,
         }
+    }
+
+    #[test]
+    fn test_code_prompt_legacy_without_step() {
+        assert_eq!(code_prompt(&ctx()), "Enter MFA code for test-loc: ");
+    }
+
+    #[test]
+    fn test_code_prompt_step_aware() {
+        let mut ctx = ctx();
+        ctx.step = Some(MfaStepContext {
+            index: 1,
+            total: 2,
+            method_label: "Authenticator app".into(),
+        });
+        assert_eq!(
+            code_prompt(&ctx),
+            "Enter Authenticator app code for 'test-loc' (step 2 of 2): "
+        );
     }
 
     #[test]

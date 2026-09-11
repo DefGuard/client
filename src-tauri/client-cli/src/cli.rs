@@ -61,6 +61,12 @@ pub enum Commands {
         #[arg(long)]
         mfa_method: Option<String>,
 
+        /// MFA method for one verification step of a multi-step location,
+        /// in order (repeat per step: --mfa-step totp --mfa-step email).
+        /// Omitted steps are chosen interactively on a TTY.
+        #[arg(long = "mfa-step")]
+        mfa_steps: Vec<String>,
+
         /// Save the mobile-approve MFA QR code as a PNG image to this path.
         /// Required when stderr is not a terminal.
         #[arg(long)]

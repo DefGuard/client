@@ -6,6 +6,8 @@
 //! rendering, TTY prompting) stays here; all HTTP, WebSocket, and poll
 //! logic delegates to `defguard_core::mfa`.
 
+use std::io::{stderr, stdin, Write};
+
 use defguard_client_proto::defguard::{
     client_types::MfaMethod, enterprise::posture::v2::DevicePostureData,
 };
@@ -20,14 +22,16 @@ use defguard_core::{
         DbPool,
     },
     mfa,
-    proto::client_types::{ClientMfaFinishRequest, ClientMfaStartRequest},
+    proto::client_types::{
+        mfa_step_result, ClientMfaFinishRequest, ClientMfaStartRequest, ClientMfaStepStartRequest,
+    },
 };
 use secrecy::{ExposeSecret, SecretString};
 use tracing::{debug, info, warn};
 use url::Url;
 
 use crate::{
-    mfa_code::{obtain_code, CodeSource, MfaContext},
+    mfa_code::{obtain_code, CodeSource, MfaContext, MfaStepContext},
     mfa_qr,
     state::CliError,
 };
@@ -104,6 +108,189 @@ pub(crate) fn validate_mfa_flags(
     Ok(())
 }
 
+/// CLI-drivable step methods for the code loop below. Mirrors the desktop's
+/// `isDesktopDrivable`, minus FIDO2 which has no CLI support.
+fn is_cli_code_method(method: LocationMfaMethod) -> bool {
+    matches!(method, LocationMfaMethod::Totp | LocationMfaMethod::Email)
+}
+
+fn proto_method(method: LocationMfaMethod) -> MfaMethod {
+    match method {
+        LocationMfaMethod::Totp => MfaMethod::Totp,
+        LocationMfaMethod::Email => MfaMethod::Email,
+        LocationMfaMethod::Oidc => MfaMethod::Oidc,
+        LocationMfaMethod::Biometric => MfaMethod::Biometric,
+        LocationMfaMethod::MobileApprove => MfaMethod::MobileApprove,
+        // Fido2 has no proto discriminant; unreachable (filtered above).
+        LocationMfaMethod::Fido2 => MfaMethod::Totp,
+    }
+}
+
+fn step_method_label(method: LocationMfaMethod) -> &'static str {
+    match method {
+        LocationMfaMethod::Totp => "Authenticator app",
+        LocationMfaMethod::Email => "Email",
+        _ => method.as_str(),
+    }
+}
+
+/// Resolve one MFA method per verification step, porting the desktop's
+/// `resolveMfaStepPlan`: `--mfa-step` one-off, then the saved plan, then the
+/// sole usable method, then an interactive pick. Returns the plan plus
+/// whether any step was chosen interactively (the caller saves those).
+pub(crate) fn resolve_step_plan(
+    location: &Location<Id>,
+    one_off: &[String],
+    interactive: bool,
+) -> Result<(Vec<MfaMethod>, bool), CliError> {
+    let steps = &location.mfa_steps;
+    if one_off.len() > steps.len() {
+        return Err(CliError::InvalidInput(format!(
+            "Location '{}' has {} verification steps but {} --mfa-step values were given.",
+            location.name,
+            steps.len(),
+            one_off.len()
+        )));
+    }
+
+    let mut plan = Vec::with_capacity(steps.len());
+    let mut interacted = false;
+    for (index, step) in steps.iter().enumerate() {
+        let mut candidates: Vec<LocationMfaMethod> = step
+            .methods
+            .iter()
+            .filter(|entry| entry.configured && is_cli_code_method(entry.method))
+            .map(|entry| entry.method)
+            .collect();
+        if candidates.is_empty() {
+            candidates = step
+                .methods
+                .iter()
+                .filter(|entry| is_cli_code_method(entry.method))
+                .map(|entry| entry.method)
+                .collect();
+        }
+
+        if let Some(raw) = one_off.get(index) {
+            let method = parse_method(raw)?;
+            let picked = LocationMfaMethod::from(method);
+            if !is_cli_code_method(picked) {
+                return Err(CliError::InvalidInput(format!(
+                    "--mfa-step only supports totp/email; step {} needs a code method.",
+                    index + 1
+                )));
+            }
+            if !candidates.contains(&picked) {
+                let usable = candidates
+                    .iter()
+                    .map(|m| m.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Err(CliError::InvalidInput(format!(
+                    "--mfa-step '{raw}' is not available for step {} of '{}' (usable: {usable}).",
+                    index + 1,
+                    location.name
+                )));
+            }
+            plan.push(method);
+            continue;
+        }
+
+        match location.mfa_step_plan.get(index) {
+            Some(saved) if candidates.contains(saved) => {
+                plan.push(proto_method(*saved));
+                continue;
+            }
+            _ => {}
+        }
+
+        if candidates.len() == 1 {
+            plan.push(proto_method(candidates[0]));
+        } else if candidates.is_empty() {
+            return Err(CliError::MfaFailed(format!(
+                "Step {} of '{}' has no method the CLI can drive (totp/email). \
+                 Use the desktop client.",
+                index + 1,
+                location.name
+            )));
+        } else if interactive {
+            plan.push(prompt_step_method(
+                &location.name,
+                index,
+                steps.len(),
+                &candidates,
+            )?);
+            interacted = true;
+        } else {
+            let usable = candidates
+                .iter()
+                .map(|m| m.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(CliError::MfaInputRequired(format!(
+                "Step {} of '{}' offers multiple methods ({usable}). \
+                 Pass --mfa-step or run on a TTY.",
+                index + 1,
+                location.name
+            )));
+        }
+    }
+    Ok((plan, interacted))
+}
+
+/// Ask which method to use for one step.
+fn prompt_step_method(
+    location_name: &str,
+    index: usize,
+    step_count: usize,
+    candidates: &[LocationMfaMethod],
+) -> Result<MfaMethod, CliError> {
+    eprintln!(
+        "Step {} of {} for '{location_name}': choose MFA method:",
+        index + 1,
+        step_count
+    );
+    for (n, method) in candidates.iter().enumerate() {
+        eprintln!(
+            "  {}) {} ({})",
+            n + 1,
+            step_method_label(*method),
+            method.as_str()
+        );
+    }
+    eprint!("Enter choice [1-{} or name]: ", candidates.len());
+    stderr().flush().ok();
+
+    let mut input = String::new();
+    stdin()
+        .read_line(&mut input)
+        .map_err(|e| CliError::MfaFailed(format!("Failed to read choice: {e}")))?;
+    let input = input.trim();
+
+    let numbered = input
+        .parse::<usize>()
+        .ok()
+        .filter(|n| (1..=candidates.len()).contains(n));
+    if let Some(n) = numbered {
+        return Ok(proto_method(candidates[n - 1]));
+    }
+    match parse_method(input) {
+        Ok(method) if is_cli_code_method(LocationMfaMethod::from(method)) => {
+            if candidates.contains(&LocationMfaMethod::from(method)) {
+                Ok(method)
+            } else {
+                Err(CliError::InvalidInput(format!(
+                    "'{input}' is not available for this step."
+                )))
+            }
+        }
+        _ => Err(CliError::InvalidInput(format!(
+            "Invalid choice '{input}'. Enter 1-{} or a method name.",
+            candidates.len()
+        ))),
+    }
+}
+
 /// Run the VPN MFA handshake for a location (TOTP or email).
 ///
 /// The HTTP calls are handled by `defguard_core::mfa`; this function
@@ -176,6 +363,7 @@ pub(crate) async fn authorize(
     let ctx = MfaContext {
         instance: instance.name.clone(),
         location: location.name.clone(),
+        step: None,
     };
     let code = obtain_code(source, &ctx)?;
 
@@ -193,6 +381,139 @@ pub(crate) async fn authorize(
 
     info!("MFA session completed, preshared key obtained");
     Ok(SecretString::from(psk.preshared_key))
+}
+
+/// Run the VPN MFA handshake for a multi-step location (TOTP / email steps).
+///
+/// Returns the preshared key once the server reports the plan completed.
+pub(crate) async fn authorize_multistep(
+    location: &Location<Id>,
+    code_command: Option<&str>,
+    plan: &[MfaMethod],
+    instance: &Instance<Id>,
+    posture_data: Option<DevicePostureData>,
+    pool: &DbPool,
+) -> Result<SecretString, CliError> {
+    let Some((first, _)) = plan.split_first() else {
+        return Err(CliError::Other("MFA step plan is empty".into()));
+    };
+
+    let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
+        .await
+        .map_err(|e| CliError::Other(e.to_string()))?
+        .ok_or_else(|| {
+            CliError::Other(format!(
+                "WireGuard keys not found for instance {}",
+                instance.name
+            ))
+        })?;
+
+    let proxy_url = Url::parse(&instance.proxy_url)
+        .map_err(|e| CliError::Other(format!("Invalid proxy URL: {e}")))?;
+    check_proxy_scheme(&proxy_url);
+
+    debug!(
+        "Starting multi-step MFA session for location {} ({} steps)",
+        location.name,
+        plan.len()
+    );
+    #[allow(deprecated)]
+    let request = ClientMfaStartRequest {
+        location_id: location.network_id,
+        pubkey: wireguard_keys.pubkey,
+        method: *first as i32,
+        posture_data,
+        selected_methods: plan.iter().map(|method| *method as i32).collect(),
+    };
+    let info = mfa::mfa_start(proxy_url.clone(), request)
+        .await
+        .map_err(into_cli)?;
+
+    let ctx = MfaContext {
+        instance: instance.name.clone(),
+        location: location.name.clone(),
+        step: None,
+    };
+    let token = info.token;
+    for (index, method) in plan.iter().enumerate() {
+        let step_attempt_id = if index == 0 {
+            None
+        } else {
+            debug!(
+                "Starting MFA step {}/{} ({method:?})",
+                index + 1,
+                plan.len()
+            );
+            let step = mfa::mfa_step_start(
+                proxy_url.clone(),
+                ClientMfaStepStartRequest {
+                    token: token.clone(),
+                    method: *method as i32,
+                },
+            )
+            .await
+            .map_err(into_cli)?;
+            Some(step.step_attempt_id)
+        };
+
+        let source = match code_command {
+            Some(cmd) => CodeSource::Command(cmd.to_string()),
+            // Interactive; obtain_code errors clearly without a TTY.
+            None => CodeSource::Interactive,
+        };
+        let step_ctx = MfaContext {
+            instance: ctx.instance.clone(),
+            location: ctx.location.clone(),
+            step: Some(MfaStepContext {
+                index,
+                total: plan.len(),
+                method_label: step_method_label(LocationMfaMethod::from(*method)).to_string(),
+            }),
+        };
+        let code = obtain_code(&source, &step_ctx)?;
+
+        let finish = mfa::mfa_finish_code(
+            proxy_url.clone(),
+            ClientMfaFinishRequest {
+                token: token.clone(),
+                code: Some(code.expose_secret().to_string()),
+                auth_pub_key: None,
+                step_attempt_id,
+                auth_data: None,
+                credential_id: None,
+            },
+        )
+        .await
+        .map_err(into_cli)?;
+
+        match finish.result.and_then(|result| result.outcome) {
+            Some(mfa_step_result::Outcome::Advanced(advanced)) => {
+                debug!(
+                    "MFA step passed, advancing to step {}",
+                    advanced.next_step + 1
+                );
+            }
+            Some(mfa_step_result::Outcome::Completed(completed)) => {
+                info!("MFA session completed, preshared key obtained");
+                return Ok(SecretString::from(completed.preshared_key));
+            }
+            Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {
+                return Err(CliError::Other(
+                    "The server returned an unexpected verification state".into(),
+                ));
+            }
+            // Legacy single-response path.
+            None => {
+                info!("MFA session completed, preshared key obtained");
+                #[allow(deprecated)]
+                return Ok(SecretString::from(finish.preshared_key));
+            }
+        }
+    }
+
+    Err(CliError::Other(
+        "MFA finished without a preshared key".into(),
+    ))
 }
 
 /// Run the OIDC MFA flow for an external-IdP location.
@@ -534,5 +855,109 @@ mod tests {
         let err = resolve_method(&l, Some("oidc")).unwrap_err();
         assert!(matches!(err, CliError::InvalidInput(_)));
         assert!(err.to_string().contains("oidc"));
+    }
+
+    use defguard_core::database::models::location::{LocationMfaStep, LocationMfaStepMethod};
+    use sqlx::types::Json;
+
+    fn step(methods: &[(LocationMfaMethod, bool)]) -> LocationMfaStep {
+        LocationMfaStep {
+            methods: methods
+                .iter()
+                .map(|(method, configured)| LocationMfaStepMethod {
+                    method: *method,
+                    configured: *configured,
+                })
+                .collect(),
+        }
+    }
+
+    fn multistep_location(
+        steps: Vec<LocationMfaStep>,
+        saved: Vec<LocationMfaMethod>,
+    ) -> Location<Id> {
+        let mut l = location("office", LocationMfaMode::Internal);
+        l.mfa_steps = Json(steps);
+        l.mfa_step_plan = Json(saved);
+        l
+    }
+
+    #[test]
+    fn test_step_plan_one_off_beats_saved() {
+        let l = multistep_location(
+            vec![
+                step(&[
+                    (LocationMfaMethod::Totp, true),
+                    (LocationMfaMethod::Email, true),
+                ]),
+                step(&[(LocationMfaMethod::Email, true)]),
+            ],
+            vec![LocationMfaMethod::Totp, LocationMfaMethod::Email],
+        );
+        let (plan, interacted) = resolve_step_plan(&l, &["email".to_string()], false).unwrap();
+        assert_eq!(plan, vec![MfaMethod::Email, MfaMethod::Email]);
+        assert!(!interacted);
+    }
+
+    #[test]
+    fn test_step_plan_saved_used_without_one_off() {
+        let l = multistep_location(
+            vec![
+                step(&[
+                    (LocationMfaMethod::Totp, true),
+                    (LocationMfaMethod::Email, true),
+                ]),
+                step(&[(LocationMfaMethod::Email, true)]),
+            ],
+            vec![LocationMfaMethod::Email],
+        );
+        let (plan, interacted) = resolve_step_plan(&l, &[], false).unwrap();
+        assert_eq!(plan, vec![MfaMethod::Email, MfaMethod::Email]);
+        assert!(!interacted);
+    }
+
+    #[test]
+    fn test_step_plan_single_usable_auto_picked() {
+        let l = multistep_location(vec![step(&[(LocationMfaMethod::Totp, true)])], vec![]);
+        let (plan, _) = resolve_step_plan(&l, &[], false).unwrap();
+        assert_eq!(plan, vec![MfaMethod::Totp]);
+    }
+
+    #[test]
+    fn test_step_plan_ambiguous_headless_errors() {
+        let l = multistep_location(
+            vec![step(&[
+                (LocationMfaMethod::Totp, true),
+                (LocationMfaMethod::Email, true),
+            ])],
+            vec![],
+        );
+        let err = resolve_step_plan(&l, &[], false).unwrap_err();
+        assert!(matches!(err, CliError::MfaInputRequired(_)));
+        assert!(err.to_string().contains("--mfa-step"));
+    }
+
+    #[test]
+    fn test_step_plan_too_many_one_offs_rejected() {
+        let l = multistep_location(vec![step(&[(LocationMfaMethod::Totp, true)])], vec![]);
+        let err =
+            resolve_step_plan(&l, &["totp".to_string(), "email".to_string()], false).unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn test_step_plan_unavailable_one_off_rejected() {
+        let l = multistep_location(vec![step(&[(LocationMfaMethod::Totp, true)])], vec![]);
+        let err = resolve_step_plan(&l, &["email".to_string()], false).unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("step 1"));
+    }
+
+    #[test]
+    fn test_step_plan_no_cli_method_uses_desktop() {
+        let l = multistep_location(vec![step(&[(LocationMfaMethod::Biometric, true)])], vec![]);
+        let err = resolve_step_plan(&l, &[], false).unwrap_err();
+        assert!(matches!(err, CliError::MfaFailed(_)));
+        assert!(err.to_string().contains("desktop"));
     }
 }

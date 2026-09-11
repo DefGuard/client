@@ -12,6 +12,7 @@ version.workspace = true
 defguard-client-core = { path = "../../core" }
 defguard-client-proto = { path = "../../client-proto" }
 defguard-client-service-locations = { path = "../service-locations" }
+futures-util.workspace = true
 log.workspace = true
 reqwest.workspace = true
 semver.workspace = true
