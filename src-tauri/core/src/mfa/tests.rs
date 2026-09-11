@@ -1,7 +1,7 @@
 use defguard_client_proto::defguard::client_types::{
     MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaStepResult,
 };
-use reqwest::Url;
+use reqwest::{StatusCode, Url};
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use wiremock::{
@@ -37,7 +37,8 @@ fn start_response_template(
     core_version: Option<&str>,
     proxy_version: Option<&str>,
 ) -> ResponseTemplate {
-    let mut response = ResponseTemplate::new(200).set_body_json(start_response_json("mfa-token"));
+    let mut response = ResponseTemplate::new(StatusCode::OK.as_u16())
+        .set_body_json(start_response_json("mfa-token"));
     if let Some(version) = core_version {
         response = response.insert_header(CORE_VERSION_HEADER, version);
     }
