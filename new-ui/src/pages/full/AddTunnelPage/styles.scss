@@ -1,0 +1,17 @@
+#add-tunnel-page {
+  .contents {
+    display: flex;
+    flex-flow: column;
+    row-gap: 1ch;
+    padding-bottom: var(--spacing-3xl);
+
+    .page-description {
+      font: var(--t-body-sm-400);
+      color: var(--fg-white-70);
+    }
+  }
+
+  .controls {
+    margin-top: auto;
+  }
+}

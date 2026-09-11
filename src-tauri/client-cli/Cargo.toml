@@ -1,0 +1,44 @@
+[package]
+name = "defguard-cli"
+description = "Command-line client for Defguard VPN - connect, disconnect, status"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file = "../../LICENSE.md"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+chrono.workspace = true
+clap = { workspace = true, features = ["cargo", "derive", "env"] }
+owo-colors = { version = "4", features = ["supports-colors"] }
+
+common = { package = "defguard-client-common", path = "../common" }
+defguard_core = { package = "defguard-client-core", path = "../core" }
+defguard_client_config_sync = { package = "defguard-client-config-sync", path = "../enterprise/config-sync" }
+defguard_client_posture = { package = "defguard-client-posture", path = "../enterprise/posture" }
+defguard_client_proto = { package = "defguard-client-proto", path = "../client-proto" }
+base64.workspace = true
+reqwest.workspace = true
+secrecy.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+url.workspace = true
+webbrowser.workspace = true
+http.workspace = true
+qrcode.workspace = true
+image.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+
+[dev-dependencies]
+sha1 = "0.11"
+tempfile.workspace = true
+tokio-stream = "0.1"
+tonic.workspace = true

@@ -1,0 +1,272 @@
+use std::io::{stderr, stdin, IsTerminal};
+
+use defguard_client_posture::{authorize_posture_session, get_posture_data};
+use defguard_client_proto::defguard::client_types::MfaMethod;
+use defguard_core::{
+    connection::{active_state::active_state, bring_up, ConnectionTarget},
+    database::models::{instance::Instance, Id},
+    ConnectionType,
+};
+use secrecy::ExposeSecret;
+use serde_json::{json, Value};
+use tracing::info;
+
+use crate::{
+    mfa,
+    mfa_code::CodeSource,
+    output::CommandOutput,
+    resolve::{resolve_connect_target, ResolvedTarget, TargetSpec},
+    state::{CliError, State},
+};
+
+#[allow(clippy::too_many_arguments)]
+pub async fn handle(
+    state: &State,
+    name: Option<&str>,
+    tunnel: bool,
+    id: Option<i64>,
+    instance: Option<&str>,
+    code: Option<&str>,
+    code_command: Option<&str>,
+    mfa_method: Option<&str>,
+    qr_file: Option<&str>,
+    all_traffic: bool,
+    predefined_traffic: bool,
+    json: bool,
+) -> Result<ConnectResult, CliError> {
+    // Per-call routing override: --all-traffic = true, --predefined-traffic = false,
+    // neither = None (use the location/tunnel default).
+    let routing_override: Option<bool> = if all_traffic {
+        Some(true)
+    } else if predefined_traffic {
+        Some(false)
+    } else {
+        None
+    };
+
+    let spec = TargetSpec {
+        name: name.map(String::from),
+        tunnel,
+        id,
+        instance: instance.map(String::from),
+    };
+
+    let target = resolve_connect_target(&spec, &state.pool).await?;
+
+    if matches!(&target, ResolvedTarget::Tunnel(_)) {
+        Instance::ensure_tunnels_enabled(&state.pool).await?;
+    }
+
+    // Idempotency: if the target is already connected, report and exit 0.
+    let (target_id, target_connection_type, target_name) = match &target {
+        ResolvedTarget::Location(loc) => (loc.id, ConnectionType::Location, loc.name.as_str()),
+        ResolvedTarget::Tunnel(tun) => (tun.id, ConnectionType::Tunnel, tun.name.as_str()),
+    };
+    let active: Vec<(Id, ConnectionType)> = active_state(&state.pool)
+        .await?
+        .iter()
+        .map(|c| (c.target_id, c.connection_type))
+        .collect();
+    if active.contains(&(target_id, target_connection_type)) {
+        return Ok(ConnectResult::AlreadyConnected {
+            name: target_name.to_string(),
+        });
+    }
+
+    let (target_name, psk, mtu) = match &target {
+        ResolvedTarget::Location(location) => {
+            if location.mfa_enabled() {
+                // Resolve the effective MFA method.
+                let method = mfa::resolve_method(location, mfa_method)?;
+
+                // Reject flags that are incompatible with the resolved method.
+                mfa::validate_mfa_flags(method, &location.name, code, code_command, qr_file)?;
+
+                let instance = Instance::find_by_id(&state.pool, location.instance_id)
+                    .await
+                    .map_err(|e| CliError::Other(format!("Failed to load instance: {e}")))?
+                    .ok_or_else(|| {
+                        CliError::Other(format!("Instance {} not found", location.instance_id))
+                    })?;
+
+                // When posture is also required, collect posture data and pass it
+                // into the MFA start request so the server can validate both together.
+                let posture_data = if location.posture_check_required {
+                    Some(
+                        get_posture_data()
+                            .await
+                            .map_err(|e| CliError::Other(e.to_string()))?,
+                    )
+                } else {
+                    None
+                };
+
+                let psk = if method == MfaMethod::Oidc {
+                    mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
+                        .await?
+                } else if method == MfaMethod::MobileApprove {
+                    // Fail-fast: if neither stderr is a TTY nor --qr-file is set,
+                    // the user cannot scan the QR.  Do not call /start.
+                    if !stderr().is_terminal() && qr_file.is_none() {
+                        return Err(CliError::InvalidInput(
+                            "No QR display available (stderr is not a TTY). \
+                             Use --qr-file <path> to save the QR as a PNG image."
+                                .into(),
+                        ));
+                    }
+                    mfa::authorize_mobile_approve(
+                        location,
+                        &instance,
+                        posture_data,
+                        qr_file,
+                        &state.pool,
+                        json,
+                    )
+                    .await?
+                } else {
+                    // Determine the MFA code source from CLI flags.
+                    let code_source = code
+                        .map(|c| CodeSource::Literal(c.to_string()))
+                        .or_else(|| code_command.map(|cmd| CodeSource::Command(cmd.to_string())));
+
+                    let source = if let Some(code_source) = code_source {
+                        code_source
+                    } else if stdin().is_terminal() {
+                        CodeSource::Interactive
+                    } else {
+                        return Err(CliError::MfaInputRequired(format!(
+                            "Location '{}' requires MFA but no --code, --code-command, or TTY is available.",
+                            location.name
+                        )));
+                    };
+
+                    mfa::authorize(
+                        location,
+                        &source,
+                        &instance,
+                        method,
+                        posture_data,
+                        &state.pool,
+                    )
+                    .await?
+                };
+                (
+                    location.name.clone(),
+                    Some(psk.expose_secret().to_string()),
+                    state.app_config.mtu(),
+                )
+            } else if location.posture_check_required {
+                // Posture only (no MFA).
+                let psk = authorize_posture_session(location)
+                    .await
+                    .map_err(|e| CliError::Other(e.to_string()))?;
+                (location.name.clone(), psk, state.app_config.mtu())
+            } else {
+                (location.name.clone(), None, state.app_config.mtu())
+            }
+        }
+        ResolvedTarget::Tunnel(tun) => (
+            tun.name.clone(),
+            tun.preshared_key.clone(),
+            state.app_config.mtu(),
+        ),
+    };
+
+    info!("Connecting to {target_name}...");
+    let conn_target = match target {
+        ResolvedTarget::Location(loc) => ConnectionTarget::Location(loc),
+        ResolvedTarget::Tunnel(tun) => ConnectionTarget::Tunnel(tun),
+    };
+
+    bring_up(conn_target, psk, mtu, &state.pool, routing_override).await?;
+
+    Ok(ConnectResult::Connected { name: target_name })
+}
+
+pub enum ConnectResult {
+    /// A new connection was established.
+    Connected { name: String },
+    /// The target was already connected (idempotent).
+    AlreadyConnected { name: String },
+}
+
+impl CommandOutput for ConnectResult {
+    fn human(&self) -> String {
+        match self {
+            ConnectResult::Connected { name } => format!("Connected to {name}"),
+            ConnectResult::AlreadyConnected { name } => {
+                format!("Already connected to {name}")
+            }
+        }
+    }
+
+    fn json(&self) -> Value {
+        match self {
+            ConnectResult::Connected { name } => json!({
+                "connected": name,
+            }),
+            ConnectResult::AlreadyConnected { name } => json!({
+                "connected": name,
+                "already": true,
+            }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_connected_human() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        assert_eq!(result.human(), "Connected to office");
+    }
+
+    #[test]
+    fn test_already_connected_human() {
+        let result = ConnectResult::AlreadyConnected {
+            name: "office".to_string(),
+        };
+        assert_eq!(result.human(), "Already connected to office");
+    }
+
+    #[test]
+    fn test_connected_json() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        let json = result.json();
+        assert_eq!(json["connected"], "office");
+        assert!(json["already"].is_null());
+    }
+
+    #[test]
+    fn test_already_connected_json() {
+        let result = ConnectResult::AlreadyConnected {
+            name: "office".to_string(),
+        };
+        let json = result.json();
+        assert_eq!(json["connected"], "office");
+        assert_eq!(json["already"], true);
+    }
+
+    #[test]
+    fn test_json_no_message_field() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        let json = result.json();
+        assert!(json["message"].is_null());
+    }
+
+    #[test]
+    fn test_exit_code_zero() {
+        let result = ConnectResult::Connected {
+            name: "office".to_string(),
+        };
+        assert_eq!(result.exit_code(), 0);
+    }
+}

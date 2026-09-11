@@ -9,6 +9,9 @@ use serde_with::{serde_as, DisplayFromStr};
 use thiserror::Error;
 use tracing::Level;
 
+const SERVICE_LOG_PREFIX: &str = "defguard-service.";
+const SERVICE_LOG_SUFFIX: &str = ".log";
+
 pub mod global_log_watcher;
 pub mod service_log_watcher;
 
@@ -68,10 +71,9 @@ struct LogLineFields {
 
 fn extract_timestamp(filename: &str) -> Option<NaiveDate> {
     trace!("Extracting timestamp from log file name: {filename}");
-    // we know that the date is always in the last 10 characters
-    let split_pos = filename.char_indices().nth_back(9)?.0;
-    let timestamp = &filename[split_pos..];
-    // parse and convert to `NaiveDate`
+    let timestamp = filename
+        .strip_prefix(SERVICE_LOG_PREFIX)?
+        .strip_suffix(SERVICE_LOG_SUFFIX)?;
     NaiveDate::parse_from_str(timestamp, "%Y-%m-%d").ok()
 }
 

@@ -1,0 +1,8 @@
+.flexible-empty-state {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: var(--spacing-2xl) 0;
+}

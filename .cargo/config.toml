@@ -1,0 +1,6 @@
+# A clean Windows has no vcruntime140.dll, so link the MSVC C runtime into the binaries.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -1,0 +1,104 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic,  keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\",\n            mfa_method \"mfa_method: _\", posture_check_required FROM location WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "instance_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "address",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "pubkey",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "endpoint",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "allowed_ips",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "dns",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "network_id",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "route_all_traffic",
+        "ordinal": 9,
+        "type_info": "Bool"
+      },
+      {
+        "name": "keepalive_interval",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "location_mfa_mode: LocationMfaMode",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "service_location_mode: ServiceLocationMode",
+        "ordinal": 12,
+        "type_info": "Integer"
+      },
+      {
+        "name": "mfa_method: _",
+        "ordinal": 13,
+        "type_info": "Integer"
+      },
+      {
+        "name": "posture_check_required",
+        "ordinal": 14,
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "a25979219918af2df8abca48a48d7fba459b79b74d462565088bf27d8e9fcd5d"
+}

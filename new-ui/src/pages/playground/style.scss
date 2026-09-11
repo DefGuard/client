@@ -1,0 +1,14 @@
+#playground-index {
+  .main-track {
+    box-sizing: border-box;
+    padding: var(--spacing-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    place-content: center flex-start;
+    align-items: center;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+}

@@ -1,26 +1,26 @@
+use defguard_client_core::connection::active_connections::{
+    get_connection_id_by_type, ACTIVE_CONNECTIONS,
+};
 use tauri::{
     image::Image,
     menu::{Menu, MenuBuilder, MenuEvent, MenuItem, SubmenuBuilder},
     path::BaseDirectory,
-    tray::TrayIconBuilder,
-    AppHandle, Emitter, Manager, Runtime,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager, Runtime,
 };
 
 use crate::{
-    active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
     appstate::AppState,
     commands::{all_instances, all_locations, connect, disconnect},
     database::{models::location::Location, DB_POOL},
     error::Error,
-    events::EventKey,
+    window_manager::{show_tray_or_full_view, trigger_mfa, COMPACT_WINDOW_ID},
     ConnectionType,
 };
 
 const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
 const JOIN_COMMUNITY_LINK: &str = "https://github.com/DefGuard/defguard/discussions/new/choose";
 const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
-
-const MAIN_WINDOW_ID: &str = "main";
 
 const TRAY_ICON_ID: &str = "tray";
 
@@ -31,27 +31,48 @@ const TRAY_EVENT_UPDATES: &str = "updates";
 const TRAY_EVENT_COMMUNITY: &str = "community";
 const TRAY_EVENT_FOLLOW: &str = "follow";
 
+fn store_tray_click_position(app: &AppHandle, event: &TrayIconEvent) {
+    let position = match event {
+        TrayIconEvent::Click {
+            button_state: MouseButtonState::Down,
+            rect,
+            ..
+        } => Some(rect.position.to_physical(1.0)),
+        _ => None,
+    };
+
+    if let Some(position) = position {
+        *app.state::<AppState>().tray_click_position.lock().unwrap() = Some(position);
+    }
+}
+
 /// Generate contents of system tray menu.
 async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error> {
     debug!("Generating tray menu.");
-    let quit = MenuItem::with_id(app, TRAY_EVENT_QUIT, "Quit", true, None::<&str>)?;
-    let show = MenuItem::with_id(app, TRAY_EVENT_SHOW, "Show", true, None::<&str>)?;
-    let hide = MenuItem::with_id(app, TRAY_EVENT_HIDE, "Hide", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, TRAY_EVENT_QUIT, "Quit", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
+    let show = MenuItem::with_id(app, TRAY_EVENT_SHOW, "Show", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
+    let hide = MenuItem::with_id(app, TRAY_EVENT_HIDE, "Hide", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
     let subscribe_updates = MenuItem::with_id(
         app,
         TRAY_EVENT_UPDATES,
         "Subscribe for updates",
         true,
         None::<&str>,
-    )?;
+    )
+    .map_err(crate::tauri_err_to_app_err)?;
     let join_community = MenuItem::with_id(
         app,
         TRAY_EVENT_COMMUNITY,
         "Community support",
         true,
         None::<&str>,
-    )?;
-    let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)?;
+    )
+    .map_err(crate::tauri_err_to_app_err)?;
+    let follow_us = MenuItem::with_id(app, TRAY_EVENT_FOLLOW, "Follow us", true, None::<&str>)
+        .map_err(crate::tauri_err_to_app_err)?;
 
     let mut menu = MenuBuilder::new(app);
     debug!("Getting all instances information for the tray menu");
@@ -76,7 +97,8 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                         location.menu_label(),
                         true,
                         None::<&str>,
-                    )?;
+                    )
+                    .map_err(crate::tauri_err_to_app_err)?;
                     menu = menu.item(&menu_item);
                 }
             } else {
@@ -96,10 +118,11 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                             location.menu_label(),
                             true,
                             None::<&str>,
-                        )?;
+                        )
+                        .map_err(crate::tauri_err_to_app_err)?;
                         instance_menu = instance_menu.item(&menu_item);
                     }
-                    let submenu = instance_menu.build()?;
+                    let submenu = instance_menu.build().map_err(crate::tauri_err_to_app_err)?;
                     menu = menu.item(&submenu);
                 }
             }
@@ -109,14 +132,14 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         }
     }
 
-    Ok(menu
-        .separator()
+    menu.separator()
         .items(&[&show, &hide])
         .separator()
         .items(&[&subscribe_updates, &join_community, &follow_us])
         .separator()
         .item(&quit)
-        .build()?)
+        .build()
+        .map_err(crate::tauri_err_to_app_err)
 }
 
 /// Setup system tray.
@@ -124,27 +147,42 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
 pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     let tray_menu = generate_tray_menu(app).await?;
 
-    // On macOS, always show menu under system tray icon.
-    #[cfg(target_os = "macos")]
-    TrayIconBuilder::with_id(TRAY_ICON_ID)
-        .menu(&tray_menu)
-        .show_menu_on_left_click(true)
-        .on_menu_event(handle_tray_menu_event)
-        .build(app)?;
-    // On other systems (especially Windows), system tray menu is on right-click,
-    // and double-click shows the main window.
-    #[cfg(not(target_os = "macos"))]
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
+        // NOTE: on Linux this click handler never fires. The `tray-icon` appindicator
+        // backend (libayatana-appindicator) does not emit tray click events - only the
+        // context menu works (`show_menu_on_left_click` is likewise a no-op on Linux).
+        // So left-click cannot open/toggle the window on Linux; users interact via the
+        // right-click menu's Show/Hide items (handled in `handle_tray_menu_event`).
+        // This is an upstream limitation, not a bug here. Documented in known-issues.
         .on_tray_icon_event(|icon, event| {
-            if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
-                show_main_window(icon.app_handle());
+            store_tray_click_position(icon.app_handle(), &event);
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                let app = icon.app_handle();
+
+                let tray_visible = app
+                    .get_webview_window(COMPACT_WINDOW_ID)
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false);
+
+                if tray_visible {
+                    if let Some(w) = app.get_webview_window(COMPACT_WINDOW_ID) {
+                        let _ = w.hide();
+                    }
+                } else {
+                    show_tray_or_full_view(app);
+                }
             }
         })
         .on_menu_event(handle_tray_menu_event)
-        .build(app)?;
-
+        .build(app)
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Tray menu successfully generated");
     Ok(())
 }
@@ -163,35 +201,17 @@ pub(crate) async fn reload_tray_menu(app: &AppHandle) {
     }
 }
 
-fn hide_main_window(app: &AppHandle) {
+fn hide_visible_windows(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     if let Err(err) = app.hide() {
         warn!("Failed to hide application: {err}");
     }
-    #[cfg(not(target_os = "macos"))]
-    if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
-        if let Err(err) = main_window.hide() {
-            warn!("Failed to hide main window: {err}");
-        }
-    }
-}
-
-pub fn show_main_window(app: &AppHandle) {
-    if let Some(main_window) = app.get_webview_window(MAIN_WINDOW_ID) {
-        if let Err(err) = main_window.unminimize() {
-            warn!("Failed to unminimize main window: {err}");
-        }
-        #[cfg(target_os = "macos")]
-        if let Err(err) = app.show() {
-            warn!("Failed to show application: {err}");
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            if let Err(err) = main_window.show() {
-                warn!("Failed to show main window: {err}");
+    for (id, window) in app.webview_windows() {
+        if window.is_visible().unwrap_or(false) {
+            if let Err(err) = window.hide() {
+                warn!("Failed to hide window {id}: {err}");
             }
         }
-        let _ = main_window.set_focus();
     }
 }
 
@@ -203,8 +223,8 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
             info!("Received QUIT request. Initiating shutdown...");
             handle.exit(0);
         }
-        TRAY_EVENT_SHOW => show_main_window(app),
-        TRAY_EVENT_HIDE => hide_main_window(app),
+        TRAY_EVENT_SHOW => show_tray_or_full_view(app),
+        TRAY_EVENT_HIDE => hide_visible_windows(app),
         TRAY_EVENT_UPDATES => {
             let _ = webbrowser::open(SUBSCRIBE_UPDATES_LINK);
         }
@@ -225,19 +245,27 @@ pub fn handle_tray_menu_event(app: &AppHandle, event: MenuEvent) {
 
 /// Show correct system tray icon, depending on the theme and connection status.
 pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
-    let state = app_handle.state::<AppState>();
-    let theme = state.app_config.lock().unwrap().tray_theme;
-
     let Some(tray_icon) = app_handle.tray_by_id(TRAY_ICON_ID) else {
         error!("System tray menu not initialized.");
         return Ok(());
     };
 
-    let mut resource_str = String::from("resources/icons/tray-32x32-");
-    resource_str.push_str(theme.as_ref());
+    let mut resource_str = String::from("resources/icons/tray/");
+    #[cfg(windows)]
+    resource_str.push_str("blue");
+    #[cfg(not(windows))]
+    {
+        // TODO: `use tauri::Theme;`
+        // let theme = app_handle
+        //     .webview_windows()
+        //     .into_values()
+        //     .next()
+        //     .and_then(|w| w.theme().ok());
+        resource_str.push_str("white");
+    }
     let active_connections = ACTIVE_CONNECTIONS.lock().await;
     if !active_connections.is_empty() {
-        resource_str.push_str("-active");
+        resource_str.push_str("-connected");
     }
     resource_str.push_str(".png");
     debug!("Trying to load the tray icon from {resource_str}");
@@ -245,8 +273,10 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
         .path()
         .resolve(&resource_str, BaseDirectory::Resource)
     {
-        let icon = Image::from_path(icon_path)?;
-        tray_icon.set_icon(Some(icon))?;
+        let icon = Image::from_path(icon_path).map_err(crate::tauri_err_to_app_err)?;
+        tray_icon
+            .set_icon(Some(icon))
+            .map_err(crate::tauri_err_to_app_err)?;
         debug!("Tray icon set to {resource_str} successfully.");
         Ok(())
     } else {
@@ -271,19 +301,12 @@ async fn handle_location_tray_menu(id: String, app: &AppHandle) {
                         info!("Connect location with ID {id}");
                         // Check if MFA is enabled. If so, trigger modal on frontend.
                         if location.mfa_enabled() {
-                            info!(
-                                "MFA enabled for location with ID {:?}, trigger MFA modal",
-                                location.id
-                            );
-                            show_main_window(app);
-                            let _ = app.emit(EventKey::MfaTrigger.into(), &location);
+                            info!("MFA enabled for location with ID {id}, trigger MFA modal");
+                            trigger_mfa(app, &location);
                         } else if let Err(err) =
-                            connect(location_id, ConnectionType::Location, None, app.clone()).await
+                            connect(location_id, ConnectionType::Location, app.clone()).await
                         {
-                            info!(
-                                "Unable to connect location with ID {}, error: {err:?}",
-                                location.id
-                            );
+                            info!("Unable to connect location with ID {id}, error: {err:?}");
                         }
                     }
                 }

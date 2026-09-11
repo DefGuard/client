@@ -1,0 +1,15 @@
+.location-card-view-header {
+  display: flex;
+  flex-flow: column;
+  row-gap: var(--spacing-xs);
+
+  p {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-70);
+  }
+
+  > .title {
+    font: var(--t-body-sm-500);
+    color: var(--fg-white-100);
+  }
+}

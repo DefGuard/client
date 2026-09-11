@@ -1,0 +1,41 @@
+.carousel-controls {
+  display: flex;
+  flex-flow: row;
+  column-gap: var(--spacing-md);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+
+  > button {
+    --color: var(--fg-white-100);
+
+    border: solid 1px var(--color);
+    border-radius: 100px;
+    height: 28px;
+    width: 28px;
+    margin: 0;
+    padding: 0;
+    background-color: transparent;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    user-select: none;
+
+    @include animate(border);
+
+    &:disabled,
+    &.disabled {
+      --color: var(--fg-white-20);
+
+      cursor: not-allowed;
+    }
+
+    .icon {
+      --icon-color: var(--color);
+    }
+  }
+}

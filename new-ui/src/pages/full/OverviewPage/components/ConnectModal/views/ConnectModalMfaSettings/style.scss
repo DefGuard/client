@@ -1,0 +1,11 @@
+.modal > .modal-content #mfa-settings-view {
+  .methods {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-md);
+  }
+
+  .controls {
+    padding-top: 0;
+  }
+}

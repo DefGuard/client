@@ -11,6 +11,7 @@ use std::{
 
 use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
+use defguard_client_proto::conversions::normalize_allowed_ips;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -18,6 +19,10 @@ use defguard_wireguard_rs::Userspace;
 use defguard_wireguard_rs::{
     error::WireguardInterfaceError, key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration,
     WGApi, WireguardInterfaceApi,
+};
+use proto::defguard::client_types::{
+    Device, DeviceConfig, DeviceConfigResponse, EnrollmentStartRequest, EnrollmentStartResponse,
+    InstanceInfo, InstanceInfoRequest, InstanceInfoResponse, NewDevice,
 };
 use reqwest::{Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
@@ -31,15 +36,37 @@ use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
 
 mod proto {
-    include!(concat!(env!("OUT_DIR"), "/defguard.proxy.rs"));
+    pub mod defguard {
+        pub mod client_types {
+            include!(concat!(env!("OUT_DIR"), "/defguard.client_types.rs"));
+        }
+
+        #[allow(dead_code)]
+        pub mod enterprise {
+            pub mod posture {
+                pub mod v2 {
+                    include!(concat!(
+                        env!("OUT_DIR"),
+                        "/defguard.enterprise.posture.v2.rs"
+                    ));
+                }
+            }
+        }
+
+        pub mod proxy {
+            pub mod v1 {
+                include!(concat!(env!("OUT_DIR"), "/defguard.proxy.v1.rs"));
+            }
+        }
+    }
 }
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 struct CliConfig {
     private_key: Key,
-    device: proto::Device,
-    device_config: proto::DeviceConfig,
-    instance_info: proto::InstanceInfo,
+    device: Device,
+    device_config: DeviceConfig,
+    instance_info: InstanceInfo,
     // polling token used for further client-core communication
     token: Option<String>,
 }
@@ -217,7 +244,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         .collect::<Vec<_>>();
     debug!("Parsed assigned IPs: {addresses:?}");
 
-    let config = InterfaceConfiguration {
+    let mut config = InterfaceConfiguration {
         name: config.instance_info.name.clone(),
         prvkey: config.private_key.to_string(),
         addresses,
@@ -226,6 +253,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         mtu: None,
         fwmark: None,
     };
+    normalize_allowed_ips(&mut config);
     let configure_interface_result = wgapi.configure_interface(&config);
 
     configure_interface_result.expect("Failed to configure WireGuard interface");
@@ -283,11 +311,11 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
     url.set_path("/api/v1/enrollment/start");
     let result = client
         .post(url)
-        .json(&proto::EnrollmentStartRequest { token })
+        .json(&EnrollmentStartRequest { token })
         .send()
         .await?;
 
-    let response: proto::EnrollmentStartResponse = if result.status() == StatusCode::OK {
+    let response: EnrollmentStartResponse = if result.status() == StatusCode::OK {
         let result = result.json().await?;
         debug!(
             "Enrollment start request has been successfully sent to Defguard Proxy. Received a \
@@ -314,7 +342,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
     url.set_path("/api/v1/enrollment/create_device");
     let result = client
         .post(url)
-        .json(&proto::NewDevice {
+        .json(&NewDevice {
             // The name is ignored by the server as it's set by the user before the enrollment.
             name: String::new(),
             pubkey: pubkey.to_string(),
@@ -323,7 +351,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
         .send()
         .await?;
 
-    let response: proto::DeviceConfigResponse = if result.status() == StatusCode::OK {
+    let response: DeviceConfigResponse = if result.status() == StatusCode::OK {
         let result = result.json().await?;
         debug!(
             "The device public key has been successfully sent to Defguard Proxy. The device should \
@@ -367,19 +395,15 @@ const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Fetch configuration from Defguard proxy.
-async fn fetch_config(
-    client: &Client,
-    url: Url,
-    token: String,
-) -> Result<proto::DeviceConfig, CliError> {
+async fn fetch_config(client: &Client, url: Url, token: String) -> Result<DeviceConfig, CliError> {
     let result = client
         .post(url.clone())
-        .json(&proto::InstanceInfoRequest { token })
+        .json(&InstanceInfoRequest { token })
         .timeout(HTTP_REQ_TIMEOUT)
         .send()
         .await?;
 
-    let instance_response: proto::InstanceInfoResponse = if result.status() == StatusCode::OK {
+    let instance_response: InstanceInfoResponse = if result.status() == StatusCode::OK {
         result.json().await?
     } else if result.status() == StatusCode::PAYMENT_REQUIRED {
         return Err(CliError::EnterpriseDisabled);
@@ -489,6 +513,7 @@ async fn wait_for_hangup() {
         hangup.recv().await;
     }
 }
+
 /// Dummy version of the above function for non-UNIX systems.
 #[cfg(not(unix))]
 async fn wait_for_hangup() {
@@ -536,12 +561,14 @@ async fn main() {
         .value_name("URL")
         .value_parser(value_parser!(Url));
 
+    // Handle --version / -V before clap parsing.
+    common::check_version_flag("dg");
+
     let matches = command!()
         .arg(config_opt)
         .arg(debug_opt)
         .arg(verbose_opt)
         .arg_required_else_help(false)
-        .propagate_version(true)
         .subcommand_required(false)
         .subcommand(
             Command::new("enroll")

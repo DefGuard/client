@@ -5,7 +5,7 @@ use tokio::time::interval;
 
 use crate::{appstate::AppState, commands::get_latest_app_version, events::EventKey};
 
-const INTERVAL_IN_SECONDS: Duration = Duration::from_secs(12 * 60 * 60); // 12 hours
+const INTERVAL_IN_SECONDS: Duration = Duration::from_hours(12);
 
 pub async fn poll_version(app_handle: AppHandle) {
     debug!("Starting the latest application version polling loop.");

@@ -20,7 +20,7 @@
     categories = ["Network" "Security"];
   };
 
-  pnpm = pkgs.pnpm_10;
+  inherit (import ./versions.nix pkgs) nodejs pnpm;
 
   buildInputs = with pkgs; [
     at-spi2-atk
@@ -73,28 +73,49 @@
   };
 
   # Pre-compile cargo dependencies; cached as long as Cargo.lock is unchanged.
-  # Features must match the main build (tauri.linux.conf.json adds --features service).
+  # Features must match the main build.
   cargoArtifacts = craneLib.buildDepsOnly {
     inherit pname;
     inherit version buildInputs cargoVendorDir;
     src = depsSrc;
     nativeBuildInputs = cargoNativeBuildInputs;
-    cargoExtraArgs = "--features custom-protocol,service";
+    cargoExtraArgs = "--features custom-protocol";
     VERGEN_IDEMPOTENT = "true";
     SQLX_OFFLINE = "true";
   };
 
-  # Prefetch pnpm dependencies.
-  # Explicit pnpm_10 keeps fetchPnpmDeps and pnpmConfigHook on the same major version.
-  pnpmDeps = fetchPnpmDeps {
-    inherit pname version pnpm;
-    src = ../.;
-    fetcherVersion = 3;
-    hash = "sha256-s9exoyIlT++5TWqDstD21h3YQ1cuDF/0cyZnI/3CZ3A=";
+  # Prefetch pnpm dependencies for the new UI (separate pnpm project).
+  newUiPnpmDeps = fetchPnpmDeps {
+    pname = "defguard-client-new-ui";
+    inherit version pnpm;
+    src = ../new-ui;
+    fetcherVersion = 4;
+    hash = "sha256-Ka76Vy52+5ZpHAc7EEFXjJJVc1dTuIH4HBvrzU0CPW0=";
+  };
+
+  # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".
+  newUiDist = pkgs.stdenv.mkDerivation {
+    pname = "defguard-client-new-ui";
+    inherit version;
+    src = ../new-ui;
+    nativeBuildInputs = [nodejs pnpm pnpmConfigHook];
+    pnpmDeps = newUiPnpmDeps;
+    buildPhase = ''
+      runHook preBuild
+      pnpm tsc -b
+      pnpm vite build --outDir "$out"
+      # Create entry points for compact, full, and welcome view windows.
+      mkdir -p "$out"/compact "$out"/full "$out"/welcome
+      cp "$out"/index.html "$out"/compact/
+      cp "$out"/index.html "$out"/full/
+      cp "$out"/index.html "$out"/welcome/
+      runHook postBuild
+    '';
+    installPhase = "true";
   };
 in
   craneLib.mkCargoDerivation {
-    inherit pname version buildInputs cargoArtifacts cargoVendorDir pnpmDeps;
+    inherit pname version buildInputs cargoArtifacts cargoVendorDir newUiDist;
 
     src = ../.;
 
@@ -103,9 +124,6 @@ in
       ++ [
         pkgs.makeWrapper
         pkgs.wrapGAppsHook3
-        pkgs.nodejs_24
-        pnpm
-        pnpmConfigHook
       ];
 
     # Pin CARGO_TARGET_DIR before crane's inheritCargoArtifacts hook runs so
@@ -140,15 +158,14 @@ in
     buildPhase = ''
       runHook preBuild
 
-      # Build the frontend first; tauri's beforeBuildCommand is suppressed
-      # below to avoid running pnpm build a second time.
-      pnpm build
+      # Copy in the pre-built new UI frontend.
+      mkdir -p dist
+      cp -r ${newUiDist}/* dist/
+      chmod -R u+w dist/
 
-      # features:service is repeated here because --config replaces the build
-      # section from tauri.linux.conf.json rather than merging with it.
-      pnpm tauri build \
-        --config '{"build":{"beforeBuildCommand":"","features":["service"]}}' \
-        --bundles deb
+      # --config replaces the build section from tauri.linux.conf.json.
+      cargo tauri build \
+        --config '{"build":{"beforeBuildCommand":""}}'
 
       runHook postBuild
     '';
@@ -171,8 +188,8 @@ in
       cp ${desktopItem}/share/applications/* $out/share/applications/
 
       mkdir -p $out/share/icons/hicolor/{32x32,128x128}/apps
-      install -Dm644 src-tauri/icons/32x32.png  $out/share/icons/hicolor/32x32/apps/${pname}.png
-      install -Dm644 src-tauri/icons/128x128.png $out/share/icons/hicolor/128x128/apps/${pname}.png
+      install -Dm644 src-tauri/icons/windows/32x32.png  $out/share/icons/hicolor/32x32/apps/${pname}.png
+      install -Dm644 src-tauri/icons/windows/128x128.png $out/share/icons/hicolor/128x128/apps/${pname}.png
 
       runHook postInstall
     '';
@@ -189,10 +206,12 @@ in
     SQLX_OFFLINE = "true";
     doInstallCargoArtifacts = false;
 
-    # passthru attrs are ignored by the build but addressable by external tools:
-    # pnpmDeps — referenced by the update-pnpm-hash.yaml CI workflow
+    # passthru attrs are ignored by the build but addressable by external tools.
+    # newUiPnpmDeps has its own pinned hash that must be kept current when
+    # new-ui/pnpm-lock.yaml changes. Any hash-refresh automation (e.g. an
+    # update-pnpm-hash workflow) must update it.
     passthru = {
-      inherit pnpmDeps;
+      inherit newUiPnpmDeps;
     };
 
     meta = with lib; {

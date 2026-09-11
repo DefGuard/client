@@ -1,0 +1,48 @@
+/* stylelint-disable no-descending-specificity */
+.checkbox {
+  display: inline-flex;
+  flex-flow: column;
+  user-select: none;
+
+  &.disabled {
+    cursor: not-allowed;
+  }
+
+  & > .track {
+    &:not(.text) {
+      display: inline-block;
+    }
+
+    &.text {
+      display: grid;
+      grid-template-columns: 24px auto;
+      grid-template-rows: 1fr;
+      column-gap: var(--spacing-sm);
+      align-items: center;
+    }
+
+    &:not(.disabled) {
+      cursor: pointer;
+    }
+
+    &.disabled {
+      pointer-events: none;
+      cursor: not-allowed;
+
+      span {
+        color: var(--fg-disabled);
+      }
+    }
+
+    span {
+      font: var(--t-body-sm-400);
+      color: var(--fg-white-100);
+    }
+
+    &:not(.active, .disabled, .error):hover {
+      .box {
+        --border: var(--border-emphasis);
+      }
+    }
+  }
+}

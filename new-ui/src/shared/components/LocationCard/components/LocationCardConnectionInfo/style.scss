@@ -1,0 +1,42 @@
+.location-card-connection-info {
+  > .connection-info {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    > .info {
+      > .label {
+        font: var(--t-body-xxs-400);
+        color: var(--fg-white-50);
+        padding-bottom: var(--spacing-xs);
+      }
+
+      > .label-value {
+        font: var(--t-body-xs-500);
+      }
+    }
+  }
+}
+
+.no-connection-info {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+
+  p {
+    text-align: center;
+  }
+
+  .title {
+    font: var(--t-body-sm-500);
+    color: var(--fg-white-100);
+  }
+
+  .description {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-60);
+  }
+}

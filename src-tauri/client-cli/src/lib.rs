@@ -1,0 +1,155 @@
+use std::{env, process::ExitCode};
+
+use clap::Parser;
+
+mod brand;
+mod cli;
+mod commands;
+mod exit;
+mod logging;
+mod mfa;
+mod mfa_code;
+mod mfa_qr;
+mod monitor;
+mod output;
+mod polling;
+mod resolve;
+mod state;
+#[cfg(all(test, target_os = "linux"))]
+mod tests_daemon;
+
+use cli::{Cli, InstanceCommand, LocationCommand, TunnelCommand};
+
+use crate::{
+    cli::Commands,
+    commands::{connect, disconnect, instance, list, location, status, tunnel},
+    state::State,
+};
+
+pub async fn cli_main() -> ExitCode {
+    // Brand banner: shown before clap's --help, and when invoked with
+    // zero arguments. NOT shown for --version (must stay grep-friendly).
+    show_banner_if_appropriate();
+
+    let cli = Cli::parse();
+
+    // Init logging to stderr so stdout stays data-only.
+    logging::init(cli.verbose);
+
+    // Resolve state (DB pool, migrations, app config).
+    let state = match State::init().await {
+        Ok(s) => s,
+        Err(err) => {
+            let code = exit::exit_code_for(&err);
+            output::emit_error(&err, cli.json);
+            return ExitCode::from(code);
+        }
+    };
+
+    polling::poll_config(&state).await;
+    monitor::tear_down_stale_connections(&state).await;
+
+    // Dispatch command.
+    match cli.command {
+        Commands::List => output::finish(list::handle(&state).await, cli.json),
+        Commands::Status => output::finish(status::handle(&state).await, cli.json),
+        Commands::Connect {
+            name,
+            tunnel,
+            id,
+            instance,
+            code,
+            code_command,
+            mfa_method,
+            qr_file,
+            all_traffic,
+            predefined_traffic,
+        } => output::finish(
+            connect::handle(
+                &state,
+                name.as_deref(),
+                tunnel,
+                id,
+                instance.as_deref(),
+                code.as_deref(),
+                code_command.as_deref(),
+                mfa_method.as_deref(),
+                qr_file.as_deref(),
+                all_traffic,
+                predefined_traffic,
+                cli.json,
+            )
+            .await,
+            cli.json,
+        ),
+        Commands::Disconnect {
+            name,
+            tunnel,
+            id,
+            instance,
+            all,
+        } => output::finish(
+            disconnect::handle(
+                &state,
+                name.as_deref(),
+                tunnel,
+                id,
+                instance.as_deref(),
+                all,
+            )
+            .await,
+            cli.json,
+        ),
+        Commands::Location(sub) => match sub {
+            LocationCommand::List => output::finish(location::handle_list(&state).await, cli.json),
+            LocationCommand::Set {
+                name,
+                instance,
+                mfa_method,
+                route_all_traffic,
+                predefined_traffic,
+            } => output::finish(
+                location::handle_set(
+                    &state,
+                    &name,
+                    instance.as_deref(),
+                    mfa_method.as_deref(),
+                    if route_all_traffic { Some(true) } else { None },
+                    predefined_traffic,
+                )
+                .await,
+                cli.json,
+            ),
+            LocationCommand::Show { name, instance } => output::finish(
+                location::handle_show(&state, &name, instance.as_deref()).await,
+                cli.json,
+            ),
+        },
+        Commands::Instance(sub) => match sub {
+            InstanceCommand::List => output::finish(instance::handle_list(&state).await, cli.json),
+            InstanceCommand::Show { name } => {
+                output::finish(instance::handle_show(&state, &name).await, cli.json)
+            }
+        },
+        Commands::Tunnel(sub) => match sub {
+            TunnelCommand::List => output::finish(tunnel::handle_list(&state).await, cli.json),
+            TunnelCommand::Show { name } => {
+                output::finish(tunnel::handle_show(&state, &name).await, cli.json)
+            }
+        },
+    }
+}
+
+/// Show the brand banner (logo + copyright + project version) on the two surfaces that need
+/// branding: `defguard-client` with no args (clap prints help; we banner first), and
+/// `defguard-client --help` / `-h`. Don't check for `--version` / `-V` – that is handled in
+/// `check_version_flag`, which should be called before calling this function.
+fn show_banner_if_appropriate() {
+    // Skip argv[0]. If user supplied any subcommand or flag other
+    // than --help / -h, do not print the banner.
+    let no_args = env::args().count() <= 1;
+    let asked_help = env::args().skip(1).any(|a| a == "--help" || a == "-h");
+    if no_args || asked_help {
+        brand::print_banner();
+    }
+}

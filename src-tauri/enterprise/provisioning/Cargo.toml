@@ -1,0 +1,18 @@
+[package]
+name = "defguard-client-provisioning"
+description = "Zero-touch provisioning for the Defguard desktop client"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license = "LicenseRef-Proprietary"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+defguard-client-core = { path = "../../core" }
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

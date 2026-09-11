@@ -1,0 +1,50 @@
+.overview-location-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--spacing-lg) var(--spacing-md);
+  background: var(--c-saturated-dark-blue-20);
+  border-radius: 12px;
+
+  > * {
+    width: 100%;
+  }
+
+  > .header {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--spacing-md);
+
+    > .right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      column-gap: var(--spacing-xs);
+
+      .bottom {
+        button {
+          height: 24px;
+          width: 24px;
+        }
+      }
+    }
+
+    > .left {
+      button {
+        min-height: 36px;
+      }
+    }
+  }
+
+  .no-connection-info {
+    min-height: 124px;
+  }
+
+  > .controls {
+    display: flex;
+    flex-flow: row nowrap;
+    column-gap: var(--spacing-5xl);
+    min-height: 40px;
+  }
+}

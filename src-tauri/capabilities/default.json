@@ -3,8 +3,13 @@
   "identifier": "main-capability",
   "description": "Capability for the main window",
   "local": true,
-  "windows": ["main"],
+  "remote": {
+    "urls": ["http://localhost:5072/*"]
+  },
+  "windows": ["compact-view", "full-view", "welcome"],
   "permissions": [
+    "core:webview:allow-create-webview",
+    "core:webview:allow-create-webview-window",
     "core:default",
     "core:window:allow-create",
     "core:window:allow-center",
@@ -38,6 +43,7 @@
     "core:window:allow-set-cursor-position",
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-start-dragging",
+    "core:window:allow-toggle-maximize",
     "core:webview:allow-print",
     "deep-link:default",
     "fs:default",
@@ -49,6 +55,7 @@
     "dialog:default",
     "clipboard-manager:allow-write-text",
     "process:allow-exit",
+    "allow-app-commands",
     {
       "identifier": "http:default",
       "allow": [

@@ -1,0 +1,126 @@
+/* stylelint-disable no-descending-specificity */
+.menu {
+  display: flex;
+  flex-flow: column;
+  box-sizing: border-box;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-lg);
+  border: 0;
+  background-color: var(--c-saturated-dark-blue-60);
+  box-shadow: 0 4px 12px 0 rgb(0 0 0 / 7%);
+  backdrop-filter: blur(10px);
+  overflow: hidden auto;
+  z-index: 5;
+
+  .menu-spacer {
+    user-select: none;
+    padding: var(--spacing-sm) 0;
+
+    & > .line {
+      display: block;
+      content: ' ';
+      background-color: var(--bg-white-20);
+      height: 1px;
+      width: 100%;
+    }
+  }
+
+  .menu-header {
+    display: flex;
+    flex-flow: row nowrap;
+    column-gap: var(--spacing-md);
+    justify-content: space-between;
+    flex: none;
+
+    p {
+      font: var(--t-menu-title);
+      color: var(--fg-white-60);
+      padding-left: var(--spacing-sm);
+    }
+
+    .interaction-box {
+      button {
+        height: 26px;
+        width: 26px;
+      }
+
+      .icon {
+        --icon-color: var(--fg-white-60);
+      }
+
+      &:hover {
+        .icon {
+          --icon-color: var(--fg-white-100);
+        }
+      }
+    }
+  }
+
+  .menu-item {
+    --bg-color: var(--bg-default);
+    --color: var(--fg-default);
+    --icon-fill: var(--fg-white-100);
+
+    display: flex;
+    flex-flow: row nowrap;
+    flex: none;
+    align-items: center;
+    border-radius: var(--radius-md);
+    padding: 0 var(--spacing-sm);
+    column-gap: var(--spacing-md);
+    background-color: var(--bg-color);
+    cursor: pointer;
+    height: 36px;
+    color: var(--color);
+    position: relative;
+    min-width: 115px;
+
+    @include animate(background-color);
+
+    &.disabled {
+      --bg-color: var(--fg-white-0);
+      --icon-fill: var(--fg-white-60);
+      --color: var(--fg-white-60);
+
+      cursor: not-allowed;
+    }
+
+    &.nested {
+      // account for positioned icon on the right side
+      padding: 0 calc(var(--spacing-sm) + var(--spacing-md) + 20px) 0 var(--spacing-sm);
+    }
+
+    &.variant-danger {
+      --color: var(--fg-critical);
+      --icon-fill: var(--fg-critical);
+    }
+
+    &:not(.disabled) {
+      &:hover {
+        --bg-color: var(--bg-white-5);
+      }
+    }
+
+    p {
+      font: var(--t-menu-text);
+      color: inherit;
+    }
+
+    & > .icon {
+      --icon-color: var(--icon-fill);
+    }
+
+    & > .suffix {
+      position: absolute;
+      height: 20px;
+      width: 20px;
+      top: 50%;
+      right: var(--spacing-sm);
+      transform: translateY(-50%);
+
+      .icon {
+        --icon-color: var(--fg-white-100);
+      }
+    }
+  }
+}

@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use chrono::{NaiveDateTime, TimeDelta, Utc};
+use defguard_client_core::connection::active_connections::ACTIVE_CONNECTIONS;
 use tauri::{AppHandle, Manager};
 use tokio::time::interval;
 
 use crate::{
-    active_connections::ACTIVE_CONNECTIONS,
     appstate::AppState,
     commands::{connect, disconnect},
     database::{
@@ -49,7 +49,7 @@ async fn reconnect(
                 peer_alive_period: peer_alive_period.num_seconds(),
             };
             payload.emit(app_handle);
-            match connect(con_id, con_type, None, app_handle.clone()).await {
+            match connect(con_id, con_type, app_handle.clone()).await {
                 Ok(()) => {
                     info!("Reconnect for {con_type} {con_interface_name} ({con_id}) succeeded.");
                 }

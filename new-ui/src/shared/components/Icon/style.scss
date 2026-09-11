@@ -1,0 +1,47 @@
+.icon {
+  display: inline-block;
+  overflow: hidden;
+  user-select: none;
+  transition-property: transform;
+  width: var(--icon-size);
+  height: var(--icon-size);
+
+  @include animate;
+
+  svg {
+    width: inherit;
+    height: inherit;
+
+    path {
+      @include animate(fill);
+    }
+
+    circle {
+      @include animate(stroke);
+    }
+  }
+}
+
+.icon svg {
+  path {
+    fill: var(--icon-color, var(--fg-white-100));
+  }
+
+  circle {
+    stroke: var(--icon-color, var(--fg-white-100));
+  }
+}
+
+.icon[style*='--icon-color'] svg path {
+  fill: var(--icon-color, var(--fg-white-100));
+}
+
+.icon[style*='--icon-color'] svg circle {
+  stroke: var(--icon-color, var(--fg-white-100));
+}
+
+.icon svg.stroke-icon path,
+.icon[style*='--icon-color'] svg.stroke-icon path {
+  fill: none;
+  stroke: var(--icon-color, var(--c-white-100));
+}

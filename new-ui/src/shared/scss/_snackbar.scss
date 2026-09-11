@@ -1,0 +1,16 @@
+#snackbar-root {
+  z-index: 6;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-flow: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  pointer-events: none;
+
+  & > * {
+    pointer-events: auto;
+  }
+}

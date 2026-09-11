@@ -24,7 +24,9 @@ final class Log {
     /// The category for this logger instance (usually class name), e.g. "PacketTunnelProvider"
     let category: String
     private let systemLogger: Logger
+#if os(macOS)
     private let fileLogger = FileLogger.shared
+#endif
 
     init(category: String) {
         self.category = category
@@ -36,29 +38,40 @@ final class Log {
 
     func debug(_ message: String) {
         systemLogger.debug("\(message, privacy: .public)")
+#if os(macOS)
         fileLogger.log(level: .debug, message: message, category: category)
+#endif
     }
 
     func info(_ message: String) {
         systemLogger.info("\(message, privacy: .public)")
+#if os(macOS)
         fileLogger.log(level: .info, message: message, category: category)
+#endif
     }
 
     func warning(_ message: String) {
         systemLogger.warning("\(message, privacy: .public)")
+#if os(macOS)
         fileLogger.log(level: .warning, message: message, category: category)
+#endif
     }
 
     func error(_ message: String) {
         systemLogger.error("\(message, privacy: .public)")
+#if os(macOS)
         fileLogger.log(level: .error, message: message, category: category)
+#endif
     }
 
     func flush() {
+#if os(macOS)
         fileLogger.flush()
+#endif
     }
 }
 
+#if os(macOS)
 /// A file-based logger that writes to an App Group shared container.
 /// This allows the main rust app to read logs from the network extension.
 /// Use the `Log` class instead of this directly for unified logging.
@@ -235,3 +248,4 @@ final class FileLogger {
         return logFileURL?.path
     }
 }
+#endif

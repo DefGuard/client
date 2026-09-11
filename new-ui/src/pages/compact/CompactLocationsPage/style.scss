@@ -1,0 +1,29 @@
+#compact-locations-page {
+  display: flex;
+  flex-flow: column;
+  height: 100dvh;
+
+  > .compact-footer {
+    display: flex;
+    flex-flow: column;
+  }
+
+  > .window-header,
+  > .compact-footer {
+    flex: 0 0 auto;
+  }
+
+  .main-content {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-sm);
+  }
+
+  .locations {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-sm);
+    width: 100%;
+    box-sizing: border-box;
+  }
+}

@@ -1,0 +1,47 @@
+#password-step {
+  .checklist {
+    user-select: none;
+
+    > p {
+      font: var(--t-body-xs-600);
+      color: var(--fg-white-100);
+      padding-bottom: var(--spacing-md);
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-sm);
+
+      li {
+        --color: var(--fg-white-60);
+
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-flow: row;
+        align-items: center;
+        column-gap: var(--spacing-sm);
+
+        &.active {
+          --color: var(--fg-success);
+        }
+
+        .icon[data-kind='empty-point'] {
+          --icon-color: var(--fg-white-60);
+        }
+
+        .icon[data-kind='check-filled'] {
+          --icon-color: var(--fg-success);
+        }
+
+        span {
+          font: var(--t-body-xs-500);
+          color: var(--color);
+        }
+      }
+    }
+  }
+}

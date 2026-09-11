@@ -1,0 +1,15 @@
+#connect-modal {
+  .view-description {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-70);
+    padding-bottom: var(--spacing-xl);
+  }
+
+  .controls {
+    width: 100%;
+
+    .full {
+      width: 100%;
+    }
+  }
+}

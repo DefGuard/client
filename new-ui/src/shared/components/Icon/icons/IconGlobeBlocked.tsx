@@ -1,0 +1,54 @@
+import type { SVGProps } from 'react';
+
+export const IconGlobeBlocked = (props: SVGProps<SVGSVGElement>) => {
+  return (
+    <svg
+      className="stroke-icon"
+      width="26"
+      height="24"
+      viewBox="0 0 26 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <g opacity="0.5">
+        <path
+          d="M13.9422 22.659C13.3299 22.7681 12.7176 22.8149 12.0739 22.8149C6.06058 22.8149 1.17773 17.965 1.17773 11.9923C1.17773 6.01958 6.06058 1.16968 12.0739 1.16968C17.6632 1.16968 22.2635 5.34901 22.8915 10.7291"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12.0735 22.8149C9.51436 22.8149 7.44189 17.965 7.44189 11.9923C7.44189 6.01958 9.51436 1.16968 12.0735 1.16968C14.1931 1.16968 15.983 4.5225 16.5325 9.0917"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12.7015 16.0468C12.3404 16.0468 11.9636 16.0468 11.5867 16.0468C7.0493 15.9688 3.43819 14.8928 1.16162 14.0195"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M22.9696 7.9375C20.6145 8.84198 16.6266 10.0428 11.5867 9.96479C7.0493 9.88682 3.43819 8.81079 1.16162 7.9375"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M20.2379 22.8304C22.7698 22.8304 24.8224 20.7916 24.8224 18.2768C24.8224 15.7619 22.7698 13.7231 20.2379 13.7231C17.7059 13.7231 15.6533 15.7619 15.6533 18.2768C15.6533 20.7916 17.7059 22.8304 20.2379 22.8304Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M17.0508 15.1111L23.3624 21.3957"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </g>
+    </svg>
+  );
+};

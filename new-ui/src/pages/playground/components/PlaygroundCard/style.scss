@@ -1,0 +1,12 @@
+.playground-card {
+  display: flex;
+  flex-flow: column;
+  box-sizing: border-box;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: 16px;
+  border: 1px solid var(--border-default);
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  width: 100%;
+}

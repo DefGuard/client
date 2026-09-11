@@ -1,32 +1,47 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use tauri::async_runtime::{spawn, JoinHandle};
+use defguard_client_core::{
+    connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
+};
+use defguard_client_provisioning::ProvisioningConfig;
+use tauri::{
+    async_runtime::{spawn, JoinHandle},
+    PhysicalPosition,
+};
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 use crate::{
-    active_connections::ACTIVE_CONNECTIONS,
     app_config::AppConfig,
     database::models::{connection::ActiveConnection, Id},
-    enterprise::provisioning::ProvisioningConfig,
+    session_state::SessionState,
     utils::stats_handler,
     ConnectionType,
 };
 
 pub struct AppState {
+    pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
+    pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
+    pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
     pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
+    pub session_state: Mutex<SessionState>,
 }
 
 impl AppState {
     #[must_use]
     pub fn new(config: AppConfig, provisioning_config: Option<ProvisioningConfig>) -> Self {
         Self {
+            enrollment_sessions: Mutex::new(HashMap::new()),
             log_watchers: Mutex::new(HashMap::new()),
+            mfa_tasks: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
+            tray_click_position: Mutex::new(None),
             stat_threads: Mutex::new(HashMap::new()),
             provisioning_config: Mutex::new(provisioning_config),
+            session_state: Mutex::new(SessionState::default()),
         }
     }
 

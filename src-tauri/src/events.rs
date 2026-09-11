@@ -1,44 +1,12 @@
+pub use defguard_client_core::events::EventKey;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Url};
+use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
 
-use crate::{tray::show_main_window, ConnectionType};
-
-// Match src/pages/client/types.ts.
-#[non_exhaustive]
-pub enum EventKey {
-    ConnectionChanged,
-    InstanceUpdate,
-    LocationUpdate,
-    AppVersionFetch,
-    ConfigChanged,
-    DeadConnectionDropped,
-    DeadConnectionReconnected,
-    ApplicationConfigChanged,
-    AddInstance,
-    MfaTrigger,
-    VersionMismatch,
-    UuidMismatch,
-}
-
-impl From<EventKey> for &'static str {
-    fn from(key: EventKey) -> &'static str {
-        match key {
-            EventKey::ConnectionChanged => "connection-changed",
-            EventKey::InstanceUpdate => "instance-update",
-            EventKey::LocationUpdate => "location-update",
-            EventKey::AppVersionFetch => "app-version-fetch",
-            EventKey::ConfigChanged => "config-changed",
-            EventKey::DeadConnectionDropped => "dead-connection-dropped",
-            EventKey::DeadConnectionReconnected => "dead-connection-reconnected",
-            EventKey::ApplicationConfigChanged => "application-config-changed",
-            EventKey::AddInstance => "add-instance",
-            EventKey::MfaTrigger => "mfa-trigger",
-            EventKey::VersionMismatch => "version-mismatch",
-            EventKey::UuidMismatch => "uuid-mismatch",
-        }
-    }
-}
+use crate::{
+    window_manager::{WindowManager, COMPACT_WINDOW_ID},
+    ConnectionType,
+};
 
 /// Used as payload for [`DEAD_CONNECTION_DROPPED`] event
 #[derive(Clone, Serialize)]
@@ -100,10 +68,47 @@ pub struct AddInstancePayload<'a> {
     pub url: &'a str,
 }
 
+#[derive(Clone, Serialize)]
+pub struct TunnelsDisabledPayload {
+    pub names: Vec<String>,
+}
+
+impl TunnelsDisabledPayload {
+    pub fn emit(app_handle: &AppHandle, names: Vec<String>) {
+        let payload = Self { names };
+        for name in &payload.names {
+            if let Err(err) = app_handle
+                .notification()
+                .builder()
+                .title(format!("Tunnel {name} disconnected"))
+                .body("WireGuard tunnels have been disabled by the administrator.")
+                .show()
+            {
+                warn!("Tunnels disabled notification not shown. Reason: {err}");
+            }
+        }
+        if let Err(err) = app_handle.emit(EventKey::TunnelsDisabled.into(), payload) {
+            error!("Event TunnelsDisabled was not emitted. Reason: {err}");
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+pub struct TunnelsEnabledPayload;
+
+impl TunnelsEnabledPayload {
+    pub fn emit(app_handle: &AppHandle) {
+        if let Err(err) = app_handle.emit(EventKey::TunnelsEnabled.into(), Self) {
+            error!("Event TunnelsEnabled was not emitted. Reason: {err}");
+        }
+    }
+}
+
 /// Handle deep-link URLs.
 pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
+    debug!("Deep link received.");
     for link in urls {
-        if link.path() == "/addinstance" {
+        if link.host_str() == Some("addinstance") {
             let mut token = None;
             let mut url = None;
             for (key, value) in link.query_pairs() {
@@ -115,7 +120,13 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
                 }
             }
             if let (Some(token), Some(url)) = (token, url) {
-                show_main_window(app_handle);
+                info!("Valid Deep link received.");
+                if let Some(tray_win) = app_handle.get_webview_window(COMPACT_WINDOW_ID) {
+                    let _ = tray_win.hide();
+                }
+                if let Err(e) = WindowManager::open_full_view(app_handle) {
+                    warn!("Deep link: failed to open main window: {e}");
+                }
                 let _ = app_handle.emit(
                     EventKey::AddInstance.into(),
                     AddInstancePayload {

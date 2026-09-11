@@ -1,0 +1,87 @@
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { Select } from '../../../../shared/components/Select/Select';
+import type {
+  SelectOption,
+  SelectOptionGroup,
+} from '../../../../shared/components/Select/types';
+import { useAppData } from '../../../../shared/providers/AppDataContext';
+import {
+  getInstancesQueryOptions,
+  getTunnelsQueryOptions,
+  tunnelsDisabled,
+} from '../../../../shared/rust-api/query';
+import type { OverviewViewSelection } from '../../../../shared/rust-api/types';
+import { isPresent } from '../../../../shared/utils/isPresent';
+
+export const InstanceSwitcher = () => {
+  const { viewSelection: selectedInstance, setViewSelection } = useAppData();
+
+  const { data: tunnels } = useQuery(getTunnelsQueryOptions);
+  const { data: instances } = useQuery(getInstancesQueryOptions);
+
+  const groups = useMemo((): readonly SelectOptionGroup<OverviewViewSelection>[] => {
+    if (!isPresent(instances) || !isPresent(tunnels)) return [];
+
+    const instanceGroup: SelectOptionGroup<OverviewViewSelection> = {
+      key: 'instances',
+      label: 'Instances',
+      options: instances.map((instance) => ({
+        // Instances and tunnels have separate id spaces, so prefix the key with
+        // the kind to keep it unique across groups (the Select marks the checkmark
+        // by comparing option keys).
+        key: `instance-${instance.id}`,
+        label: instance.name,
+        value: { kind: 'instance', id: instance.id },
+      })),
+    };
+
+    const tunnelGroup: SelectOptionGroup<OverviewViewSelection> | undefined =
+      !tunnelsDisabled(instances ?? []) && tunnels.length > 0
+        ? {
+            key: 'tunnels',
+            label: 'Tunnels',
+            options: tunnels.map((tunnel) => ({
+              key: `tunnel-${tunnel.id ?? tunnel.name}`,
+              label: tunnel.name,
+              value: { kind: 'tunnel', id: tunnel.id },
+            })),
+          }
+        : undefined;
+
+    const result: SelectOptionGroup<OverviewViewSelection>[] = [instanceGroup];
+    if (tunnelGroup) result.push(tunnelGroup);
+    return result;
+  }, [instances, tunnels]);
+
+  const totalOptions = useMemo(
+    () => groups.reduce((acc, g) => acc + g.options.length, 0),
+    [groups],
+  );
+
+  const selectedOption = useMemo((): SelectOption<OverviewViewSelection> | undefined => {
+    if (!isPresent(selectedInstance)) return undefined;
+    for (const group of groups) {
+      const found = group.options.find((o) => {
+        return (
+          o.value.kind === selectedInstance.kind && o.value.id === selectedInstance.id
+        );
+      });
+      if (found) return found;
+    }
+    return undefined;
+  }, [selectedInstance, groups]);
+
+  if (!isPresent(instances) || !isPresent(tunnels)) return null;
+  if (totalOptions <= 1) return null;
+
+  return (
+    <Select
+      groups={groups}
+      value={selectedOption as never}
+      onChange={(option) => {
+        setViewSelection(option.value);
+      }}
+    />
+  );
+};

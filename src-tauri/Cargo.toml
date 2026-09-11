@@ -1,15 +1,22 @@
 [workspace]
-members = ["cli", "common"]
-default-members = [".", "cli"]
+members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
+default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-defguard_wireguard_rs = "0.9"
+defguard_wireguard_rs = "0.11"
 dirs-next = "2.0"
+log = { version = "0.4", features = ["serde"] }
 prost = "0.14"
 reqwest = { version = "0.13", features = ["cookies", "json"] }
+secrecy = "0.10"
+semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_with = "3.11"
+sqlx = { version = "0.8", features = ["chrono", "runtime-tokio", "sqlite", "uuid", "macros"] }
 thiserror = "2.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tonic = { version = "0.14", default-features = false, features = [
@@ -24,14 +31,31 @@ tonic-prost = "0.14"
 tonic-prost-build = "0.14"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+webbrowser = "1.0"
+tempfile = "3"
+futures-util = "0.3"
+http = "1"
+image = "0.25"
+qrcode = { version = "0.14", features = ["image"] }
+tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
+tokio-util = "0.7"
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+vergen-git2 = { version = "10.0", features = ["build"] }
+wiremock = "0.6"
+x25519-dalek = { version = "3.0", features = [
+    "getrandom",
+    "serde",
+    "static_secrets",
+] }
 
 [workspace.package]
 authors = ["Defguard"]
 edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
-rust-version = "1.87"
-version = "1.6.10"
+rust-version = "1.95"
+version = "2.1.1"
 
 [package]
 name = "defguard-client"
@@ -49,43 +73,45 @@ version.workspace = true
 [[bin]]
 name = "defguard-client"
 
-[[bin]]
-name = "defguard-service"
-required-features = ["service"]
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-tonic-prost-build.workspace = true
-vergen-git2 = { version = "9.1", features = ["build"] }
+vergen-git2.workspace = true
+
+[workspace.lints.clippy]
+uninlined_format_args = "deny"
+manual_let_else = "warn"
+redundant_closure = "warn"
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.22"
-clap.workspace = true
-chrono = { version = "0.4", features = ["serde"] }
-common = { path = "common" }
+base64.workspace = true
+chrono.workspace = true
+defguard-cli.path = "client-cli"
+defguard-client-proto.path = "client-proto"
+defguard-client-core.path = "core"
+defguard-client-posture.path = "enterprise/posture"
+defguard-client-config-sync.path = "enterprise/config-sync"
+defguard-client-service-locations.path = "enterprise/service-locations"
+defguard-client-provisioning.path = "enterprise/provisioning"
+defguard-client-common.path = "common"
 dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 hyper-util = "0.1"
-log = { version = "0.4", features = ["serde"] }
+log.workspace = true
+os_info = { version = "3.14", default-features = false }
 prost.workspace = true
 regex = "1.12"
 reqwest.workspace = true
 rust-ini = "0.21"
-semver = "1.0"
+semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-serde_with = "3.11"
-sqlx = { version = "0.8", features = [
-    "chrono",
-    "sqlite",
-    "runtime-tokio",
-    "uuid",
-    "macros",
-] }
-struct-patch = "0.10"
+serde_with.workspace = true
+sqlx.workspace = true
+struct-patch = "0.12"
 strum = { version = "0.28", features = ["derive"] }
+sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }
 tauri = { version = "2", features = [
     "native-tls-vendored",
     "image-png",
@@ -109,27 +135,23 @@ time = { version = "0.3", features = ["formatting", "macros"] }
 tokio.workspace = true
 tokio-util = "0.7"
 tonic.workspace = true
+uuid.workspace = true
 tonic-prost.workspace = true
 tower = "0.5"
 tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber.workspace = true
-webbrowser = "1.0"
-x25519-dalek = { version = "2", features = [
-    "getrandom",
-    "serde",
-    "static_secrets",
-] }
-os_info = "3.12"
+webbrowser.workspace = true
+x25519-dalek.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
+dispatch2 = { version = "0.3", optional = true }
 objc2 = "0.6"
+objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 objc2-network-extension = "0.3"
-
-[target.'cfg(target_os = "macos")'.build-dependencies]
-swift-rs = { version = "1.0", features = ["build"] }
+objc2-system-extensions = { version = "0.3", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["user", "fs"] }
@@ -143,6 +165,9 @@ windows = { version = "0.62", features = [
     "Win32",
     "Win32_System",
     "Win32_System_RemoteDesktop",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_HiDpi",
+    "Win32_Foundation",
 ] }
 windows-acl = "0.3"
 windows-service = "0.8"
@@ -164,13 +189,14 @@ windows-sys = { version = "0.61", features = [
     # Network address change notifications (NotifyAddrChange)
     "Win32_NetworkManagement_IpHelper",
 ] }
+wmi = {version = "0.18", default-features = false}
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
-service = []
+macos_installer = ["dep:dispatch2", "dep:objc2-system-extensions"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

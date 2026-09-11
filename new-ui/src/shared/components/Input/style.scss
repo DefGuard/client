@@ -1,0 +1,52 @@
+.input {
+  & > .inner {
+    box-sizing: border-box;
+
+    &.error {
+      padding-bottom: var(--form-field-error-space);
+    }
+
+    .field-label {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .input-track {
+      --input-font: var(--t-input-text-primary);
+
+      &.size-lg {
+        --input-font: var(--t-input-text-big);
+      }
+
+      input {
+        font: var(--input-font);
+        color: var(--fg-white-100);
+        border: none;
+        background: none;
+        border-radius: 0;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+
+        &::placeholder {
+          font: var(--input-font);
+          color: var(--fg-white-50);
+        }
+
+        &:disabled {
+          cursor: not-allowed;
+        }
+      }
+    }
+
+    &.disabled {
+      user-select: none;
+
+      & > .field-label {
+        cursor: not-allowed;
+      }
+    }
+  }
+}

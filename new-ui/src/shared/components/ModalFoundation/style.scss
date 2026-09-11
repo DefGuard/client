@@ -1,0 +1,34 @@
+#modals-root {
+  position: relative;
+
+  .modal-root {
+    display: block;
+
+    .backdrop {
+      position: fixed;
+      left: 0;
+      top: var(--window-decorations-height);
+      display: block;
+      content: ' ';
+      width: 100%;
+      height: calc(100dvh - var(--window-decorations-height));
+      z-index: 4;
+    }
+
+    .modal-positioner {
+      overflow: auto;
+      position: fixed;
+      left: 0;
+      top: var(--window-decorations-height);
+      width: 100%;
+      height: calc(100dvh - var(--window-decorations-height));
+      z-index: 4;
+      display: flex;
+      flex-flow: column;
+      align-items: safe center;
+      justify-content: safe center;
+      box-sizing: border-box;
+      padding: var(--spacing-xl);
+    }
+  }
+}

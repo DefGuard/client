@@ -1,27 +1,48 @@
 use core::fmt;
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-    str::FromStr,
-};
+use std::{collections::HashMap, env, str::FromStr};
 
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
+use defguard_client_core::{
+    connection::{
+        active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
+        disconnect_interface, ConnectionTarget,
+    },
+    enrollment::{self},
+    mfa,
+};
+use defguard_client_posture::authorize_posture_session;
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{
+    DeleteServiceLocationsRequest, RemoveInterfaceRequest,
+};
+use defguard_client_proto::defguard::{
+    client_types::{
+        AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+        CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
+        EnrollmentSettings, InitialUserInfo, InstanceInfo as ProtoInstanceInfo, MfaMethod,
+    },
+    enterprise::posture::v2::DevicePostureData,
+};
+use defguard_client_provisioning::ProvisioningConfig;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use sqlx::{Sqlite, Transaction};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 use crate::{
-    active_connections::{find_connection, get_connection_id_by_type},
     app_config::{AppConfig, AppConfigPatch},
     appstate::AppState,
     database::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
-            instance::{ClientTrafficPolicy, Instance, InstanceInfo},
-            location::{Location, LocationMfaMode},
+            instance::{Instance, InstanceInfo},
+            location::{Location, LocationMfaMethod, LocationMfaMode},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
@@ -29,42 +50,104 @@ use crate::{
         },
         DB_POOL,
     },
-    enterprise::{periodic::config::poll_instance, provisioning::ProvisioningConfig},
     error::Error,
-    events::EventKey,
+    events::{EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
+    into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
         service_log_watcher::stop_log_watcher_task,
     },
-    proto::DeviceConfigResponse,
+    periodic::config::{
+        do_update_instance, poll_instance_with_events, sync_service_locations_best_effort,
+    },
+    proxy::construct_platform_header,
+    tauri_err_to_app_err,
     tray::{configure_tray_icon, reload_tray_menu},
     utils::{
-        construct_platform_header, disconnect_interface, get_location_interface_details,
-        get_tunnel_interface_details, get_tunnel_or_location_name, handle_connection_for_location,
-        handle_connection_for_tunnel,
+        get_location_interface_details, get_tunnel_interface_details, get_tunnel_or_location_name,
+        handle_connection_for_location, handle_connection_for_tunnel,
     },
     wg_config::parse_wireguard_config,
     CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
 };
 #[cfg(not(target_os = "macos"))]
-use crate::{
-    service::{
-        client::DAEMON_CLIENT,
-        proto::{
-            DeleteServiceLocationsRequest, RemoveInterfaceRequest, SaveServiceLocationsRequest,
-        },
-    },
-    utils::execute_command,
-};
+use crate::{periodic::config::sync_service_locations, utils::execute_command};
+
+#[derive(Debug, Serialize, thiserror::Error)]
+#[serde(tag = "kind", content = "message", rename_all = "camelCase")]
+pub enum ConnectError {
+    #[error("Posture check failed: {0}")]
+    PostureCheckFailed(String),
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+    #[error("{0}")]
+    AllTrafficConflict(String),
+    #[error("{0}")]
+    Other(String),
+}
+
+impl From<Error> for ConnectError {
+    fn from(error: Error) -> Self {
+        match error {
+            Error::PostureCheckFailed(message) => Self::PostureCheckFailed(message),
+            Error::ServiceUnavailable(message) => Self::ServiceUnavailable(message),
+            Error::AllTrafficConflict(message) => Self::AllTrafficConflict(message),
+            error => Self::Other(error.to_string()),
+        }
+    }
+}
+
+impl From<sqlx::Error> for ConnectError {
+    fn from(error: sqlx::Error) -> Self {
+        Error::from(error).into()
+    }
+}
+
+/// Serialize a structured error (e.g. `MfaError`, `EnrollmentError`) to JSON so
+/// the frontend can match on its tagged `type`, falling back to the Display
+/// string if serialization somehow fails.
+fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
+    serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
+}
+
+/// Look up a cloned enrollment session by its opaque string id. Used by the
+/// enrollment commands that need read access to the in-memory session.
+fn get_enrollment_session(
+    state: &AppState,
+    session_id: &str,
+) -> Result<enrollment::EnrollmentSession, String> {
+    let uid = Uuid::parse_str(session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
+    state
+        .enrollment_sessions
+        .lock()
+        .expect("enrollment_sessions mutex poisoned")
+        .get(&uid)
+        .cloned()
+        .ok_or_else(|| "Enrollment session not found".to_string())
+}
+
+/// Bring up a location connection with an already-obtained preshared key and
+/// refresh the tray. Shared by `connect` and the MFA finish flows so the
+/// preshared key never has to cross back into the frontend.
+async fn connect_location_with_psk(
+    location: Location<Id>,
+    preshared_key: Option<String>,
+    handle: &AppHandle,
+) -> Result<(), Error> {
+    handle_connection_for_location(location.clone(), preshared_key, handle).await?;
+    reload_tray_menu(handle).await;
+    info!("Connected to location {location}");
+    configure_tray_icon(handle).await?;
+    Ok(())
+}
 
 /// Open new WireGuard connection.
 #[tauri::command(async)]
 pub async fn connect(
     location_id: Id,
     connection_type: ConnectionType,
-    preshared_key: Option<String>,
     handle: AppHandle,
-) -> Result<(), Error> {
+) -> Result<(), ConnectError> {
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
     if connection_type == ConnectionType::Location {
         if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
@@ -72,30 +155,49 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
-            handle_connection_for_location(&location, preshared_key, &handle).await?;
-            reload_tray_menu(&handle).await;
-            info!("Connected to location {location}");
+
+            // Avoid connecting a service location - they should be managed by the background service.
+            if location.is_service_location() {
+                error!(
+                    "Refusing to connect location {location} from the app: it is a service \
+                    location, managed by the background service"
+                );
+                return Err(Error::InvalidInput(format!(
+                    "Location \"{}\" is a service location and is managed by the defguard service",
+                    location.name
+                ))
+                .into());
+            }
+            // Connect-time MFA brings the tunnel up itself (keeping the preshared
+            // key backend-side), so the only preshared key resolved here is for
+            // posture-only locations.
+            let preshared_key = if location.posture_check_required {
+                authorize_posture_session(&location).await?
+            } else {
+                None
+            };
+            connect_location_with_psk(location, preshared_key, &handle).await?;
         } else {
             error!(
                 "Location with ID {location_id} not found in the database, aborting connection \
                 attempt"
             );
-            return Err(Error::NotFound);
+            return Err(Error::NotFound.into());
         }
     } else if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
+        Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
         debug!(
             "Identified tunnel with ID {location_id} as \"{}\", handling connection...",
             tunnel.name
         );
-        handle_connection_for_tunnel(&tunnel, &handle).await?;
+        handle_connection_for_tunnel(tunnel.clone(), &handle).await?;
         info!("Successfully connected to tunnel {tunnel}");
+        // Update tray icon to reflect connection state.
+        configure_tray_icon(&handle).await?;
     } else {
         error!("Tunnel {location_id} not found");
-        return Err(Error::NotFound);
+        return Err(Error::NotFound.into());
     }
-
-    // Update tray icon to reflect connection state.
-    configure_tray_icon(&handle).await?;
 
     Ok(())
 }
@@ -139,7 +241,9 @@ pub async fn disconnect(
             "Emitting the event informing the frontend about the disconnection from \
             {connection_type} {name}({location_id})"
         );
-        handle.emit(EventKey::ConnectionChanged.into(), ())?;
+        handle
+            .emit(EventKey::ConnectionChanged.into(), ())
+            .map_err(tauri_err_to_app_err)?;
         debug!("Event emitted successfully");
         stop_log_watcher_task(&handle, &connection.interface_name)?;
         reload_tray_menu(&handle).await;
@@ -185,6 +289,113 @@ pub async fn disconnect(
     }
 }
 
+pub async fn disconnect_all_tunnels(handle: &AppHandle) -> Result<(), Error> {
+    let state = handle.state::<AppState>();
+    let tunnel_ids = get_connection_id_by_type(ConnectionType::Tunnel).await;
+    if tunnel_ids.is_empty() {
+        debug!("No active tunnels to disconnect, emitting TunnelsDisabled event anyway");
+        TunnelsDisabledPayload::emit(handle, Vec::new());
+        return Ok(());
+    }
+
+    let mut names = Vec::new();
+    for tunnel_id in &tunnel_ids {
+        let name = get_tunnel_or_location_name(*tunnel_id, ConnectionType::Tunnel).await;
+        debug!("Tunnels are disabled, disconnecting tunnel {name}(ID: {tunnel_id})");
+        if let Some(connection) = state
+            .remove_connection(*tunnel_id, ConnectionType::Tunnel)
+            .await
+        {
+            disconnect_interface(&connection).await?;
+            stop_log_watcher_task(handle, &connection.interface_name)?;
+            info!("Tunnel {name}(ID: {tunnel_id}) disconnected (disabled by server administrator)");
+            names.push(name);
+        }
+    }
+
+    TunnelsDisabledPayload::emit(handle, names);
+    handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+    reload_tray_menu(handle).await;
+    configure_tray_icon(handle).await?;
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> Result<(), Error> {
+    debug!(
+        "Received a command to disconnect {} location(s): {location_ids:?}",
+        location_ids.len()
+    );
+    let state = handle.state::<AppState>();
+    let mut any_disconnected = false;
+
+    for location_id in location_ids {
+        match Location::find_by_id(&*DB_POOL, location_id).await? {
+            Some(location) if location.is_service_location() => {
+                debug!(
+                    "Skipping service location {location}(ID: {location_id}) in \
+                    disconnect_locations"
+                );
+                continue;
+            }
+            None => {
+                debug!("Location with ID {location_id} not found in the database, skipping.");
+                continue;
+            }
+            _ => {}
+        }
+
+        let name = get_tunnel_or_location_name(location_id, ConnectionType::Location).await;
+        debug!("Disconnecting from location {name}(ID: {location_id})");
+
+        if let Some(connection) = state
+            .remove_connection(location_id, ConnectionType::Location)
+            .await
+        {
+            disconnect_interface(&connection).await?;
+            stop_log_watcher_task(&handle, &connection.interface_name)?;
+            if let Err(err) = maybe_update_instance_config(location_id, &handle).await {
+                match err {
+                    Error::CoreNotEnterprise => {
+                        debug!(
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but the core is not enterprise."
+                        );
+                    }
+                    Error::NoToken => {
+                        debug!(
+                            "Tried to fetch instance config from core after disconnecting from \
+                            {name}(ID: {location_id}), but the instance has no polling token."
+                        );
+                    }
+                    _ => {
+                        warn!(
+                            "Error while trying to fetch instance config after disconnecting \
+                            from {name}(ID: {location_id}): {err}"
+                        );
+                    }
+                }
+            }
+            info!("Disconnected from location {name}(ID: {location_id})");
+            any_disconnected = true;
+        } else {
+            debug!("No active connection found for location {name}(ID: {location_id}), skipping.");
+        }
+    }
+
+    if any_disconnected {
+        handle
+            .emit(EventKey::ConnectionChanged.into(), ())
+            .map_err(tauri_err_to_app_err)?;
+        reload_tray_menu(&handle).await;
+        configure_tray_icon(&handle).await?;
+    }
+
+    Ok(())
+}
+
 /// Triggers poll on location's instance config. Config will be updated if there are no more active
 /// connections for this instance.
 async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Result<(), Error> {
@@ -201,27 +412,15 @@ async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Re
         );
         return Err(Error::NotFound);
     };
-    poll_instance(&mut transaction, &mut instance, handle).await?;
+    poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+
+    sync_service_locations_best_effort(&DB_POOL, &instance).await;
+
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
     Ok(())
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Device {
-    pub id: Id,
-    pub name: String,
-    pub pubkey: String,
-    pub user_id: Id,
-    pub created_at: i64,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct InstanceResponse {
-    // uuid
-    pub id: String,
-    pub name: String,
-    pub url: String,
 }
 
 #[derive(Serialize)]
@@ -239,10 +438,10 @@ pub async fn save_device_config(
     debug!("Saving device configuration: {response:#?}.");
 
     let mut transaction = DB_POOL.begin().await?;
-    let instance_info = response
-        .instance
-        .expect("Missing instance info in device config response");
-    let mut instance: Instance = instance_info.into();
+    let instance_info = response.instance.ok_or_else(|| {
+        Error::ResourceNotFound("instance info in device config response".to_string())
+    })?;
+    let mut instance = Instance::from(instance_info);
     if response.token.is_some() {
         debug!(
             "The newly saved device config has a polling token, automatic configuration polling \
@@ -250,7 +449,7 @@ pub async fn save_device_config(
         );
     } else {
         warn!(
-            "Missing polling token for instance {}, core and/or proxy services may need an update, \
+            "Missing polling token for instance {}, Core and/or Edge services may need an update, \
             configuration polling won't work",
             instance.name,
         );
@@ -261,9 +460,9 @@ pub async fn save_device_config(
     let instance = instance.save(&mut *transaction).await?;
     debug!("Saved instance {}", instance.name);
 
-    let device = response
-        .device
-        .expect("Missing device info in device config response");
+    let device = response.device.ok_or_else(|| {
+        Error::ResourceNotFound("device info in device config response".to_string())
+    })?;
     let keys = WireguardKeys::new(instance.id, device.pubkey, private_key);
     debug!(
         "Saving wireguard key {} for instance {}({})",
@@ -275,7 +474,7 @@ pub async fn save_device_config(
         keys.pubkey, instance.name, instance.id
     );
     for dev_config in response.configs {
-        let new_location = dev_config.into_location(instance.id);
+        let new_location = into_location(dev_config, instance.id);
         debug!(
             "Saving location {} for instance {}({})",
             new_location.name, instance.name, instance.id
@@ -290,9 +489,15 @@ pub async fn save_device_config(
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
-    let locations = push_service_locations(&instance, keys).await?;
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        disconnect_all_tunnels(&handle).await?;
+    }
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    let locations = push_service_locations(&instance).await?;
+
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
     let res = SaveDeviceConfigResponse {
         locations,
         instance,
@@ -303,63 +508,22 @@ pub async fn save_device_config(
 }
 
 #[cfg(target_os = "macos")]
-async fn push_service_locations(
-    _instance: &Instance<Id>,
-    _keys: WireguardKeys<Id>,
-) -> Result<Vec<Location<Id>>, Error> {
+async fn push_service_locations(_instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     // Nothing here... yet
 
     Ok(Vec::new())
 }
 
+/// Pushes the instance's service locations to the daemon and returns all of its locations.
+///
+/// Delegates to [`sync_service_locations`] rather than building its own request, so the pushed
+/// field set cannot drift from the config-sync path.
 #[cfg(not(target_os = "macos"))]
-async fn push_service_locations(
-    instance: &Instance<Id>,
-    keys: WireguardKeys<Id>,
-) -> Result<Vec<Location<Id>>, Error> {
+async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<Id>>, Error> {
     let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, true).await?;
     trace!("Created following locations: {locations:#?}");
 
-    let mut service_locations = Vec::new();
-
-    for saved_location in &locations {
-        if saved_location.is_service_location() {
-            debug!(
-                "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
-                saved_location.name, saved_location.id, instance.name, instance.id,
-            );
-            service_locations.push(saved_location.to_service_location()?);
-        }
-    }
-
-    if !service_locations.is_empty() {
-        let save_request = SaveServiceLocationsRequest {
-            service_locations: service_locations.clone(),
-            instance_id: instance.uuid.clone(),
-            private_key: keys.prvkey,
-        };
-        debug!(
-            "Saving {} service locations to the daemon for instance {}({}).",
-            save_request.service_locations.len(),
-            instance.name,
-            instance.id,
-        );
-        DAEMON_CLIENT
-            .clone()
-            .save_service_locations(save_request)
-            .await
-            .map_err(|err| {
-                error!(
-                    "Error while saving service locations to the daemon for instance {}({}): {err}",
-                    instance.name, instance.id,
-                );
-                Error::InternalError(err.to_string())
-            })?;
-        debug!(
-            "Saved service locations to the daemon for instance {}({}).",
-            instance.name, instance.id,
-        );
-    }
+    sync_service_locations(&DB_POOL, instance).await?;
 
     Ok(locations)
 }
@@ -377,7 +541,10 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     let connection_ids = get_connection_id_by_type(ConnectionType::Location).await;
     for instance in instances {
         let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
-        let location_ids: Vec<i64> = locations.iter().map(|location| location.id).collect();
+        let location_ids = locations
+            .iter()
+            .map(|location| location.id)
+            .collect::<Vec<_>>();
         let connected = connection_ids
             .iter()
             .any(|item1| location_ids.iter().any(|item2| item1 == item2));
@@ -394,6 +561,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             pubkey: keys.pubkey,
             client_traffic_policy: instance.client_traffic_policy,
             enterprise_enabled: instance.enterprise_enabled,
+            disable_tunnels: instance.disable_tunnels,
             openid_display_name: instance.openid_display_name,
         });
     }
@@ -405,7 +573,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     Ok(instance_info)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct LocationInfo {
     pub id: Id,
     pub instance_id: Id,
@@ -418,6 +586,8 @@ pub struct LocationInfo {
     pub pubkey: String,
     pub network_id: Id,
     pub location_mfa_mode: LocationMfaMode,
+    pub posture_check_required: bool,
+    pub mfa_method: Option<LocationMfaMethod>,
 }
 
 impl LocationInfo {
@@ -470,6 +640,8 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
             pubkey: location.pubkey,
             network_id: location.network_id,
             location_mfa_mode: location.location_mfa_mode,
+            posture_check_required: location.posture_check_required,
+            mfa_method: location.mfa_method,
         };
         location_info.push(info);
     }
@@ -480,6 +652,26 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
     trace!("Locations returned:\n{location_info:#?}");
 
     Ok(location_info)
+}
+
+/// Returns `true` if there is at least one visible (non-service) location across all instances.
+/// Shares the same visibility filter as [`all_locations`] (`include_service_locations = false`).
+#[tauri::command(async)]
+pub async fn has_any_visible_locations() -> Result<bool, Error> {
+    trace!("Checking whether any visible locations exist.");
+    let instances = Instance::all(&*DB_POOL).await?;
+    for instance in &instances {
+        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
+        if !locations.is_empty() {
+            trace!(
+                "Found at least one visible location in instance {}.",
+                instance.name
+            );
+            return Ok(true);
+        }
+    }
+    trace!("No visible locations found.");
+    Ok(false)
 }
 
 #[derive(Serialize, Debug)]
@@ -497,6 +689,7 @@ pub struct LocationInterfaceDetails {
     pub allowed_ips: String,
     pub persistent_keepalive_interval: Option<u16>,
     pub last_handshake: Option<i64>,
+    pub mfa_method: Option<LocationMfaMethod>,
 }
 
 #[tauri::command(async)]
@@ -521,239 +714,26 @@ pub async fn update_instance(
     if let Some(mut instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? {
         debug!("The instance with id {instance_id} to update was found: {instance}");
         let mut transaction = DB_POOL.begin().await?;
-        do_update_instance(&mut transaction, &mut instance, response).await?;
+        let locations_changed =
+            do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
 
-        app_handle.emit(EventKey::InstanceUpdate.into(), ())?;
+        sync_service_locations_best_effort(&DB_POOL, &instance).await;
+
+        if locations_changed {
+            if let Err(err) = app_handle.emit(EventKey::InstanceUpdated.into(), ()) {
+                error!("Failed to emit instance-updated event: {err}");
+            }
+        }
+        app_handle
+            .emit(EventKey::InstanceUpdate.into(), ())
+            .map_err(tauri_err_to_app_err)?;
         reload_tray_menu(&app_handle).await;
         Ok(())
     } else {
         error!("Instance to update with id {instance_id} was not found, aborting update");
         Err(Error::NotFound)
     }
-}
-
-/// Returns true if configuration in instance_info differs from current configuration
-pub(crate) async fn locations_changed(
-    transaction: &mut Transaction<'_, Sqlite>,
-    instance: &Instance<Id>,
-    device_config: &DeviceConfigResponse,
-) -> Result<bool, Error> {
-    let db_locations: HashSet<Location<NoId>> =
-        Location::find_by_instance_id(transaction.as_mut(), instance.id, true)
-            .await?
-            .into_iter()
-            .map(|location| {
-                let mut new_location = Location::<NoId>::from(location);
-                // Ignore `route_all_traffic` flag as Defguard core does not have it.
-                new_location.route_all_traffic = false;
-                new_location
-            })
-            .collect();
-    let core_locations: HashSet<Location> = device_config
-        .configs
-        .iter()
-        .map(|config| config.clone().into_location(instance.id))
-        .collect();
-
-    Ok(db_locations != core_locations)
-}
-
-pub(crate) async fn do_update_instance(
-    transaction: &mut Transaction<'_, Sqlite>,
-    instance: &mut Instance<Id>,
-    response: DeviceConfigResponse,
-) -> Result<(), Error> {
-    // update instance
-    debug!("Updating instance {instance}");
-    let locations_changed = locations_changed(transaction, instance, &response).await?;
-    let instance_info = response
-        .instance
-        .expect("Missing instance info in device config response");
-    instance.name = instance_info.name;
-    instance.url = instance_info.url;
-    instance.proxy_url = instance_info.proxy_url;
-    instance.username = instance_info.username;
-    // Make sure to update the locations too if we are disabling all traffic
-    let policy = instance_info.client_traffic_policy.into();
-    if instance.client_traffic_policy != policy && policy == ClientTrafficPolicy::DisableAllTraffic
-    {
-        debug!("Disabling all traffic for all locations of instance {instance}");
-        Location::disable_all_traffic_for_all(transaction.as_mut(), instance.id).await?;
-        debug!("Disabled all traffic for all locations of instance {instance}");
-    }
-    instance.client_traffic_policy = instance_info.client_traffic_policy.into();
-    instance.openid_display_name = instance_info.openid_display_name;
-    instance.uuid = instance_info.id;
-    // Token may be empty if it was not issued
-    // This happens during polling, as core doesn't issue a new token for polling request
-    if response.token.is_some() {
-        instance.token = response.token;
-        debug!("Set polling token for instance {}", instance.name);
-    } else {
-        debug!(
-            "No polling token received for instance {}, not updating",
-            instance.name
-        );
-    }
-    instance.save(transaction.as_mut()).await?;
-    debug!(
-        "A new base configuration has been applied to instance {instance}, even if nothing changed"
-    );
-
-    let mut service_locations = Vec::new();
-
-    // check if locations have changed
-    if locations_changed {
-        // process locations received in response
-        debug!(
-            "Updating locations for instance {}({}).",
-            instance.name, instance.id
-        );
-        // Fetch existing locations for a given instance.
-        let mut current_locations =
-            Location::find_by_instance_id(transaction.as_mut(), instance.id, true).await?;
-        for dev_config in response.configs {
-            // parse device config
-            let new_location = dev_config.into_location(instance.id);
-
-            // check if location is already present in current locations
-            let saved_location = if let Some(position) = current_locations
-                .iter()
-                .position(|loc| loc.network_id == new_location.network_id)
-            {
-                // remove from list of existing locations
-                let mut current_location = current_locations.remove(position);
-                debug!(
-                    "Updating existing location {}({}) for instance {}({}).",
-                    current_location.name, current_location.id, instance.name, instance.id,
-                );
-                // update existing location
-                current_location.name = new_location.name;
-                current_location.address = new_location.address;
-                current_location.pubkey = new_location.pubkey;
-                current_location.endpoint = new_location.endpoint;
-                current_location.allowed_ips = new_location.allowed_ips;
-                current_location.keepalive_interval = new_location.keepalive_interval;
-                current_location.dns = new_location.dns;
-                current_location.location_mfa_mode = new_location.location_mfa_mode;
-                current_location.service_location_mode = new_location.service_location_mode;
-                current_location.save(transaction.as_mut()).await?;
-                info!("Location {current_location} configuration updated for instance {instance}");
-                current_location
-            } else {
-                // create new location
-                debug!("Creating new location {new_location} for instance instance {instance}");
-                let new_location = new_location.save(transaction.as_mut()).await?;
-                info!("New location {new_location} created for instance {instance}");
-                new_location
-            };
-
-            if saved_location.is_service_location() {
-                debug!(
-                    "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
-                    saved_location.name, saved_location.id, instance.name, instance.id,
-                );
-                service_locations.push(saved_location.to_service_location()?);
-            }
-        }
-
-        // remove locations which were present in current locations
-        // but no longer found in core response
-        debug!("Removing locations for instance {instance}");
-        for removed_location in current_locations {
-            removed_location.delete(transaction.as_mut()).await?;
-            info!(
-                "Removed location {removed_location} for instance {instance} during instance update"
-            );
-        }
-        debug!("Finished updating locations for instance {instance}");
-    } else {
-        info!("Locations for instance {instance} didn't change. Not updating them.");
-    }
-
-    if service_locations.is_empty() {
-        debug!(
-            "No service locations for instance {}({}), removing all existing service locations connections if there are any.",
-            instance.name, instance.id
-        );
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            let delete_request = DeleteServiceLocationsRequest {
-                instance_id: instance.uuid.clone(),
-            };
-            DAEMON_CLIENT
-            .clone()
-            .delete_service_locations(delete_request)
-            .await
-            .map_err(|err| {
-                error!(
-                    "Error while deleting service locations from the daemon for instance {}({}): {err}",
-                    instance.name, instance.id,
-                );
-                Error::InternalError(err.to_string())
-            })?;
-            debug!(
-                "Successfully removed all service locations from daemon for instance {}({})",
-                instance.name, instance.id
-            );
-        }
-    } else {
-        debug!(
-            "Processing {} service location(s) for instance {}({})",
-            service_locations.len(),
-            instance.name,
-            instance.id
-        );
-
-        #[cfg(not(target_os = "macos"))]
-        {
-            let private_key = WireguardKeys::find_by_instance_id(transaction.as_mut(), instance.id)
-                .await?
-                .ok_or(Error::NotFound)?
-                .prvkey;
-
-            let save_request = SaveServiceLocationsRequest {
-                service_locations: service_locations.clone(),
-                instance_id: instance.uuid.clone(),
-                private_key,
-            };
-
-            debug!(
-                "Sending request to daemon to save {} service location(s) for instance {}({})",
-                save_request.service_locations.len(),
-                instance.name,
-                instance.id
-            );
-
-            DAEMON_CLIENT
-                .clone()
-                .save_service_locations(save_request)
-                .await
-                .map_err(|err| {
-                    error!(
-                    "Error while saving service locations to the daemon for instance {}({}): {err}",
-                    instance.name, instance.id,
-                );
-                    Error::InternalError(err.to_string())
-                })?;
-
-            info!(
-                "Successfully saved {} service location(s) to daemon for instance {}({})",
-                service_locations.len(),
-                instance.name,
-                instance.id
-            );
-
-            debug!(
-                "Completed processing all service locations for instance {}({})",
-                instance.name, instance.id
-            );
-        }
-    }
-
-    Ok(())
 }
 
 /// If `datetime` is Some, parses the date string, otherwise returns `DateTime` one hour ago.
@@ -764,35 +744,6 @@ pub(crate) fn parse_timestamp(from: Option<String>) -> Result<DateTime<Utc>, Err
     })
 }
 
-pub(crate) enum DateTimeAggregation {
-    Hour,
-    Second,
-}
-
-impl DateTimeAggregation {
-    /// Returns database format string for a given aggregation variant.
-    #[must_use]
-    pub(crate) fn fstring(&self) -> &'static str {
-        match self {
-            Self::Hour => "%Y-%m-%d %H:00:00",
-            Self::Second => "%Y-%m-%d %H:%M:%S",
-        }
-    }
-}
-
-pub(crate) fn get_aggregation(from: NaiveDateTime) -> Result<DateTimeAggregation, Error> {
-    // Use hourly aggregation for longer periods
-    let aggregation = match Utc::now().naive_utc() - from {
-        duration if duration >= Duration::hours(8) => Ok(DateTimeAggregation::Hour),
-        duration if duration < Duration::zero() => Err(Error::InternalError(format!(
-            "Negative duration between dates: now ({}) and {from}",
-            Utc::now().naive_utc(),
-        ))),
-        _ => Ok(DateTimeAggregation::Second),
-    }?;
-    Ok(aggregation)
-}
-
 #[tauri::command(async)]
 pub async fn location_stats(
     location_id: Id,
@@ -801,7 +752,7 @@ pub async fn location_stats(
 ) -> Result<Vec<CommonLocationStats<Id>>, Error> {
     trace!("Location stats command received");
     let from = parse_timestamp(from)?.naive_utc();
-    let aggregation = get_aggregation(from)?;
+    let aggregation = crate::get_aggregation(from)?;
     let stats = match connection_type {
         ConnectionType::Location => {
             LocationStats::all_by_location_id(&*DB_POOL, location_id, &from, &aggregation, None)
@@ -828,17 +779,17 @@ pub async fn all_connections(
     connection_type: ConnectionType,
 ) -> Result<Vec<CommonConnectionInfo>, Error> {
     debug!("Retrieving connections for location {location_id}");
-    let connections: Vec<CommonConnectionInfo> = match connection_type {
+    let connections = match connection_type {
         ConnectionType::Location => ConnectionInfo::all_by_location_id(&*DB_POOL, location_id)
             .await?
             .into_iter()
             .map(Into::into)
-            .collect(),
+            .collect::<Vec<_>>(),
         ConnectionType::Tunnel => TunnelConnectionInfo::all_by_tunnel_id(&*DB_POOL, location_id)
             .await?
             .into_iter()
             .map(Into::into)
-            .collect(),
+            .collect::<Vec<_>>(),
     };
     debug!("Connections retrieved({})", connections.len());
     trace!("Connections found:\n{connections:#?}");
@@ -920,55 +871,21 @@ pub async fn update_location_routing(
 
     match connection_type {
         ConnectionType::Location => {
-            if let Some(mut location) = Location::find_by_id(&*DB_POOL, location_id).await? {
-                let instance = Instance::find_by_id(&*DB_POOL, location.instance_id)
-                    .await?
-                    .ok_or(Error::NotFound)?;
-                // Check if the instance has route_all_traffic disabled
-                if (instance.client_traffic_policy == ClientTrafficPolicy::DisableAllTraffic)
-                    && route_all_traffic
-                {
-                    error!(
-                        "Couldn't update location routing: instance with id {} has \
-                        route_all_traffic disabled.",
-                        instance.id
-                    );
-                    return Err(Error::InternalError(
-                        "Instance has route_all_traffic disabled".into(),
-                    ));
-                }
-                // Check if the instance has route_all_traffic enforced
-                if (instance.client_traffic_policy == ClientTrafficPolicy::ForceAllTraffic)
-                    && !route_all_traffic
-                {
-                    error!(
-                        "Couldn't update location routing: instance with id {} has \
-                        route_all_traffic enforced.",
-                        instance.id
-                    );
-                    return Err(Error::InternalError(
-                        "Instance has route_all_traffic enforced".into(),
-                    ));
-                }
-
-                location.route_all_traffic = route_all_traffic;
-                location.save(&*DB_POOL).await?;
-                debug!("Location routing updated for location {name}(ID: {location_id})");
-                handle.emit(EventKey::LocationUpdate.into(), ())?;
-                Ok(())
-            } else {
-                error!(
-                    "Couldn't update location routing: location with id {location_id} not found."
-                );
-                Err(Error::NotFound)
-            }
+            Location::update_routing(&DB_POOL, location_id, route_all_traffic).await?;
+            debug!("Location routing updated for location {name}(ID: {location_id})");
+            handle
+                .emit(EventKey::LocationUpdate.into(), ())
+                .map_err(tauri_err_to_app_err)?;
+            Ok(())
         }
         ConnectionType::Tunnel => {
             if let Some(mut tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
                 tunnel.route_all_traffic = route_all_traffic;
                 tunnel.save(&*DB_POOL).await?;
                 info!("Tunnel routing updated for tunnel {location_id}");
-                handle.emit(EventKey::LocationUpdate.into(), ())?;
+                handle
+                    .emit(EventKey::LocationUpdate.into(), ())
+                    .map_err(tauri_err_to_app_err)?;
                 Ok(())
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
@@ -976,6 +893,21 @@ pub async fn update_location_routing(
             }
         }
     }
+}
+
+#[tauri::command(async)]
+pub async fn set_location_mfa_method(
+    location_id: Id,
+    mfa_method: LocationMfaMethod,
+    handle: AppHandle,
+) -> Result<(), Error> {
+    debug!("Received command to set MFA method for location {location_id}");
+    Location::set_mfa_method(&DB_POOL, location_id, mfa_method).await?;
+    debug!("MFA method updated for location (ID: {location_id})");
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
@@ -1011,15 +943,22 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
         }
     }
 
+    let was_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+
+    if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
+        TunnelsEnabledPayload::emit(&handle);
+    }
 
     reload_tray_menu(&handle).await;
 
     configure_tray_icon(&handle).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -1073,9 +1012,14 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
             );
         }
     }
+    let was_disabled = Instance::tunnels_disabled(&*DB_POOL).await?;
     instance.delete(&mut *transaction).await?;
 
     transaction.commit().await?;
+
+    if was_disabled && !Instance::tunnels_disabled(&*DB_POOL).await? {
+        TunnelsEnabledPayload::emit(&handle);
+    }
 
     client
         .delete_service_locations(DeleteServiceLocationsRequest {
@@ -1094,7 +1038,9 @@ pub async fn delete_instance(instance_id: Id, handle: AppHandle) -> Result<(), E
 
     configure_tray_icon(&handle).await?;
 
-    handle.emit(EventKey::InstanceUpdate.into(), ())?;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
     info!("Successfully deleted instance {instance}.");
     Ok(())
 }
@@ -1112,23 +1058,29 @@ pub fn parse_tunnel_config(filename: &str, config: &str) -> Result<Tunnel, Error
 
 #[tauri::command(async)]
 pub async fn update_tunnel(mut tunnel: Tunnel<Id>, handle: AppHandle) -> Result<(), Error> {
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Received tunnel configuration to update: {tunnel}");
     tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been updated.");
-    handle.emit(EventKey::LocationUpdate.into(), ())?;
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
     Ok(())
 }
 
 #[tauri::command(async)]
 pub async fn save_tunnel(tunnel: Tunnel<NoId>, handle: AppHandle) -> Result<(), Error> {
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Received tunnel configuration to save: {tunnel}");
     let tunnel = tunnel.save(&*DB_POOL).await?;
     info!("The tunnel {tunnel} configuration has been saved.");
-    handle.emit(EventKey::LocationUpdate.into(), ())?;
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TunnelInfo<I = NoId> {
     pub id: I,
     pub name: String,
@@ -1141,6 +1093,11 @@ pub struct TunnelInfo<I = NoId> {
 
 #[tauri::command(async)]
 pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
+    // Soft-hide: report no tunnels (rather than erroring) so callers render an empty
+    // list. Mutating/connecting commands hard-refuse via `ensure_tunnels_enabled`.
+    if Instance::tunnels_disabled(&*DB_POOL).await? {
+        return Ok(Vec::new());
+    }
     trace!("Getting information about all tunnels");
 
     let tunnels = Tunnel::all(&*DB_POOL).await?;
@@ -1169,6 +1126,7 @@ pub async fn all_tunnels() -> Result<Vec<TunnelInfo<Id>>, Error> {
 
 #[tauri::command(async)]
 pub async fn tunnel_details(tunnel_id: Id) -> Result<Tunnel<Id>, Error> {
+    Instance::ensure_tunnels_enabled(&*DB_POOL).await?;
     debug!("Retrieving details about tunnel with ID {tunnel_id}.");
 
     if let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, tunnel_id).await? {
@@ -1246,10 +1204,10 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
                     ))
                 })?;
             info!(
-            "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
+                "Network interface {} has been removed and the connection to tunnel {tunnel} has been \
             closed.",
-            connection.interface_name
-        );
+                connection.interface_name
+            );
             if let Some(post_down) = &tunnel.post_down {
                 debug!(
                     "Executing defined PostDown command after removing the interface {} for the \
@@ -1269,6 +1227,10 @@ pub async fn delete_tunnel(tunnel_id: Id, handle: AppHandle) -> Result<(), Error
 
     transaction.commit().await?;
 
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+
     info!("Successfully deleted tunnel {tunnel}");
     Ok(())
 }
@@ -1287,13 +1249,21 @@ pub struct AppVersionInfo {
     pub release_date: String,
     pub release_notes_url: String,
     pub update_url: String,
+    pub summary: Option<String>,
 }
 
 const PRODUCT_NAME: &str = "defguard-client";
 
+fn reported_app_version(handle: &AppHandle) -> String {
+    defguard_client_core::version::select_reported_app_version(
+        &handle.package_info().version.to_string(),
+        option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
+    )
+}
+
 #[tauri::command(async)]
 pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo, Error> {
-    let app_version = handle.package_info().version.to_string();
+    let app_version = reported_app_version(&handle);
     let operating_system = env::consts::OS;
 
     let mut request_data = HashMap::new();
@@ -1347,21 +1317,17 @@ pub async fn command_set_app_config(
     let app_state = app_handle.state::<AppState>();
     debug!("Command set app config received.");
     trace!("Command payload: {config_patch:?}");
-    let tray_changed = config_patch.tray_theme.is_some();
     let res = {
         let mut app_config = app_state.app_config.lock().unwrap();
         app_config.apply(config_patch);
-        app_config.save(&app_handle);
+        let config_dir = app_handle
+            .path()
+            .app_data_dir()
+            .expect("Failed to access app data");
+        app_config.save(&config_dir);
         app_config.clone()
     };
     info!("Config changed successfully");
-    if tray_changed {
-        debug!("Tray theme included in config change, tray will be updated.");
-        match configure_tray_icon(&app_handle).await {
-            Ok(()) => debug!("Tray updated upon config change"),
-            Err(err) => error!("Tray change failed. Reason: {err}"),
-        }
-    }
     if emit_event {
         match app_handle.emit(EventKey::ApplicationConfigChanged.into(), ()) {
             Ok(()) => debug!("Config changed event emitted successfully"),
@@ -1394,4 +1360,427 @@ pub fn get_provisioning_config(
 #[must_use]
 pub fn get_platform_header() -> String {
     construct_platform_header()
+}
+
+#[tauri::command(async)]
+pub async fn get_posture_data() -> Result<DevicePostureData, Error> {
+    debug!("Received a command to prepare posture report");
+    defguard_client_posture::get_posture_data().await
+}
+
+#[derive(Debug, Serialize)]
+pub struct ActiveConnectionSummary {
+    pub id: Id,
+    pub name: String,
+    pub connection_type: ConnectionType,
+}
+
+#[tauri::command(async)]
+pub async fn all_active_connections() -> Result<Vec<ActiveConnectionSummary>, Error> {
+    debug!("Getting information about all active connections.");
+    let connections = ACTIVE_CONNECTIONS.lock().await;
+    let mut result = Vec::with_capacity(connections.len());
+    for conn in connections.iter() {
+        if conn.connection_type == ConnectionType::Location {
+            match Location::find_by_id(&*DB_POOL, conn.location_id).await? {
+                Some(location) if location.is_service_location() => continue,
+                None => continue,
+                _ => {}
+            }
+        }
+        let name = get_tunnel_or_location_name(conn.location_id, conn.connection_type).await;
+        result.push(ActiveConnectionSummary {
+            id: conn.location_id,
+            name,
+            connection_type: conn.connection_type,
+        });
+    }
+    debug!("Returning {} active connections.", result.len());
+    Ok(result)
+}
+
+/// Returned by the `enrollment_start` Tauri command.
+#[derive(Clone, Debug, Serialize)]
+pub struct EnrollmentStartResult {
+    pub session_id: String,
+    pub user: InitialUserInfo,
+    pub admin: AdminInfo,
+    pub settings: EnrollmentSettings,
+    pub instance: ProtoInstanceInfo,
+    pub deadline_timestamp: i64,
+    pub final_page_content: String,
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_start(
+    proxy_url: String,
+    token: String,
+    state: State<'_, AppState>,
+) -> Result<EnrollmentStartResult, String> {
+    debug!("Starting enrollment at {proxy_url}");
+    let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let (session, response) = enrollment::enrollment_start(url, token)
+        .await
+        .map_err(err_to_json)?;
+    let session_uuid = Uuid::new_v4();
+    let session_id = session_uuid.to_string();
+    state
+        .enrollment_sessions
+        .lock()
+        .expect("enrollment_sessions mutex poisoned")
+        .insert(session_uuid, session);
+    let login = response
+        .user
+        .as_ref()
+        .map_or("<unknown>", |u| u.login.as_str());
+    info!("Enrollment started for user {login}, session {session_id}");
+    Ok(EnrollmentStartResult {
+        session_id,
+        user: response
+            .user
+            .ok_or_else(|| "Proxy did not return user info".to_string())?,
+        admin: response
+            .admin
+            .ok_or_else(|| "Proxy did not return admin info".to_string())?,
+        settings: response
+            .settings
+            .ok_or_else(|| "Proxy did not return enrollment settings".to_string())?,
+        instance: response
+            .instance
+            .ok_or_else(|| "Proxy did not return instance info".to_string())?,
+        deadline_timestamp: response.deadline_timestamp,
+        final_page_content: response.final_page_content,
+    })
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_create_device(
+    session_id: String,
+    name: String,
+    pubkey: String,
+    state: State<'_, AppState>,
+) -> Result<DeviceConfigResponse, String> {
+    debug!("Creating device \"{name}\"");
+    let session = get_enrollment_session(&state, &session_id)?;
+    let result = enrollment::enrollment_create_device(session, name, pubkey)
+        .await
+        .map_err(err_to_json)?;
+    info!("Device created");
+    Ok(result)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_activate_user(
+    session_id: String,
+    password: Option<String>,
+    phone_number: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Activating user");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_activate_user(session, password, phone_number)
+        .await
+        .map_err(err_to_json)?;
+    info!("User activated");
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_register_mfa_start(
+    session_id: String,
+    method: String,
+    state: State<'_, AppState>,
+) -> Result<CodeMfaSetupStartResponse, String> {
+    debug!("Starting MFA setup");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_register_mfa_start(session, method)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_register_mfa_finish(
+    session_id: String,
+    code: String,
+    method: String,
+    state: State<'_, AppState>,
+) -> Result<CodeMfaSetupFinishResponse, String> {
+    debug!("Finishing MFA setup");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_register_mfa_finish(session, code, method)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_network_info(
+    session_id: String,
+    pubkey: String,
+    state: State<'_, AppState>,
+) -> Result<DeviceConfigResponse, String> {
+    debug!("Fetching network info");
+    let session = get_enrollment_session(&state, &session_id)?;
+    enrollment::enrollment_network_info(session, pubkey)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn enrollment_finish(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Finishing enrollment");
+    let session = {
+        let uid = Uuid::parse_str(&session_id).map_err(|e| format!("Invalid session ID: {e}"))?;
+        let mut sessions = state
+            .enrollment_sessions
+            .lock()
+            .expect("enrollment_sessions mutex poisoned");
+        sessions
+            .remove(&uid)
+            .ok_or_else(|| "Enrollment session not found".to_string())?
+    };
+    enrollment::enrollment_finish(session);
+    info!("Enrollment finished, session {session_id} removed");
+    Ok(())
+}
+
+#[derive(Clone, Serialize)]
+pub struct MfaErrorPayload {
+    pub error: String,
+}
+
+/// Bring up a location connection with a preshared key obtained from a
+/// completed MFA handshake. Keeps the preshared key inside the backend - it is
+/// never returned to or emitted at the frontend.
+async fn connect_after_mfa(
+    location_id: Id,
+    preshared_key: String,
+    handle: &AppHandle,
+) -> Result<(), String> {
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Location not found".to_string())?;
+    connect_location_with_psk(location, Some(preshared_key), handle)
+        .await
+        // Distinct prefix so the frontend can tell a post-MFA connection
+        // failure apart from an MFA/auth failure.
+        .map_err(|e| format!("VPN connection failed: {e}"))
+}
+
+/// Map the frontend MFA method string to the proto `MfaMethod` enum the proxy
+/// expects on the wire (a numeric enum, not a string).
+fn parse_mfa_method(method: &str) -> Result<MfaMethod, String> {
+    match method {
+        "totp" => Ok(MfaMethod::Totp),
+        "email" => Ok(MfaMethod::Email),
+        "oidc" => Ok(MfaMethod::Oidc),
+        "biometric" => Ok(MfaMethod::Biometric),
+        "mobileapprove" => Ok(MfaMethod::MobileApprove),
+        other => Err(format!("Unsupported MFA method: {other}")),
+    }
+}
+
+#[tauri::command(async)]
+pub async fn mfa_start(
+    instance_id: Id,
+    location_id: Id,
+    method: String,
+) -> Result<defguard_client_proto::defguard::client_types::ClientMfaStartResponse, String> {
+    debug!("Starting MFA session for location {location_id}");
+    let method = parse_mfa_method(&method)?;
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "WireGuard keys not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Location not found".to_string())?;
+    // FIXME: ugly struct
+    ConnectionTarget::Location(location.clone())
+        .ensure_single_all_traffic_connection(&DB_POOL, None)
+        .await
+        .map_err(|err| err.to_string())?;
+    let posture_data = if location.posture_check_required {
+        Some(
+            defguard_client_posture::get_posture_data()
+                .await
+                .map_err(|e| format!("Failed to collect posture data: {e}"))?,
+        )
+    } else {
+        None
+    };
+    let request = ClientMfaStartRequest {
+        location_id: location.network_id,
+        pubkey: keys.pubkey,
+        method: method as i32,
+        posture_data,
+    };
+    mfa::mfa_start(proxy_url, request)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn mfa_finish_code(
+    instance_id: Id,
+    location_id: Id,
+    token: String,
+    code: String,
+    handle: AppHandle,
+) -> Result<(), String> {
+    debug!("Finishing MFA with code for instance {instance_id}");
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let request = ClientMfaFinishRequest {
+        token,
+        code: Some(code),
+        auth_pub_key: None,
+    };
+    let response = mfa::mfa_finish_code(proxy_url, request)
+        .await
+        .map_err(err_to_json)?;
+    connect_after_mfa(location_id, response.preshared_key, &handle).await
+}
+
+/// Register a long-running MFA task, run its future in the background, and on
+/// success bring up the connection Rust-side before emitting a payload-free
+/// completion event (or an error event). Shared by the OpenID poll and mobile
+/// approve flows so the preshared key never leaves the backend. Returns the
+/// task id the frontend uses to cancel.
+fn spawn_mfa_task<F, R>(
+    handle: &AppHandle,
+    location_id: Id,
+    complete_event: EventKey,
+    error_event: EventKey,
+    run: R,
+) -> String
+where
+    R: FnOnce(CancellationToken) -> F + Send + 'static,
+    F: std::future::Future<Output = Result<ClientMfaFinishResponse, mfa::MfaError>>
+        + Send
+        + 'static,
+{
+    let cancel = CancellationToken::new();
+    let task_id = Uuid::new_v4().to_string();
+    handle
+        .state::<AppState>()
+        .mfa_tasks
+        .lock()
+        .expect("mfa_tasks mutex poisoned")
+        .insert(task_id.clone(), cancel.clone());
+
+    let task_id_for_task = task_id.clone();
+    let listen_handle = handle.clone();
+    tokio::spawn(async move {
+        let result = run(cancel).await;
+        listen_handle
+            .state::<AppState>()
+            .mfa_tasks
+            .lock()
+            .expect("mfa_tasks mutex poisoned")
+            .remove(&task_id_for_task);
+        match result {
+            Ok(response) => {
+                info!("MFA completed for task {task_id_for_task}");
+                match connect_after_mfa(location_id, response.preshared_key, &listen_handle).await {
+                    Ok(()) => {
+                        let _ = listen_handle.emit(complete_event.into(), ());
+                    }
+                    Err(err) => {
+                        warn!("Connect after MFA failed for task {task_id_for_task}: {err}");
+                        let _ =
+                            listen_handle.emit(error_event.into(), MfaErrorPayload { error: err });
+                    }
+                }
+            }
+            Err(err) => {
+                warn!("MFA task {task_id_for_task} failed: {err}");
+                // Emit the structured error as JSON so the frontend classifies
+                // it the same way as command errors.
+                let _ = listen_handle.emit(
+                    error_event.into(),
+                    MfaErrorPayload {
+                        error: err_to_json(err),
+                    },
+                );
+            }
+        }
+    });
+
+    task_id
+}
+
+#[tauri::command(async)]
+pub async fn mfa_poll_openid(
+    instance_id: Id,
+    location_id: Id,
+    token: String,
+    handle: AppHandle,
+) -> Result<String, String> {
+    debug!("Starting OpenID MFA poll for instance {instance_id}");
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    Ok(spawn_mfa_task(
+        &handle,
+        location_id,
+        EventKey::MfaOpenIdComplete,
+        EventKey::MfaOpenIdError,
+        move |cancel| mfa::poll_openid_mfa(proxy_url, token, cancel),
+    ))
+}
+
+#[tauri::command(async)]
+pub async fn mfa_connect_mobile_approve(
+    instance_id: Id,
+    location_id: Id,
+    token: String,
+    handle: AppHandle,
+) -> Result<String, String> {
+    debug!("Starting mobile approve MFA for instance {instance_id}");
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Instance not found".to_string())?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    let ws_url = mfa::derive_ws_url(&proxy_url, &token).map_err(|e| e.to_string())?;
+    Ok(spawn_mfa_task(
+        &handle,
+        location_id,
+        EventKey::MfaMobileComplete,
+        EventKey::MfaMobileError,
+        move |cancel| async move { mfa::connect_mobile_approve(&ws_url, cancel).await },
+    ))
+}
+
+#[tauri::command(async)]
+pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    debug!("Cancelling MFA task {task_id}");
+    let cancel = {
+        let tasks = state.mfa_tasks.lock().expect("mfa_tasks mutex poisoned");
+        tasks
+            .get(&task_id)
+            .cloned()
+            .ok_or_else(|| "MFA task not found".to_string())?
+    };
+    cancel.cancel();
+    Ok(())
 }

@@ -1,0 +1,33 @@
+.location-card {
+  border-radius: 16px;
+  box-sizing: border-box;
+  padding: var(--spacing-lg);
+  background-color: var(--bg-dark-blue-40);
+
+  > .top-track {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    user-select: none;
+
+    &.interactive {
+      cursor: pointer;
+
+      &:hover {
+        > .right > .icon-button {
+          --bg: var(--c-white-20);
+          --icon: var(--c-white-100);
+        }
+      }
+    }
+
+    > .right {
+      margin-left: auto;
+    }
+  }
+
+  .controls {
+    padding-top: var(--spacing-3xl);
+  }
+}

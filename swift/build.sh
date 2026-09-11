@@ -2,52 +2,45 @@
 set -e
 
 DST="${PWD}/extension/BoringTun"
-CARGO="${HOME}/.cargo/bin/cargo"
+CARGO="${CARGO:-${HOME}/.cargo/bin/cargo}"
 RUSTUP="${HOME}/.cargo/bin/rustup"
+TARGET_DIR="${CARGO_TARGET_DIR:-./target}"
 
 export MACOSX_DEPLOYMENT_TARGET=13.5
 
 # Build BoringTun.
-
 pushd boringtun
 
-for TARGET in aarch64-apple-darwin x86_64-apple-darwin
-do
-    ${RUSTUP} target add "${TARGET}"
-    ${CARGO} build --lib --locked --release --target ${TARGET}
+for TARGET in aarch64-apple-darwin x86_64-apple-darwin; do
+    if [ -x "${RUSTUP}" ]; then
+        ${RUSTUP} target add "${TARGET}"
+    fi
+    ${CARGO} build --features=bindgen --lib --locked --release --target ${TARGET}
 done
 
 # Create universal library.
-
-mkdir -p target/universal/release
+mkdir -p ${TARGET_DIR}/universal/release
 lipo -create \
-    target/aarch64-apple-darwin/release/libdefguard_boringtun.a \
-    target/x86_64-apple-darwin/release/libdefguard_boringtun.a \
-    -output target/universal/release/libdefguard_boringtun.a
+    ${TARGET_DIR}/aarch64-apple-darwin/release/libdefguard_boringtun.a \
+    ${TARGET_DIR}/x86_64-apple-darwin/release/libdefguard_boringtun.a \
+    -output ${TARGET_DIR}/universal/release/libdefguard_boringtun.a
 
-rm -f -r target/uniffi
-${CARGO} run --release --bin uniffi-bindgen -- \
+rm -f -r ${TARGET_DIR}/uniffi
+${CARGO} run --features=bindgen --release --bin uniffi-bindgen -- \
     --xcframework --headers --modulemap --swift-sources \
-    target/aarch64-apple-darwin/release/libdefguard_boringtun.a target/uniffi
+    ${TARGET_DIR}/aarch64-apple-darwin/release/libdefguard_boringtun.a ${TARGET_DIR}/uniffi
 
 # Install BoringTun framework.
-
 mkdir -p "${DST}"
-cp -c target/uniffi/defguard_boringtun.swift "${DST}/"
+cp -c ${TARGET_DIR}/uniffi/defguard_boringtun.swift "${DST}/"
 rm -f -r "${DST}/defguard_boringtun.xcframework"
 xcodebuild -create-xcframework \
-    -library target/universal/release/libdefguard_boringtun.a \
-    -headers target/uniffi \
+    -library ${TARGET_DIR}/universal/release/libdefguard_boringtun.a \
+    -headers ${TARGET_DIR}/uniffi \
     -output ${DST}/defguard_boringtun.xcframework
-cp -c target/uniffi/defguard_boringtunFFI.h "${DST}/"
+cp -c ${TARGET_DIR}/uniffi/defguard_boringtunFFI.h "${DST}/"
 
 popd
 
 # Build VPNExtension.
-
-# if [ "${TAURI_ENV_DEBUG}" = 'false' ]; then
-    CONFIG=Release
-# else
-#     CONFIG=Debug
-# fi
-xcodebuild -project extension/VPNExtension.xcodeproj -target VPNExtension -configuration ${CONFIG} build
+xcodebuild -project extension/VPNExtension.xcodeproj -target ${1:-VPNExtension} -configuration ${2:-Release} build

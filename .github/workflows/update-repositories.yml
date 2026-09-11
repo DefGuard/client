@@ -14,7 +14,7 @@ jobs:
       amd64_sha: ${{ steps.get_sha.outputs.AMD64_SHA }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -46,9 +46,9 @@ jobs:
       - name: Upload DEB to APT repository
         run: |
           if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
-            component="pre-release"
+            component="pre-release-2.0"
           else
-            component="release"
+            component="release-2.0"
           fi
 
           for deb_file in debs/*.deb; do

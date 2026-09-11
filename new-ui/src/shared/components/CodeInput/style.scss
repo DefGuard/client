@@ -1,0 +1,30 @@
+.code-input > .inputs-grid {
+  display: flex;
+  flex-flow: row nowrap;
+  gap: var(--spacing-md);
+  justify-content: center;
+  align-items: center;
+
+  .field-box {
+    height: 36px;
+    width: 36px;
+    min-height: unset;
+    padding: 0;
+    cursor: text;
+
+    input {
+      width: auto;
+      min-width: 12px;
+      height: 20px;
+      text-align: center;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--fg-white-100);
+      font: var(--t-input-text-primary);
+      line-height: 20px;
+      caret-color: transparent;
+      cursor: text;
+    }
+  }
+}

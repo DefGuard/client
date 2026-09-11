@@ -1,17 +1,18 @@
 {
   "build": {
-    "features": [
-      "service"
-    ]
+    "beforeBundleCommand": {
+      "cwd": ".",
+      "script": "powershell -ExecutionPolicy Bypass -File ./resources-windows/scripts/Sign-Binaries.ps1"
+    }
   },
   "bundle": {
-    "targets": [
-      "msi"
-    ],
     "resources": [
       "resources-windows/binaries/*",
       "resources-windows/scripts/*",
-      "resources/icons/*"
+      "resources/icons/tray/*"
+    ],
+    "targets": [
+      "msi"
     ]
   }
 }

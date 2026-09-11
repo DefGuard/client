@@ -1,0 +1,108 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
+import { Button } from '../../../../../../../shared/components/Button/Button';
+import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
+import { CodeInput } from '../../../../../../../shared/components/CodeInput/CodeInput';
+import { Controls } from '../../../../../../../shared/components/Controls/Controls';
+import { useMfaConnect } from '../../../../../../../shared/components/LocationCard/hooks/useMfaConnect';
+import { type LocationInfo, MfaMethod } from '../../../../../../../shared/rust-api/types';
+import { isPresent } from '../../../../../../../shared/utils/isPresent';
+import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
+import { ConnectModalView } from '../../hooks/types';
+import { useConnectModal } from '../../hooks/useConnectModal';
+
+const MIN_POSTURE_LOADER_MS = 500;
+
+export const ConnectModalMfaEmail = () => {
+  const [perviousView, location] = useConnectModal(
+    useShallow((s) => [s.perviousView, s.location]),
+  );
+
+  const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
+    location as LocationInfo,
+    MfaMethod.Email,
+    {
+      debounceMs: location?.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
+      onSessionExpired: () =>
+        useConnectModal.getState().setView(perviousView ?? ConnectModalView.MfaSettings),
+      onPostureError: (msg) => {
+        useConnectModal.setState({ postureError: msg });
+        useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
+      },
+      onServiceUnavailable: () =>
+        useConnectModal.getState().setView(ConnectModalView.ConnectionError),
+    },
+  );
+
+  const [emailCode, setEmailCode] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleVerify = useCallback(
+    (initCode?: string | null) => {
+      const codeToVerify = initCode ?? emailCode;
+
+      if (!isPresent(codeToVerify)) {
+        setError('Enter code');
+        return;
+      }
+      if (codeToVerify.length !== 6) {
+        setError('6 digits are required');
+        return;
+      }
+      verifyCode(codeToVerify);
+    },
+    [emailCode, verifyCode],
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
+  useEffect(() => {
+    setError(null);
+  }, [emailCode, setError]);
+
+  useEffect(() => {
+    if (verifyError) setError(verifyError);
+  }, [verifyError]);
+
+  if (isStarting && location?.posture_check_required && !startError) {
+    return <ConnectModalPostureCheckLoading />;
+  }
+
+  return (
+    <div
+      id="mfa-email-view"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') handleVerify();
+      }}
+    >
+      <p className="view-description">
+        Enter the 6-digit code sent to your email address.
+      </p>
+      <CodeInput
+        length={6}
+        value={emailCode}
+        onChange={setEmailCode}
+        error={startError ?? error}
+        onSuccessPaste={(value) => {
+          handleVerify(value);
+        }}
+      />
+      <Controls>
+        <Button
+          variant={ButtonVariant.Secondary}
+          text="Use different MFA"
+          onClick={() => {
+            useConnectModal.getState().setView(ConnectModalView.MfaSettings);
+          }}
+        />
+        <div className="right">
+          <Button
+            text="Verify"
+            variant={ButtonVariant.Primary}
+            onClick={() => handleVerify()}
+            loading={isStarting || isVerifying}
+          />
+        </div>
+      </Controls>
+    </div>
+  );
+};

@@ -1,0 +1,33 @@
+.info-banner {
+  border-radius: 12px;
+  box-sizing: border-box;
+  padding: var(--spacing-md);
+  background-color: var(--bg-white-10);
+
+  > .grid {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    column-gap: var(--spacing-md);
+    place-items: start start;
+
+    .icon-track {
+      display: flex;
+      flex-flow: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      user-select: none;
+    }
+
+    .content-track {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-md);
+
+      p {
+        font: var(--t-body-xs-500);
+        color: var(--fg-white-100);
+      }
+    }
+  }
+}

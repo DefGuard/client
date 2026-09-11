@@ -1,0 +1,31 @@
+.interaction-box {
+  --interaction-size: 36px;
+
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  position: relative;
+  user-select: none;
+
+  & > button {
+    display: block;
+    position: absolute;
+    content: ' ';
+    width: var(--interaction-size);
+    height: var(--interaction-size);
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0;
+    margin: 0;
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+  }
+}

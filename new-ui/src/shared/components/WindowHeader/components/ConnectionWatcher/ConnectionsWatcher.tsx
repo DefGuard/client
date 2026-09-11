@@ -1,0 +1,173 @@
+import './style.scss';
+import type { Placement } from '@floating-ui/react';
+import {
+  autoUpdate,
+  FloatingPortal,
+  size as floatingSize,
+  offset,
+  safePolygon,
+  shift,
+  useDismiss,
+  useFloating,
+  useHover,
+  useInteractions,
+} from '@floating-ui/react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
+import { useEffect, useMemo, useState } from 'react';
+import { Snackbar } from '../../../../providers/snackbar/snackbar';
+import { api } from '../../../../rust-api/api';
+import { Direction, ThemeSpacing, ThemeVariable } from '../../../../types';
+import { isPresent } from '../../../../utils/isPresent';
+import { Divider } from '../../../Divider/Divider';
+import { FloatingMenu } from '../../../FloatingMenu/FloatingMenu';
+import { Icon } from '../../../Icon';
+
+type Props = {
+  placement?: Placement;
+};
+
+export const ConnectionWatcher = ({ placement = 'bottom-start' }: Props) => {
+  const { mutate: disconnect } = useMutation({
+    mutationFn: api.disconnect,
+    onError: () => {
+      Snackbar.error('Failed to disconnect.');
+    },
+  });
+
+  const { data: connections } = useQuery({
+    queryKey: ['alive-connection'],
+    queryFn: api.getAllActiveConnections,
+    refetchInterval: 5_000,
+  });
+
+  const connected = (connections?.length ?? 0) > 0;
+
+  const [floatingOpen, setFloatingOpen] = useState(false);
+
+  const disconnectAllPromise = useMemo(() => {
+    return () =>
+      Promise.all(
+        (connections ?? []).map((connection) =>
+          api.disconnect({
+            locationId: connection.id,
+            connectionType: connection.connection_type,
+          }),
+        ),
+      );
+  }, [connections]);
+
+  const { mutate: disconnectAll } = useMutation({
+    mutationFn: disconnectAllPromise,
+    onError: () => {
+      Snackbar.error('Failed to disconnect all locations.');
+    },
+  });
+
+  useEffect(() => {
+    if (!connected) {
+      setFloatingOpen(false);
+    }
+  }, [connected]);
+
+  const { refs, context, floatingStyles } = useFloating({
+    placement,
+    open: floatingOpen,
+    onOpenChange: setFloatingOpen,
+    middleware: [
+      offset(4),
+      shift({ padding: 4 }),
+      floatingSize({
+        apply({ rects, elements }) {
+          elements.floating.style.minWidth = `${rects.reference.width}px`;
+        },
+      }),
+    ],
+    whileElementsMounted: autoUpdate,
+  });
+
+  const hover = useHover(context, {
+    handleClose: safePolygon(),
+    enabled: connected,
+  });
+
+  const dismiss = useDismiss(context, {
+    ancestorScroll: true,
+    outsidePress: true,
+  });
+
+  const { getFloatingProps, getReferenceProps } = useInteractions([hover, dismiss]);
+
+  return (
+    <>
+      <div
+        className={clsx('connection-watcher', {
+          connected,
+        })}
+        ref={refs.setReference}
+        {...getReferenceProps()}
+      >
+        {!connected && <p className="no-connection-label">Not connected</p>}
+        {connected && isPresent(connections) && (
+          <div className="connected-row">
+            <Icon size={16} staticColor={ThemeVariable.FgAction} icon="online" />
+            <p>{`Connected (${connections.length})`}</p>
+            <Icon
+              size={16}
+              icon="arrow-small"
+              staticColor="var(--fg-action)"
+              rotationDirection={Direction.DOWN}
+            />
+          </div>
+        )}
+      </div>
+      {floatingOpen && (
+        <FloatingPortal>
+          <FloatingMenu
+            containerProps={{
+              ref: refs.setFloating,
+              style: { position: 'absolute', ...floatingStyles },
+              ...getFloatingProps(),
+              className: 'connection-watcher-floating',
+            }}
+          >
+            <p className="label">Connected locations</p>
+            {connections?.map((con) => (
+              <div
+                className="connection"
+                key={con.id}
+                onClick={() => {
+                  disconnect({
+                    locationId: con.id,
+                    connectionType: con.connection_type,
+                  });
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle cx="8" cy="8" r="4" fill="#74FFB8" />
+                </svg>
+                <p>{con.name}</p>
+              </div>
+            ))}
+            <Divider spacing={ThemeSpacing.Sm} />
+            <button
+              className="disconnect"
+              onClick={() => {
+                void disconnectAll();
+              }}
+            >
+              <Icon size={16} icon="disconnect-all" />
+              <p>Disconnect all</p>
+            </button>
+          </FloatingMenu>
+        </FloatingPortal>
+      )}
+    </>
+  );
+};

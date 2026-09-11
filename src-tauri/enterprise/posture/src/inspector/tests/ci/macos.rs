@@ -1,0 +1,76 @@
+use std::process::Command;
+
+use super::super::super::{
+    device_integrity, disk_encryption_status, os_name, os_version, DiskEncryptionTarget,
+};
+
+fn expected_os_version() -> String {
+    let output = Command::new("sw_vers")
+        .arg("-productVersion")
+        .output()
+        .expect("failed to execute sw_vers -productVersion");
+    assert!(
+        output.status.success(),
+        "sw_vers -productVersion failed: {output:?}"
+    );
+    String::from_utf8(output.stdout)
+        .expect("sw_vers returned non-UTF8 output")
+        .trim()
+        .to_owned()
+}
+
+mod setup1 {
+    use super::*;
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_name() {
+        assert_eq!(os_name().unwrap(), "Darwin");
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_version() {
+        assert_eq!(os_version().unwrap(), expected_os_version());
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_device_integrity() {
+        assert!(device_integrity().unwrap());
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_disk_encryption_status_unencrypted() {
+        assert!(!disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
+    }
+}
+
+mod setup2 {
+    use super::*;
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_name() {
+        assert_eq!(os_name().unwrap(), "Darwin");
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_os_version() {
+        assert_eq!(os_version().unwrap(), expected_os_version());
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_device_integrity() {
+        assert!(!device_integrity().unwrap());
+    }
+
+    #[test]
+    #[ignore = "CI posture testing only"]
+    fn test_disk_encryption_status_unencrypted() {
+        assert!(disk_encryption_status(DiskEncryptionTarget::ClientDatabase).unwrap());
+    }
+}

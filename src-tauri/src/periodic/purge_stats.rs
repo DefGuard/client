@@ -7,8 +7,7 @@ use crate::database::{
     DB_POOL,
 };
 
-// 12 hours
-const PURGE_INTERVAL: Duration = Duration::from_secs(12 * 60 * 60);
+const PURGE_INTERVAL: Duration = Duration::from_hours(12);
 
 /// Periodically purges location and tunnel stats.
 ///

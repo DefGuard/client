@@ -6,6 +6,7 @@ on:
       - main
       - dev
       - "release/**"
+      - "stable/**"
     paths-ignore:
       - "*.md"
       - "LICENSE"
@@ -14,12 +15,14 @@ on:
       - main
       - dev
       - "release/**"
+      - "stable/**"
     paths-ignore:
       - "*.md"
       - "LICENSE"
 
 env:
   CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "1"
   # sccache
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -39,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -67,22 +70,22 @@ jobs:
       - name: Check format
         run: |
           rustup component add rustfmt
-          cargo fmt -- --check
+          cargo fmt --all -- --check
 
       - name: Run clippy linter
         run: |
           mkdir ../dist
           rustup component add clippy
-          cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Install cargo extensions
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deny
+          tool: cargo-deny,cargo-nextest
 
       - name: Run cargo deny
         working-directory: ./src-tauri
         run: cargo deny check --hide-inclusion-graph
 
       - name: Run tests
-        run: cargo test --locked --no-fail-fast
+        run: cargo nextest run --workspace --locked --no-fail-fast

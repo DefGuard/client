@@ -27,7 +27,7 @@ use tracing::Level;
 use super::LogLineFields;
 use super::{LogLine, LogWatcherError};
 #[cfg(not(target_os = "macos"))]
-use crate::utils::get_service_log_dir;
+use crate::utils::DEFAULT_SERVICE_LOG_DIR;
 use crate::{
     appstate::AppState, database::models::Id, error::Error, log_watcher::extract_timestamp,
     utils::get_tunnel_or_location_name, ConnectionType,
@@ -183,8 +183,7 @@ impl<'a> ServiceLogWatcher<'a> {
 
     /// Find the latest log file in directory
     ///
-    /// Log files are rotated daily and have a knows naming format,
-    /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
+    /// Log files are rotated daily and include the date in their filename.
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         trace!(
             "Getting latest log file from directory: {}",
@@ -428,7 +427,7 @@ pub async fn spawn_log_watcher_task(
     // prepare cancellation token
     let token = CancellationToken::new();
 
-    let log_dir = get_service_log_dir(); // get log file directory
+    let log_dir = Path::new(DEFAULT_SERVICE_LOG_DIR);
     let mut log_watcher = ServiceLogWatcher::new(
         handle.clone(),
         token.clone(),

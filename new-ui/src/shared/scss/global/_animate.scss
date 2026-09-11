@@ -1,0 +1,11 @@
+@use 'sass:list';
+
+// for now no prop required
+@mixin animate($properties...) {
+  transition-timing-function: ease-out;
+  transition-duration: 160ms;
+
+  @if list.length($properties) > 0 {
+    transition-property: $properties;
+  }
+}

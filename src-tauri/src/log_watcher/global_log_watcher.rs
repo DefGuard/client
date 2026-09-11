@@ -30,7 +30,7 @@ use crate::{
     LOG_FILENAME,
 };
 #[cfg(not(target_os = "macos"))]
-use crate::{log_watcher::extract_timestamp, utils::get_service_log_dir};
+use crate::{log_watcher::extract_timestamp, utils::DEFAULT_SERVICE_LOG_DIR};
 
 #[cfg(target_os = "macos")]
 pub(crate) const VPN_EXTENSION_LOG_FILENAME: &str = "vpn-extension.log";
@@ -56,7 +56,7 @@ impl LogDirs {
     pub fn new(handle: &AppHandle) -> Result<Self, LogWatcherError> {
         debug!("Getting log directories for service and client to watch.");
         #[cfg(not(target_os = "macos"))]
-        let service_log_dir = get_service_log_dir().to_path_buf();
+        let service_log_dir = std::path::Path::new(DEFAULT_SERVICE_LOG_DIR).to_path_buf();
         let client_log_dir = handle.path().app_log_dir().map_err(|_| {
             LogWatcherError::LogPathError("Path to client logs directory is empty.".to_string())
         })?;
@@ -91,8 +91,7 @@ impl LogDirs {
 
     /// Find the latest log file in directory for the service
     ///
-    /// Log files are rotated daily and have a known naming format,
-    /// with the last 10 characters specifying a date (e.g. `2023-12-15`).
+    /// Log files are rotated daily and include the date in their filename.
     #[cfg(not(target_os = "macos"))]
     fn get_latest_log_file(&self) -> Result<Option<PathBuf>, LogWatcherError> {
         debug!(
@@ -637,7 +636,7 @@ pub async fn spawn_global_log_watcher_task(
     let app_state = handle.state::<AppState>();
 
     // Show logs only from the last hour
-    let from = Some(Utc::now() - Duration::from_secs(60 * 60));
+    let from = Some(Utc::now() - Duration::from_hours(1));
 
     let event_topic = "log-update-global".to_string();
 

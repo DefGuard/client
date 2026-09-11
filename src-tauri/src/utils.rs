@@ -1,19 +1,30 @@
-#[cfg(not(target_os = "macos"))]
-use std::str::FromStr;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
-use std::{env, path::Path, process::Command};
-
-use base64::{prelude::BASE64_STANDARD, Engine};
 #[cfg(not(target_os = "macos"))]
-use common::{find_free_tcp_port, get_interface_name};
+use std::{collections::HashMap, str::FromStr};
+use std::{env, process::Command};
+#[cfg(target_os = "linux")]
+use std::{fs, path::Path};
+
+#[cfg(not(target_os = "macos"))]
+use defguard_client_common::{find_free_tcp_port, get_interface_name};
+#[cfg(windows)]
+use defguard_client_core::connection::active_connections::find_connection;
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::apple::tunnel_stats;
+use defguard_client_core::connection::{bring_up, ConnectionTarget};
+#[cfg(not(target_os = "macos"))]
+use defguard_client_core::{
+    connection::daemon_client::DAEMON_CLIENT, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
+};
+#[cfg(not(target_os = "macos"))]
+use defguard_client_proto::defguard::client::v1::{
+    CreateInterfaceRequest, ReadInterfaceDataRequest,
+};
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
-use prost::Message;
 use sqlx::query;
 use tauri::{AppHandle, Emitter, Manager};
-#[cfg(not(target_os = "macos"))]
-use tonic::Code;
 use tracing::Level;
 #[cfg(windows)]
 use windows_service::{
@@ -23,124 +34,95 @@ use windows_service::{
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::ERROR_SERVICE_DOES_NOT_EXIST;
 
-#[cfg(windows)]
-use crate::active_connections::find_connection;
-#[cfg(target_os = "macos")]
-use crate::apple::tunnel_stats;
+#[cfg(not(target_os = "macos"))]
+use crate::database::models::{
+    location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats,
+};
 use crate::{
     appstate::AppState,
     commands::LocationInterfaceDetails,
     database::{
-        models::{
-            connection::{ActiveConnection, Connection},
-            location::Location,
-            tunnel::{Tunnel, TunnelConnection},
-            wireguard_keys::WireguardKeys,
-            Id,
-        },
+        models::{location::Location, tunnel::Tunnel, wireguard_keys::WireguardKeys, Id},
         DbPool, DB_POOL,
     },
     error::Error,
     events::EventKey,
     log_watcher::service_log_watcher::spawn_log_watcher_task,
-    proto::ClientPlatformInfo,
     ConnectionType,
 };
-#[cfg(not(target_os = "macos"))]
-use crate::{
-    database::models::{location_stats::peer_to_location_stats, tunnel::peer_to_tunnel_stats},
-    service::{
-        client::DAEMON_CLIENT,
-        proto::{CreateInterfaceRequest, ReadInterfaceDataRequest, RemoveInterfaceRequest},
-    },
-};
 
-pub(crate) static DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
-pub(crate) static DEFAULT_ROUTE_IPV6: &str = "::/0";
 // Work-around MFA propagation delay. FIXME: remove once Core API is corrected.
 #[cfg(target_os = "macos")]
 static TUNNEL_START_DELAY: Duration = Duration::from_secs(1);
 
-/// Setup client interface for `Instance`.
-#[cfg(not(target_os = "macos"))]
-pub(crate) async fn setup_interface(
-    location: &Location<Id>,
-    name: &str,
-    preshared_key: Option<String>,
-    mtu: Option<u32>,
-    pool: &DbPool,
-) -> Result<String, Error> {
-    debug!("Setting up interface for location: {location}");
-    let interface_name = get_interface_name(name);
+fn stats_diffs(previous_totals: Option<(i64, i64)>, current_totals: (i64, i64)) -> (i64, i64) {
+    previous_totals.map_or((0, 0), |(previous_upload, previous_download)| {
+        (
+            current_totals.0.saturating_sub(previous_upload).max(0),
+            current_totals.1.saturating_sub(previous_download).max(0),
+        )
+    })
+}
 
-    // request interface configuration
-    debug!("Looking for a free port for interface {interface_name}.");
-    let Some(port) = find_free_tcp_port() else {
-        let msg = format!(
-            "Couldn't find free port during interface {interface_name} setup for location \
-            {location}"
-        );
-        error!("{msg}");
-        return Err(Error::InternalError(msg));
-    };
-    debug!("Found free port: {port} for interface {interface_name}.");
+#[cfg(target_os = "linux")]
+const NVIDIA_EXPLICIT_SYNC_ENV: &str = "__NV_DISABLE_EXPLICIT_SYNC";
+#[cfg(target_os = "linux")]
+const WEBKIT_DMABUF_ENV: &str = "WEBKIT_DISABLE_DMABUF_RENDERER";
 
-    let mut interface_config = location
-        .interface_configuration(pool, interface_name.clone(), preshared_key, mtu)
-        .await?;
-    interface_config.mtu = mtu;
-    debug!("Creating interface for location {location} with configuration {interface_config:?}");
-    let request = CreateInterfaceRequest {
-        config: Some(interface_config.clone().into()),
-        dns: location.dns.clone(),
-    };
-    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
-        if error.code() == Code::Unavailable {
-            error!(
-                "Failed to set up connection for location {location}; background service is \
-                unavailable. Make sure the service is running. Error: {error}, Interface \
-                configuration: {interface_config:?}"
-            );
-            Err(Error::InternalError(
-                "Background service is unavailable. Make sure the service is running.".into(),
-            ))
-        } else {
-            error!(
-                "Failed to send a request to the background service to create an interface for \
-                location {location} with the following configuration: {interface_config:?}. \
-                Error: {error}"
-            );
-            Err(Error::InternalError(format!(
-                "Failed to send a request to the background service to create an interface for \
-                location {location}. Error: {error}. Check logs for details."
-            )))
-        }
-    } else {
-        info!(
-            "The interface for location {location} has been created successfully, interface \
-            name: {}.",
-            interface_config.name
+/// Sets relevant environment variables to workaround webkitgtk on nvidia and wayland issues.
+/// https://v2.tauri.app/develop/debug/linux-graphics
+#[cfg(target_os = "linux")]
+pub fn set_webkitgtk_variables() {
+    let (should_set_dmabuf, should_set_explicit_sync) = should_set_webkit_variables();
+    if should_set_dmabuf {
+        env::set_var(WEBKIT_DMABUF_ENV, "1");
+        eprintln!(
+            "Applied Linux WebKitGTK NVIDIA environment variable: \
+            {WEBKIT_DMABUF_ENV}=1"
         );
-        Ok(interface_name)
+    }
+    if should_set_explicit_sync {
+        env::set_var(NVIDIA_EXPLICIT_SYNC_ENV, "1");
+        eprintln!(
+            "Applied Linux WebKitGTK NVIDIA on Wayland environment variable: \
+            {NVIDIA_EXPLICIT_SYNC_ENV}=1"
+        );
     }
 }
 
-#[cfg(target_os = "macos")]
-pub(crate) async fn setup_interface(
-    location: &Location<Id>,
-    _name: &str,
-    preshared_key: Option<String>,
-    mtu: Option<u32>,
-    _pool: &DbPool,
-) -> Result<String, Error> {
-    let tunnel_config = location.tunnel_configurarion(preshared_key, mtu).await?;
+/// Encodes the decision on which webkitgtk-related variables should be set.
+/// Returns (should_set_dmabuf, should_set_explicit_sync) bool pair.
+#[cfg(target_os = "linux")]
+fn should_set_webkit_variables() -> (bool, bool) {
+    let nvidia_driver = has_nvidia_driver();
+    (
+        nvidia_driver && env::var_os(WEBKIT_DMABUF_ENV).is_none(),
+        nvidia_driver && is_wayland_session() && env::var_os(NVIDIA_EXPLICIT_SYNC_ENV).is_none(),
+    )
+}
 
-    tunnel_config.save();
-    tokio::time::sleep(TUNNEL_START_DELAY).await;
-    tunnel_config.start_tunnel();
+#[cfg(target_os = "linux")]
+fn is_wayland_session() -> bool {
+    env::var("XDG_SESSION_TYPE")
+        .is_ok_and(|session_type| session_type.eq_ignore_ascii_case("wayland"))
+        || env::var_os("WAYLAND_DISPLAY").is_some()
+}
 
-    // FIXME: not really useful nor true.
-    Ok(String::new())
+#[cfg(target_os = "linux")]
+fn has_nvidia_driver() -> bool {
+    Path::new("/sys/module/nvidia").exists()
+        || Path::new("/proc/driver/nvidia/version").exists()
+        || fs::read_to_string("/proc/modules")
+            .is_ok_and(|modules| proc_modules_has_nvidia(&modules))
+}
+
+#[cfg(target_os = "linux")]
+fn proc_modules_has_nvidia(modules: &str) -> bool {
+    modules.lines().any(|line| {
+        line.split_whitespace()
+            .next()
+            .is_some_and(|name| name == "nvidia" || name.starts_with("nvidia_"))
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -153,6 +135,7 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
 
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
     let pool = DB_POOL.clone();
+    let mut previous_totals = None;
 
     loop {
         debug!("Waiting for the next stats collection interval for ID {id} and connection type {connection_type:?}");
@@ -162,6 +145,8 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
         let Some(stats) = stats else {
             continue;
         };
+        let current_totals = (stats.tx_bytes.cast_signed(), stats.rx_bytes.cast_signed());
+        let (upload_diff, download_diff) = stats_diffs(previous_totals, current_totals);
 
         let mut transaction = match pool.begin().await {
             Ok(transactions) => transactions,
@@ -172,6 +157,7 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 continue;
             }
         };
+        let mut saved = false;
 
         if connection_type == ConnectionType::Location {
             let location_stats = LocationStats::new(
@@ -181,10 +167,12 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 stats.last_handshake.cast_signed(),
                 0,
                 None,
-            );
+            )
+            .with_diffs(upload_diff, download_diff);
             match location_stats.save(&mut *transaction).await {
                 Ok(_) => {
                     debug!("Saved network usage stats for location ID {id}");
+                    saved = true;
                 }
                 Err(err) => {
                     error!("Failed to save network usage stats for location ID {id}: {err}");
@@ -199,10 +187,12 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 chrono::Utc::now().naive_utc(),
                 0,
                 0,
-            );
+            )
+            .with_diffs(upload_diff, download_diff);
             match tunnel_stats.save(&mut *transaction).await {
                 Ok(_) => {
                     debug!("Saved network usage stats for tunnel ID {id}");
+                    saved = true;
                 }
                 Err(err) => {
                     error!("Failed to save network usage stats for tunnel ID {id}: {err}");
@@ -212,6 +202,8 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
 
         if let Err(err) = transaction.commit().await {
             error!("Failed to commit database transaction for saving location/tunnel stats: {err}");
+        } else if saved {
+            previous_totals = Some(current_totals);
         }
     }
 }
@@ -228,6 +220,7 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
         .await
         .expect("Failed to connect to interface stats stream for interface {interface_name}")
         .into_inner();
+    let mut previous_totals = HashMap::new();
 
     loop {
         match stream.message().await {
@@ -246,8 +239,18 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                     }
                 };
 
-                let peers: Vec<Peer> = interface_data.peers.into_iter().map(Into::into).collect();
+                let peers = interface_data
+                    .peers
+                    .into_iter()
+                    .filter_map(|peer| {
+                        Peer::try_from(peer)
+                            .inspect_err(|err| error!("Skipping malformed peer: {err}"))
+                            .ok()
+                    })
+                    .collect::<Vec<Peer>>();
+                let mut pending_totals = Vec::new();
                 for peer in peers {
+                    let current_totals = (peer.tx_bytes.cast_signed(), peer.rx_bytes.cast_signed());
                     if connection_type.eq(&ConnectionType::Location) {
                         let location_stats = match peer_to_location_stats(
                             &peer,
@@ -272,9 +275,14 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                             (interface {interface_name})."
                         );
                         trace!("Stats: {location_stats:?}");
+                        let location_id = location_stats.location_id;
+                        let (upload_diff, download_diff) =
+                            stats_diffs(previous_totals.get(&location_id).copied(), current_totals);
+                        let location_stats = location_stats.with_diffs(upload_diff, download_diff);
                         match location_stats.save(&mut *transaction).await {
                             Ok(_) => {
                                 debug!("Saved network usage stats for location {location_name}");
+                                pending_totals.push((location_id, current_totals));
                             }
                             Err(err) => {
                                 error!(
@@ -305,9 +313,14 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                             "Saving network usage stats related to tunnel {tunnel_name} \
                             (interface {interface_name}): {tunnel_stats:?}"
                         );
+                        let tunnel_id = tunnel_stats.tunnel_id;
+                        let (upload_diff, download_diff) =
+                            stats_diffs(previous_totals.get(&tunnel_id).copied(), current_totals);
+                        let tunnel_stats = tunnel_stats.with_diffs(upload_diff, download_diff);
                         match tunnel_stats.save(&mut *transaction).await {
                             Ok(_) => {
                                 debug!("Saved stats for tunnel {tunnel_name}");
+                                pending_totals.push((tunnel_id, current_totals));
                             }
                             Err(err) => {
                                 error!("Failed to save stats for tunnel {tunnel_name}: {err}");
@@ -322,6 +335,8 @@ pub(crate) async fn stats_handler(interface_name: String, connection_type: Conne
                         "Failed to commit database transaction for saving location/tunnel stats: \
                         {err}",
                     );
+                } else {
+                    previous_totals.extend(pending_totals);
                 }
             }
             Ok(None) => {
@@ -352,22 +367,17 @@ pub fn load_log_targets() -> Vec<String> {
     Vec::new()
 }
 
-/// Helper function to get log file directory for `defguard-service` daemon.
-#[must_use]
-pub fn get_service_log_dir() -> &'static Path {
-    #[cfg(windows)]
-    let path = "/Logs/defguard-service";
+/// Default log file directory for `defguard-service` daemon.
+#[cfg(windows)]
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/Logs/defguard-service";
 
-    #[cfg(not(windows))]
-    let path = "/var/log/defguard-service";
-
-    Path::new(path)
-}
+#[cfg(not(windows))]
+pub const DEFAULT_SERVICE_LOG_DIR: &str = "/var/log/defguard-service";
 
 /// Setup client interface
 #[cfg(not(target_os = "macos"))]
 pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel<Id>,
+    tunnel: Tunnel<Id>,
     name: &str,
     mtu: Option<u32>,
 ) -> Result<String, Error> {
@@ -522,13 +532,13 @@ pub async fn setup_interface_tunnel(
 
 #[cfg(target_os = "macos")]
 pub async fn setup_interface_tunnel(
-    tunnel: &Tunnel<Id>,
+    tunnel: Tunnel<Id>,
     _name: &str,
     mtu: Option<u32>,
 ) -> Result<String, Error> {
     debug!("Setting up interface for tunnel: {tunnel}");
 
-    let tunnel_config = tunnel.tunnel_configurarion(mtu)?;
+    let tunnel_config = tunnel.tunnel_configuration(mtu)?;
 
     tunnel_config.save();
     tokio::time::sleep(TUNNEL_START_DELAY).await;
@@ -592,6 +602,7 @@ pub async fn get_tunnel_interface_details(
             allowed_ips: tunnel.allowed_ips.unwrap_or_default(),
             persistent_keepalive_interval,
             last_handshake,
+            mfa_method: None,
         })
     } else {
         error!("Error while fetching tunnel details for ID {tunnel_id}: tunnel not found");
@@ -660,6 +671,7 @@ pub async fn get_location_interface_details(
             allowed_ips: location.allowed_ips,
             persistent_keepalive_interval,
             last_handshake,
+            mfa_method: location.mfa_method,
         })
     } else {
         error!("Error while fetching location details for ID {location_id}: location not found");
@@ -669,7 +681,7 @@ pub async fn get_location_interface_details(
 
 /// Setup new connection for location
 pub(crate) async fn handle_connection_for_location(
-    location: &Location<Id>,
+    location: Location<Id>,
     preshared_key: Option<String>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
@@ -680,14 +692,22 @@ pub(crate) async fn handle_connection_for_location(
         .lock()
         .expect("failed to lock app state")
         .mtu();
-    let interface_name =
-        setup_interface(location, &location.name, preshared_key, mtu, &DB_POOL).await?;
+    let interface_name = bring_up(
+        ConnectionTarget::Location(location.clone()),
+        preshared_key,
+        mtu,
+        &DB_POOL,
+        None,
+    )
+    .await?;
     state
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit(EventKey::ConnectionChanged.into(), ())?;
+    handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
@@ -707,37 +727,49 @@ pub(crate) async fn handle_connection_for_location(
 
 /// Setup new connection for tunnel
 pub(crate) async fn handle_connection_for_tunnel(
-    tunnel: &Tunnel<Id>,
+    tunnel: Tunnel<Id>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
-    debug!("Setting up the connection for tunnel: {}", tunnel.name);
+    let tunnel_id = tunnel.id;
+    let tunnel_name = tunnel.name.clone();
+    let tunnel_preshared_key = tunnel.preshared_key.clone();
+    debug!("Setting up the connection for tunnel: {tunnel_name}");
     let state = handle.state::<AppState>();
     let mtu = state
         .app_config
         .lock()
         .expect("failed to lock app state")
         .mtu();
-    let interface_name = setup_interface_tunnel(tunnel, &tunnel.name, mtu).await?;
+    let interface_name = bring_up(
+        ConnectionTarget::Tunnel(tunnel),
+        tunnel_preshared_key,
+        mtu,
+        &DB_POOL,
+        None,
+    )
+    .await?;
     state
-        .add_connection(tunnel.id, &interface_name, ConnectionType::Tunnel)
+        .add_connection(tunnel_id, &interface_name, ConnectionType::Tunnel)
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle.emit(EventKey::ConnectionChanged.into(), ())?;
+    handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     // spawn log watcher
-    debug!("Spawning log watcher for tunnel {}", tunnel.name);
+    debug!("Spawning log watcher for tunnel {tunnel_name}");
     spawn_log_watcher_task(
         handle,
-        tunnel.id,
+        tunnel_id,
         interface_name,
         ConnectionType::Tunnel,
         Level::DEBUG,
         None,
     )
     .await?;
-    debug!("Log watcher for tunnel {} spawned", tunnel.name);
+    debug!("Log watcher for tunnel {tunnel_name} spawned");
     Ok(())
 }
 
@@ -764,164 +796,6 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
     }
     Ok(())
 }
-
-/// Helper function to remove interface and close connection
-pub(crate) async fn disconnect_interface(
-    active_connection: &ActiveConnection,
-) -> Result<(), Error> {
-    debug!(
-        "Disconnecting interface {}.",
-        active_connection.interface_name
-    );
-    let location_id = active_connection.location_id;
-    let interface_name = active_connection.interface_name.clone();
-
-    match active_connection.connection_type {
-        ConnectionType::Location => {
-            let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
-                error!(
-                    "Error while disconnecting interface {interface_name}, location with ID \
-                    {location_id} not found"
-                );
-                return Err(Error::NotFound);
-            };
-
-            #[cfg(target_os = "macos")]
-            {
-                let result = location.stop_vpn_tunnel();
-                error!(
-                    "stop_tunnel() for location {} returned {result:?}",
-                    location.name
-                );
-                if !result {
-                    return Err(Error::InternalError("Error from tunnel".into()));
-                }
-            }
-
-            #[cfg(not(target_os = "macos"))]
-            {
-                let request = RemoveInterfaceRequest {
-                    interface_name,
-                    endpoint: location.endpoint.clone(),
-                };
-                debug!(
-                    "Sending request to the background service to remove interface {} for location \
-                    {}...",
-                    active_connection.interface_name, location.name
-                );
-                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-                    let msg = if error.code() == Code::Unavailable {
-                        format!(
-                            "Couldn't remove interface {}. Background service is unavailable. \
-                            Please make sure the service is running. Error: {error}.",
-                            active_connection.interface_name
-                        )
-                    } else {
-                        format!(
-                            "Failed to send a request to the background service to remove interface \
-                            {}. Error: {error}.",
-                            active_connection.interface_name
-                        )
-                    };
-                    error!("{msg}");
-                }
-            }
-
-            let connection: Connection = active_connection.into();
-            let connection = connection.save(&*DB_POOL).await?;
-            debug!(
-                "Saved location {} new connection status in the database",
-                location.name
-            );
-            trace!("Saved connection: {connection:?}");
-            info!(
-                "Network interface {} for location {location} has been removed",
-                active_connection.interface_name
-            );
-            debug!("Finished disconnecting from location {}", location.name);
-        }
-        ConnectionType::Tunnel => {
-            let Some(tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? else {
-                error!(
-                    "Error while disconnecting interface {interface_name}, tunnel with ID \
-                    {location_id} not found"
-                );
-                return Err(Error::NotFound);
-            };
-            if let Some(pre_down) = &tunnel.pre_down {
-                debug!(
-                    "Executing defined PreDown command before setting up the interface {} for the \
-                    tunnel {tunnel}: {pre_down}",
-                    active_connection.interface_name
-                );
-                let _ = execute_command(pre_down);
-                info!(
-                    "Executed defined PreDown command before setting up the interface {} for the \
-                    tunnel {tunnel}: {pre_down}",
-                    active_connection.interface_name
-                );
-            }
-
-            #[cfg(target_os = "macos")]
-            {
-                let result = tunnel.stop_vpn_tunnel();
-                error!(
-                    "stop_tunnel() for tunnel {} returned {result:?}",
-                    tunnel.name
-                );
-                if !result {
-                    return Err(Error::InternalError("Error from tunnel".into()));
-                }
-            }
-
-            #[cfg(not(target_os = "macos"))]
-            {
-                let request = RemoveInterfaceRequest {
-                    interface_name,
-                    endpoint: tunnel.endpoint.clone(),
-                };
-                if let Err(error) = DAEMON_CLIENT.clone().remove_interface(request).await {
-                    error!(
-                        "Error while removing interface {}, error details: {error:?}",
-                        active_connection.interface_name
-                    );
-                    return Err(Error::InternalError(format!(
-                        "Failed to remove interface, error message: {}",
-                        error.message()
-                    )));
-                }
-            }
-            if let Some(post_down) = &tunnel.post_down {
-                debug!(
-                    "Executing defined PostDown command after removing the interface {} for the \
-                    tunnel {tunnel}: {post_down}",
-                    active_connection.interface_name
-                );
-                let _ = execute_command(post_down);
-                info!(
-                    "Executed defined PostDown command after removing the interface {} for the \
-                    tunnel {tunnel}: {post_down}",
-                    active_connection.interface_name
-                );
-            }
-            let connection: TunnelConnection = active_connection.into();
-            let connection = connection.save(&*DB_POOL).await?;
-            debug!(
-                "Saved new tunnel {} connection status in the database",
-                tunnel.name
-            );
-            trace!("Saved connection: {connection:#?}");
-            info!(
-                "Network interface {} for tunnel {tunnel} has been removed",
-                active_connection.interface_name
-            );
-            debug!("Finished disconnecting from tunnel {}", tunnel.name);
-        }
-    }
-
-    Ok(())
-}
-
 /// Helper function to get the name of a tunnel or location by its ID
 /// Returns the name of the tunnel or location if it exists, otherwise "UNKNOWN"
 /// This is for logging purposes.
@@ -1014,7 +888,9 @@ async fn check_connection(
         .await;
 
     debug!("Sending event informing the frontend that a new connection has been created.");
-    app_handle.emit(EventKey::ConnectionChanged.into(), ())?;
+    app_handle
+        .emit(EventKey::ConnectionChanged.into(), ())
+        .map_err(crate::tauri_err_to_app_err)?;
     debug!("Event informing the frontend that a new connection has been created sent.");
 
     debug!("Spawning service log watcher for {connection_type} {name}...");
@@ -1087,32 +963,22 @@ pub async fn sync_connections(app_handle: &AppHandle) -> Result<(), Error> {
     Ok(())
 }
 
-#[must_use]
-pub(crate) fn construct_platform_header() -> String {
-    let os = os_info::get();
+#[cfg(test)]
+mod tests {
+    use super::stats_diffs;
 
-    let platform_info = ClientPlatformInfo {
-        os_family: std::env::consts::OS.to_string(),
-        os_type: os.os_type().to_string(),
-        version: os.version().to_string(),
-        edition: os.edition().map(str::to_string),
-        codename: os.codename().map(str::to_string),
-        bitness: Some(os.bitness().to_string()),
-        architecture: os.architecture().map(str::to_string),
-    };
+    #[test]
+    fn stats_diffs_returns_zero_for_first_sample() {
+        assert_eq!(stats_diffs(None, (100, 200)), (0, 0));
+    }
 
-    debug!("Constructed platform info header: {platform_info:?}");
+    #[test]
+    fn stats_diffs_returns_counter_increments() {
+        assert_eq!(stats_diffs(Some((100, 200)), (150, 275)), (50, 75));
+    }
 
-    let buffer = platform_info.encode_to_vec();
-
-    BASE64_STANDARD.encode(buffer)
-}
-
-#[must_use]
-/// Utility function to get all tunnels and locations from the database.
-#[cfg(target_os = "macos")]
-pub async fn get_all_tunnels_locations() -> (Vec<Tunnel<Id>>, Vec<Location<Id>>) {
-    let tunnels = Tunnel::all(&*DB_POOL).await.unwrap_or_default();
-    let locations = Location::all(&*DB_POOL, false).await.unwrap_or_default();
-    (tunnels, locations)
+    #[test]
+    fn stats_diffs_clamps_counter_resets_to_zero() {
+        assert_eq!(stats_diffs(Some((100, 200)), (50, 125)), (0, 0));
+    }
 }

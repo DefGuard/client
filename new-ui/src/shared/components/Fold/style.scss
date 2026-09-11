@@ -1,0 +1,19 @@
+.fold {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+
+  @include animate(grid-template-rows);
+
+  &.folded {
+    grid-template-rows: 0fr;
+  }
+
+  .fold-content {
+    overflow: hidden;
+
+    // fix for content with single button in place
+    padding-bottom: 1px;
+    padding-left: 1px;
+  }
+}

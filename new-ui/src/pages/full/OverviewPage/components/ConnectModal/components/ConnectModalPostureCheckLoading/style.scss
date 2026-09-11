@@ -1,0 +1,14 @@
+.connect-modal-posture-check-loading {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  row-gap: var(--spacing-lg);
+  min-height: 220px;
+
+  p {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-100);
+    text-align: center;
+  }
+}

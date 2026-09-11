@@ -1,0 +1,28 @@
+#finish-step {
+  .banner {
+    box-sizing: border-box;
+    padding-bottom: var(--spacing-3xl);
+  }
+
+  h1 {
+    font: var(--t-h4);
+    color: var(--fg-white-100);
+    padding-bottom: var(--spacing-sm);
+    user-select: none;
+  }
+
+  > p {
+    user-select: none;
+    font: var(--t-small-400);
+    color: var(--fg-white-70);
+    padding-bottom: var(--spacing-lg);
+  }
+
+  > .actions {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--spacing-md);
+  }
+}

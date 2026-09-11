@@ -1,0 +1,14 @@
+.timer {
+  display: inline-flex;
+  flex-flow: row nowrap;
+  column-gap: var(--spacing-sm);
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  pointer-events: none;
+
+  p {
+    font: var(--t-body-xxs-400);
+    color: var(--fg-white-60);
+  }
+}

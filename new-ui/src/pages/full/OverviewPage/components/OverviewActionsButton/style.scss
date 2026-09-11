@@ -1,0 +1,15 @@
+.overview-header-actions {
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  column-gap: var(--spacing-xs);
+  cursor: pointer;
+  user-select: none;
+
+  p {
+    font: var(--t-body-xs-500);
+    color: var(--fg-white-80);
+  }
+}

@@ -1,0 +1,113 @@
+*:-moz-focus-inner {
+  border: 0;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  transition: background-color 8553600s;
+  -webkit-text-fill-color: #fff !important;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  overscroll-behavior: none;
+}
+
+// for apple
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: auto;
+}
+
+#root,
+#app {
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  appearance: textfield;
+}
+
+*:focus {
+  outline: none;
+}
+
+*:-moz-focus-inner {
+  border: 0;
+}
+
+p,
+span,
+div,
+section,
+a,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  color: var(--fg-white-100);
+  font-family:
+    geist,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Open Sans',
+    'Helvetica Neue',
+    sans-serif;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 100px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--fg-white-50) transparent;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  transition: background-color 8553600s;
+  -webkit-text-fill-color: #fff !important;
+}

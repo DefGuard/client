@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         // Make all messages serde-serializable.
         .type_attribute(".", "#[derive(serde::Deserialize,serde::Serialize)]")
-        .compile_protos(&["../proto/core/proxy.proto"], &["../proto/core"])?;
+        .compile_protos(&["../proto/v1/core/proxy.proto"], &["../proto"])?;
 
     Ok(())
 }
