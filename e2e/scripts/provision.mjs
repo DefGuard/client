@@ -36,7 +36,10 @@ const NETWORK = {
 	peer_disconnect_threshold: 300,
 	acl_enabled: false,
 	acl_default_allow: false,
-	location_mfa_mode: "disabled",
+	allowed_ips_from_acl: false,
+	mfa_enabled: false,
+	posture_checks: [],
+	mfa_flows: [],
 	service_location_mode: "disabled",
 };
 

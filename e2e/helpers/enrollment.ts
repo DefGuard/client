@@ -33,6 +33,16 @@ export const setPassword = async () => {
 	await clickNext();
 };
 
+export const selectTotpIfNeeded = async () => {
+	if (
+		await $("#mfa-choice-step")
+			.isDisplayed()
+			.catch(() => false)
+	) {
+		await clickNext();
+	}
+};
+
 export const configureTotp = async (): Promise<string> => {
 	await expect($("#mfa-configuration-step")).toBeDisplayed();
 	const secretField = $("#mfa-configuration-step .copy-field .track p");
