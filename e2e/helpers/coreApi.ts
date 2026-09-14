@@ -76,6 +76,23 @@ export class CoreApi {
 		return response;
 	}
 
+	// Core serves the web UI for any unrouted GET, so an endpoint the deployed core does not
+	// have arrives as 200 text/html instead of a 404.
+	private async requestJson<T>(
+		method: string,
+		apiPath: string,
+		body?: unknown,
+	): Promise<T> {
+		const response = await this.request(method, apiPath, body);
+		const contentType = response.headers.get("content-type") ?? "";
+		if (!contentType.includes("application/json")) {
+			throw new Error(
+				`Core API ${method} ${apiPath} returned ${contentType || "no content type"} instead of JSON - the endpoint is missing from this core version`,
+			);
+		}
+		return (await response.json()) as T;
+	}
+
 	async login(): Promise<void> {
 		const response = await this.request("POST", "/api/v1/auth", {
 			username: process.env.CORE_ADMIN_USER ?? "admin",
@@ -110,20 +127,21 @@ export class CoreApi {
 	}
 
 	async listNetworks(): Promise<Array<{ id: number; name: string }>> {
-		const response = await this.request("GET", "/api/v1/network");
-		return (await response.json()) as Array<{ id: number; name: string }>;
+		return this.requestJson<Array<{ id: number; name: string }>>(
+			"GET",
+			"/api/v1/network",
+		);
 	}
 
 	async addUserDevice(name: string, pubkey: string): Promise<AddedUserDevice> {
 		const username = process.env.CORE_ADMIN_USER ?? "admin";
-		const response = await this.request("POST", `/api/v1/device/${username}`, {
+		const data = await this.requestJson<{
+			configs: DeviceConfig[];
+			device: { id: number };
+		}>("POST", `/api/v1/device/${username}`, {
 			name,
 			wireguard_pubkey: pubkey,
 		});
-		const data = (await response.json()) as {
-			configs: DeviceConfig[];
-			device: { id: number };
-		};
 		return { deviceId: data.device.id, configs: data.configs };
 	}
 
@@ -134,21 +152,21 @@ export class CoreApi {
 	private async getNetworkDetails(
 		networkId: number,
 	): Promise<Record<string, unknown>> {
-		const response = await this.request("GET", `/api/v1/network/${networkId}`);
-		return (await response.json()) as Record<string, unknown>;
+		return this.requestJson<Record<string, unknown>>(
+			"GET",
+			`/api/v1/network/${networkId}`,
+		);
 	}
 
 	async getLocationMfaState(networkId: number): Promise<LocationMfaState> {
 		const current = await this.getNetworkDetails(networkId);
-		const response = await this.request(
-			"GET",
-			`/api/v1/location/${networkId}/mfa-flows`,
-		);
-		const flows = (await response.json()) as Array<{
-			id: number;
-			is_default: boolean;
-			groups: Array<{ id: number }>;
-		}>;
+		const flows = await this.requestJson<
+			Array<{
+				id: number;
+				is_default: boolean;
+				groups: Array<{ id: number }>;
+			}>
+		>("GET", `/api/v1/location/${networkId}/mfa-flows`);
 		return {
 			mfaEnabled: current.mfa_enabled === true,
 			mfaFlows: flows.map((flow) => ({
@@ -254,11 +272,14 @@ export class CoreApi {
 	}
 
 	async createTotpFlow(): Promise<number> {
-		const response = await this.request("POST", "/api/v1/mfa-flow", {
-			title: `e2e-totp-${Date.now()}`,
-			steps: [{ methods: ["totp"] }],
-		});
-		const data = (await response.json()) as { id: number };
+		const data = await this.requestJson<{ id: number }>(
+			"POST",
+			"/api/v1/mfa-flow",
+			{
+				title: `e2e-totp-${Date.now()}`,
+				steps: [{ methods: ["totp"] }],
+			},
+		);
 		return data.id;
 	}
 
@@ -270,14 +291,13 @@ export class CoreApi {
 		username: string,
 		ephemeral: boolean,
 	): Promise<EnrollmentFixture> {
-		const response = await this.request(
+		const data = await this.requestJson<{ enrollment_token: string }>(
 			"POST",
 			`/api/v1/user/${username}/start_enrollment`,
 			{
 				send_enrollment_notification: false,
 			},
 		);
-		const data = (await response.json()) as { enrollment_token: string };
 		return {
 			username,
 			enrollmentToken: data.enrollment_token,
