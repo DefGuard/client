@@ -98,6 +98,14 @@ export const TauriCommand = {
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
   MfaFido2Pin: 'mfa_fido2_pin',
   CancelMfa: 'cancel_mfa',
+  // MFA configuration
+  MfaConfigStart: 'mfa_config_start',
+  MfaConfigSendCode: 'mfa_config_send_code',
+  MfaConfigAuthorize: 'mfa_config_authorize',
+  MfaConfigSetupStart: 'mfa_config_setup_start',
+  MfaConfigSetupFinish: 'mfa_config_setup_finish',
+  MfaConfigSetupFido2: 'mfa_config_setup_fido2',
+  MfaConfigCancel: 'mfa_config_cancel',
   // Instances
   AllInstances: 'all_instances',
   DeleteInstance: 'delete_instance',
@@ -172,6 +180,7 @@ export const TauriEvent = {
   MfaFido2Complete: 'mfa-fido2-complete',
   MfaFido2Error: 'mfa-fido2-error',
   MfaFido2Touch: 'mfa-fido2-touch',
+  MfaConfigFido2Touch: 'mfa-config-fido2-touch',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
   TunnelsEnabled: 'tunnel-enabled-by-policy',
 } as const;
@@ -237,6 +246,8 @@ export type InstanceInfo = {
   enterprise_enabled: boolean;
   disable_tunnels: boolean;
   openid_display_name: string | null;
+  /** Factors set up on the account, as last reported. Null when the instance predates the API. */
+  mfa_configured_methods: MfaMethodValue[] | null;
 };
 
 export type MfaStepMethod = {
@@ -493,13 +504,29 @@ export type EnrollmentStartResult = {
   final_page_content: string;
 };
 
-/** Result from enrollment_register_mfa_start. */
-export type EnrollmentMfaStartResult = {
+/** Result from enrollment_register_mfa_start and mfa_config_setup_start. */
+export type MfaSetupStartResult = {
   totp_secret: string | null;
 };
 
-/** Result from enrollment_register_mfa_finish. */
-export type EnrollmentMfaFinishResult = {
+/** Result from enrollment_register_mfa_finish and mfa_config_setup_finish. Core issues recovery
+ *  codes for the first factor only, so an empty list is an ordinary success. */
+export type MfaSetupFinishResult = {
+  recovery_codes: string[];
+};
+
+/** Result from mfa_config_start. `available_methods` holds only factors that can authorize. */
+export type MfaConfigStartResult = {
+  session_id: string;
+  available_methods: MfaMethodValue[];
+  email_fallback: boolean;
+  deadline_timestamp: number;
+};
+
+/** Result from mfa_config_authorize. `recovery_codes` is filled only by the email fallback,
+ *  where verifying the code also enables the email factor. */
+export type MfaConfigAuthorizeResult = {
+  deadline_timestamp: number;
   recovery_codes: string[];
 };
 

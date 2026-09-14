@@ -2,13 +2,19 @@
   --page-content-limit: 536px;
 
   height: calc(100dvh - var(--window-decorations-height));
+  min-height: 0;
   overflow-y: auto;
+
+  // Fill the layout slot here, standalone wizards need viewport height and `#root` has none.
+  .full-page-layout & {
+    height: 100%;
+  }
 
   > .page-grid {
     display: grid;
     grid-template-columns: 232px minmax(0, 1fr);
     grid-template-rows: 1fr;
-    height: 100%;
+    min-height: 100%;
 
     & > .side {
       position: relative;

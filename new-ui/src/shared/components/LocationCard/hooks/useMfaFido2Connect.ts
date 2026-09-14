@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
+import { fido2ShowsTouchPrompt } from '../../../rust-api/fido2';
 import {
   isConnectFailure,
   isMfaPostureError,
@@ -25,10 +26,10 @@ type Options = {
 };
 
 /**
- * FIDO2 MFA. Submitting the PIN starts a backend task that asks Edge for the
- * challenge and the credential id, has the security key sign them, submits the
- * assertion and brings the connection up - so the outcome arrives as an event
- * rather than as the call's return value, like the other task-based methods.
+ * FIDO2 MFA. The backend runs the whole ceremony as a task, so the outcome arrives as an
+ * event rather than as the call's return value, like the other task-based methods.
+ *
+ * `pin` is null where the platform collects it in its own prompt.
  */
 export const useMfaFido2Connect = (
   location: LocationInfo,
@@ -48,8 +49,6 @@ export const useMfaFido2Connect = (
     }
   }, []);
 
-  /// Every exit from a verification attempt lands here: listeners dropped, the
-  /// task forgotten, the view back to accepting a PIN.
   const settle = useCallback(() => {
     cleanupListeners();
     taskIdRef.current = null;
@@ -69,8 +68,8 @@ export const useMfaFido2Connect = (
     };
   }, [cleanupListeners]);
 
-  const verifyPin = useCallback(
-    async (pin: string) => {
+  const verify = useCallback(
+    async (pin: string | null) => {
       cleanupListeners();
       setIsVerifying(true);
       setIsAwaitingTouch(false);
@@ -80,7 +79,8 @@ export const useMfaFido2Connect = (
       // would otherwise emit before the listeners are attached.
       const [touchUnlisten, completeUnlisten, errorUnlisten] = await Promise.all([
         listen(TauriEvent.MfaFido2Touch, () => {
-          setIsAwaitingTouch(true);
+          // A platform running the ceremony shows its own prompt, ours would render behind it.
+          setIsAwaitingTouch(fido2ShowsTouchPrompt());
         }),
         listen(TauriEvent.MfaFido2Complete, () => {
           settle();
@@ -140,5 +140,5 @@ export const useMfaFido2Connect = (
     ],
   );
 
-  return { verifyPin, isVerifying, isAwaitingTouch, verifyError };
+  return { verify, isVerifying, isAwaitingTouch, verifyError };
 };

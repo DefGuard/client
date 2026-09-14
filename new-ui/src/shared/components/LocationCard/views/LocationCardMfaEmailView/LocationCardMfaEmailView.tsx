@@ -70,10 +70,11 @@ export const LocationCardMfaEmailView = () => {
     [emailCode, verifyCode],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
-  useEffect(() => {
-    setError(null);
-  }, [emailCode, setError]);
+  // Only real input clears the error, CodeInput's own reset passes ''.
+  const handleCodeChange = useCallback((value: string) => {
+    setEmailCode(value);
+    if (value.length > 0) setError(null);
+  }, []);
 
   // Reflect server-side verify errors into the local error state
   useEffect(() => {
@@ -100,7 +101,7 @@ export const LocationCardMfaEmailView = () => {
       <CodeInput
         length={6}
         value={emailCode}
-        onChange={setEmailCode}
+        onChange={handleCodeChange}
         error={startError ?? error}
         onSuccessPaste={(value) => {
           handleVerify(value);

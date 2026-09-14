@@ -1,16 +1,8 @@
 use core::fmt;
 use std::{collections::HashMap, env, future::Future, str::FromStr};
 
-use base64::{
-    alphabet,
-    engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig},
-    prelude::BASE64_URL_SAFE_NO_PAD,
-    Engine,
-};
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Duration, Utc};
-use ctap_hid_fido2::{
-    fidokey::get_assertion::get_assertion_params::Assertion, FidoKeyHidFactory, LibCfg,
-};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
@@ -20,7 +12,9 @@ use defguard_client_core::{
     },
     enrollment::{self},
     mfa,
+    mfa_config::{self, MfaConfigError, MfaConfigSession, SetupProof},
 };
+use defguard_client_fido2::{pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext};
 use defguard_client_posture::authorize_posture_session;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
@@ -32,7 +26,7 @@ use defguard_client_proto::defguard::{
         ClientMfaStartRequest, ClientMfaStartResponse, ClientMfaStepStartRequest,
         ClientMfaStepStartResponse, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
         DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
-        InstanceInfo as ProtoInstanceInfo, MfaMethod,
+        InstanceInfo as ProtoInstanceInfo, MfaConfigAuthorizeResponse, MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -40,7 +34,7 @@ use defguard_client_provisioning::ProvisioningConfig;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -63,6 +57,7 @@ use crate::{
     },
     error::Error,
     events::{EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
+    fido2_window::{platform_context, WindowLevelGuard},
     into_location,
     log_watcher::{
         global_log_watcher::{spawn_global_log_watcher_task, stop_global_log_watcher_task},
@@ -417,17 +412,18 @@ pub async fn disconnect_locations(location_ids: Vec<Id>, handle: AppHandle) -> R
 /// Triggers poll on location's instance config. Config will be updated if there are no more active
 /// connections for this instance.
 async fn maybe_update_instance_config(location_id: Id, handle: &AppHandle) -> Result<(), Error> {
-    let mut transaction = DB_POOL.begin().await?;
-    let Some(location) = Location::find_by_id(&mut *transaction, location_id).await? else {
+    let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? else {
         error!("Location {location_id} not found, skipping config update check");
         return Err(Error::NotFound);
     };
-    let Some(mut instance) = Instance::find_by_id(&mut *transaction, location.instance_id).await?
-    else {
-        error!(
-            "Instance {} not found, skipping config update check",
-            location.instance_id
-        );
+    refresh_instance_config(location.instance_id, handle).await
+}
+
+/// Emits `InstanceUpdate` so the frontend refetches whatever the poll changed.
+async fn refresh_instance_config(instance_id: Id, handle: &AppHandle) -> Result<(), Error> {
+    let mut transaction = DB_POOL.begin().await?;
+    let Some(mut instance) = Instance::find_by_id(&mut *transaction, instance_id).await? else {
+        error!("Instance {instance_id} not found, skipping config update check");
         return Err(Error::NotFound);
     };
     poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
@@ -581,6 +577,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
             enterprise_enabled: instance.enterprise_enabled,
             disable_tunnels: instance.disable_tunnels,
             openid_display_name: instance.openid_display_name,
+            mfa_configured_methods: instance.mfa_configured_methods.map(|json| json.0),
         });
     }
     debug!(
@@ -1869,66 +1866,101 @@ pub async fn mfa_connect_mobile_approve(
     ))
 }
 
-/// Decode a base64 value handed out by Edge.
-///
-/// Core deals in `webauthn-rs` types, whose `Base64UrlSafeData` writes URL-safe
-/// base64 without padding but reads either alphabet, padded or not. Be equally
-/// forgiving rather than assuming one of them.
-fn decode_base64(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    /// Padding is accepted but not required, so one engine covers both the
-    /// padded and unpadded spelling of its alphabet.
-    fn engine(alphabet: alphabet::Alphabet) -> GeneralPurpose {
-        GeneralPurpose::new(
-            &alphabet,
-            GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
-        )
+/// The PIN to hand the ceremony, if this platform expects one from us. A platform that runs
+/// the ceremony collects it in its own dialog, so anything the frontend sent is dropped.
+fn fido2_pin(pin: Option<String>) -> Result<Option<String>, &'static str> {
+    if pin_policy() == PinPolicy::Platform {
+        return Ok(None);
+    }
+    let pin = pin.unwrap_or_default().trim().to_string();
+    if pin.is_empty() {
+        return Err("PIN is required");
+    }
+    Ok(Some(pin))
+}
+
+/// Registers a running security key ceremony for the life of the call. A stale token left
+/// behind would make the next `mfa_config_cancel` look like it worked.
+struct CeremonyGuard<'a> {
+    state: &'a AppState,
+    session: Uuid,
+    token: CancellationToken,
+}
+
+impl<'a> CeremonyGuard<'a> {
+    fn register(state: &'a AppState, session: Uuid, token: CancellationToken) -> Self {
+        state
+            .mfa_config_ceremonies
+            .lock()
+            .expect("mfa_config_ceremonies mutex poisoned")
+            .insert(session, token.clone());
+        Self {
+            state,
+            session,
+            token,
+        }
     }
 
-    engine(alphabet::URL_SAFE)
-        .decode(value)
-        .or_else(|err| engine(alphabet::STANDARD).decode(value).map_err(|_| err))
+    fn token(&self) -> CancellationToken {
+        self.token.clone()
+    }
 }
 
-/// CTAP status codes worth telling the user apart, as defined by the spec and
-/// rendered into the crate's error text.
-const CTAP2_ERR_NO_CREDENTIALS: u8 = 0x2E;
-const CTAP2_ERR_USER_ACTION_TIMEOUT: u8 = 0x2F;
-const CTAP2_ERR_PIN_INVALID: u8 = 0x31;
-const CTAP2_ERR_PIN_BLOCKED: u8 = 0x32;
-const CTAP2_ERR_PIN_AUTH_BLOCKED: u8 = 0x34;
-const CTAP2_ERR_ACTION_TIMEOUT: u8 = 0x3A;
-
-/// The CTAP status behind a failed operation.
-///
-/// The crate surfaces status codes only inside its error text, rendered as
-/// `"0x31 CTAP2_ERR_PIN_INVALID   PIN Invalid."` - so read back the leading
-/// byte rather than matching on the name, which would conflate, say, a rejected
-/// PIN with one that was never set.
-fn ctap_status(err: &impl fmt::Display) -> Option<u8> {
-    let text = err.to_string();
-    let code = text.strip_prefix("0x")?.get(..2)?;
-    u8::from_str_radix(code, 16).ok()
+impl Drop for CeremonyGuard<'_> {
+    fn drop(&mut self) {
+        self.state
+            .mfa_config_ceremonies
+            .lock()
+            .expect("mfa_config_ceremonies mutex poisoned")
+            .remove(&self.session);
+    }
 }
 
-/// Turn a failed assertion into something the user can act on.
-///
-/// Everything here is user-fixable, so it is reported as a rejection rather
-/// than an internal error.
-fn assertion_error(err: &impl fmt::Display) -> mfa::MfaError {
-    let message = match ctap_status(err) {
+/// The crate reports what went wrong, the wording lives here next to the other MFA messages.
+/// `ceremony` names the half that failed, so the same mapping serves both.
+fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
+    match err {
+        Fido2Error::NoDevice => "No security key detected".to_string(),
         // The key was blinking for a touch that never came.
-        Some(CTAP2_ERR_USER_ACTION_TIMEOUT | CTAP2_ERR_ACTION_TIMEOUT) => {
-            "Security key timed out waiting to be touched".to_string()
-        }
-        Some(CTAP2_ERR_NO_CREDENTIALS) => {
+        Fido2Error::Timeout => "Security key timed out waiting to be touched".to_string(),
+        Fido2Error::NoCredentials => {
             "This security key is not registered for your account".to_string()
         }
-        Some(CTAP2_ERR_PIN_INVALID | CTAP2_ERR_PIN_BLOCKED | CTAP2_ERR_PIN_AUTH_BLOCKED) => {
+        // The platform would not say why, and guessing would blame the user's key wrongly.
+        Fido2Error::NotAllowed => {
+            "Security key did not respond. Check that it is plugged in and try again".to_string()
+        }
+        Fido2Error::CredentialExcluded => {
+            "This security key is already registered for your account".to_string()
+        }
+        Fido2Error::PinRequired => "This security key needs a PIN".to_string(),
+        Fido2Error::PinInvalid | Fido2Error::PinBlocked => {
             format!("Security key rejected the PIN: {err}")
         }
-        _ => format!("Security key did not authorize the request: {err}"),
-    };
-    mfa::MfaError::MfaRejected { message }
+        _ => format!("Security key did not {ceremony}: {err}"),
+    }
+}
+
+/// Anything the user can fix is reported as a rejection rather than an internal error, so the
+/// frontend offers another attempt.
+fn assertion_error(err: &Fido2Error) -> mfa::MfaError {
+    match err {
+        Fido2Error::Cancelled => mfa::MfaError::Cancelled,
+        err => mfa::MfaError::MfaRejected {
+            message: fido2_message(err, "authorize the request"),
+        },
+    }
+}
+
+/// As on the assertion side, but a cancellation keeps its own variant rather than arriving as
+/// a security key error, since the user is the one who asked for it.
+fn registration_error(err: &Fido2Error) -> MfaConfigError {
+    match err {
+        Fido2Error::Cancelled => MfaConfigError::Cancelled,
+        err => MfaConfigError::SecurityKey {
+            message: fido2_message(err, "complete the registration"),
+        },
+    }
 }
 
 /// Everything the key needs to produce an assertion, as handed out by Edge.
@@ -1996,58 +2028,32 @@ async fn fido2_challenge(
     })
 }
 
-/// Drive the security key over CTAP-HID, returning the assertion and the
-/// credential that produced it.
+/// Drive the security key, returning the assertion it produced.
 ///
-/// The key waits for the user to touch it, and the crate's API is blocking, so
-/// this runs on the blocking pool.
+/// `pin` is `None` where the platform collects it in its own dialog.
 async fn fido2_assertion(
     rp_id: String,
     challenge: Fido2Challenge,
-    pin: String,
-) -> Result<(Assertion, Vec<u8>), mfa::MfaError> {
-    let credential_ids = challenge
-        .credential_ids
-        .iter()
-        .map(|credential_id| decode_base64(credential_id))
-        .collect::<Result<Vec<Vec<u8>>, _>>()
-        .map_err(|err| mfa::MfaError::Other {
-            message: format!("Edge sent a malformed FIDO2 credential id: {err}"),
-        })?;
-
-    tokio::task::spawn_blocking(move || {
-        let mut cfg = LibCfg::init();
-        // Suppress the crate's keep-alive chatter on stdout.
-        cfg.enable_keep_alive_msg = false;
-
-        let device = FidoKeyHidFactory::create(&cfg).map_err(|err| mfa::MfaError::Other {
-            message: format!("No FIDO2 device detected: {err}"),
-        })?;
-
-        // The key picks the credential it holds out of the ones offered and
-        // names it back, so there is nothing to narrow beforehand.
-        let assertion = device
-            .get_assertion(
-                &rp_id,
-                challenge.challenge.as_bytes(),
-                &credential_ids,
-                Some(&pin),
-            )
-            .map_err(|err| assertion_error(&err))?;
-
-        // CTAP may leave the credential out when it was offered only one, so
-        // fall back to what we asked for.
-        let credential_id = if assertion.credential_id.is_empty() {
-            credential_ids.into_iter().next().unwrap_or_default()
-        } else {
-            assertion.credential_id.clone()
-        };
-        Ok((assertion, credential_id))
-    })
+    pin: Option<String>,
+    context: PlatformContext,
+    cancel: CancellationToken,
+) -> Result<Assertion, mfa::MfaError> {
+    defguard_client_fido2::assert_for_mfa(
+        &rp_id,
+        &challenge.challenge,
+        &challenge.credential_ids,
+        pin,
+        context,
+        cancel,
+    )
     .await
-    .map_err(|err| mfa::MfaError::Other {
-        message: format!("FIDO2 task failed: {err}"),
-    })?
+    .map_err(|err| match err {
+        // Edge is the only source of these ids, so a bad one is not the user's problem.
+        Fido2Error::MalformedChallenge(detail) => mfa::MfaError::Other {
+            message: format!("Edge sent a malformed FIDO2 challenge: {detail}"),
+        },
+        err => assertion_error(&err),
+    })
 }
 
 /// Full FIDO2 exchange: challenge from Edge, assertion from the key, proof back
@@ -2056,7 +2062,8 @@ async fn run_fido2_mfa(
     proxy_url: Url,
     rp_id: String,
     start: Fido2Start,
-    pin: String,
+    pin: Option<String>,
+    window: WebviewWindow,
     cancel: CancellationToken,
     handle: AppHandle,
 ) -> Result<ClientMfaFinishResponse, mfa::MfaError> {
@@ -2071,12 +2078,12 @@ async fn run_fido2_mfa(
     // none comes, so tell the frontend to ask for one.
     let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
 
-    // The key cannot be interrupted once it is waiting for a touch, so
-    // cancelling here abandons the assertion instead of aborting it.
-    let (assertion, credential_id) = tokio::select! {
-        () = cancel.cancelled() => return Err(mfa::MfaError::Cancelled),
-        assertion = fido2_assertion(rp_id, challenge, pin) => assertion?,
-    };
+    // The prompt must not open behind the panel that asked for it.
+    let _level = WindowLevelGuard::lower(&window);
+    // Handed to the ceremony rather than raced against here, since only the platform can take
+    // its own modal dialog down.
+    let assertion =
+        fido2_assertion(rp_id, challenge, pin, platform_context(&window), cancel).await?;
 
     let request = ClientMfaFinishRequest {
         token,
@@ -2084,10 +2091,10 @@ async fn run_fido2_mfa(
         code: None,
         auth_pub_key: Some(BASE64_URL_SAFE_NO_PAD.encode(&assertion.signature)),
         step_attempt_id,
-        auth_data: Some(assertion.auth_data),
+        auth_data: Some(assertion.authenticator_data),
         // Names the key that answered, so Core can offer just this credential
         // next time instead of every one the user registered.
-        credential_id: Some(credential_id),
+        credential_id: Some(assertion.credential_id),
     };
     mfa::mfa_finish_code(proxy_url, request).await
 }
@@ -2119,15 +2126,13 @@ pub async fn mfa_fido2_pin(
     location_id: Id,
     methods: Vec<String>,
     token: Option<String>,
-    pin: String,
+    pin: Option<String>,
+    window: WebviewWindow,
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting FIDO2 MFA for location {location_id} of instance {instance_id}");
     // The PIN is never logged, here or anywhere below.
-    let pin = pin.trim().to_string();
-    if pin.is_empty() {
-        return Err("PIN is required".to_string());
-    }
+    let pin = fido2_pin(pin).map_err(ToString::to_string)?;
 
     let step_methods = methods
         .iter()
@@ -2158,7 +2163,7 @@ pub async fn mfa_fido2_pin(
         location_id,
         EventKey::MfaFido2Complete,
         EventKey::MfaFido2Error,
-        move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, cancel, task_handle),
+        move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, window, cancel, task_handle),
     ))
 }
 
@@ -2176,35 +2181,312 @@ pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use base64::prelude::{BASE64_STANDARD, BASE64_STANDARD_NO_PAD, BASE64_URL_SAFE};
+#[derive(Serialize)]
+pub struct MfaConfigStartResult {
+    session_id: String,
+    available_methods: Vec<LocationMfaMethod>,
+    email_fallback: bool,
+    deadline_timestamp: i64,
+}
 
-    use super::*;
+fn parse_mfa_config_session_id(session_id: &str) -> Result<Uuid, String> {
+    Uuid::parse_str(session_id).map_err(|e| {
+        err_to_json(MfaConfigError::Other {
+            message: format!("Invalid session ID: {e}"),
+        })
+    })
+}
 
-    #[test]
-    fn test_decode_base64_accepts_every_alphabet() {
-        // Bytes whose url-safe encoding (`_-`) differs from the standard one
-        // (`/+`), so a decoder locked to one alphabet fails the other.
-        let raw = vec![0xff_u8, 0xfe, 0xfd, 0x00];
+/// An absent session is reported as expired, since only a tagged error reaches the frontend's
+/// recovery path.
+fn get_mfa_config_session(state: &AppState, session_id: &str) -> Result<MfaConfigSession, String> {
+    let uid = parse_mfa_config_session_id(session_id)?;
+    let now = Utc::now().timestamp();
+    let mut sessions = state
+        .mfa_config_sessions
+        .lock()
+        .expect("mfa_config_sessions mutex poisoned");
+    sessions.retain(|_, session| !session.is_expired(now));
+    sessions
+        .get(&uid)
+        .cloned()
+        .ok_or_else(|| err_to_json(MfaConfigError::SessionExpired))
+}
 
-        for encoded in [
-            // What webauthn-rs writes for a CredentialID.
-            BASE64_URL_SAFE_NO_PAD.encode(&raw),
-            BASE64_URL_SAFE.encode(&raw),
-            BASE64_STANDARD.encode(&raw),
-            BASE64_STANDARD_NO_PAD.encode(&raw),
-        ] {
-            assert_eq!(
-                decode_base64(&encoded).expect("should decode {encoded}"),
-                raw,
-                "failed to decode {encoded}"
-            );
-        }
+#[tauri::command(async)]
+pub async fn mfa_config_start(
+    instance_id: Id,
+    state: State<'_, AppState>,
+) -> Result<MfaConfigStartResult, String> {
+    debug!("Starting MFA configuration for instance {instance_id}");
+    let other = |message: String| err_to_json(MfaConfigError::Other { message });
+    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| other(e.to_string()))?
+        .ok_or_else(|| other("Instance not found".to_string()))?;
+    let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
+        .await
+        .map_err(|e| other(e.to_string()))?
+        .ok_or_else(|| {
+            other(format!(
+                "WireGuard keys not found for instance {instance_id}"
+            ))
+        })?;
+    let token = instance
+        .token
+        .clone()
+        .filter(|token| !token.is_empty())
+        .ok_or_else(|| err_to_json(MfaConfigError::NoToken))?;
+    let proxy_url =
+        Url::parse(&instance.proxy_url).map_err(|e| other(format!("Invalid proxy URL: {e}")))?;
+
+    let response = mfa_config::mfa_config_start(proxy_url.clone(), token, keys.pubkey)
+        .await
+        .map_err(err_to_json)?;
+
+    let available_methods = mfa_config::authorizing_methods(&response)
+        .into_iter()
+        .map(LocationMfaMethod::from)
+        .collect();
+    let session = MfaConfigSession {
+        instance_id,
+        proxy_url,
+        session_token: response.session_token,
+        deadline_timestamp: response.deadline_timestamp,
+    };
+
+    let session_uuid = Uuid::new_v4();
+    {
+        let now = Utc::now().timestamp();
+        let mut sessions = state
+            .mfa_config_sessions
+            .lock()
+            .expect("mfa_config_sessions mutex poisoned");
+        sessions.retain(|_, session| !session.is_expired(now));
+        sessions.insert(session_uuid, session);
     }
 
-    #[test]
-    fn test_decode_base64_rejects_garbage() {
-        assert!(decode_base64("not base64!!").is_err());
+    info!("Started MFA configuration session for instance {instance_id}");
+    Ok(MfaConfigStartResult {
+        session_id: session_uuid.to_string(),
+        available_methods,
+        email_fallback: response.email_fallback,
+        deadline_timestamp: response.deadline_timestamp,
+    })
+}
+
+#[tauri::command(async)]
+pub async fn mfa_config_send_code(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Requesting MFA configuration email code");
+    let session = get_mfa_config_session(&state, &session_id)?;
+    mfa_config::mfa_config_send_code(session.proxy_url, session.session_token)
+        .await
+        .map_err(err_to_json)
+}
+
+#[tauri::command(async)]
+pub async fn mfa_config_authorize(
+    session_id: String,
+    method: String,
+    code: String,
+    state: State<'_, AppState>,
+) -> Result<MfaConfigAuthorizeResponse, String> {
+    debug!("Authorizing MFA configuration session");
+    let method = parse_mfa_method(&method)?;
+    let uid = parse_mfa_config_session_id(&session_id)?;
+    let session = get_mfa_config_session(&state, &session_id)?;
+    let response =
+        mfa_config::mfa_config_authorize(session.proxy_url, session.session_token, method, code)
+            .await
+            .map_err(err_to_json)?;
+
+    // The new deadline bounds every setup in this session, not just the next one.
+    if let Some(session) = state
+        .mfa_config_sessions
+        .lock()
+        .expect("mfa_config_sessions mutex poisoned")
+        .get_mut(&uid)
+    {
+        session.deadline_timestamp = response.deadline_timestamp;
     }
+
+    info!("Authorized MFA configuration session");
+    Ok(response)
+}
+
+#[tauri::command(async)]
+pub async fn mfa_config_setup_start(
+    session_id: String,
+    method: String,
+    state: State<'_, AppState>,
+) -> Result<CodeMfaSetupStartResponse, String> {
+    debug!("Starting MFA factor setup");
+    let method = parse_mfa_method(&method)?;
+    let session = get_mfa_config_session(&state, &session_id)?;
+    mfa_config::mfa_config_setup_start(session.proxy_url, session.session_token, method)
+        .await
+        .map_err(err_to_json)
+}
+
+/// Keeps the session alive so the user can configure another factor without authorizing again.
+#[tauri::command(async)]
+pub async fn mfa_config_setup_finish(
+    session_id: String,
+    method: String,
+    code: String,
+    state: State<'_, AppState>,
+    handle: AppHandle,
+) -> Result<CodeMfaSetupFinishResponse, String> {
+    debug!("Finishing MFA factor setup");
+    let method = parse_mfa_method(&method)?;
+    let session = get_mfa_config_session(&state, &session_id)?;
+    let response = mfa_config::mfa_config_setup_finish(
+        session.proxy_url,
+        session.session_token,
+        method,
+        SetupProof::Code(code),
+    )
+    .await
+    .map_err(err_to_json)?;
+
+    // Best effort, a stale `configured` flag must not cost the user their recovery codes.
+    if let Err(err) = refresh_instance_config(session.instance_id, &handle).await {
+        warn!(
+            "Failed to refresh instance {} after configuring MFA: {err}",
+            session.instance_id
+        );
+    }
+
+    info!("Configured a new MFA factor");
+    Ok(response)
+}
+
+/// Register a security key as an MFA factor for an already enrolled device.
+///
+/// Challenge, ceremony and attestation go in one call. `mfa_config_cancel` is what takes a
+/// platform prompt down, and `mfa-config-fido2-touch` is emitted once the key starts blinking.
+#[tauri::command(async)]
+pub async fn mfa_config_setup_fido2(
+    session_id: String,
+    name: String,
+    pin: Option<String>,
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    handle: AppHandle,
+) -> Result<CodeMfaSetupFinishResponse, String> {
+    debug!("Starting FIDO2 MFA factor setup");
+    // The PIN is never logged, here or anywhere below.
+    let pin = fido2_pin(pin).map_err(|message| {
+        err_to_json(MfaConfigError::SecurityKey {
+            message: message.to_string(),
+        })
+    })?;
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err(err_to_json(MfaConfigError::SecurityKey {
+            message: "Name the security key so you can recognize it later".to_string(),
+        }));
+    }
+
+    let session_id_uid = parse_mfa_config_session_id(&session_id)?;
+    let session = get_mfa_config_session(&state, &session_id)?;
+    // The credential is bound to the instance, not to the proxy that relays the setup.
+    let instance = Instance::find_by_id(&*DB_POOL, session.instance_id)
+        .await
+        .map_err(|err| {
+            err_to_json(MfaConfigError::Other {
+                message: err.to_string(),
+            })
+        })?
+        .ok_or_else(|| {
+            err_to_json(MfaConfigError::Other {
+                message: "Instance not found".to_string(),
+            })
+        })?;
+    let instance_url = Url::parse(&instance.url).map_err(|err| {
+        err_to_json(MfaConfigError::Other {
+            message: format!("Invalid instance URL: {err}"),
+        })
+    })?;
+
+    let started = mfa_config::mfa_config_setup_start(
+        session.proxy_url.clone(),
+        session.session_token.clone(),
+        MfaMethod::Fido2,
+    )
+    .await
+    .map_err(err_to_json)?;
+    let challenge = started.fido2_creation_challenge.ok_or_else(|| {
+        err_to_json(MfaConfigError::Other {
+            message: "Defguard did not return a security key challenge".to_string(),
+        })
+    })?;
+
+    // From here the key blinks and waits for a touch, and gives up if none comes.
+    let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
+    let ceremony = CeremonyGuard::register(&state, session_id_uid, CancellationToken::new());
+    // The prompt must not open behind the window that asked for it.
+    let _level = WindowLevelGuard::lower(&window);
+    let attestation = defguard_client_fido2::register_security_key(
+        &challenge,
+        &instance_url,
+        pin,
+        platform_context(&window),
+        ceremony.token(),
+    )
+    .await
+    .map_err(|err| match err {
+        // Core minted the challenge, so a bad one is not the user's problem.
+        Fido2Error::MalformedChallenge(detail) => err_to_json(MfaConfigError::Other {
+            message: format!("Defguard sent a malformed security key challenge: {detail}"),
+        }),
+        err => err_to_json(registration_error(&err)),
+    })?;
+
+    let response = mfa_config::mfa_config_setup_finish(
+        session.proxy_url,
+        session.session_token,
+        MfaMethod::Fido2,
+        SetupProof::Fido2 { name, attestation },
+    )
+    .await
+    .map_err(err_to_json)?;
+
+    // Best effort, a stale `configured` flag must not cost the user their recovery codes.
+    if let Err(err) = refresh_instance_config(session.instance_id, &handle).await {
+        warn!(
+            "Failed to refresh instance {} after registering a security key: {err}",
+            session.instance_id
+        );
+    }
+
+    info!("Registered a new security key");
+    Ok(response)
+}
+
+#[tauri::command(async)]
+pub async fn mfa_config_cancel(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Cancelling MFA configuration session");
+    let uid = parse_mfa_config_session_id(&session_id)?;
+    state
+        .mfa_config_sessions
+        .lock()
+        .expect("mfa_config_sessions mutex poisoned")
+        .remove(&uid);
+    // A ceremony may still be waiting for a touch, behind a prompt only the platform can close.
+    if let Some(ceremony) = state
+        .mfa_config_ceremonies
+        .lock()
+        .expect("mfa_config_ceremonies mutex poisoned")
+        .remove(&uid)
+    {
+        ceremony.cancel();
+    }
+    Ok(())
 }

@@ -1,0 +1,21 @@
+// A row of the raised surface used by every "pick one of these" list.
+@mixin surface-row {
+  box-sizing: border-box;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-md);
+  background: var(--bg-white-5);
+  border-radius: 12px;
+}
+
+@mixin surface-row-stack {
+  display: flex;
+  flex-flow: column;
+  row-gap: var(--spacing-sm);
+  width: 100%;
+  padding-bottom: var(--spacing-xl);
+}

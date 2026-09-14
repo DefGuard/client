@@ -38,6 +38,7 @@ export const CodeInput = ({
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const prevLengthRef = useRef(length);
+  const hadErrorRef = useRef(false);
 
   useEffect(() => {
     const lengthChanged = prevLengthRef.current !== length;
@@ -53,6 +54,19 @@ export const CodeInput = ({
       });
     }
   }, [value, length]);
+
+  // Clears for retyping, callers must not treat the empty `onChange` as user input.
+  useEffect(() => {
+    const hasError = isPresent(error) && error.length > 0;
+    const shouldClear = hasError && !hadErrorRef.current;
+    hadErrorRef.current = hasError;
+
+    if (shouldClear) {
+      setDigits(Array.from({ length }, () => ''));
+      onChange('');
+      requestAnimationFrame(() => inputRefs.current[0]?.focus());
+    }
+  }, [error, length, onChange]);
 
   const focus = (index: number) => {
     const clamped = Math.max(0, Math.min(index, length - 1));

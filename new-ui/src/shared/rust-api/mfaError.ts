@@ -54,3 +54,28 @@ export const isServiceUnavailable = (err: unknown): boolean => {
  *  (see `connect_after_mfa` in the Rust backend). */
 export const isConnectFailure = (message: string): boolean =>
   message.includes('VPN connection failed');
+
+/** The proxy predates the MFA configuration API (HTTP 404 on /mfa-config/start). */
+export const isMfaConfigUnsupported = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'unsupported';
+
+export const isMfaConfigSessionExpired = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'session_expired';
+
+export const isMfaConfigInvalidCode = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'invalid_code';
+
+export const isMfaConfigMissingToken = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'no_token';
+
+/** The backend's message names what went wrong (no key, wrong PIN, no touch), so show it as is. */
+export const isMfaConfigSecurityKeyError = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'security_key';
+
+/** The command rejects on the user's own cancel, which is not worth showing as an error. */
+export const isMfaConfigCancelled = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'cancelled';
+
+/** A status with no specific handling, 403 / 429 / 5xx all land here. */
+export const isMfaConfigProxyError = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'proxy_error';

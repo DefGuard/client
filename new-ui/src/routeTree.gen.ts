@@ -16,6 +16,7 @@ import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as CompactIndexRouteImport } from './routes/compact/index'
 import { Route as FullIndexRouteImport } from './routes/full/index'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
+import { Route as FullConfigureMfaRouteImport } from './routes/full/configure-mfa'
 import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
 import { Route as FullTunnelWizardRouteImport } from './routes/full/tunnel-wizard'
@@ -28,6 +29,7 @@ import { Route as FullDefaultSupportRouteImport } from './routes/full/_default/s
 import { Route as FullDefaultUpdateRouteImport } from './routes/full/_default/update'
 import { Route as FullDefaultAddIndexRouteImport } from './routes/full/_default/add/index'
 import { Route as FullDefaultAddInstanceRouteImport } from './routes/full/_default/add/instance'
+import { Route as FullDefaultAddMfaRouteImport } from './routes/full/_default/add/mfa'
 import { Route as FullDefaultAddTunnelRouteImport } from './routes/full/_default/add/tunnel'
 
 const IndexRoute = IndexRouteImport.update({
@@ -62,6 +64,11 @@ const FullIndexRoute = FullIndexRouteImport.update({
 } as any)
 const FullDefaultRoute = FullDefaultRouteImport.update({
   id: '/_default',
+  getParentRoute: () => FullRoute,
+} as any)
+const FullConfigureMfaRoute = FullConfigureMfaRouteImport.update({
+  id: '/configure-mfa',
+  path: '/configure-mfa',
   getParentRoute: () => FullRoute,
 } as any)
 const FullEnrollmentRoute = FullEnrollmentRouteImport.update({
@@ -125,6 +132,11 @@ const FullDefaultAddInstanceRoute = FullDefaultAddInstanceRouteImport.update({
   path: '/add/instance',
   getParentRoute: () => FullDefaultRoute,
 } as any)
+const FullDefaultAddMfaRoute = FullDefaultAddMfaRouteImport.update({
+  id: '/add/mfa',
+  path: '/add/mfa',
+  getParentRoute: () => FullDefaultRoute,
+} as any)
 const FullDefaultAddTunnelRoute = FullDefaultAddTunnelRouteImport.update({
   id: '/add/tunnel',
   path: '/add/tunnel',
@@ -136,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/empty': typeof EmptyRoute
   '/full': typeof FullRouteWithChildren
   '/welcome': typeof WelcomeRoute
+  '/full/configure-mfa': typeof FullConfigureMfaRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
@@ -149,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add/mfa': typeof FullDefaultAddMfaRoute
   '/full/add/tunnel': typeof FullDefaultAddTunnelRoute
   '/full/add/': typeof FullDefaultAddIndexRoute
 }
@@ -157,6 +171,7 @@ export interface FileRoutesByTo {
   '/empty': typeof EmptyRoute
   '/welcome': typeof WelcomeRoute
   '/full': typeof FullIndexRoute
+  '/full/configure-mfa': typeof FullConfigureMfaRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
@@ -169,6 +184,7 @@ export interface FileRoutesByTo {
   '/full/support': typeof FullDefaultSupportRoute
   '/full/update': typeof FullDefaultUpdateRoute
   '/full/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/add/mfa': typeof FullDefaultAddMfaRoute
   '/full/add/tunnel': typeof FullDefaultAddTunnelRoute
   '/full/add': typeof FullDefaultAddIndexRoute
 }
@@ -179,6 +195,7 @@ export interface FileRoutesById {
   '/full': typeof FullRouteWithChildren
   '/welcome': typeof WelcomeRoute
   '/full/_default': typeof FullDefaultRouteWithChildren
+  '/full/configure-mfa': typeof FullConfigureMfaRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
@@ -192,6 +209,7 @@ export interface FileRoutesById {
   '/full/_default/support': typeof FullDefaultSupportRoute
   '/full/_default/update': typeof FullDefaultUpdateRoute
   '/full/_default/add/instance': typeof FullDefaultAddInstanceRoute
+  '/full/_default/add/mfa': typeof FullDefaultAddMfaRoute
   '/full/_default/add/tunnel': typeof FullDefaultAddTunnelRoute
   '/full/_default/add/': typeof FullDefaultAddIndexRoute
 }
@@ -202,6 +220,7 @@ export interface FileRouteTypes {
     | '/empty'
     | '/full'
     | '/welcome'
+    | '/full/configure-mfa'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/full/tunnel-wizard'
@@ -215,6 +234,7 @@ export interface FileRouteTypes {
     | '/full/support'
     | '/full/update'
     | '/full/add/instance'
+    | '/full/add/mfa'
     | '/full/add/tunnel'
     | '/full/add/'
   fileRoutesByTo: FileRoutesByTo
@@ -223,6 +243,7 @@ export interface FileRouteTypes {
     | '/empty'
     | '/welcome'
     | '/full'
+    | '/full/configure-mfa'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/full/tunnel-wizard'
@@ -235,6 +256,7 @@ export interface FileRouteTypes {
     | '/full/support'
     | '/full/update'
     | '/full/add/instance'
+    | '/full/add/mfa'
     | '/full/add/tunnel'
     | '/full/add'
   id:
@@ -244,6 +266,7 @@ export interface FileRouteTypes {
     | '/full'
     | '/welcome'
     | '/full/_default'
+    | '/full/configure-mfa'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/full/tunnel-wizard'
@@ -257,6 +280,7 @@ export interface FileRouteTypes {
     | '/full/_default/support'
     | '/full/_default/update'
     | '/full/_default/add/instance'
+    | '/full/_default/add/mfa'
     | '/full/_default/add/tunnel'
     | '/full/_default/add/'
   fileRoutesById: FileRoutesById
@@ -319,6 +343,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/full'
       preLoaderRoute: typeof FullDefaultRouteImport
+      parentRoute: typeof FullRoute
+    }
+    '/full/configure-mfa': {
+      id: '/full/configure-mfa'
+      path: '/configure-mfa'
+      fullPath: '/full/configure-mfa'
+      preLoaderRoute: typeof FullConfigureMfaRouteImport
       parentRoute: typeof FullRoute
     }
     '/full/enrollment': {
@@ -405,6 +436,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FullDefaultAddInstanceRouteImport
       parentRoute: typeof FullDefaultRoute
     }
+    '/full/_default/add/mfa': {
+      id: '/full/_default/add/mfa'
+      path: '/add/mfa'
+      fullPath: '/full/add/mfa'
+      preLoaderRoute: typeof FullDefaultAddMfaRouteImport
+      parentRoute: typeof FullDefaultRoute
+    }
     '/full/_default/add/tunnel': {
       id: '/full/_default/add/tunnel'
       path: '/add/tunnel'
@@ -423,6 +461,7 @@ interface FullDefaultRouteChildren {
   FullDefaultSupportRoute: typeof FullDefaultSupportRoute
   FullDefaultUpdateRoute: typeof FullDefaultUpdateRoute
   FullDefaultAddInstanceRoute: typeof FullDefaultAddInstanceRoute
+  FullDefaultAddMfaRoute: typeof FullDefaultAddMfaRoute
   FullDefaultAddTunnelRoute: typeof FullDefaultAddTunnelRoute
   FullDefaultAddIndexRoute: typeof FullDefaultAddIndexRoute
 }
@@ -435,6 +474,7 @@ const FullDefaultRouteChildren: FullDefaultRouteChildren = {
   FullDefaultSupportRoute: FullDefaultSupportRoute,
   FullDefaultUpdateRoute: FullDefaultUpdateRoute,
   FullDefaultAddInstanceRoute: FullDefaultAddInstanceRoute,
+  FullDefaultAddMfaRoute: FullDefaultAddMfaRoute,
   FullDefaultAddTunnelRoute: FullDefaultAddTunnelRoute,
   FullDefaultAddIndexRoute: FullDefaultAddIndexRoute,
 }
@@ -445,6 +485,7 @@ const FullDefaultRouteWithChildren = FullDefaultRoute._addFileChildren(
 
 interface FullRouteChildren {
   FullDefaultRoute: typeof FullDefaultRouteWithChildren
+  FullConfigureMfaRoute: typeof FullConfigureMfaRoute
   FullEnrollmentRoute: typeof FullEnrollmentRoute
   FullSessionTimeoutRoute: typeof FullSessionTimeoutRoute
   FullTunnelWizardRoute: typeof FullTunnelWizardRoute
@@ -453,6 +494,7 @@ interface FullRouteChildren {
 
 const FullRouteChildren: FullRouteChildren = {
   FullDefaultRoute: FullDefaultRouteWithChildren,
+  FullConfigureMfaRoute: FullConfigureMfaRoute,
   FullEnrollmentRoute: FullEnrollmentRoute,
   FullSessionTimeoutRoute: FullSessionTimeoutRoute,
   FullTunnelWizardRoute: FullTunnelWizardRoute,

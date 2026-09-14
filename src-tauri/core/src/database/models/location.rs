@@ -70,7 +70,9 @@ impl From<ProtoServiceLocationMode> for ServiceLocationMode {
 /// Discriminants match the proto `MfaMethod` enum, except for `Fido2`, which the
 /// protocol does not carry yet and which is therefore handled entirely on the
 /// client.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Type,
+)]
 #[repr(u32)]
 #[serde(rename_all = "lowercase")]
 pub enum LocationMfaMethod {
@@ -713,6 +715,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            mfa_configured_methods: None,
         }
     }
 
@@ -755,6 +758,19 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[test]
+    fn test_mfa_method_serde_matches_frontend_contract() {
+        // The frontend compares these strings, and `as_str` says "mobile" for the same variant.
+        assert_eq!(
+            serde_json::to_string(&LocationMfaMethod::MobileApprove).unwrap(),
+            "\"mobileapprove\""
+        );
+        assert_eq!(
+            serde_json::to_string(&LocationMfaMethod::Fido2).unwrap(),
+            "\"fido2\""
+        );
     }
 
     #[test]

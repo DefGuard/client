@@ -44,3 +44,18 @@ pub async fn post_with_headers<T: Serialize + ?Sized>(
         .send()
         .await
 }
+
+/// Falls back to the status line when the body is absent, empty or not the expected shape.
+pub async fn read_error_message(response: Response) -> String {
+    let status = response.status();
+    response
+        .json::<serde_json::Value>()
+        .await
+        .ok()
+        .and_then(|body| {
+            body.get("error")
+                .and_then(serde_json::Value::as_str)
+                .map(String::from)
+        })
+        .unwrap_or_else(|| format!("HTTP {status}"))
+}

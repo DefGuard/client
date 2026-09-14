@@ -1,0 +1,16 @@
+// Pins a trailing `Controls` row to the bottom of the viewport, or below the content
+// when that is taller.
+.full-page.with-controls {
+  display: flex;
+  flex-flow: column;
+  box-sizing: border-box;
+  min-height: calc(100dvh - var(--window-decorations-height));
+
+  .full-page-layout & {
+    min-height: 100%;
+  }
+
+  .controls {
+    margin-top: auto;
+  }
+}
