@@ -1791,9 +1791,19 @@ where
             .remove(&task_id_for_task);
         match result {
             Ok(response) => {
+                let Some(preshared_key) = mfa::completed_preshared_key(&response) else {
+                    warn!("MFA task {task_id_for_task} needs another verification step");
+                    let _ = listen_handle.emit(
+                        error_event.into(),
+                        MfaErrorPayload {
+                            error:
+                                "Verification is incomplete. This location requires another step."
+                                    .to_string(),
+                        },
+                    );
+                    return;
+                };
                 info!("MFA completed for task {task_id_for_task}");
-                #[allow(deprecated)]
-                let preshared_key = response.preshared_key;
                 match connect_after_mfa(location_id, Some(preshared_key), &listen_handle).await {
                     Ok(()) => {
                         let _ = listen_handle.emit(complete_event.into(), ());

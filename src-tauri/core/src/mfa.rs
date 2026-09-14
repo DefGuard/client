@@ -6,13 +6,13 @@
 use std::time::Duration;
 
 use defguard_client_proto::defguard::client_types::{
-    ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest, ClientMfaStartResponse,
-    ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod, MfaStartRejectionReason,
-    MfaStepRejection,
+    mfa_step_result, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+    ClientMfaStartResponse, ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod,
+    MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
 };
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use reqwest::{Client, Response, StatusCode, Url};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
     net::TcpStream,
@@ -266,6 +266,9 @@ const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Keepalive period for the mobile-approve WebSocket.
+const MOBILE_APPROVE_PING_INTERVAL: Duration = Duration::from_secs(20);
+
 /// Poll Defguard Edge for OpenID MFA completion.
 ///
 /// The caller must already have opened the browser to the OIDC provider
@@ -344,13 +347,35 @@ pub async fn poll_openid_mfa(
     }
 }
 
+/// Return the preshared key only when the MFA session completed.
+///
+/// Intermediate responses contain no key. For legacy responses without a step
+/// result, use the top-level key.
+#[must_use]
+pub fn completed_preshared_key(response: &ClientMfaFinishResponse) -> Option<String> {
+    let key = match response
+        .result
+        .as_ref()
+        .and_then(|result| result.outcome.as_ref())
+    {
+        Some(mfa_step_result::Outcome::Completed(completed)) => &completed.preshared_key,
+        Some(_) => return None,
+        // Older Edge responses and mobile-approve frames have no step outcome.
+        #[allow(deprecated)]
+        None => &response.preshared_key,
+    };
+    (!key.is_empty()).then(|| key.clone())
+}
+
 /// Connect to a WebSocket endpoint and wait for mobile-approve MFA
 /// completion.
 ///
 /// The caller must have already displayed the QR code to the user
 /// (the token from `mfa_start` encodes the challenge).  This function
 /// opens a WebSocket to `ws_url` and waits for a
-/// `{"type":"mfa_success","preshared_key":"..."}` text frame.
+/// `mfa_success` (legacy) or `mfa_result` text frame.
+/// A completed result contains the key. An intermediate result advances the
+/// session without one.
 /// Returns [`MfaError::Cancelled`] if the token fires or
 /// [`MfaError::Timeout`] if the deadline expires.
 pub async fn connect_mobile_approve(
@@ -401,13 +426,45 @@ pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> 
     Ok(ws_url.to_string())
 }
 
-/// Wait on the WebSocket for an `mfa_success` frame.
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum RemoteMfaFrame {
+    #[serde(rename = "mfa_success")]
+    Legacy {
+        #[serde(default)]
+        preshared_key: String,
+    },
+    #[serde(rename = "mfa_result")]
+    Result { result: MfaStepResult },
+}
+
+fn mobile_approve_closed(detail: Option<String>) -> MfaError {
+    let message = match detail {
+        Some(detail) => {
+            format!("mobile approval failed: connection closed by Edge ({detail})")
+        }
+        None => "mobile approval failed: connection closed by Edge".to_string(),
+    };
+    MfaError::MfaRejected { message }
+}
+
+fn read_error_label(err: &WsError) -> String {
+    match err {
+        WsError::Io(io_err) => format!("I/O error: {}", io_err.kind()),
+        WsError::Protocol(protocol_err) => format!("protocol error: {protocol_err}"),
+        WsError::Capacity(_) | WsError::Utf8(_) => "malformed frame from Edge".to_string(),
+        _ => "stream error".to_string(),
+    }
+}
+
 async fn wait_for_mfa_success(
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let (_write, mut read) = ws_stream.split();
+    let (mut write, mut read) = ws_stream.split();
     let deadline = Instant::now() + MOBILE_APPROVE_TIMEOUT;
+    // Preserve Edge's close reason for the user-facing error.
+    let mut close_detail: Option<String> = None;
 
     loop {
         let remaining = deadline
@@ -424,32 +481,54 @@ async fn wait_for_mfa_success(
             () = cancel.cancelled() => {
                 return Err(MfaError::Cancelled);
             }
+            // Keep the socket alive while the user approves; proxies may drop
+            // idle connections before the MFA timeout.
+            () = sleep(MOBILE_APPROVE_PING_INTERVAL) => {
+                if write.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    return Err(mobile_approve_closed(close_detail));
+                }
+                continue;
+            }
             msg = read.next() => {
                 match msg {
                     Some(Ok(msg)) => msg,
-                    Some(Err(_)) | None => {
-                        return Err(MfaError::MfaRejected {
-                            message: "mobile approval failed: connection closed by Edge"
-                                .into(),
-                        });
+                    Some(Err(err)) => {
+                        return Err(mobile_approve_closed(
+                            close_detail.or_else(|| Some(read_error_label(&err))),
+                        ));
                     }
+                    None => return Err(mobile_approve_closed(close_detail)),
                 }
             }
         };
 
-        if let Message::Text(text) = msg {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
-                if parsed.get("type").and_then(|v| v.as_str()) == Some("mfa_success") {
-                    if let Some(key) = parsed["preshared_key"].as_str() {
-                        #[allow(deprecated)]
-                        return Ok(ClientMfaFinishResponse {
-                            preshared_key: key.to_string(),
-                            token: None,
-                            result: None,
-                        });
-                    }
+        match msg {
+            Message::Text(text) => {
+                if let Ok(frame) = serde_json::from_str::<RemoteMfaFrame>(&text) {
+                    let (preshared_key, result) = match frame {
+                        RemoteMfaFrame::Legacy { preshared_key } => (preshared_key, None),
+                        // An intermediate result has no key; the caller checks
+                        // its outcome.
+                        RemoteMfaFrame::Result { result } => (String::new(), Some(result)),
+                    };
+                    #[allow(deprecated)]
+                    return Ok(ClientMfaFinishResponse {
+                        preshared_key,
+                        token: None,
+                        result,
+                    });
                 }
             }
+            Message::Close(frame) => {
+                close_detail = Some(match frame {
+                    Some(frame) if frame.reason.is_empty() => {
+                        format!("code {}", u16::from(frame.code))
+                    }
+                    Some(frame) => format!("code {}: {}", u16::from(frame.code), frame.reason),
+                    None => "no close reason".to_string(),
+                });
+            }
+            _ => {}
         }
     }
 }

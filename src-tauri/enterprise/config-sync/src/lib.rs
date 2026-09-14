@@ -240,9 +240,9 @@ async fn apply_fetched_config(
 
 /// Polls all instances that have a polling token and commits any safe configuration updates.
 ///
-/// Fetches run concurrently
-///
-/// The caller owns active-connection detection and all user-facing side effects.
+/// Fetches run concurrently. Configuration updates commit in one transaction,
+/// in instance order. The caller handles active-connection checks and
+/// user-facing effects.
 pub async fn poll_instances(
     pool: &DbPool,
     active_instance_ids: &HashSet<Id>,

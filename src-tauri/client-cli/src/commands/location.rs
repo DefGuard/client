@@ -2,20 +2,34 @@ use std::collections::HashMap;
 
 use defguard_core::database::models::{
     instance::{ClientTrafficPolicy, Instance},
-    location::{Location, LocationMfaMethod},
+    location::{Location, LocationMfaMethod, LocationMfaStep},
     Id,
 };
 use serde_json::{json, Value};
 
 use crate::{
+    mfa::{join_methods, parse_method},
     output::{CommandOutput, LocationEntry},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
 
 const MIN_NAME_COL_WIDTH: usize = 8;
+const MIN_ADDRESS_COL_WIDTH: usize = 15;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_INST_COL_WIDTH: usize = 8;
+const MIN_MFA_COL_WIDTH: usize = 3;
+
+/// Return the widest value, but never less than `min`.
+///
+/// Count characters because `format!` pads strings by character, not byte.
+pub(crate) fn col_width<'a>(values: impl Iterator<Item = &'a str>, min: usize) -> usize {
+    values
+        .map(|value| value.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max(min)
+}
 
 pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
     let locations = Location::all(&state.pool, false).await?;
@@ -45,6 +59,7 @@ pub async fn handle_set(
     name: &str,
     instance: Option<&str>,
     mfa_method: Option<&str>,
+    mfa_steps: &[String],
     route_all_traffic: Option<bool>,
     predefined_traffic: bool,
 ) -> Result<LocationSetResult, CliError> {
@@ -56,17 +71,34 @@ pub async fn handle_set(
     };
 
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
-    let location_id = match &target {
-        ResolvedTarget::Location(loc) => loc.id,
+    let location = match &target {
+        ResolvedTarget::Location(loc) => loc,
         ResolvedTarget::Tunnel(_) => {
             return Err(CliError::NotFound(format!("Location '{name}' not found")));
         }
     };
+    let location_id = location.id;
 
     let mut changed = Vec::new();
 
+    if !mfa_steps.is_empty() {
+        if mfa_method.is_some() {
+            return Err(CliError::InvalidInput(
+                "--mfa-step conflicts with --mfa-method; use only one.".into(),
+            ));
+        }
+        if location.mfa_steps.len() <= 1 {
+            return Err(CliError::InvalidInput(
+                "--mfa-step requires a multi-step location; use --mfa-method for a single-step location.".into(),
+            ));
+        }
+        let plan = parse_step_plan(name, mfa_steps, &location.mfa_steps)?;
+        Location::set_mfa_step_plan(&state.pool, location_id, plan).await?;
+        changed.push(format!("MFA steps → {}", mfa_steps.join(", ")));
+    }
+
     if let Some(method_str) = mfa_method {
-        let method = parse_mfa_method(method_str)?;
+        let method = parse_method(method_str)?;
         Location::set_mfa_method(&state.pool, location_id, method).await?;
         changed.push(format!("MFA method → {method_str}"));
     }
@@ -114,7 +146,13 @@ pub async fn handle_show(
         pubkey: location.pubkey.clone(),
         allowed_ips: location.allowed_ips.clone(),
         dns: location.dns.clone(),
-        mfa_method: mfa_label(location.mfa_method).to_string(),
+        mfa_method: location_mfa_label(location),
+        mfa_steps: location
+            .mfa_steps
+            .iter()
+            .map(|step| step.methods.iter().map(|entry| entry.method).collect())
+            .collect(),
+        mfa_step_plan: location.mfa_step_plan.to_vec(),
         route_all_traffic: match client_traffic_policy {
             ClientTrafficPolicy::None => location.route_all_traffic,
             ClientTrafficPolicy::DisableAllTraffic => false,
@@ -124,18 +162,39 @@ pub async fn handle_show(
     })
 }
 
-fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
-    match raw.to_lowercase().as_str() {
-        "totp" => Ok(LocationMfaMethod::Totp),
-        "email" => Ok(LocationMfaMethod::Email),
-        "oidc" => Ok(LocationMfaMethod::Oidc),
-        "biometric" => Ok(LocationMfaMethod::Biometric),
-        "mobile" | "mobile_approve" => Ok(LocationMfaMethod::MobileApprove),
-        "fido2" => Ok(LocationMfaMethod::Fido2),
-        _ => Err(CliError::Usage(format!(
-            "Invalid MFA method '{raw}'. Valid: totp, email, oidc, biometric, mobile, fido2."
-        ))),
+/// Parse one method per verification step for `location set --mfa-step`.
+///
+/// Unsupported methods can be saved because the desktop client reads the same
+/// plan; `connect` rejects methods the CLI cannot run.
+fn parse_step_plan(
+    name: &str,
+    raw: &[String],
+    steps: &[LocationMfaStep],
+) -> Result<Vec<LocationMfaMethod>, CliError> {
+    if raw.len() != steps.len() {
+        return Err(CliError::InvalidInput(format!(
+            "Location '{name}' has {} verification steps but {} --mfa-step values were given.",
+            steps.len(),
+            raw.len()
+        )));
     }
+    raw.iter()
+        .zip(steps.iter())
+        .enumerate()
+        .map(|(index, (value, step))| {
+            let method = parse_method(value)?;
+            let offered: Vec<LocationMfaMethod> =
+                step.methods.iter().map(|entry| entry.method).collect();
+            if !offered.contains(&method) {
+                return Err(CliError::InvalidInput(format!(
+                    "'{value}' is not available for step {} of '{name}' (offered: {}).",
+                    index + 1,
+                    join_methods(&offered)
+                )));
+            }
+            Ok(method)
+        })
+        .collect()
 }
 
 pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
@@ -143,6 +202,15 @@ pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
         Some(method) => method.as_str(),
         None => "none",
     }
+}
+
+/// Format the MFA column for a location. Multi-step locations show their step
+/// count instead of a single method.
+pub(crate) fn location_mfa_label(location: &Location<Id>) -> String {
+    if location.mfa_steps.len() > 1 {
+        return format!("{} steps", location.mfa_steps.len());
+    }
+    mfa_label(location.mfa_method).to_string()
 }
 
 pub(crate) struct InstanceDetails {
@@ -185,7 +253,7 @@ impl CommandOutput for LocationListResult {
                     address: l.address.clone(),
                     endpoint: l.endpoint.clone(),
                     mfa_enabled: None,
-                    mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                    mfa_method: Some(location_mfa_label(l)),
                     route_all_traffic: Some(route_all_traffic),
                 }
             })
@@ -198,34 +266,35 @@ fn format_location_list_table(
     locations: &[Location<Id>],
     instance_details: &HashMap<Id, InstanceDetails>,
 ) -> String {
-    let name_col_width = locations
-        .iter()
-        .map(|l| l.name.len())
-        .max()
-        .unwrap_or(MIN_NAME_COL_WIDTH)
-        .max(MIN_NAME_COL_WIDTH);
-    let endpoint_col_width = locations
-        .iter()
-        .map(|l| l.endpoint.len())
-        .max()
-        .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
-        .max(MIN_ENDPOINT_COL_WIDTH);
-    let inst_col_width = locations
-        .iter()
-        .filter_map(|l| {
+    let name_col_width = col_width(
+        locations.iter().map(|l| l.name.as_str()),
+        MIN_NAME_COL_WIDTH,
+    );
+    let address_col_width = col_width(
+        locations.iter().map(|l| l.address.as_str()),
+        MIN_ADDRESS_COL_WIDTH,
+    );
+    let endpoint_col_width = col_width(
+        locations.iter().map(|l| l.endpoint.as_str()),
+        MIN_ENDPOINT_COL_WIDTH,
+    );
+    let inst_col_width = col_width(
+        locations.iter().filter_map(|l| {
             instance_details
                 .get(&l.instance_id)
-                .map(|details| details.name.len())
-        })
-        .max()
-        .unwrap_or(MIN_INST_COL_WIDTH)
-        .max(MIN_INST_COL_WIDTH);
+                .map(|details| details.name.as_str())
+        }),
+        MIN_INST_COL_WIDTH,
+    );
+    // Measure MFA labels too so the Routing column stays aligned.
+    let mfa_labels: Vec<String> = locations.iter().map(location_mfa_label).collect();
+    let mfa_col_width = col_width(mfa_labels.iter().map(String::as_str), MIN_MFA_COL_WIDTH);
 
     let mut lines = vec![format!(
-        "  {:>4}  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:<11}",
+        "  {:>4}  {:<name_col_width$}  {:<address_col_width$}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:<mfa_col_width$}  {}",
         "ID", "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
     )];
-    for location in locations {
+    for (location, mfa_label) in locations.iter().zip(&mfa_labels) {
         let details = instance_details.get(&location.instance_id);
 
         let instance_name = details.map_or("?", |instance| instance.name.as_str());
@@ -246,13 +315,13 @@ fn format_location_list_table(
         };
 
         lines.push(format!(
-            "  {:>4}  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:>11}",
+            "  {:>4}  {:<name_col_width$}  {:<address_col_width$}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:<mfa_col_width$}  {}",
             location.id,
             location.name,
             location.address,
             location.endpoint,
             instance_name,
-            mfa_label(location.mfa_method),
+            mfa_label,
             route_label
         ));
     }
@@ -267,6 +336,11 @@ pub struct LocationShowResult {
     pub allowed_ips: String,
     pub dns: Option<String>,
     pub mfa_method: String,
+    /// Methods offered by each verification step, in order. Empty when Edge
+    /// returned no step data.
+    pub mfa_steps: Vec<Vec<LocationMfaMethod>>,
+    /// Saved method for each step, set by `location set --mfa-step`.
+    pub mfa_step_plan: Vec<LocationMfaMethod>,
     pub route_all_traffic: bool,
     pub keepalive_interval: i64,
 }
@@ -283,6 +357,21 @@ impl CommandOutput for LocationShowResult {
             lines.push(format!("DNS:               {dns}"));
         }
         lines.push(format!("MFA method:        {}", self.mfa_method));
+        if self.mfa_steps.len() > 1 {
+            for (index, methods) in self.mfa_steps.iter().enumerate() {
+                lines.push(format!(
+                    "MFA step {}:        {}",
+                    index + 1,
+                    join_methods(methods)
+                ));
+            }
+            if !self.mfa_step_plan.is_empty() {
+                lines.push(format!(
+                    "MFA saved plan:    {}",
+                    join_methods(&self.mfa_step_plan)
+                ));
+            }
+        }
         lines.push(format!("Route all traffic: {}", self.route_all_traffic));
         lines.push(format!("Keepalive:         {}s", self.keepalive_interval));
         lines.join("\n")
@@ -296,6 +385,14 @@ impl CommandOutput for LocationShowResult {
             "pubkey": self.pubkey,
             "allowed_ips": self.allowed_ips,
             "mfa_method": self.mfa_method,
+            "mfa_steps": self.mfa_steps
+                .iter()
+                .map(|methods| methods.iter().map(|method| method.as_str()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            "mfa_step_plan": self.mfa_step_plan
+                .iter()
+                .map(|method| method.as_str())
+                .collect::<Vec<_>>(),
             "route_all_traffic": self.route_all_traffic,
             "keepalive_interval": self.keepalive_interval,
         });
@@ -334,7 +431,9 @@ impl CommandOutput for LocationSetResult {
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::database::models::location::{LocationMfaMode, ServiceLocationMode};
+    use defguard_core::database::models::location::{
+        LocationMfaMode, LocationMfaStepMethod, ServiceLocationMode,
+    };
 
     use super::*;
 
@@ -423,6 +522,39 @@ mod tests {
         .human()
     }
 
+    fn char_col(line: &str, needle: &str) -> usize {
+        let byte = line.find(needle).expect("the line holds the value");
+        line[..byte].chars().count()
+    }
+
+    #[test]
+    fn test_list_human_columns_align_with_a_wide_mfa_cell() {
+        // Exercise character width for "Kraków" and the wider "2 steps" MFA cell.
+        let mut multistep = make_location(1, 10, "Kraków", "1.2.3.4:51820", true);
+        multistep.mfa_steps = sqlx::types::Json(steps(&[
+            &[LocationMfaMethod::Totp],
+            &[LocationMfaMethod::Oidc],
+        ]));
+        let plain = make_location(2, 10, "office", "5.6.7.8:51820", false);
+        let mut instance_details = HashMap::new();
+        instance_details.insert(10, make_instance_details("acme", ClientTrafficPolicy::None));
+
+        let table = LocationListResult {
+            locations: vec![multistep, plain],
+            instance_details,
+        }
+        .human();
+
+        let lines: Vec<&str> = table.lines().collect();
+        let routing_col = char_col(lines[0], "Routing");
+        let mfa_col = char_col(lines[0], "MFA");
+        for line in &lines[1..] {
+            assert_eq!(char_col(line, "Predefined"), routing_col, "line: {line}");
+        }
+        assert_eq!(char_col(lines[1], "2 steps"), mfa_col);
+        assert_eq!(char_col(lines[2], "none"), mfa_col);
+    }
+
     #[test]
     fn test_list_human_force_all_traffic_overrides_location() {
         let table = routing_column(false, ClientTrafficPolicy::ForceAllTraffic);
@@ -481,6 +613,8 @@ mod tests {
             allowed_ips: "0.0.0.0/0".to_string(),
             dns: Some("8.8.8.8".to_string()),
             mfa_method: "totp".to_string(),
+            mfa_steps: Vec::new(),
+            mfa_step_plan: Vec::new(),
             route_all_traffic: false,
             keepalive_interval: 25,
         };
@@ -501,6 +635,8 @@ mod tests {
             allowed_ips: "0.0.0.0/0".to_string(),
             dns: None,
             mfa_method: "none".to_string(),
+            mfa_steps: Vec::new(),
+            mfa_step_plan: Vec::new(),
             route_all_traffic: true,
             keepalive_interval: 30,
         };
@@ -519,6 +655,8 @@ mod tests {
             allowed_ips: "0.0.0.0/0".to_string(),
             dns: Some("8.8.8.8".to_string()),
             mfa_method: "totp".to_string(),
+            mfa_steps: Vec::new(),
+            mfa_step_plan: Vec::new(),
             route_all_traffic: false,
             keepalive_interval: 25,
         };
@@ -539,6 +677,8 @@ mod tests {
             allowed_ips: "0.0.0.0/0".to_string(),
             dns: None,
             mfa_method: "none".to_string(),
+            mfa_steps: Vec::new(),
+            mfa_step_plan: Vec::new(),
             route_all_traffic: true,
             keepalive_interval: 30,
         };
@@ -565,6 +705,8 @@ mod tests {
                 allowed_ips: "0.0.0.0/0".to_string(),
                 dns: None,
                 mfa_method: "n".to_string(),
+                mfa_steps: Vec::new(),
+                mfa_step_plan: Vec::new(),
                 route_all_traffic: false,
                 keepalive_interval: 25,
             }
@@ -626,5 +768,80 @@ mod tests {
         assert_eq!(json["location"], "office");
         assert_eq!(json["changes"].as_array().unwrap().len(), 0);
         assert!(json["message"].is_null());
+    }
+
+    fn steps(offered: &[&[LocationMfaMethod]]) -> Vec<LocationMfaStep> {
+        offered
+            .iter()
+            .map(|methods| LocationMfaStep {
+                methods: methods
+                    .iter()
+                    .map(|method| LocationMfaStepMethod {
+                        method: *method,
+                        configured: true,
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_parse_step_plan_ok() {
+        let steps = steps(&[
+            &[LocationMfaMethod::Email, LocationMfaMethod::Totp],
+            &[LocationMfaMethod::Totp],
+        ]);
+        let plan =
+            parse_step_plan("office", &["email".to_string(), "totp".to_string()], &steps).unwrap();
+        assert_eq!(
+            plan,
+            vec![LocationMfaMethod::Email, LocationMfaMethod::Totp]
+        );
+    }
+
+    #[test]
+    fn test_parse_step_plan_wrong_count_rejected() {
+        let steps = steps(&[&[LocationMfaMethod::Totp], &[LocationMfaMethod::Email]]);
+        let err = parse_step_plan("office", &["totp".to_string()], &steps).unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("2 verification steps"));
+    }
+
+    #[test]
+    fn test_parse_step_plan_bad_name_rejected() {
+        let steps = steps(&[&[LocationMfaMethod::Totp], &[LocationMfaMethod::Email]]);
+        let err = parse_step_plan(
+            "office",
+            &["totp".to_string(), "smoke-signals".to_string()],
+            &steps,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("smoke-signals"));
+    }
+
+    #[test]
+    fn test_parse_step_plan_method_absent_from_step_rejected() {
+        let steps = steps(&[&[LocationMfaMethod::Totp], &[LocationMfaMethod::Email]]);
+        let err = parse_step_plan("office", &["totp".to_string(), "oidc".to_string()], &steps)
+            .unwrap_err();
+        assert!(matches!(err, CliError::InvalidInput(_)));
+        assert!(err.to_string().contains("step 2"));
+    }
+
+    #[test]
+    fn test_parse_step_plan_keeps_fido2_for_the_desktop() {
+        let steps = steps(&[&[LocationMfaMethod::Fido2]]);
+        let plan = parse_step_plan("office", &["fido2".to_string()], &steps).unwrap();
+        assert_eq!(plan, vec![LocationMfaMethod::Fido2]);
+    }
+
+    #[test]
+    fn test_location_mfa_label_reports_step_count() {
+        let mut location = make_location(1, 1, "office", "1.2.3.4:51820", true);
+        location.mfa_steps = sqlx::types::Json(steps(&[
+            &[LocationMfaMethod::Totp],
+            &[LocationMfaMethod::Oidc],
+        ]));
+        assert_eq!(location_mfa_label(&location), "2 steps");
     }
 }

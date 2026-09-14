@@ -48,21 +48,24 @@ pub enum Commands {
         #[arg(long)]
         instance: Option<String>,
 
-        /// MFA authentication code (TOTP / email).
+        /// MFA code for a single-step location (TOTP or email).
+        /// For multi-step locations, use --code-command or enter each code in interactive mode.
         #[arg(long)]
         code: Option<String>,
 
-        /// Shell command that prints the MFA code to stdout.  Receives
-        /// DG_INSTANCE and DG_LOCATION in its environment.
+        /// Shell command that prints the MFA code to stdout. It receives
+        /// DG_INSTANCE and DG_LOCATION. For multi-step locations, it also
+        /// receives DG_MFA_STEP, DG_MFA_STEP_COUNT, and DG_MFA_METHOD, and
+        /// runs once per step.
         #[arg(long)]
         code_command: Option<String>,
 
-        /// Override the persisted MFA method.
+        /// Override the persisted MFA method for a single-step location.
         #[arg(long)]
         mfa_method: Option<String>,
 
-        /// MFA method for one verification step of a multi-step location,
-        /// in order (repeat per step: --mfa-step totp --mfa-step email).
+        /// MFA method for one step of a multi-step location. Repeat this flag
+        /// in step order, for example, --mfa-step totp --mfa-step email.
         /// Omitted steps are chosen interactively on a TTY.
         #[arg(long = "mfa-step")]
         mfa_steps: Vec<String>,
@@ -105,7 +108,7 @@ pub enum Commands {
         all: bool,
     },
 
-    /// Manage locations (view settings, set MFA method, routing).
+    /// Manage locations (view settings, set MFA methods, routing).
     #[command(subcommand, alias = "l")]
     Location(LocationCommand),
 
@@ -138,9 +141,17 @@ pub enum LocationCommand {
         #[arg(long)]
         instance: Option<String>,
 
-        /// Override the MFA method (totp, email, oidc, mobile).
+        /// Override the MFA method (totp, email, oidc, biometric, mobile, fido2).
+        /// The CLI cannot connect with biometric or fido2, but it saves them
+        /// because the desktop client reads the same preference.
         #[arg(long)]
         mfa_method: Option<String>,
+
+        /// Persist one MFA method per verification step, in order. Repeat this
+        /// flag for every step. Multi-step locations only. Conflicts with
+        /// --mfa-method.
+        #[arg(long = "mfa-step")]
+        mfa_steps: Vec<String>,
 
         /// Always route all traffic through this location.
         #[arg(long, overrides_with = "predefined_traffic")]

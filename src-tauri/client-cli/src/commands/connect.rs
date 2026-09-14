@@ -4,7 +4,7 @@ use defguard_client_posture::{authorize_posture_session, get_posture_data};
 use defguard_client_proto::defguard::client_types::MfaMethod;
 use defguard_core::{
     connection::{active_state::active_state, bring_up, ConnectionTarget},
-    database::models::{instance::Instance, location::Location, Id},
+    database::models::{instance::Instance, location::LocationMfaMethod, Id},
     ConnectionType,
 };
 use secrecy::ExposeSecret;
@@ -76,79 +76,42 @@ pub async fn handle(
 
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(location) => {
-            if location.mfa_steps.len() > 1 {
-                // Multi-step MFA: one method per verification step.
-                if mfa_method.is_some() {
-                    return Err(CliError::InvalidInput(format!(
-                        "Location '{}' needs multi-step MFA; use --mfa-step per step instead of --mfa-method.",
-                        location.name
-                    )));
-                }
-                if code.is_some() {
+            // Multi-step locations choose one method per step; single-step
+            // locations keep the legacy method selection.
+            let multistep = location.mfa_steps.len() > 1;
+            if multistep || location.mfa_enabled() {
+                let (plan, interacted) = if multistep {
+                    if mfa_method.is_some() {
+                        return Err(CliError::InvalidInput(format!(
+                            "Location '{}' uses multiple MFA steps; use --mfa-step instead of --mfa-method.",
+                            location.name
+                        )));
+                    }
+                    mfa::resolve_step_plan(location, mfa_steps, stdin().is_terminal())?
+                } else {
+                    if !mfa_steps.is_empty() {
+                        return Err(CliError::InvalidInput(format!(
+                            "Location '{}' has one MFA step; use --mfa-method instead of --mfa-step.",
+                            location.name
+                        )));
+                    }
+                    (vec![mfa::resolve_method(location, mfa_method)?], false)
+                };
+
+                mfa::validate_mfa_flags(&plan, &location.name, code, code_command, qr_file)?;
+
+                // A headless process needs --qr-file before starting a mobile
+                // approval step.
+                if plan.contains(&MfaMethod::MobileApprove)
+                    && !stderr().is_terminal()
+                    && qr_file.is_none()
+                {
                     return Err(CliError::InvalidInput(
-                        "--code holds a single code; multi-step locations need one code per step. \
-                         Use --code-command or an interactive terminal."
+                        "No QR display available (stderr is not a TTY). \
+                         Use --qr-file <path> to save the QR as a PNG image."
                             .into(),
                     ));
                 }
-                if qr_file.is_some() {
-                    return Err(CliError::InvalidInput(
-                        "--qr-file is only valid with mobile-approve MFA".into(),
-                    ));
-                }
-
-                let instance = Instance::find_by_id(&state.pool, location.instance_id)
-                    .await
-                    .map_err(|e| CliError::Other(format!("Failed to load instance: {e}")))?
-                    .ok_or_else(|| {
-                        CliError::Other(format!("Instance {} not found", location.instance_id))
-                    })?;
-
-                let posture_data = if location.posture_check_required {
-                    Some(
-                        get_posture_data()
-                            .await
-                            .map_err(|e| CliError::Other(e.to_string()))?,
-                    )
-                } else {
-                    None
-                };
-
-                let (plan, interacted) =
-                    mfa::resolve_step_plan(location, mfa_steps, stdin().is_terminal())?;
-                let psk = mfa::authorize_multistep(
-                    location,
-                    code_command,
-                    &plan,
-                    &instance,
-                    posture_data,
-                    &state.pool,
-                )
-                .await?;
-                if interacted {
-                    // Mirror the desktop client: interactively picked methods
-                    // become the saved plan; --mfa-step one-offs do not.
-                    let saved = plan
-                        .iter()
-                        .map(|method| (*method).into())
-                        .collect::<Vec<_>>();
-                    if let Err(e) =
-                        Location::set_mfa_step_plan(&state.pool, location.id, saved).await
-                    {
-                        tracing::warn!("Failed to save MFA step plan: {e}");
-                    }
-                }
-                (
-                    location.name.clone(),
-                    Some(psk.expose_secret().to_string()),
-                    state.app_config.mtu(),
-                )
-            } else if location.mfa_enabled() {
-                // Resolve the effective MFA method.
-                let method = mfa::resolve_method(location, mfa_method)?;
-
-                // Reject flags that are incompatible with the resolved method.
-                mfa::validate_mfa_flags(method, &location.name, code, code_command, qr_file)?;
 
                 let instance = Instance::find_by_id(&state.pool, location.instance_id)
                     .await
@@ -169,19 +132,38 @@ pub async fn handle(
                     None
                 };
 
-                let psk = if method == MfaMethod::Oidc {
+                let psk = if multistep {
+                    let psk = mfa::authorize_multistep(
+                        location,
+                        code_command,
+                        &plan,
+                        &instance,
+                        posture_data,
+                        &state.pool,
+                        qr_file,
+                        json,
+                    )
+                    .await?;
+                    // Interactive choices are one-off; show the command needed
+                    // to save the plan.
+                    if interacted && !json {
+                        eprintln!(
+                            "Save this plan with `defguard-client location set '{}' {}`.",
+                            location.name,
+                            plan.iter()
+                                .map(|method| format!(
+                                    "--mfa-step {}",
+                                    LocationMfaMethod::from(*method).as_str()
+                                ))
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        );
+                    }
+                    psk
+                } else if plan[0] == MfaMethod::Oidc {
                     mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
                         .await?
-                } else if method == MfaMethod::MobileApprove {
-                    // Fail-fast: if neither stderr is a TTY nor --qr-file is set,
-                    // the user cannot scan the QR.  Do not call /start.
-                    if !stderr().is_terminal() && qr_file.is_none() {
-                        return Err(CliError::InvalidInput(
-                            "No QR display available (stderr is not a TTY). \
-                             Use --qr-file <path> to save the QR as a PNG image."
-                                .into(),
-                        ));
-                    }
+                } else if plan[0] == MfaMethod::MobileApprove {
                     mfa::authorize_mobile_approve(
                         location,
                         &instance,
@@ -212,7 +194,7 @@ pub async fn handle(
                         location,
                         &source,
                         &instance,
-                        method,
+                        plan[0],
                         posture_data,
                         &state.pool,
                     )
