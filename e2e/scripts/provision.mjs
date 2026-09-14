@@ -37,9 +37,7 @@ const NETWORK = {
 	acl_enabled: false,
 	acl_default_allow: false,
 	allowed_ips_from_acl: false,
-	mfa_enabled: false,
-	posture_checks: [],
-	mfa_flows: [],
+	location_mfa_mode: "disabled",
 	service_location_mode: "disabled",
 };
 

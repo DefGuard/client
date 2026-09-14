@@ -9,7 +9,7 @@ import {
 import {
 	type CoreApi,
 	type EnrollmentFixture,
-	type LocationMfaState,
+	type LocationMfaMode,
 	loggedInCoreApi,
 } from "../helpers/coreApi.js";
 import {
@@ -24,14 +24,12 @@ import { switchToTrayView } from "../helpers/windows.js";
 describe("enrollment", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfaStates: Map<number, LocationMfaState> | undefined;
+	let previousMfaModes: Map<number, LocationMfaMode> | undefined;
 	let fixture: EnrollmentFixture | undefined;
-	let temporaryMfaFlowId: number | undefined;
 
 	beforeEach(async () => {
-		previousMfaStates = undefined;
+		previousMfaModes = undefined;
 		fixture = undefined;
-		temporaryMfaFlowId = undefined;
 		core = await loggedInCoreApi();
 		const networkName = process.env.NETWORK_NAME ?? "e2e";
 		const network = (await core.listNetworks()).find(
@@ -44,11 +42,8 @@ describe("enrollment", () => {
 	});
 
 	afterEach(async () => {
-		if (previousMfaStates) {
-			await core.restoreLocationMfaStates(previousMfaStates);
-		}
-		if (temporaryMfaFlowId !== undefined) {
-			await core.deleteMfaFlow(temporaryMfaFlowId);
+		if (previousMfaModes) {
+			await core.restoreLocationMfaModes(previousMfaModes);
 		}
 		await resetInstances();
 		if (fixture?.ephemeral) {
@@ -57,7 +52,7 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user without MFA and connects from the full and tray views", async () => {
-		previousMfaStates = await core.disableAllLocationMfa();
+		previousMfaModes = await core.disableAllLocationMfa();
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);
@@ -73,18 +68,8 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user with TOTP MFA and connects from the full and tray views", async () => {
-		previousMfaStates = await core.disableAllLocationMfa();
-		temporaryMfaFlowId = await core.createTotpFlow();
-		await core.setLocationMfaState(networkId, {
-			mfaEnabled: true,
-			mfaFlows: [
-				{
-					flow_id: temporaryMfaFlowId,
-					is_default: true,
-					group_ids: [],
-				},
-			],
-		});
+		previousMfaModes = await core.disableAllLocationMfa();
+		await core.setLocationMfaMode(networkId, "internal");
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);
