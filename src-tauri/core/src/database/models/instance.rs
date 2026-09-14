@@ -205,8 +205,8 @@ impl Instance<NoId> {
         let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
-            client_traffic_policy , enterprise_enabled, disable_tunnels) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
+            client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -215,7 +215,8 @@ impl Instance<NoId> {
             self.token,
             self.client_traffic_policy,
             self.enterprise_enabled,
-            self.disable_tunnels
+            self.disable_tunnels,
+            self.openid_display_name
         )
         .fetch_one(executor)
         .await?;
@@ -356,6 +357,23 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_openid_display_name_persisted_on_insert(pool: SqlitePool) {
+        let mut instance = new_instance();
+        instance.openid_display_name = Some("Defguard SSO".into());
+
+        let saved = instance.save(&pool).await.unwrap();
+        let persisted = Instance::find_by_id(&pool, saved.id)
+            .await
+            .unwrap()
+            .expect("instance should exist");
+
+        assert_eq!(
+            persisted.openid_display_name.as_deref(),
+            Some("Defguard SSO")
+        );
     }
 
     #[test]
