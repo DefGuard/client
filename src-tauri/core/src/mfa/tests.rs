@@ -1,3 +1,4 @@
+use defguard_client_proto::defguard::client_types::{MfaAdvanced, MfaCompleted, MfaStepResult};
 use reqwest::Url;
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
@@ -5,8 +6,6 @@ use wiremock::{
     matchers::{body_partial_json, method, path},
     Mock, MockServer, ResponseTemplate,
 };
-
-use defguard_client_proto::defguard::client_types::{MfaAdvanced, MfaCompleted, MfaStepResult};
 
 use super::*;
 use crate::test_helpers::{start_ws_stub, WsStubCommand};
@@ -408,11 +407,13 @@ async fn test_mobile_approve_advanced_result_is_a_passed_step() {
     let cancel = CancellationToken::new();
     let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
 
-    tx.send(WsStubCommand::SendMessage(mfa_result_frame(&MfaStepResult {
-        outcome: Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
-            next_step: 1,
-        })),
-    })))
+    tx.send(WsStubCommand::SendMessage(mfa_result_frame(
+        &MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+                next_step: 1,
+            })),
+        },
+    )))
     .unwrap();
     tx.send(WsStubCommand::Close).unwrap();
 
@@ -430,11 +431,13 @@ async fn test_mobile_approve_completed_result_carries_the_key() {
     let cancel = CancellationToken::new();
     let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
 
-    tx.send(WsStubCommand::SendMessage(mfa_result_frame(&MfaStepResult {
-        outcome: Some(mfa_step_result::Outcome::Completed(MfaCompleted {
-            preshared_key: "mobile-psk".into(),
-        })),
-    })))
+    tx.send(WsStubCommand::SendMessage(mfa_result_frame(
+        &MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(MfaCompleted {
+                preshared_key: "mobile-psk".into(),
+            })),
+        },
+    )))
     .unwrap();
     tx.send(WsStubCommand::Close).unwrap();
 
@@ -562,10 +565,7 @@ async fn test_mfa_start_reads_fido2_credential_ids() {
     assert_eq!(info.credential_ids, vec!["a-b_c", "ZmlkbzI"]);
 }
 
-fn finish_response(
-    preshared_key: &str,
-    result: Option<MfaStepResult>,
-) -> ClientMfaFinishResponse {
+fn finish_response(preshared_key: &str, result: Option<MfaStepResult>) -> ClientMfaFinishResponse {
     ClientMfaFinishResponse {
         preshared_key: preshared_key.into(),
         token: None,
