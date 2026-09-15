@@ -14,13 +14,15 @@ import { useMfaStep } from '../../hooks/useMfaStep';
 
 export const ConnectModalMfaFido2 = () => {
   const [location] = useConnectModal(useShallow((s) => [s.location]));
-  const { canPickOtherMethod, stepPlan, mfaToken } = useMfaStep();
+  const { canPickOtherMethod, stepPlan, mfaToken, setMfaToken, goToStep } = useMfaStep();
 
   const { verifyPin, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
     location as LocationInfo,
     {
       stepPlan,
       mfaToken,
+      setMfaToken,
+      onStepAdvanced: goToStep,
       onPostureError: (message) => {
         useConnectModal.setState({ postureError: message });
         useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);

@@ -1,7 +1,7 @@
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
 import {
   isConnectFailure,
@@ -12,6 +12,7 @@ import {
 import type {
   LocationInfo,
   MfaErrorPayload,
+  MfaFido2StepAdvancedPayload,
   MfaMethodValue,
 } from '../../../rust-api/types';
 import { TauriEvent } from '../../../rust-api/types';
@@ -19,122 +20,152 @@ import { TauriEvent } from '../../../rust-api/types';
 type Options = {
   stepPlan: MfaMethodValue[];
   mfaToken: string | null;
+  setMfaToken: (token: string | null) => void;
   onConnected?: () => void;
+  onStepAdvanced?: (nextStepIndex: number) => void;
   onPostureError?: (message: string) => void;
   onServiceUnavailable?: () => void;
 };
 
 /**
- * FIDO2 MFA. Submitting the PIN starts a backend task that asks Edge for the
- * challenge and the credential id, has the security key sign them, submits the
- * assertion and brings the connection up - so the outcome arrives as an event
- * rather than as the call's return value, like the other task-based methods.
+ * FIDO2 MFA. The PIN starts a background task that gets the challenge from Edge,
+ * signs it with the security key, and brings up the VPN. Results arrive as events.
  */
 export const useMfaFido2Connect = (
   location: LocationInfo,
-  { stepPlan, mfaToken, onConnected, onPostureError, onServiceUnavailable }: Options,
+  {
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    onConnected,
+    onStepAdvanced,
+    onPostureError,
+    onServiceUnavailable,
+  }: Options,
 ) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [isAwaitingTouch, setIsAwaitingTouch] = useState(false);
 
-  const taskIdRef = useRef<string | null>(null);
-  const unlistenRef = useRef<UnlistenFn | null>(null);
+  const { startAttempt } = useMfaClientAttempt();
 
-  const cleanupListeners = useCallback(() => {
-    if (unlistenRef.current !== null) {
-      unlistenRef.current();
-      unlistenRef.current = null;
-    }
-  }, []);
+  // The attempt hook cancels the task; this hook must release its token too.
+  const taskOutstandingRef = useRef(false);
 
-  /// Every exit from a verification attempt lands here: listeners dropped, the
-  /// task forgotten, the view back to accepting a PIN.
-  const settle = useCallback(() => {
-    cleanupListeners();
-    taskIdRef.current = null;
-    setIsVerifying(false);
-    setIsAwaitingTouch(false);
-  }, [cleanupListeners]);
-
-  // Drop the listeners and abandon the key on unmount, so a view left mid-touch
-  // does not connect behind the user's back.
+  // Release the token on unmount so an abandoned view does not keep it for a cancelled task.
+  // The attempt hook handles task and listener cleanup.
   useEffect(() => {
     return () => {
-      cleanupListeners();
-      const taskId = taskIdRef.current;
-      if (taskId) {
-        void api.cancelMfa(taskId).catch(() => {});
+      if (taskOutstandingRef.current) {
+        taskOutstandingRef.current = false;
+        setMfaToken(null);
       }
     };
-  }, [cleanupListeners]);
+  }, [setMfaToken]);
 
   const verifyPin = useCallback(
     async (pin: string) => {
-      cleanupListeners();
+      const attempt = startAttempt();
       setIsVerifying(true);
       setIsAwaitingTouch(false);
       setVerifyError(null);
 
-      // Listen before starting: a task that fails fast (no key plugged in)
-      // would otherwise emit before the listeners are attached.
-      const [touchUnlisten, completeUnlisten, errorUnlisten] = await Promise.all([
-        listen(TauriEvent.MfaFido2Touch, () => {
-          setIsAwaitingTouch(true);
-        }),
-        listen(TauriEvent.MfaFido2Complete, () => {
-          settle();
-          onConnected?.();
-        }),
-        listen<MfaErrorPayload>(TauriEvent.MfaFido2Error, (event) => {
-          settle();
-          void error(
-            `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
-          );
-
-          if (isMfaPostureError(event.payload.error, location)) {
-            onPostureError?.(mfaErrorMessage(event.payload.error));
-            return;
-          }
-          if (isServiceUnavailable(event.payload.error)) {
-            onServiceUnavailable?.();
-            return;
-          }
-          const message = mfaErrorMessage(event.payload.error);
-          // The backend's messages name what actually went wrong (no key, wrong
-          // PIN, no touch), so they are worth showing as they are.
-          setVerifyError(
-            isConnectFailure(message) ? 'Failed to establish VPN connection' : message,
-          );
-        }),
-      ]);
-      unlistenRef.current = () => {
-        touchUnlisten();
-        completeUnlisten();
-        errorUnlisten();
+      // Finish this attempt and update the view.
+      const tryFinishAttempt = () => {
+        if (!attempt.tryFinish()) return false;
+        taskOutstandingRef.current = false;
+        setIsVerifying(false);
+        setIsAwaitingTouch(false);
+        return true;
       };
 
+      // Attach listeners before starting in case the task fails immediately.
       try {
-        taskIdRef.current = await api.mfaFido2Pin(
+        await Promise.all([
+          attempt.ownListener(
+            // A touch is progress, not the final result.
+            listen(TauriEvent.MfaFido2Touch, () => {
+              if (attempt.isLive()) setIsAwaitingTouch(true);
+            }),
+          ),
+          attempt.ownListener(
+            listen(TauriEvent.MfaFido2Complete, () => {
+              if (!tryFinishAttempt()) return;
+              onConnected?.();
+            }),
+          ),
+          attempt.ownListener(
+            listen<MfaFido2StepAdvancedPayload>(
+              TauriEvent.MfaFido2StepAdvanced,
+              (event) => {
+                if (!tryFinishAttempt()) return;
+                setMfaToken(event.payload.token);
+                onStepAdvanced?.(event.payload.nextStep);
+              },
+            ),
+          ),
+          attempt.ownListener(
+            listen<MfaErrorPayload>(TauriEvent.MfaFido2Error, (event) => {
+              if (!tryFinishAttempt()) return;
+              setMfaToken(null);
+              void error(
+                `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
+              );
+
+              if (isMfaPostureError(event.payload.error, location)) {
+                onPostureError?.(mfaErrorMessage(event.payload.error));
+                return;
+              }
+              if (isServiceUnavailable(event.payload.error)) {
+                onServiceUnavailable?.();
+                return;
+              }
+              const message = mfaErrorMessage(event.payload.error);
+              // Show the server error; it tells the user whether the key, PIN, or touch failed.
+              setVerifyError(
+                isConnectFailure(message)
+                  ? 'Failed to establish VPN connection'
+                  : message,
+              );
+            }),
+          ),
+        ]);
+      } catch (err) {
+        if (!tryFinishAttempt()) return;
+        setMfaToken(null);
+        void error(`FIDO2 MFA listener setup failed for location ${location.id}: ${err}`);
+        setVerifyError(mfaErrorMessage(err));
+        return;
+      }
+
+      if (!attempt.isLive()) return;
+
+      try {
+        const taskId = await api.mfaFido2Pin(
           location.instance_id,
           location.id,
           stepPlan,
           mfaToken,
           pin,
         );
+        attempt.ownTask(taskId);
+        if (!attempt.isLive()) return;
+        taskOutstandingRef.current = true;
       } catch (err) {
-        settle();
+        if (!tryFinishAttempt()) return;
+        setMfaToken(null);
         void error(`FIDO2 MFA start failed for location ${location.id}: ${err}`);
         setVerifyError(mfaErrorMessage(err));
       }
     },
     [
+      startAttempt,
       location,
       stepPlan,
       mfaToken,
-      cleanupListeners,
-      settle,
+      setMfaToken,
       onConnected,
+      onStepAdvanced,
       onPostureError,
       onServiceUnavailable,
     ],

@@ -19,7 +19,7 @@ export const ConnectModalMfaMobile = () => {
     useShallow((s) => [s.perviousView, s.location]),
   );
 
-  const { canPickOtherMethod, stepPlan, mfaToken, setMfaToken } = useMfaStep();
+  const { canPickOtherMethod, stepPlan, mfaToken, setMfaToken, goToStep } = useMfaStep();
 
   const { start, isStarting, startError, qrValue, connectionError } = useMfaMobileConnect(
     location as LocationInfo,
@@ -27,6 +27,7 @@ export const ConnectModalMfaMobile = () => {
       stepPlan,
       mfaToken,
       setMfaToken,
+      onStepAdvanced: goToStep,
       onPostureError: (msg) => {
         useConnectModal.setState({ postureError: msg });
         useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
