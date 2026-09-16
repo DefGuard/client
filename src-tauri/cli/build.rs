@@ -10,6 +10,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         // Make all messages serde-serializable.
         .type_attribute(".", "#[derive(serde::Deserialize,serde::Serialize)]")
+        // TODO: remove once it is used :)
+        .type_attribute(
+            ".defguard.client_types.MfaConfigAuthorizeResponse",
+            "#[allow(unused)]",
+        )
+        .type_attribute(
+            ".defguard.client_types.MfaConfigSendCodeResponse",
+            "#[allow(unused)]",
+        )
+        .type_attribute(
+            ".defguard.client_types.MfaConfigSendCodeRequest",
+            "#[allow(unused)]",
+        )
+        .type_attribute(
+            ".defguard.client_types.MfaConfigStartRequest",
+            "#[allow(unused)]",
+        )
         .compile_protos(&["../proto/v1/core/proxy.proto"], &["../proto"])?;
 
     Ok(())
