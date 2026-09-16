@@ -357,7 +357,7 @@ impl Location<Id> {
             addresses,
             listen_port: Some(0),
             peers: vec![peer],
-            mtu,
+            mtu: self.effective_mtu(mtu),
             dns,
             dns_search,
         })

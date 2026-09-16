@@ -414,13 +414,15 @@ fn open_url(_url: &str, _json_mode: bool) {
 #[cfg(test)]
 mod tests {
     use defguard_core::database::models::location::ServiceLocationMode;
+    use sqlx::types::Json;
 
     use super::*;
 
     fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
         Location {
-            mfa_steps: Default::default(),
-            mfa_step_plan: Default::default(),
+            mfa_steps: Json::default(),
+            mfa_step_plan: Json::default(),
+            client_mtu: None,
             id: 1,
             instance_id: 1,
             network_id: 1,

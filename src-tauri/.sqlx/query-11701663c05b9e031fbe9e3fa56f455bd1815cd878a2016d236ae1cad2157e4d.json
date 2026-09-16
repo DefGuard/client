@@ -6,14 +6,20 @@
       {
         "name": "id!",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel_connection",
+            "name": "id"
+          }
+        }
       }
     ],
     "parameters": {
       "Right": 3
     },
     "nullable": [
-      true
+      null
     ]
   },
   "hash": "11701663c05b9e031fbe9e3fa56f455bd1815cd878a2016d236ae1cad2157e4d"

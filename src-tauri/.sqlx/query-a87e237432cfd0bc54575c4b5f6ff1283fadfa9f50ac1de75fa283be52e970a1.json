@@ -6,66 +6,101 @@
       {
         "name": "id!",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "location_stats",
+            "name": "id"
+          }
+        }
       },
       {
         "name": "location_id",
         "ordinal": 1,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "location_stats",
+            "name": "location_id"
+          }
+        }
       },
       {
         "name": "upload!: i64",
         "ordinal": 2,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": "Expression"
       },
       {
         "name": "download!: i64",
         "ordinal": 3,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": "Expression"
       },
       {
         "name": "upload_diff!: i64",
         "ordinal": 4,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       },
       {
         "name": "download_diff!: i64",
         "ordinal": 5,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       },
       {
         "name": "last_handshake!: i64",
         "ordinal": 6,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "location_stats",
+            "name": "last_handshake"
+          }
+        }
       },
       {
         "name": "collected_at!: NaiveDateTime",
         "ordinal": 7,
-        "type_info": "Null"
+        "type_info": "Text",
+        "origin": "Expression"
       },
       {
         "name": "listen_port!: u32",
         "ordinal": 8,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "location_stats",
+            "name": "listen_port"
+          }
+        }
       },
       {
         "name": "persistent_keepalive_interval?: u16",
         "ordinal": 9,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "location_stats",
+            "name": "persistent_keepalive_interval"
+          }
+        }
       }
     ],
     "parameters": {
       "Right": 4
     },
     "nullable": [
+      false,
+      false,
+      true,
       true,
       false,
-      null,
-      null,
-      null,
-      null,
       false,
-      null,
+      false,
+      true,
       false,
       true
     ]
