@@ -208,6 +208,7 @@ mod tests {
             posture_check_required: false,
             mfa_steps: Default::default(),
             mfa_step_plan: Default::default(),
+            client_mtu: None,
         }
     }
 

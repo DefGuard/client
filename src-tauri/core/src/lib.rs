@@ -213,6 +213,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
                 .collect::<Vec<_>>()
         }),
         mfa_step_plan: Json::default(),
+        client_mtu: dev_config.mtu,
     }
 }
 
@@ -280,6 +281,18 @@ mod tests {
         assert_eq!(location.keepalive_interval, 25);
         assert!(!location.route_all_traffic);
         assert!(!location.posture_check_required);
+    }
+
+    #[test]
+    fn test_into_location_maps_client_mtu() {
+        // Cores that don't send an MTU leave the location without one.
+        let location = into_location(base_dev_config(), 3);
+        assert_eq!(location.client_mtu, None);
+
+        let mut cfg = base_dev_config();
+        cfg.client_mtu = Some(1380);
+        let location = into_location(cfg, 3);
+        assert_eq!(location.client_mtu, Some(1380));
     }
 
     #[test]

@@ -421,6 +421,7 @@ mod tests {
         Location {
             mfa_steps: Default::default(),
             mfa_step_plan: Default::default(),
+            client_mtu: None,
             id: 1,
             instance_id: 1,
             network_id: 1,
