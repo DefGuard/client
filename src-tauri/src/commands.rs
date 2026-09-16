@@ -1629,7 +1629,7 @@ fn classify_fido2_response(
             next_step,
             token: Some(token),
         }),
-        outcome => Ok(outcome),
+        outcome @ MfaTaskOutcome::Completed { .. } => Ok(outcome),
     }
 }
 
@@ -2005,16 +2005,16 @@ pub async fn mfa_connect_mobile_approve(
 fn decode_base64(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
     /// Padding is accepted but not required, so one engine covers both the
     /// padded and unpadded spelling of its alphabet.
-    fn engine(alphabet: alphabet::Alphabet) -> GeneralPurpose {
+    fn engine(alphabet: &alphabet::Alphabet) -> GeneralPurpose {
         GeneralPurpose::new(
-            &alphabet,
+            alphabet,
             GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
         )
     }
 
-    engine(alphabet::URL_SAFE)
+    engine(&alphabet::URL_SAFE)
         .decode(value)
-        .or_else(|err| engine(alphabet::STANDARD).decode(value).map_err(|_| err))
+        .or_else(|err| engine(&alphabet::STANDARD).decode(value).map_err(|_| err))
 }
 
 /// CTAP status codes worth telling the user apart, as defined by the spec and

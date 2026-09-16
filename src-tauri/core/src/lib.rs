@@ -290,7 +290,7 @@ mod tests {
         assert_eq!(location.client_mtu, None);
 
         let mut cfg = base_dev_config();
-        cfg.client_mtu = Some(1380);
+        cfg.mtu = Some(1380);
         let location = into_location(cfg, 3);
         assert_eq!(location.client_mtu, Some(1380));
     }
