@@ -1681,6 +1681,18 @@ enum MfaBeginStepInput {
     Continue(String),
 }
 
+/// Returns the existing MFA session token only for multi-step-capable instances.
+///
+/// Pre-2.2 sessions are bound to one method, so switching methods must start a
+/// new session to obtain the selected method's challenge.
+fn reusable_mfa_continuation_token(
+    state: &AppState,
+    instance_id: Id,
+    token: Option<String>,
+) -> Option<String> {
+    token.filter(|_| state.is_multi_step_mfa_capable(instance_id))
+}
+
 async fn begin_mfa_step(
     state: &AppState,
     instance_id: Id,
@@ -1795,7 +1807,7 @@ pub async fn mfa_begin_step(
     let proxy_url =
         Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
 
-    let input = if let Some(token) = token {
+    let input = if let Some(token) = reusable_mfa_continuation_token(&state, instance_id, token) {
         MfaBeginStepInput::Continue(token)
     } else {
         let step_methods = step_plan
@@ -2367,6 +2379,19 @@ mod tests {
             "challenge": challenge,
             "credential_ids": credential_ids,
         }))
+    }
+
+    #[test]
+    fn test_reusable_mfa_continuation_token_requires_multi_step_capability() {
+        let state = AppState::new(AppConfig::default(), None);
+
+        assert!(reusable_mfa_continuation_token(&state, 1, Some("token-1".into())).is_none());
+
+        state.set_multi_step_mfa_capable(1, true);
+        assert_eq!(
+            reusable_mfa_continuation_token(&state, 1, Some("token-1".into())).as_deref(),
+            Some("token-1")
+        );
     }
 
     #[tokio::test]
