@@ -96,7 +96,6 @@ defguard-client-config-sync.path = "enterprise/config-sync"
 defguard-client-service-locations.path = "enterprise/service-locations"
 defguard-client-provisioning.path = "enterprise/provisioning"
 defguard-client-common.path = "common"
-dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 hyper-util = "0.1"
@@ -131,7 +130,6 @@ tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
-tauri-plugin-window-state = "2"
 thiserror.workspace = true
 time = { version = "0.3", features = ["formatting", "macros"] }
 tokio.workspace = true
