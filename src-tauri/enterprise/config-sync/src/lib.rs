@@ -7,7 +7,10 @@ pub mod commands;
 
 use defguard_client_core::{
     database::{
-        models::{instance::Instance, Id},
+        models::{
+            instance::{mfa_configured_methods, Instance},
+            Id,
+        },
         DbPool,
     },
     error::Error,
@@ -18,7 +21,7 @@ use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, Instanc
 use reqwest::{StatusCode, Url};
 use semver::Version;
 use serde::Serialize;
-use sqlx::{Sqlite, Transaction};
+use sqlx::{types::Json, Sqlite, Transaction};
 
 use crate::commands::{
     disable_enterprise_features, do_update_instance, sync_service_locations_best_effort,
@@ -47,6 +50,9 @@ pub enum PollInstanceResult {
     },
     ChangedWhileActive {
         version_mismatch: Option<VersionMismatchPayload>,
+        /// Part of the config was safe to write mid-connection, so the frontend's copy of the
+        /// instance is stale even though the rest of the update was deferred.
+        instance_updated: bool,
     },
 }
 
@@ -194,8 +200,9 @@ pub async fn poll_instance(
     );
 
     if has_active_connections {
-        // add dedicated override to disable tunnels without waiting for a disconnect
+        let mut instance_updated = false;
         if let Some(ref info) = device_config.instance {
+            // add dedicated override to disable tunnels without waiting for a disconnect
             let new_tunnels_disabled = info.disable_tunnels.unwrap_or(false);
             if new_tunnels_disabled && !instance.disable_tunnels {
                 debug!(
@@ -204,10 +211,30 @@ pub async fn poll_instance(
                     instance.name, instance.id
                 );
                 instance.disable_tunnels = true;
+                instance_updated = true;
+            }
+            // Says nothing about the tunnel, and deferring it would keep the instance unable to
+            // configure MFA for as long as the VPN stayed up.
+            let configured_methods = mfa_configured_methods(info).map(Json);
+            if instance.mfa_configured_methods.as_ref().map(|json| &json.0)
+                != configured_methods.as_ref().map(|json| &json.0)
+            {
+                debug!(
+                    "MFA state changed for instance {}({}) while a connection is active, \
+                    persisting the snapshot immediately.",
+                    instance.name, instance.id
+                );
+                instance.mfa_configured_methods = configured_methods;
+                instance_updated = true;
+            }
+            if instance_updated {
                 instance.save(transaction.as_mut()).await?;
             }
         }
-        return Ok(PollInstanceResult::ChangedWhileActive { version_mismatch });
+        return Ok(PollInstanceResult::ChangedWhileActive {
+            version_mismatch,
+            instance_updated,
+        });
     }
 
     debug!(
@@ -441,7 +468,7 @@ mod tests {
         NoId,
     };
     use defguard_client_proto::defguard::client_types::{
-        DeviceConfig, DeviceConfigResponse, InstanceInfo,
+        DeviceConfig, DeviceConfigResponse, InstanceInfo, MfaUserState,
     };
     use sqlx::SqlitePool;
 
@@ -541,6 +568,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            mfa_configured_methods: None,
         }
     }
 
@@ -622,6 +650,7 @@ mod tests {
             enterprise_enabled: true,
             disable_tunnels: false,
             openid_display_name: None,
+            mfa_configured_methods: None,
         }
         .save(pool)
         .await
@@ -786,6 +815,53 @@ mod tests {
             result,
             PollInstanceResult::ChangedWhileActive { .. }
         ));
+        let location = Location::find_by_instance_id(&pool, instance.id, true)
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(location.endpoint, "1.2.3.4:51820");
+    }
+
+    /// The migration leaves a null snapshot, which the frontend reads as "cannot configure MFA",
+    /// so deferring it behind an active connection would hide the instance until the VPN dropped.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn test_poll_instance_persists_mfa_snapshot_while_active(pool: SqlitePool) {
+        let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+        seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
+        assert!(instance.mfa_configured_methods.is_none());
+
+        let mut response =
+            device_config_response(&instance, device_config(1, "office", "5.6.7.8:51820"));
+        // An account with no factors still reports state, which is what tells the client the
+        // proxy speaks the API at all.
+        response.instance.as_mut().unwrap().mfa_user_state = Some(MfaUserState::default());
+        let server = MockPollServer::new(vec![poll_response(response)]);
+        instance.proxy_url = server.url();
+        instance.save(&pool).await.unwrap();
+
+        let mut transaction = pool.begin().await.unwrap();
+        let result = poll_instance(&mut transaction, &mut instance, true)
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+
+        assert!(matches!(
+            result,
+            PollInstanceResult::ChangedWhileActive {
+                instance_updated: true,
+                ..
+            }
+        ));
+        let stored = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored.mfa_configured_methods.map(|json| json.0),
+            Some(Vec::new())
+        );
+        // The rest of the config still waits for the disconnect.
         let location = Location::find_by_instance_id(&pool, instance.id, true)
             .await
             .unwrap()

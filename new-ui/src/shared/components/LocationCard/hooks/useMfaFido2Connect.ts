@@ -3,6 +3,7 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
+import { fido2ShowsTouchPrompt } from '../../../rust-api/fido2';
 import {
   isConnectFailure,
   isMfaPostureError,
@@ -28,8 +29,10 @@ type Options = {
 };
 
 /**
- * FIDO2 MFA. The PIN starts a background task that gets the challenge from Edge,
- * signs it with the security key, and brings up the VPN. Results arrive as events.
+ * FIDO2 MFA. Starting verification kicks off a background task that gets the challenge from
+ * Edge, signs it with the security key, and brings up the VPN. Results arrive as events.
+ *
+ * `pin` is null where the platform collects it in its own prompt.
  */
 export const useMfaFido2Connect = (
   location: LocationInfo,
@@ -63,8 +66,8 @@ export const useMfaFido2Connect = (
     };
   }, [setMfaToken]);
 
-  const verifyPin = useCallback(
-    async (pin: string) => {
+  const verify = useCallback(
+    async (pin: string | null) => {
       const attempt = startAttempt();
       setIsVerifying(true);
       setIsAwaitingTouch(false);
@@ -85,7 +88,7 @@ export const useMfaFido2Connect = (
           attempt.ownListener(
             // A touch is progress, not the final result.
             listen(TauriEvent.MfaFido2Touch, () => {
-              if (attempt.isLive()) setIsAwaitingTouch(true);
+              if (attempt.isLive()) setIsAwaitingTouch(fido2ShowsTouchPrompt());
             }),
           ),
           attempt.ownListener(
@@ -171,5 +174,5 @@ export const useMfaFido2Connect = (
     ],
   );
 
-  return { verifyPin, isVerifying, isAwaitingTouch, verifyError };
+  return { verify, isVerifying, isAwaitingTouch, verifyError };
 };

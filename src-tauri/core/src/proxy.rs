@@ -1,4 +1,4 @@
-use std::{env, time::Duration};
+use std::{env, sync::LazyLock, time::Duration};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use defguard_client_proto::defguard::client_types::ClientPlatformInfo;
@@ -10,9 +10,26 @@ use crate::version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION}
 
 const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Build a base64-encoded `ClientPlatformInfo` header value.
+/// Shared across every proxy request, so the connection pool and TLS session cache survive
+/// between them. Carries no timeout of its own: callers set their own per request.
+static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
+
+/// The platform does not change while the process runs, and `os_info::get` is a registry probe
+/// on Windows and a file read elsewhere - not something to repeat per request.
+static PLATFORM_HEADER: LazyLock<String> = LazyLock::new(build_platform_header);
+
+#[must_use]
+pub fn http_client() -> &'static Client {
+    &HTTP_CLIENT
+}
+
+/// A base64-encoded `ClientPlatformInfo` header value, built once.
 #[must_use]
 pub fn construct_platform_header() -> String {
+    PLATFORM_HEADER.clone()
+}
+
+fn build_platform_header() -> String {
     let os = os_info::get();
 
     let platform_info = ClientPlatformInfo {
@@ -35,7 +52,7 @@ pub async fn post_with_headers<T: Serialize + ?Sized>(
     url: Url,
     data: &T,
 ) -> Result<Response, reqwest::Error> {
-    Client::new()
+    http_client()
         .post(url)
         .json(data)
         .header(CLIENT_VERSION_HEADER, PKG_VERSION)
@@ -43,4 +60,19 @@ pub async fn post_with_headers<T: Serialize + ?Sized>(
         .timeout(HTTP_REQ_TIMEOUT)
         .send()
         .await
+}
+
+/// Falls back to the status line when the body is absent, empty or not the expected shape.
+pub async fn read_error_message(response: Response) -> String {
+    let status = response.status();
+    response
+        .json::<serde_json::Value>()
+        .await
+        .ok()
+        .and_then(|body| {
+            body.get("error")
+                .and_then(serde_json::Value::as_str)
+                .map(String::from)
+        })
+        .unwrap_or_else(|| format!("HTTP {status}"))
 }

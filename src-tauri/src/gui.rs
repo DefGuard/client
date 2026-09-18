@@ -215,6 +215,13 @@ pub fn run_app() {
             mfa_connect_mobile_approve,
             mfa_fido2_pin,
             cancel_mfa,
+            mfa_config_start,
+            mfa_config_send_code,
+            mfa_config_authorize,
+            mfa_config_setup_start,
+            mfa_config_setup_finish,
+            mfa_config_setup_fido2,
+            mfa_config_cancel,
             session_state::get_session_state,
             session_state::patch_session_state,
         ])

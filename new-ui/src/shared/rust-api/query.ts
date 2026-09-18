@@ -16,6 +16,14 @@ import type {
 export const tunnelsDisabled = (instances: InstanceInfo[]): boolean =>
   instances.some((i) => i.disable_tunnels);
 
+/** An instance that never reported its MFA state predates the configuration API. */
+export const supportsMfaConfiguration = (instance: InstanceInfo): boolean =>
+  isPresent(instance.mfa_configured_methods);
+
+/** Shared by the Add page, its route guard and the instance picker, so all three count alike. */
+export const mfaConfigurableInstances = (instances: InstanceInfo[]): InstanceInfo[] =>
+  instances.filter(supportsMfaConfiguration);
+
 export const getAllActiveConnectionQueryOptions = queryOptions({
   queryKey: ['alive-connections'] as const,
   queryFn: api.getAllActiveConnections,

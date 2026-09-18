@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
 import { error as logError } from '@tauri-apps/plugin-log';
@@ -70,10 +70,11 @@ export const MfaConfigurationStep = () => {
     mutate();
   }, [code, mutate]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code
-  useEffect(() => {
-    setError(null);
-  }, [code]);
+  // Only real input clears the error, CodeInput's own reset passes ''.
+  const handleCodeChange = useCallback((value: string) => {
+    setCode(value);
+    if (value.length > 0) setError(null);
+  }, []);
 
   return (
     <div id="mfa-configuration-step" className="step-content">
@@ -94,7 +95,7 @@ export const MfaConfigurationStep = () => {
       <CodeInput
         length={6}
         value={code}
-        onChange={setCode}
+        onChange={handleCodeChange}
         onSuccessPaste={() => {
           handleSubmit();
         }}

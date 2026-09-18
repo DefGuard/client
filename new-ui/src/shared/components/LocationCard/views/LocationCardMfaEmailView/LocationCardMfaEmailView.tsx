@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
@@ -70,10 +71,11 @@ export const LocationCardMfaEmailView = () => {
     [emailCode, verifyCode],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
-  useEffect(() => {
-    setError(null);
-  }, [emailCode, setError]);
+  // Only real input clears the error, CodeInput's own reset passes ''.
+  const handleCodeChange = useCallback((value: string) => {
+    setEmailCode(value);
+    if (value.length > 0) setError(null);
+  }, []);
 
   // Reflect server-side verify errors into the local error state
   useEffect(() => {
@@ -89,7 +91,7 @@ export const LocationCardMfaEmailView = () => {
     <div
       className="location-card-mfa-email-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
@@ -100,7 +102,7 @@ export const LocationCardMfaEmailView = () => {
       <CodeInput
         length={6}
         value={emailCode}
-        onChange={setEmailCode}
+        onChange={handleCodeChange}
         error={startError ?? error}
         onSuccessPaste={(value) => {
           handleVerify(value);

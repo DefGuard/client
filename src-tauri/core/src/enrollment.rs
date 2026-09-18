@@ -14,7 +14,7 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::{
-    proxy::construct_platform_header,
+    proxy::{construct_platform_header, read_error_message},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
@@ -85,7 +85,7 @@ async fn check_enrollment_response(response: Response) -> Result<Response, Enrol
         return Err(EnrollmentError::TokenExpired);
     }
     if !status.is_success() {
-        let message = read_error_body(response).await;
+        let message = read_error_message(response).await;
         return Err(EnrollmentError::ProxyError {
             status: status.as_u16(),
             message,
@@ -105,17 +105,6 @@ fn extract_defguard_cookie(response: &Response) -> Result<String, EnrollmentErro
         }
     }
     Err(EnrollmentError::MissingCookie)
-}
-
-/// Read an error body from a non-2xx response.
-async fn read_error_body(response: Response) -> String {
-    let status = response.status();
-    response
-        .json::<serde_json::Value>()
-        .await
-        .ok()
-        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(String::from))
-        .unwrap_or_else(|| format!("HTTP {status}"))
 }
 
 /// Start the enrollment process.
@@ -154,7 +143,7 @@ pub async fn enrollment_start(
     }
 
     if !status.is_success() {
-        let message = read_error_body(response).await;
+        let message = read_error_message(response).await;
         return Err(EnrollmentError::ProxyError {
             status: status.as_u16(),
             message,

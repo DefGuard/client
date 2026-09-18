@@ -11,7 +11,7 @@ use defguard_client_proto::defguard::client_types::{
     MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
 };
 use futures_util::StreamExt;
-use reqwest::{Client, Response, StatusCode, Url};
+use reqwest::{Response, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -27,7 +27,7 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    proxy::construct_platform_header,
+    proxy::{construct_platform_header, http_client, read_error_message},
     version::{
         is_version_at_least, Version, CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER,
         CORE_VERSION_HEADER, MIN_MULTI_STEP_MFA_VERSION, PKG_VERSION, PROXY_VERSION_HEADER,
@@ -83,9 +83,6 @@ enum MobileMfaResponse {
     Result { result: MfaStepResult },
 }
 
-fn build_client() -> Client {
-    Client::new()
-}
 fn standard_headers() -> Vec<(&'static str, String)> {
     vec![
         (CLIENT_VERSION_HEADER, PKG_VERSION.to_string()),
@@ -100,12 +97,7 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
         return Ok(response);
     }
 
-    let message = response
-        .json::<serde_json::Value>()
-        .await
-        .ok()
-        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(String::from))
-        .unwrap_or_else(|| format!("HTTP {status}"));
+    let message = read_error_message(response).await;
 
     match status {
         // A 403 means either a posture failure or an attempt-limit error. The message tells them apart.
@@ -140,7 +132,7 @@ pub async fn mfa_start_with_capability(
     proxy_url: Url,
     request: ClientMfaStartRequest,
 ) -> Result<MfaStartResult, MfaError> {
-    let client = build_client();
+    let client = http_client();
 
     let url = proxy_url
         .join("api/v1/client-mfa/start")
@@ -223,7 +215,7 @@ pub async fn mfa_step_start(
     proxy_url: Url,
     request: ClientMfaStepStartRequest,
 ) -> Result<ClientMfaStepStartResponse, MfaError> {
-    let client = Client::new();
+    let client = http_client();
 
     let url = proxy_url
         .join("api/v1/client-mfa/step-start")
@@ -278,7 +270,7 @@ pub async fn mfa_finish_code(
     proxy_url: Url,
     request: ClientMfaFinishRequest,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let client = Client::new();
+    let client = http_client();
 
     let url = proxy_url
         .join("api/v1/client-mfa/finish")
@@ -325,7 +317,7 @@ pub async fn poll_openid_mfa(
     step_attempt_id: Option<String>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let client = Client::new();
+    let client = http_client();
     let url = proxy_url
         .join("api/v1/client-mfa/finish")
         .map_err(|e| MfaError::Other {

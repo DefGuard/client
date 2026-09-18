@@ -1,4 +1,6 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import { fido2CollectsPinInApp } from '../../../../rust-api/fido2';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import { Button } from '../../../Button/Button';
@@ -28,7 +30,7 @@ export const LocationCardMfaFido2View = () => {
     goToStep,
     setPostureError,
   } = useLocationCardContext();
-  const { verifyPin, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
+  const { verify, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
     location,
     {
       stepPlan,
@@ -46,14 +48,19 @@ export const LocationCardMfaFido2View = () => {
 
   const [pin, setPin] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const collectsPin = fido2CollectsPinInApp();
 
   const handleVerify = useCallback(() => {
+    if (!collectsPin) {
+      verify(null);
+      return;
+    }
     if (!isPresent(pin) || pin.length === 0) {
       setError('Enter PIN');
       return;
     }
-    verifyPin(pin);
-  }, [pin, verifyPin]);
+    verify(pin);
+  }, [collectsPin, pin, verify]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of pin input
   useEffect(() => {
@@ -69,7 +76,7 @@ export const LocationCardMfaFido2View = () => {
     <div
       className="location-card-mfa-fido2-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
@@ -78,16 +85,24 @@ export const LocationCardMfaFido2View = () => {
       ) : (
         <Fragment>
           <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
-            <p>Insert your security key and enter its PIN to continue.</p>
+            <p>
+              {collectsPin
+                ? 'Insert your security key and enter its PIN to continue.'
+                : 'Insert your security key and continue in the prompt your system shows.'}
+            </p>
           </LocationViewHeader>
           <SizedBox height={ThemeSpacing.Xl} />
-          <Input
-            type="password"
-            label="PIN"
-            value={pin}
-            onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
-            error={error}
-          />
+          {collectsPin ? (
+            <Input
+              type="password"
+              label="PIN"
+              value={pin}
+              onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
+              error={error}
+            />
+          ) : (
+            isPresent(error) && <p className="error">{error}</p>
+          )}
         </Fragment>
       )}
       <Controls>
@@ -110,7 +125,7 @@ export const LocationCardMfaFido2View = () => {
             />
           )}
           <Button
-            text="Verify"
+            text={collectsPin ? 'Verify' : 'Use security key'}
             variant={ButtonVariant.Primary}
             onClick={handleVerify}
             loading={isVerifying}

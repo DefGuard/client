@@ -53,7 +53,7 @@ describe('useMfaFido2Connect', () => {
 
     let verifyPromise!: Promise<void>;
     await act(async () => {
-      verifyPromise = result.current.verifyPin('1234');
+      verifyPromise = result.current.verify('1234');
       await Promise.resolve();
     });
     await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(4));
@@ -98,7 +98,7 @@ describe('useMfaFido2Connect', () => {
 
     let verifyPromise!: Promise<void>;
     await act(async () => {
-      verifyPromise = result.current.verifyPin('1234');
+      verifyPromise = result.current.verify('1234');
       await Promise.resolve();
     });
     await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(4));
@@ -140,7 +140,7 @@ describe('useMfaFido2Connect', () => {
     );
 
     await act(async () => {
-      await result.current.verifyPin('1234');
+      await result.current.verify('1234');
     });
     await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(4));
 

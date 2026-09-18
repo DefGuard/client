@@ -43,6 +43,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".defguard.client_types.ClientMfaStepStartResponse.credential_ids",
             "#[serde(default)]",
         )
+        .field_attribute(
+            ".defguard.client_types.MfaConfigStartResponse.available_methods",
+            "#[serde(default)]",
+        )
+        // [2.2] FIDO2 setup fields and the email fallback's recovery codes, absent on older edges.
+        .field_attribute(
+            ".defguard.client_types.MfaConfigAuthorizeResponse.recovery_codes",
+            "#[serde(default)]",
+        )
+        .field_attribute(
+            ".defguard.client_types.CodeMfaSetupStartResponse.fido2_creation_challenge",
+            "#[serde(default)]",
+        )
+        .field_attribute(
+            ".defguard.client_types.CodeMfaSetupFinishRequest.name",
+            "#[serde(default)]",
+        )
+        .field_attribute(
+            ".defguard.client_types.CodeMfaSetupFinishRequest.fido2_attestation",
+            "#[serde(default)]",
+        )
         // Use proto defaults for missing fields in enrollment types that
         // may differ across proxy versions.
         .type_attribute(".defguard.client_types.AdminInfo", "#[serde(default)]")

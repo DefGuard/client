@@ -40,6 +40,16 @@
     }
   }
 
+  &.image-lock {
+    .images {
+      img {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+      }
+    }
+  }
+
   .title {
     font: var(--t-body-sm-500);
     color: var(--fg-white-100);
@@ -49,7 +59,7 @@
   .description {
     color: var(--color);
     font: var(--t-body-xs-400);
-    padding-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-2xl);
     transition-duration: 160ms;
     transition-timing-function: ease-out;
     transition-property: color;
@@ -72,11 +82,6 @@
       background: var(--bg-dark-blue-20);
       box-sizing: border-box;
       padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) var(--spacing-xl);
-
-      .btn-wrap,
-      .btn {
-        width: 100%;
-      }
     }
   }
 }

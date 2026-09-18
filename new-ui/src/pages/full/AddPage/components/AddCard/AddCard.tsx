@@ -1,19 +1,29 @@
 import './style.scss';
 import clsx from 'clsx';
 import { Button } from '../../../../../shared/components/Button/Button';
+import { ButtonSize, ButtonVariant } from '../../../../../shared/components/Button/types';
 import defaultImage from './assets/image_1.png';
 import yubiImage from './assets/image_2.png';
 import wireguardImage from './assets/image_3.png';
+import lockImage from './assets/image_4.png';
 
 interface Props {
   actionText: string;
   title: string;
   description: string;
-  image: 'default' | 'yubi' | 'wireguard';
+  image: 'default' | 'yubi' | 'wireguard' | 'lock';
+  loading?: boolean;
   onClick?: () => void;
 }
 
-export const AddCard = ({ actionText, description, title, image, onClick }: Props) => {
+export const AddCard = ({
+  actionText,
+  description,
+  title,
+  image,
+  loading = false,
+  onClick,
+}: Props) => {
   const renderImage = () => {
     switch (image) {
       case 'default':
@@ -46,6 +56,16 @@ export const AddCard = ({ actionText, description, title, image, onClick }: Prop
             loading="eager"
           />
         );
+      case 'lock':
+        return (
+          <img
+            src={lockImage}
+            width={165.57}
+            height={219.5}
+            decoding="async"
+            loading="eager"
+          />
+        );
     }
   };
 
@@ -56,7 +76,13 @@ export const AddCard = ({ actionText, description, title, image, onClick }: Prop
         <div className="contents">
           <p className="title">{title}</p>
           <p className="description">{description}</p>
-          <Button size="primary" variant="outlined" text={actionText} onClick={onClick} />
+          <Button
+            loading={loading}
+            size={ButtonSize.Primary}
+            variant={ButtonVariant.Secondary}
+            text={actionText}
+            onClick={onClick}
+          />
         </div>
       </div>
     </div>
