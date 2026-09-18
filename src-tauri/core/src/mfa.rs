@@ -27,7 +27,7 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    proxy::{construct_platform_header, http_client},
+    proxy::{construct_platform_header, http_client, read_error_message},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
@@ -74,12 +74,7 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
         return Ok(response);
     }
 
-    let message = response
-        .json::<serde_json::Value>()
-        .await
-        .ok()
-        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(String::from))
-        .unwrap_or_else(|| format!("HTTP {status}"));
+    let message = read_error_message(response).await;
 
     match status {
         // The proxy returns 403 only for a failed device posture check

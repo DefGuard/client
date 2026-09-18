@@ -116,6 +116,12 @@ fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
     serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
 }
 
+fn mfa_config_other(message: impl Into<String>) -> String {
+    err_to_json(MfaConfigError::Other {
+        message: message.into(),
+    })
+}
+
 /// Look up a cloned enrollment session by its opaque string id. Used by the
 /// enrollment commands that need read access to the in-memory session.
 fn get_enrollment_session(
@@ -2203,11 +2209,7 @@ pub struct MfaConfigStartResult {
 }
 
 fn parse_mfa_config_session_id(session_id: &str) -> Result<Uuid, String> {
-    Uuid::parse_str(session_id).map_err(|e| {
-        err_to_json(MfaConfigError::Other {
-            message: format!("Invalid session ID: {e}"),
-        })
-    })
+    Uuid::parse_str(session_id).map_err(|e| mfa_config_other(format!("Invalid session ID: {e}")))
 }
 
 /// An absent session is reported as expired, since only a tagged error reaches the frontend's
@@ -2232,16 +2234,15 @@ pub async fn mfa_config_start(
     state: State<'_, AppState>,
 ) -> Result<MfaConfigStartResult, String> {
     debug!("Starting MFA configuration for instance {instance_id}");
-    let other = |message: String| err_to_json(MfaConfigError::Other { message });
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
-        .map_err(|e| other(e.to_string()))?
-        .ok_or_else(|| other("Instance not found".to_string()))?;
+        .map_err(|e| mfa_config_other(e.to_string()))?
+        .ok_or_else(|| mfa_config_other("Instance not found"))?;
     let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
         .await
-        .map_err(|e| other(e.to_string()))?
+        .map_err(|e| mfa_config_other(e.to_string()))?
         .ok_or_else(|| {
-            other(format!(
+            mfa_config_other(format!(
                 "WireGuard keys not found for instance {instance_id}"
             ))
         })?;
@@ -2250,8 +2251,8 @@ pub async fn mfa_config_start(
         .clone()
         .filter(|token| !token.is_empty())
         .ok_or_else(|| err_to_json(MfaConfigError::NoToken))?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| other(format!("Invalid proxy URL: {e}")))?;
+    let proxy_url = Url::parse(&instance.proxy_url)
+        .map_err(|e| mfa_config_other(format!("Invalid proxy URL: {e}")))?;
 
     let response = mfa_config::mfa_config_start(proxy_url.clone(), token, keys.pubkey)
         .await
@@ -2409,21 +2410,10 @@ pub async fn mfa_config_setup_fido2(
     // The credential is bound to the instance, not to the proxy that relays the setup.
     let instance = Instance::find_by_id(&*DB_POOL, session.instance_id)
         .await
-        .map_err(|err| {
-            err_to_json(MfaConfigError::Other {
-                message: err.to_string(),
-            })
-        })?
-        .ok_or_else(|| {
-            err_to_json(MfaConfigError::Other {
-                message: "Instance not found".to_string(),
-            })
-        })?;
-    let instance_url = Url::parse(&instance.url).map_err(|err| {
-        err_to_json(MfaConfigError::Other {
-            message: format!("Invalid instance URL: {err}"),
-        })
-    })?;
+        .map_err(|err| mfa_config_other(err.to_string()))?
+        .ok_or_else(|| mfa_config_other("Instance not found"))?;
+    let instance_url = Url::parse(&instance.url)
+        .map_err(|err| mfa_config_other(format!("Invalid instance URL: {err}")))?;
 
     let started = mfa_config::mfa_config_setup_start(
         session.proxy_url.clone(),
@@ -2432,11 +2422,9 @@ pub async fn mfa_config_setup_fido2(
     )
     .await
     .map_err(err_to_json)?;
-    let challenge = started.fido2_creation_challenge.ok_or_else(|| {
-        err_to_json(MfaConfigError::Other {
-            message: "Defguard did not return a security key challenge".to_string(),
-        })
-    })?;
+    let challenge = started
+        .fido2_creation_challenge
+        .ok_or_else(|| mfa_config_other("Defguard did not return a security key challenge"))?;
 
     // From here the key blinks and waits for a touch, and gives up if none comes.
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
@@ -2453,9 +2441,9 @@ pub async fn mfa_config_setup_fido2(
     .await
     .map_err(|err| match err {
         // Core minted the challenge, so a bad one is not the user's problem.
-        Fido2Error::MalformedChallenge(detail) => err_to_json(MfaConfigError::Other {
-            message: format!("Defguard sent a malformed security key challenge: {detail}"),
-        }),
+        Fido2Error::MalformedChallenge(detail) => mfa_config_other(format!(
+            "Defguard sent a malformed security key challenge: {detail}"
+        )),
         err => err_to_json(registration_error(&err)),
     })?;
 
