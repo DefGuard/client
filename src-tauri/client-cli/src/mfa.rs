@@ -543,9 +543,7 @@ pub(crate) async fn authorize_multistep(
                     None => info.challenge.clone(),
                 }
                 .ok_or_else(|| {
-                    CliError::Other(
-                        "Proxy did not return a challenge for mobile-approve MFA".into(),
-                    )
+                    CliError::Other("Edge did not return a challenge for mobile-approve MFA".into())
                 })?;
                 run_mobile_step(
                     &proxy_url,
@@ -750,7 +748,7 @@ pub(crate) async fn authorize_mobile_approve(
     .await?;
 
     let challenge = info.challenge.ok_or_else(|| {
-        CliError::Other("Proxy did not return a challenge for mobile-approve MFA".into())
+        CliError::Other("Edge did not return a challenge for mobile-approve MFA".into())
     })?;
 
     let finish = run_mobile_step(
@@ -820,7 +818,7 @@ fn open_url(url: &str, badge: &str, json_mode: bool) {
         if json_mode {
             eprintln!("Could not open browser. Open this URL manually: {url}");
         } else {
-            eprintln!("{badge}Could not open browser. Open the URL above manually.");
+            eprintln!("{badge}Could not open browser. Open the above URL manually.");
         }
     }
 }
