@@ -15,7 +15,7 @@ import { useStartMfaConfiguration } from './hooks/useStartMfaConfiguration';
 
 export const AddPage = () => {
   const navigate = useNavigate();
-  const { data: instances } = useQuery(getInstancesQueryOptions);
+  const { data: instances, isPending } = useQuery(getInstancesQueryOptions);
 
   const mfaInstances = useMemo(
     () => mfaConfigurableInstances(instances ?? []),
@@ -40,7 +40,7 @@ export const AddPage = () => {
           actionText="Add instance"
           description={`Establish a secure connection to your Defguard instance effortlessly by configuring it with a single token—no manual setup.`}
         />
-        {!tunnelsDisabled(instances ?? []) && (
+        {!isPending && !tunnelsDisabled(instances ?? []) && (
           <AddCard
             image="wireguard"
             onClick={() => {
@@ -53,7 +53,7 @@ export const AddPage = () => {
             description={`Add and configure a WireGuard tunnel to securely route traffic through an encrypted connection using predefined configuration.`}
           />
         )}
-        {mfaInstances.length > 0 && (
+        {!isPending && mfaInstances.length > 0 && (
           <AddCard
             image="lock"
             title="Add new MFA method"

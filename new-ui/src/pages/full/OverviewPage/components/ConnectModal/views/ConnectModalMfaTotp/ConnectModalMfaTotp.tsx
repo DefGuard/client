@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
@@ -78,7 +79,7 @@ export const ConnectModalMfaTotp = () => {
     <div
       id="mfa-totp-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <p className="view-description">

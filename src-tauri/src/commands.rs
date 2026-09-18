@@ -2636,13 +2636,7 @@ pub async fn mfa_config_setup_fido2(
     Ok(response)
 }
 
-#[tauri::command(async)]
-pub async fn mfa_config_cancel(
-    session_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    debug!("Cancelling MFA configuration session");
-    let uid = parse_mfa_config_session_id(&session_id)?;
+fn cancel_mfa_config_session(state: &AppState, uid: Uuid) {
     state
         .mfa_config_sessions
         .lock()
@@ -2657,6 +2651,16 @@ pub async fn mfa_config_cancel(
     {
         ceremony.token.cancel();
     }
+}
+
+#[tauri::command(async)]
+pub async fn mfa_config_cancel(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Cancelling MFA configuration session");
+    let uid = parse_mfa_config_session_id(&session_id)?;
+    cancel_mfa_config_session(&state, uid);
     Ok(())
 }
 
@@ -3034,5 +3038,145 @@ mod tests {
             Err(mfa::MfaError::Other { message })
                 if message == "The server returned an unexpected verification state"
         ));
+    }
+
+    fn config_session(deadline_timestamp: i64) -> MfaConfigSession {
+        MfaConfigSession {
+            instance_id: 1,
+            proxy_url: Url::parse("https://proxy.example.com").expect("valid proxy URL"),
+            session_token: "session-token".into(),
+            deadline_timestamp,
+        }
+    }
+
+    fn store_config_session(state: &AppState, uid: Uuid, deadline_timestamp: i64) {
+        state
+            .mfa_config_sessions
+            .lock()
+            .expect("mfa_config_sessions mutex poisoned")
+            .insert(uid, config_session(deadline_timestamp));
+    }
+
+    fn live_session(state: &AppState) -> Uuid {
+        let uid = Uuid::new_v4();
+        store_config_session(state, uid, Utc::now().timestamp() + 600);
+        uid
+    }
+
+    fn sessions_are_empty(state: &AppState) -> bool {
+        state
+            .mfa_config_sessions
+            .lock()
+            .expect("mfa_config_sessions mutex poisoned")
+            .is_empty()
+    }
+
+    fn ceremonies_are_empty(state: &AppState) -> bool {
+        state
+            .mfa_config_ceremonies
+            .lock()
+            .expect("mfa_config_ceremonies mutex poisoned")
+            .is_empty()
+    }
+
+    #[test]
+    fn test_mfa_config_cancel_before_the_ceremony_expires_the_session() {
+        let state = AppState::new(AppConfig::default(), None);
+        let uid = live_session(&state);
+
+        cancel_mfa_config_session(&state, uid);
+
+        // The setup claims its ceremony first, then finds the session gone.
+        let err = get_mfa_config_session(&state, &uid.to_string()).unwrap_err();
+        assert!(err.contains("session_expired"), "{err}");
+    }
+
+    #[test]
+    fn test_mfa_config_cancel_during_the_ceremony_cancels_the_token() {
+        let state = AppState::new(AppConfig::default(), None);
+        let uid = live_session(&state);
+        let ceremony = CeremonyGuard::register(&state, uid).expect("first ceremony registers");
+        assert!(!ceremony.is_cancelled());
+
+        cancel_mfa_config_session(&state, uid);
+
+        // What both the pre-prompt and post-attestation checkpoints read.
+        assert!(ceremony.is_cancelled());
+        assert!(ceremony.token().is_cancelled());
+    }
+
+    #[test]
+    fn test_mfa_config_cancel_after_the_ceremony_clears_both_maps() {
+        let state = AppState::new(AppConfig::default(), None);
+        let uid = live_session(&state);
+        drop(CeremonyGuard::register(&state, uid).expect("ceremony registers"));
+
+        cancel_mfa_config_session(&state, uid);
+
+        assert!(sessions_are_empty(&state));
+        assert!(ceremonies_are_empty(&state));
+    }
+
+    #[test]
+    fn test_mfa_config_cancel_of_an_unknown_session_is_harmless() {
+        let state = AppState::new(AppConfig::default(), None);
+
+        cancel_mfa_config_session(&state, Uuid::new_v4());
+
+        assert!(sessions_are_empty(&state));
+        assert!(ceremonies_are_empty(&state));
+    }
+
+    #[test]
+    fn test_ceremony_guard_rejects_a_second_claim() {
+        let state = AppState::new(AppConfig::default(), None);
+        let uid = live_session(&state);
+        let _first = CeremonyGuard::register(&state, uid).expect("first ceremony registers");
+
+        // The guard is not Debug, so the error comes out by hand.
+        let Err(err) = CeremonyGuard::register(&state, uid) else {
+            panic!("a second claim must be refused");
+        };
+
+        assert!(matches!(err, MfaConfigError::SecurityKey { .. }));
+    }
+
+    #[test]
+    fn test_ceremony_guard_drop_leaves_a_newer_ceremony_alone() {
+        let state = AppState::new(AppConfig::default(), None);
+        let uid = live_session(&state);
+        let first = CeremonyGuard::register(&state, uid).expect("first ceremony registers");
+        cancel_mfa_config_session(&state, uid);
+        let second = CeremonyGuard::register(&state, uid).expect("the slot is free again");
+
+        drop(first);
+
+        assert!(!second.is_cancelled());
+        // Read out before asserting, or a failure poisons the lock the live guard still needs.
+        let held = state
+            .mfa_config_ceremonies
+            .lock()
+            .expect("mfa_config_ceremonies mutex poisoned")
+            .get(&uid)
+            .map(|ceremony| ceremony.id);
+        assert_eq!(held, Some(second.id));
+    }
+
+    #[test]
+    fn test_parse_mfa_config_session_id_rejects_a_malformed_id() {
+        assert!(parse_mfa_config_session_id("not-a-uuid").is_err());
+        assert!(parse_mfa_config_session_id(&Uuid::new_v4().to_string()).is_ok());
+    }
+
+    #[test]
+    fn test_get_mfa_config_session_prunes_an_expired_entry() {
+        let state = AppState::new(AppConfig::default(), None);
+        let uid = Uuid::new_v4();
+        store_config_session(&state, uid, Utc::now().timestamp() - 1);
+
+        let err = get_mfa_config_session(&state, &uid.to_string()).unwrap_err();
+
+        assert!(err.contains("session_expired"), "{err}");
+        assert!(sessions_are_empty(&state));
     }
 }

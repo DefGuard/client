@@ -96,8 +96,11 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
     onSettled: onCancel,
   });
 
+  const isBusy = isStartingSetup || isFinishingSetup || isCancelling;
+
   const handleSubmit = useCallback(
     (pastedCode?: string) => {
+      if (isBusy) return;
       const toSubmit = (pastedCode ?? code)?.trim();
       if (toSubmit?.length !== CODE_LENGTH) {
         setError('Enter a valid code');
@@ -105,7 +108,7 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
       }
       finishSetup(toSubmit);
     },
-    [code, finishSetup],
+    [code, finishSetup, isBusy],
   );
 
   // Only real input clears the error, CodeInput's own reset passes ''.
@@ -136,17 +139,15 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
           ? `Enter 6-digit code from authentication app`
           : `Enter 6-digit code from email`}
       </p>
-      <div
-        className="code-track"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSubmit();
-        }}
-      >
+      <div className="code-track">
         <CodeInput
           length={CODE_LENGTH}
           value={code}
           onChange={handleCodeChange}
           error={error}
+          onSubmit={() => {
+            handleSubmit();
+          }}
           onSuccessPaste={(value) => {
             handleSubmit(value);
           }}
@@ -166,6 +167,7 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
             text="Configure"
             variant={ButtonVariant.Primary}
             loading={isStartingSetup || isFinishingSetup}
+            disabled={isCancelling}
             onClick={() => {
               handleSubmit();
             }}

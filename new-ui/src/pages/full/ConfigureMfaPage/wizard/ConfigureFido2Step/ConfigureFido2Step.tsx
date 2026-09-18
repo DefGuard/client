@@ -1,4 +1,5 @@
 import './style.scss';
+import { Enter } from '@fluentui/keyboard-keys';
 import { useMutation } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
 import { hostname } from '@tauri-apps/plugin-os';
@@ -101,6 +102,7 @@ export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
   });
 
   const handleSubmit = useCallback(() => {
+    if (isRegistering || isCancelling) return;
     if (!isPresent(name) || name.trim().length === 0) {
       setError('Name your security key');
       return;
@@ -111,14 +113,14 @@ export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
     }
     setError(null);
     register();
-  }, [collectsPin, name, pin, register]);
+  }, [collectsPin, isCancelling, isRegistering, name, pin, register]);
 
   return (
     <div
       id="configure-fido2-step"
       className="step-content"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleSubmit();
+        if (e.key === Enter) handleSubmit();
       }}
     >
       <header>
@@ -164,6 +166,7 @@ export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
             text="Register"
             variant={ButtonVariant.Primary}
             loading={isRegistering}
+            disabled={isCancelling}
             onClick={handleSubmit}
           />
         </div>

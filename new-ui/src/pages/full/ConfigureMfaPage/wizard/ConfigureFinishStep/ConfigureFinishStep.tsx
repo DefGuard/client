@@ -5,7 +5,10 @@ import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { useAppData } from '../../../../../shared/providers/AppDataContext';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
+import {
+  discardMfaConfiguration,
+  useConfigureMfaStore,
+} from '../../hooks/useConfigureMfaStore';
 import bannerSrc from './assets/banner.png';
 
 export const ConfigureFinishStep = () => {
@@ -31,7 +34,7 @@ export const ConfigureFinishStep = () => {
               }
               // Reset once the page is gone, or this step re-renders on an empty store.
               void navigate({ to: '/full/overview', replace: true }).then(() => {
-                useConfigureMfaStore.getState().reset();
+                void discardMfaConfiguration();
               });
             }}
           />

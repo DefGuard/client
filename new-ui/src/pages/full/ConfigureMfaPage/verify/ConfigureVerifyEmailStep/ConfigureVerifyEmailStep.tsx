@@ -38,6 +38,9 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
     fallback: 'Verification failed',
   });
 
+  // A second call invalidates the code already sent, so fire once, StrictMode included.
+  const requestedFor = useRef<string | null>(null);
+
   const { mutate: requestCode, isPending: isRequestingCode } = useMutation({
     mutationFn: async () => {
       if (!isPresent(sessionId)) {
@@ -45,11 +48,12 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
       }
       await api.mfaConfigSendCode(sessionId);
     },
-    onError: handleApiError,
+    onError: (err) => {
+      requestedFor.current = null;
+      handleApiError(err);
+    },
   });
 
-  // A second call invalidates the code already sent, so fire once, StrictMode included.
-  const requestedFor = useRef<string | null>(null);
   useEffect(() => {
     if (!isPresent(sessionId)) return;
     if (requestedFor.current === sessionId) return;
@@ -73,8 +77,11 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
     onSettled: onCancel,
   });
 
+  const isBusy = isRequestingCode || isSubmitting || isCancelling;
+
   const handleSubmit = useCallback(
     (pastedCode?: string) => {
+      if (isBusy) return;
       const toSubmit = (pastedCode ?? code)?.trim();
       if (toSubmit?.length !== CODE_LENGTH) {
         setError('Enter a valid code');
@@ -82,8 +89,16 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
       }
       submitCode(toSubmit);
     },
-    [code, submitCode],
+    [code, isBusy, submitCode],
   );
+
+  const handleResend = useCallback(() => {
+    if (isBusy || !isPresent(sessionId)) return;
+    requestedFor.current = sessionId;
+    setCode(null);
+    setError(null);
+    requestCode();
+  }, [isBusy, requestCode, sessionId]);
 
   // Only real input clears the error, CodeInput's own reset passes ''.
   const handleCodeChange = useCallback((value: string) => {
@@ -103,17 +118,15 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
         <span>{`We've sent a verification code to your email address.`}</span>
         <span>{`Please check your inbox and enter the 6-digit code from the email to continue.`}</span>
       </p>
-      <div
-        className="code-track"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSubmit();
-        }}
-      >
+      <div className="code-track">
         <CodeInput
           length={CODE_LENGTH}
           value={code}
           onChange={handleCodeChange}
           error={error}
+          onSubmit={() => {
+            handleSubmit();
+          }}
           onSuccessPaste={(value) => {
             handleSubmit(value);
           }}
@@ -130,9 +143,17 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
         />
         <div className="right">
           <Button
+            text="Resend code"
+            variant={ButtonVariant.Secondary}
+            loading={isRequestingCode}
+            disabled={isSubmitting || isCancelling}
+            onClick={handleResend}
+          />
+          <Button
             text="Verify"
             variant={ButtonVariant.Primary}
-            loading={isRequestingCode || isSubmitting}
+            loading={isSubmitting}
+            disabled={isRequestingCode || isCancelling}
             onClick={() => {
               handleSubmit();
             }}

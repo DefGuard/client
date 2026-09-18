@@ -54,8 +54,11 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
     onSettled: onCancel,
   });
 
+  const isBusy = isSubmitting || isCancelling;
+
   const handleSubmit = useCallback(
     (pastedCode?: string) => {
+      if (isBusy) return;
       const toSubmit = (pastedCode ?? code)?.trim();
       if (toSubmit?.length !== CODE_LENGTH) {
         setError('Enter a valid code');
@@ -63,7 +66,7 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
       }
       submitCode(toSubmit);
     },
-    [code, submitCode],
+    [code, isBusy, submitCode],
   );
 
   // Only real input clears the error, CodeInput's own reset passes ''.
@@ -84,17 +87,15 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
         <span>{`Open the authentication app you use with Defguard.`}</span>
         <span>{`Enter the 6-digit code it currently displays to continue.`}</span>
       </p>
-      <div
-        className="code-track"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSubmit();
-        }}
-      >
+      <div className="code-track">
         <CodeInput
           length={CODE_LENGTH}
           value={code}
           onChange={handleCodeChange}
           error={error}
+          onSubmit={() => {
+            handleSubmit();
+          }}
           onSuccessPaste={(value) => {
             handleSubmit(value);
           }}
@@ -114,6 +115,7 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
             text="Verify"
             variant={ButtonVariant.Primary}
             loading={isSubmitting}
+            disabled={isCancelling}
             onClick={() => {
               handleSubmit();
             }}

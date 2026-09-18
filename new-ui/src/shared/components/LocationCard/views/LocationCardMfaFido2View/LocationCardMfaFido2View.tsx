@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { fido2CollectsPinInApp } from '../../../../rust-api/fido2';
 import { ThemeSpacing } from '../../../../types';
@@ -75,7 +76,7 @@ export const LocationCardMfaFido2View = () => {
     <div
       className="location-card-mfa-fido2-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />

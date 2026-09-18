@@ -13,6 +13,7 @@ import {
   getInstancesQueryOptions,
   mfaConfigurableInstances,
 } from '../../../shared/rust-api/query';
+import { isPresent } from '../../../shared/utils/isPresent';
 import { useStartMfaConfiguration } from '../AddPage/hooks/useStartMfaConfiguration';
 
 /** Shown when the client is enrolled into more than one instance, to pick which to configure. */
@@ -37,10 +38,10 @@ export const SelectMfaInstancePage = () => {
 
   // The route guard only runs on entry, so a poll leaving nothing to pick sends the user back.
   useEffect(() => {
-    if (mfaInstances.length < 2) {
+    if (isPresent(instances) && mfaInstances.length < 2) {
       leave();
     }
-  }, [mfaInstances.length, leave]);
+  }, [instances, mfaInstances.length, leave]);
 
   return (
     <FullPage

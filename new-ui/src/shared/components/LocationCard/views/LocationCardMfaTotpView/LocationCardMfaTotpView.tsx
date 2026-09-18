@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
@@ -91,7 +92,7 @@ export const LocationCardMfaTotpView = () => {
     <div
       className="location-card-mfa-totp-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
