@@ -348,7 +348,7 @@ async fn start_session(
     selected_methods: Vec<i32>,
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
-) -> Result<(Url, ClientMfaStartResponse), CliError> {
+) -> Result<(Url, ClientMfaStartResponse, bool), CliError> {
     let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?
@@ -372,11 +372,11 @@ async fn start_session(
         posture_data,
         selected_methods,
     };
-    let info = mfa::mfa_start(proxy_url.clone(), request)
+    let start = mfa::mfa_start_with_capability(proxy_url.clone(), request)
         .await
         .map_err(into_cli)?;
 
-    Ok((proxy_url, info))
+    Ok((proxy_url, start.response, start.multi_step_mfa_capable))
 }
 
 /// Run the VPN MFA handshake for a single-step location (TOTP or email).
@@ -416,7 +416,7 @@ pub(crate) async fn authorize(
         _ => {}
     }
 
-    let (proxy_url, info) =
+    let (proxy_url, info, _) =
         start_session(location, instance, method, Vec::new(), posture_data, pool).await?;
 
     let ctx = MfaContext {
@@ -468,7 +468,7 @@ pub(crate) async fn authorize_multistep(
         location.name,
         plan.len()
     );
-    let (proxy_url, info) = start_session(
+    let (proxy_url, info, capable) = start_session(
         location,
         instance,
         *first,
@@ -477,13 +477,17 @@ pub(crate) async fn authorize_multistep(
         pool,
     )
     .await?;
+    if !capable {
+        debug!("Edge or Core does not support multi-step MFA; using the legacy flow");
+    }
 
     let token = info.token;
     for (index, method) in plan.iter().enumerate() {
         debug!("Running MFA step {}/{} ({method:?})", index + 1, plan.len());
         // The start request opens the first step; later steps need their own
-        // attempt.
-        let step = if index == 0 {
+        // attempt. Servers without multi-step MFA support have no step-start
+        // endpoint and complete the session on the first step, so skip it.
+        let step = if index == 0 || !capable {
             None
         } else {
             Some(step_start(&proxy_url, &token, *method).await?)
@@ -704,7 +708,7 @@ pub(crate) async fn authorize_oidc(
     pool: &DbPool,
     json_mode: bool,
 ) -> Result<SecretString, CliError> {
-    let (proxy_url, info) = start_session(
+    let (proxy_url, info, _) = start_session(
         location,
         instance,
         MfaMethod::Oidc,
@@ -735,7 +739,7 @@ pub(crate) async fn authorize_mobile_approve(
     pool: &DbPool,
     json_mode: bool,
 ) -> Result<SecretString, CliError> {
-    let (proxy_url, info) = start_session(
+    let (proxy_url, info, _) = start_session(
         location,
         instance,
         MfaMethod::MobileApprove,
