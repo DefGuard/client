@@ -92,8 +92,6 @@ ignore = [
     { id = "RUSTSEC-2025-0081", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0098", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0100", reason = "Tauri v2 dependency (unmaintained)" },
-    { id = "RUSTSEC-2026-0194", reason = "Tauri v2 dependency (unmaintained)" },
-    { id = "RUSTSEC-2026-0195", reason = "Tauri v2 dependency (unmaintained)" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -146,6 +144,9 @@ exceptions = [
     { allow = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-client-core" },
+    { allow = [
+        "AGPL-3.0-or-later",
+    ], crate = "defguard-client-fido2" },
     { allow = [
         "AGPL-3.0-or-later",
     ], crate = "defguard-client-service" },
