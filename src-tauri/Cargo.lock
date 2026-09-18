@@ -1616,6 +1616,7 @@ dependencies = [
  "defguard_wireguard_rs",
  "dirs-next",
  "futures-util",
+ "hex",
  "hyper-util",
  "log",
  "nix",
