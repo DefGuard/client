@@ -155,6 +155,24 @@ fn is_cli_drivable_method(method: LocationMfaMethod) -> bool {
     )
 }
 
+/// Format a step prefix such as `[2/4] `.
+///
+/// Pad the step number so all prefixes in a run have the same width.
+fn step_badge(index: usize, total: usize) -> String {
+    format!("[{:>w$}/{total}] ", index + 1, w = total.to_string().len())
+}
+
+/// Return the step prefix, or an empty string when no step context exists.
+pub(crate) fn opt_step_badge(step: Option<&MfaStepContext>) -> String {
+    step.map(|step| step_badge(step.index, step.total))
+        .unwrap_or_default()
+}
+
+/// Return the indentation for text below a step prefix.
+fn step_indent(badge: &str) -> String {
+    " ".repeat(badge.len().max(2))
+}
+
 pub(crate) fn step_method_label(method: LocationMfaMethod) -> &'static str {
     match method {
         LocationMfaMethod::Totp => "Authenticator app",
@@ -288,20 +306,18 @@ fn prompt_step_method(
     step_count: usize,
     candidates: &[LocationMfaMethod],
 ) -> Result<LocationMfaMethod, CliError> {
-    eprintln!(
-        "Step {} of {} for '{location_name}': choose MFA method:",
-        index + 1,
-        step_count
-    );
+    let badge = step_badge(index, step_count);
+    let indent = step_indent(&badge);
+    eprintln!("{badge}Choose an MFA method for '{location_name}':");
     for (n, method) in candidates.iter().enumerate() {
         eprintln!(
-            "  {}) {} ({})",
+            "{indent}  {}) {} ({})",
             n + 1,
             step_method_label(*method),
             method.as_str()
         );
     }
-    eprint!("Enter choice [1-{} or name]: ", candidates.len());
+    eprint!("{indent}Enter choice [1-{} or name]: ", candidates.len());
     stderr().flush().ok();
 
     let mut input = String::new();
@@ -472,6 +488,12 @@ pub(crate) async fn authorize_multistep(
             Some(step_start(&proxy_url, &token, *method).await?)
         };
 
+        let step_ctx = MfaStepContext {
+            index,
+            total: plan.len(),
+            method: LocationMfaMethod::from(*method),
+        };
+
         let finish = match method {
             MfaMethod::Totp | MfaMethod::Email => {
                 let source = match code_command {
@@ -479,16 +501,12 @@ pub(crate) async fn authorize_multistep(
                     // Let obtain_code handle the TTY check and error.
                     None => CodeSource::Interactive,
                 };
-                let step_ctx = MfaContext {
+                let ctx = MfaContext {
                     instance: instance.name.clone(),
                     location: location.name.clone(),
-                    step: Some(MfaStepContext {
-                        index,
-                        total: plan.len(),
-                        method: LocationMfaMethod::from(*method),
-                    }),
+                    step: Some(step_ctx),
                 };
-                let code = obtain_code(&source, &step_ctx)?;
+                let code = obtain_code(&source, &ctx)?;
 
                 mfa::mfa_finish_code(
                     proxy_url.clone(),
@@ -505,8 +523,8 @@ pub(crate) async fn authorize_multistep(
                 .map_err(into_cli)?
             }
             MfaMethod::Oidc => {
-                // OIDC polling uses the session token, not the step attempt ID.
-                run_oidc_step(&proxy_url, &token, json_mode).await?
+                // OIDC polling uses the session token, not the step attempt.
+                run_oidc_step(&proxy_url, &token, Some(&step_ctx), json_mode).await?
             }
             MfaMethod::MobileApprove => {
                 let challenge = match &step {
@@ -524,6 +542,7 @@ pub(crate) async fn authorize_multistep(
                     &challenge,
                     &instance.uuid,
                     qr_file,
+                    Some(&step_ctx),
                     json_mode,
                 )
                 .await?
@@ -611,6 +630,7 @@ where
 async fn run_oidc_step(
     proxy_url: &Url,
     token: &str,
+    step: Option<&MfaStepContext>,
     json_mode: bool,
 ) -> Result<ClientMfaFinishResponse, CliError> {
     let mut browser_url = proxy_url
@@ -618,12 +638,13 @@ async fn run_oidc_step(
         .map_err(|e| CliError::Other(format!("Failed to build OIDC MFA URL: {e}")))?;
     browser_url.query_pairs_mut().append_pair("token", token);
 
+    let badge = opt_step_badge(step);
     if !json_mode {
-        eprintln!("Open this URL to authenticate:");
-        eprintln!("  {browser_url}");
-        eprintln!("Waiting for authentication... (Ctrl-C to cancel)");
+        eprintln!("{badge}Open this URL to authenticate:");
+        eprintln!("{}{browser_url}", step_indent(&badge));
+        eprintln!("{badge}Waiting for browser authentication... (Ctrl-C to cancel)");
     }
-    open_url(browser_url.as_ref(), json_mode);
+    open_url(browser_url.as_ref(), &badge, json_mode);
 
     with_ctrl_c(|cancel| mfa::poll_openid_mfa(proxy_url.clone(), token.to_string(), cancel))
         .await
@@ -637,12 +658,14 @@ async fn run_mobile_step(
     challenge: &str,
     instance_uuid: &str,
     qr_file: Option<&str>,
+    step: Option<&MfaStepContext>,
     json_mode: bool,
 ) -> Result<ClientMfaFinishResponse, CliError> {
+    let badge = opt_step_badge(step);
     let payload = mfa_qr::build_qr_payload(token, challenge, instance_uuid);
-    mfa_qr::render_qr(&payload, qr_file, json_mode)?;
+    mfa_qr::render_qr(&payload, qr_file, &badge, json_mode)?;
     if !json_mode {
-        eprintln!("Waiting for mobile approval... (Ctrl-C to cancel)");
+        eprintln!("{badge}Waiting for mobile approval... (Ctrl-C to cancel)");
     }
 
     let ws_url = mfa::derive_ws_url(proxy_url, token).map_err(into_cli)?;
@@ -676,7 +699,7 @@ pub(crate) async fn authorize_oidc(
     )
     .await?;
 
-    let finish = run_oidc_step(&proxy_url, &info.token, json_mode).await?;
+    let finish = run_oidc_step(&proxy_url, &info.token, None, json_mode).await?;
     finish_psk(finish)?.ok_or_else(|| {
         CliError::Other("The server returned an unexpected verification state".into())
     })
@@ -717,6 +740,7 @@ pub(crate) async fn authorize_mobile_approve(
         &challenge,
         &instance.uuid,
         qr_file,
+        None,
         json_mode,
     )
     .await?;
@@ -772,18 +796,18 @@ fn check_proxy_scheme(proxy_base: &Url) {
 /// it wasn't already printed above.
 /// Tests: no-op (never spawn a browser).
 #[cfg(not(test))]
-fn open_url(url: &str, json_mode: bool) {
+fn open_url(url: &str, badge: &str, json_mode: bool) {
     if webbrowser::open(url).is_err() {
         if json_mode {
             eprintln!("Could not open browser. Open this URL manually: {url}");
         } else {
-            eprintln!("Could not open browser. Open the URL above manually.");
+            eprintln!("{badge}Could not open browser. Open the URL above manually.");
         }
     }
 }
 
 #[cfg(test)]
-fn open_url(_url: &str, _json_mode: bool) {
+fn open_url(_url: &str, _badge: &str, _json_mode: bool) {
     // no-op: tests must not spawn a browser
 }
 
@@ -987,6 +1011,31 @@ mod tests {
         l.mfa_steps = Json(steps);
         l.mfa_step_plan = Json(saved);
         l
+    }
+
+    #[test]
+    fn test_step_badge_pads_to_a_fixed_width() {
+        assert_eq!(step_badge(0, 4), "[1/4] ");
+        assert_eq!(step_badge(0, 12), "[ 1/12] ");
+        assert_eq!(step_badge(9, 12), "[10/12] ");
+        assert_eq!(step_badge(0, 12).len(), step_badge(9, 12).len());
+    }
+
+    #[test]
+    fn test_step_indent_aligns_under_the_badge() {
+        assert_eq!(step_indent(""), "  ");
+        assert_eq!(step_indent(&step_badge(0, 4)), " ".repeat(6));
+    }
+
+    #[test]
+    fn test_opt_step_badge_is_empty_for_a_single_step() {
+        assert_eq!(opt_step_badge(None), "");
+        let step = MfaStepContext {
+            index: 1,
+            total: 4,
+            method: LocationMfaMethod::Email,
+        };
+        assert_eq!(opt_step_badge(Some(&step)), "[2/4] ");
     }
 
     #[test]

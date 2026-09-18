@@ -16,7 +16,10 @@ use defguard_core::database::models::location::LocationMfaMethod;
 use secrecy::SecretString;
 use tracing::debug;
 
-use crate::{mfa::step_method_label, state::CliError};
+use crate::{
+    mfa::{opt_step_badge, step_method_label},
+    state::CliError,
+};
 
 /// Describes where to source the MFA code from.
 ///
@@ -53,6 +56,7 @@ pub struct MfaContext {
 }
 
 /// Additional context displayed to the user when entering an MFA code.
+#[derive(Clone, Copy)]
 pub struct MfaStepContext {
     /// Zero-based step index.
     pub index: usize,
@@ -66,11 +70,10 @@ pub struct MfaStepContext {
 fn code_prompt(ctx: &MfaContext) -> String {
     match &ctx.step {
         Some(step) => format!(
-            "Enter {} code for '{}' (step {} of {}): ",
+            "{}Enter the {} code for '{}': ",
+            opt_step_badge(Some(step)),
             step_method_label(step.method),
-            ctx.location,
-            step.index + 1,
-            step.total
+            ctx.location
         ),
         None => format!("Enter MFA code for {}: ", ctx.location),
     }
@@ -170,7 +173,7 @@ mod tests {
         });
         assert_eq!(
             code_prompt(&ctx),
-            "Enter Authenticator app code for 'test-loc' (step 2 of 2): "
+            "[2/2] Enter the Authenticator app code for 'test-loc': "
         );
     }
 
