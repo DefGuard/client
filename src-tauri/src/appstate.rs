@@ -20,11 +20,19 @@ use crate::{
     ConnectionType,
 };
 
+/// One security key ceremony. The id tells two ceremonies for the same session apart, so a
+/// finished one never removes the entry a newer one left in its place.
+#[derive(Clone)]
+pub struct Ceremony {
+    pub id: Uuid,
+    pub token: CancellationToken,
+}
+
 pub struct AppState {
     pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
     pub mfa_config_sessions: Mutex<HashMap<Uuid, MfaConfigSession>>,
     /// Keyed by configuration session, so abandoning one dismisses the prompt it left on screen.
-    pub mfa_config_ceremonies: Mutex<HashMap<Uuid, CancellationToken>>,
+    pub mfa_config_ceremonies: Mutex<HashMap<Uuid, Ceremony>>,
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,

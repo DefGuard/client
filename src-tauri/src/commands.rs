@@ -42,7 +42,7 @@ const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
-    appstate::AppState,
+    appstate::{AppState, Ceremony},
     database::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
@@ -1885,40 +1885,61 @@ fn fido2_pin(pin: Option<String>) -> Result<Option<String>, &'static str> {
     Ok(Some(pin))
 }
 
-/// Registers a running security key ceremony for the life of the call. A stale token left
-/// behind would make the next `mfa_config_cancel` look like it worked.
+/// Registers a running security key ceremony for the life of the call. Claimed before the first
+/// await, so a cancel racing the setup never finds the slot empty.
 struct CeremonyGuard<'a> {
     state: &'a AppState,
     session: Uuid,
+    id: Uuid,
     token: CancellationToken,
 }
 
 impl<'a> CeremonyGuard<'a> {
-    fn register(state: &'a AppState, session: Uuid, token: CancellationToken) -> Self {
-        state
+    fn register(state: &'a AppState, session: Uuid) -> Result<Self, MfaConfigError> {
+        let ceremony = Ceremony {
+            id: Uuid::new_v4(),
+            token: CancellationToken::new(),
+        };
+        let mut ceremonies = state
             .mfa_config_ceremonies
             .lock()
-            .expect("mfa_config_ceremonies mutex poisoned")
-            .insert(session, token.clone());
-        Self {
+            .expect("mfa_config_ceremonies mutex poisoned");
+        // There is one key, and a second claim would leave the first ceremony's cancel unreachable.
+        if ceremonies.contains_key(&session) {
+            return Err(MfaConfigError::SecurityKey {
+                message: "A security key registration is already in progress".to_string(),
+            });
+        }
+        ceremonies.insert(session, ceremony.clone());
+        drop(ceremonies);
+        Ok(Self {
             state,
             session,
-            token,
-        }
+            id: ceremony.id,
+            token: ceremony.token,
+        })
     }
 
     fn token(&self) -> CancellationToken {
         self.token.clone()
     }
+
+    fn is_cancelled(&self) -> bool {
+        self.token.is_cancelled()
+    }
 }
 
 impl Drop for CeremonyGuard<'_> {
     fn drop(&mut self) {
-        self.state
+        let mut ceremonies = self
+            .state
             .mfa_config_ceremonies
             .lock()
-            .expect("mfa_config_ceremonies mutex poisoned")
-            .remove(&self.session);
+            .expect("mfa_config_ceremonies mutex poisoned");
+        // A cancel may have taken our entry and a newer ceremony the slot, leave that one alone.
+        if matches!(ceremonies.get(&self.session), Some(c) if c.id == self.id) {
+            ceremonies.remove(&self.session);
+        }
     }
 }
 
@@ -2406,6 +2427,7 @@ pub async fn mfa_config_setup_fido2(
     }
 
     let session_id_uid = parse_mfa_config_session_id(&session_id)?;
+    let ceremony = CeremonyGuard::register(&state, session_id_uid).map_err(err_to_json)?;
     let session = get_mfa_config_session(&state, &session_id)?;
     // The credential is bound to the instance, not to the proxy that relays the setup.
     let instance = Instance::find_by_id(&*DB_POOL, session.instance_id)
@@ -2426,9 +2448,14 @@ pub async fn mfa_config_setup_fido2(
         .fido2_creation_challenge
         .ok_or_else(|| mfa_config_other("Defguard did not return a security key challenge"))?;
 
+    // The cancel may have landed while the challenge was in flight.
+    if ceremony.is_cancelled() {
+        debug!("Security key registration was cancelled before the prompt opened");
+        return Err(err_to_json(MfaConfigError::Cancelled));
+    }
+
     // From here the key blinks and waits for a touch, and gives up if none comes.
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
-    let ceremony = CeremonyGuard::register(&state, session_id_uid, CancellationToken::new());
     // The prompt must not open behind the window that asked for it.
     let _level = WindowLevelGuard::lower(&window);
     let attestation = defguard_client_fido2::register_security_key(
@@ -2448,8 +2475,8 @@ pub async fn mfa_config_setup_fido2(
     })?;
 
     // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
-    // over. Submitting here would register a factor the user had already backed out of.
-    if ceremony.token().is_cancelled() {
+    // over, and this is the last point one can be caught before the factor is submitted.
+    if ceremony.is_cancelled() {
         debug!("Security key registration was cancelled, discarding the attestation");
         return Err(err_to_json(MfaConfigError::Cancelled));
     }
@@ -2462,6 +2489,11 @@ pub async fn mfa_config_setup_fido2(
     )
     .await
     .map_err(err_to_json)?;
+
+    // The cancel lost the race, and there is nothing to undo the registration with.
+    if ceremony.is_cancelled() {
+        warn!("Security key was registered before the cancellation arrived");
+    }
 
     // Best effort, a stale `configured` flag must not cost the user their recovery codes.
     if let Err(err) = refresh_instance_config(session.instance_id, &handle).await {
@@ -2494,7 +2526,7 @@ pub async fn mfa_config_cancel(
         .expect("mfa_config_ceremonies mutex poisoned")
         .remove(&uid)
     {
-        ceremony.cancel();
+        ceremony.token.cancel();
     }
     Ok(())
 }

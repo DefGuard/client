@@ -75,6 +75,22 @@ pub(crate) async fn register(
 ) -> Result<Registration, Fido2Error> {
     // CTAP cannot verify the user without one, and Core requires user verification.
     let pin = pin.ok_or(Fido2Error::PinRequired)?;
+    // The crate can ask for these two only, and an empty selection leaves it on its ES256 default,
+    // which would mint a credential the server never offered and will refuse.
+    let key_types: Vec<CredentialSupportedKeyType> = request
+        .algorithms
+        .iter()
+        .filter_map(|alg| match *alg {
+            COSE_ES256 => Some(CredentialSupportedKeyType::Ecdsa256),
+            COSE_EDDSA => Some(CredentialSupportedKeyType::Ed25519),
+            _ => None,
+        })
+        .collect();
+    if key_types.is_empty() {
+        return Err(Fido2Error::MalformedChallenge(
+            "no usable credential algorithms were offered".to_string(),
+        ));
+    }
     let request = request.clone();
 
     let result = tokio::task::spawn_blocking(move || {
@@ -92,13 +108,8 @@ pub(crate) async fn register(
         if request.resident_key == ResidentKey::Required {
             builder = builder.resident_key();
         }
-        // Anything the crate cannot request is dropped, which may empty the list and leave the
-        // crate on its ES256 default.
-        for key_type in request.algorithms.iter().filter_map(|alg| match *alg {
-            COSE_ES256 => Some(CredentialSupportedKeyType::Ecdsa256),
-            COSE_EDDSA => Some(CredentialSupportedKeyType::Ed25519),
-            _ => None,
-        }) {
+        // The crate appends, so the server's order of preference is preserved.
+        for key_type in key_types {
             builder = builder.key_type(key_type);
         }
         for credential_id in &request.exclude_credentials {
