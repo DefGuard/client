@@ -194,6 +194,7 @@ async fn test_active_state_lists_interfaces(pool: DbPool) {
         posture_check_required: false,
         mfa_steps: Default::default(),
         mfa_step_plan: Default::default(),
+        client_mtu: None,
     }
     .save(&pool)
     .await

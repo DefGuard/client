@@ -19,7 +19,6 @@ semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
-tokio = { version = "1", features = ["time"] }
 
 [dev-dependencies]
 http.workspace = true

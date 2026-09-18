@@ -209,8 +209,7 @@ pub fn run_app() {
             enrollment_register_mfa_finish,
             enrollment_network_info,
             enrollment_finish,
-            mfa_start,
-            mfa_step_start,
+            mfa_begin_step,
             mfa_finish_code,
             mfa_poll_openid,
             mfa_connect_mobile_approve,
@@ -418,8 +417,10 @@ pub fn run_app() {
             if let Err(e) = WindowManager::build_full_view_window(app_handle) {
                 warn!("Failed to pre-build full window: {e}");
             }
-            if let Err(e) = WindowManager::build_welcome_window(app_handle) {
-                warn!("Failed to pre-build welcome window: {e}");
+            if open_welcome_view {
+                if let Err(e) = WindowManager::build_welcome_window(app_handle) {
+                    warn!("Failed to pre-build welcome window: {e}");
+                }
             }
 
             // Decide which window to show based on available locations.

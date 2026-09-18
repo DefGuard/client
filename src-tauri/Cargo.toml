@@ -3,23 +3,46 @@ members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "ent
 default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
+anyhow = "1.0"
+async-stream = "0.3"
 base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6", features = ["cargo", "derive", "env"] }
 ctap-hid-fido2 = "3.6"
 defguard_wireguard_rs = "0.12"
 dirs-next = "2.0"
+futures-core = "0.3"
+futures-util = "0.3"
+hex = "0.4"
+http = "1"
+hyper-util = "0.1"
+image = "0.25"
+known-folders = "1.3"
 log = { version = "0.4", features = ["serde"] }
+nix = { version = "0.31", features = ["fs", "user"] }
+owo-colors = { version = "4", features = ["supports-colors"] }
+os_info = { version = "3.15", default-features = false }
 prost = "0.14"
+qrcode = { version = "0.14", features = ["image"] }
+regex = "1.13"
 reqwest = { version = "0.13", features = ["cookies", "json"] }
+rust-ini = "0.21"
 secrecy = "0.10"
 semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_with = "3.22"
-sqlx = { version = "0.8", features = ["chrono", "json", "runtime-tokio", "sqlite", "uuid", "macros"] }
+serde_with = "3.23"
+sqlx = { version = "0.9", features = ["chrono", "json", "runtime-tokio", "sqlite", "uuid", "macros"] }
+struct-patch = "0.12"
+strum = { version = "0.28", features = ["derive"] }
+sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }
+tempfile = "3"
 thiserror = "2.0"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
+tokio-util = "0.7"
 tonic = { version = "0.14", default-features = false, features = [
     "codegen",
     "gzip",
@@ -30,20 +53,41 @@ tonic = { version = "0.14", default-features = false, features = [
 ] }
 tonic-prost = "0.14"
 tonic-prost-build = "0.14"
+tower = "0.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-webbrowser = "1.2"
-tempfile = "3"
-futures-util = "0.3"
-http = "1"
-image = "0.25"
-qrcode = { version = "0.14", features = ["image"] }
-tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
-tokio-util = "0.7"
+tracing-appender = "0.2"
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 vergen-git2 = { version = "10.0", features = ["build"] }
+webbrowser = "1.2"
+windows = { version = "0.62", features = [
+    "Win32",
+    "Win32_System",
+    "Win32_System_RemoteDesktop",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_HiDpi",
+    "Win32_Foundation",
+] }
+windows-acl = "0.3"
+windows-core = "0.100"
+windows-service = "0.8"
+windows-sys = { version = "0.61", features = [
+    # Core Win32 types
+    "Win32_Foundation",
+    # Security descriptors, ACLs, SDDL
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    # Named pipes (CreateNamedPipeW)
+    "Win32_System_Pipes",
+    # HANDLE & file functions
+    "Win32_System_IO",
+    "Win32_System_Threading",
+    # Network address change notifications (NotifyAddrChange)
+    "Win32_NetworkManagement_IpHelper",
+] }
 wiremock = "0.6"
+wmi = {version = "0.18", default-features = false}
 x25519-dalek = { version = "3.0", features = [
     "getrandom",
     "serde",
@@ -75,7 +119,7 @@ version.workspace = true
 name = "defguard-client"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = "2"
 vergen-git2.workspace = true
 
 [workspace.lints.clippy]
@@ -84,7 +128,6 @@ manual_let_else = "warn"
 redundant_closure = "warn"
 
 [dependencies]
-anyhow = "1.0"
 base64.workspace = true
 chrono.workspace = true
 ctap-hid-fido2.workspace = true
@@ -93,33 +136,25 @@ defguard-client-proto.path = "client-proto"
 defguard-client-core.path = "core"
 defguard-client-posture.path = "enterprise/posture"
 defguard-client-config-sync.path = "enterprise/config-sync"
-defguard-client-service-locations.path = "enterprise/service-locations"
 defguard-client-provisioning.path = "enterprise/provisioning"
 defguard-client-common.path = "common"
-dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
-dirs-next.workspace = true
-hyper-util = "0.1"
 log.workspace = true
-os_info = { version = "3.14", default-features = false }
 prost.workspace = true
-regex = "1.12"
+regex.workspace = true
 reqwest.workspace = true
-rust-ini = "0.21"
-semver.workspace = true
+rust-ini.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true
 sqlx.workspace = true
-struct-patch = "0.12"
-strum = { version = "0.28", features = ["derive"] }
-sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }
+struct-patch.workspace = true
+# Tauri dependencies: must match Tauri plugins in package.json.
 tauri = { version = "2", features = [
     "native-tls-vendored",
     "image-png",
     "tray-icon",
 ] }
-# Must match Tauri plugins in package.json.
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
@@ -131,20 +166,15 @@ tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
-tauri-plugin-window-state = "2"
-thiserror.workspace = true
-time = { version = "0.3", features = ["formatting", "macros"] }
+time.workspace = true
 tokio.workspace = true
-tokio-util = "0.7"
+tokio-util.workspace = true
 tonic.workspace = true
-uuid.workspace = true
+thiserror.workspace = true
 tonic-prost.workspace = true
-tower = "0.5"
 tracing.workspace = true
-tracing-appender = "0.2"
-tracing-subscriber.workspace = true
+uuid.workspace = true
 webbrowser.workspace = true
-x25519-dalek.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
@@ -156,42 +186,18 @@ objc2-network-extension = "0.3"
 objc2-system-extensions = { version = "0.3", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", features = ["user", "fs"] }
-tokio-stream = "0.1"
+nix.workspace = true
+tokio-stream.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-async-stream = "0.3"
-futures-core = "0.3"
-known-folders = "1.3"
-windows = { version = "0.62", features = [
-    "Win32",
-    "Win32_System",
-    "Win32_System_RemoteDesktop",
-    "Win32_Graphics_Gdi",
-    "Win32_UI_HiDpi",
-    "Win32_Foundation",
-] }
-windows-acl = "0.3"
-windows-service = "0.8"
-windows-sys = { version = "0.61", features = [
-    # Core Win32 types
-    "Win32_Foundation",
-
-    # Security descriptors, ACLs, SDDL
-    "Win32_Security",
-    "Win32_Security_Authorization",
-
-    # Named pipes (CreateNamedPipeW)
-    "Win32_System_Pipes",
-
-    # HANDLE & file functions
-    "Win32_System_IO",
-    "Win32_System_Threading",
-
-    # Network address change notifications (NotifyAddrChange)
-    "Win32_NetworkManagement_IpHelper",
-] }
-wmi = {version = "0.18", default-features = false}
+async-stream.workspace = true
+futures-core.workspace = true
+known-folders.workspace = true
+windows.workspace = true
+windows-acl.workspace = true
+windows-service.workspace = true
+windows-sys.workspace = true
+wmi.workspace = true
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
@@ -201,7 +207,8 @@ custom-protocol = ["tauri/custom-protocol"]
 macos_installer = ["dep:dispatch2", "dep:objc2-system-extensions"]
 
 [dev-dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
+wiremock.workspace = true
 
 [profile.release]
 codegen-units = 1

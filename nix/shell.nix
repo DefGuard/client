@@ -46,20 +46,33 @@ in
     inputsFrom = [defguard-client];
 
     # add additional dev tools
-    packages = with pkgs; [
-      rustToolchain
-      fmtImports
-      trunk
-      sqlx-cli
-      cargo-nextest
-      vtsls
-      trivy
-      desktop-file-utils
-      xdg-utils
-      just
-      nodejs
-      pnpm
-    ];
+    packages = with pkgs;
+      [
+        rustToolchain
+        fmtImports
+        trunk
+        sqlx-cli
+        cargo-nextest
+        vtsls
+        trivy
+        desktop-file-utils
+        xdg-utils
+        just
+        nodejs
+        pnpm
+      ]
+      ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+        # Client E2E runtime and privileged service setup tools.
+        xvfb-run
+        xclip
+        iproute2
+        iputils
+        wireguard-tools
+        procps
+        kmod
+        shadow
+        util-linux
+      ];
 
     shellHook = with pkgs; ''
       export LD_LIBRARY_PATH="${

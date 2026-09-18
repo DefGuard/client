@@ -67,6 +67,23 @@ export class CoreApi {
 		return response;
 	}
 
+	// Core serves the web UI for any unrouted GET, so an endpoint the deployed core does not
+	// have arrives as 200 text/html instead of a 404.
+	private async requestJson<T>(
+		method: string,
+		apiPath: string,
+		body?: unknown,
+	): Promise<T> {
+		const response = await this.request(method, apiPath, body);
+		const contentType = response.headers.get("content-type") ?? "";
+		if (!contentType.includes("application/json")) {
+			throw new Error(
+				`Core API ${method} ${apiPath} returned ${contentType || "no content type"} instead of JSON - the endpoint is missing from this core version`,
+			);
+		}
+		return (await response.json()) as T;
+	}
+
 	async login(): Promise<void> {
 		const response = await this.request("POST", "/api/v1/auth", {
 			username: process.env.CORE_ADMIN_USER ?? "admin",
@@ -100,26 +117,22 @@ export class CoreApi {
 		await this.request("DELETE", `/api/v1/user/${username}`);
 	}
 
-	async listNetworks(): Promise<
-		Array<{ id: number; location_mfa_mode: LocationMfaMode }>
-	> {
-		const response = await this.request("GET", "/api/v1/network");
-		return (await response.json()) as Array<{
-			id: number;
-			location_mfa_mode: LocationMfaMode;
-		}>;
+	async listNetworks(): Promise<Array<{ id: number; name: string }>> {
+		return this.requestJson<Array<{ id: number; name: string }>>(
+			"GET",
+			"/api/v1/network",
+		);
 	}
 
 	async addUserDevice(name: string, pubkey: string): Promise<AddedUserDevice> {
 		const username = process.env.CORE_ADMIN_USER ?? "admin";
-		const response = await this.request("POST", `/api/v1/device/${username}`, {
+		const data = await this.requestJson<{
+			configs: DeviceConfig[];
+			device: { id: number };
+		}>("POST", `/api/v1/device/${username}`, {
 			name,
 			wireguard_pubkey: pubkey,
 		});
-		const data = (await response.json()) as {
-			configs: DeviceConfig[];
-			device: { id: number };
-		};
 		return { deviceId: data.device.id, configs: data.configs };
 	}
 
@@ -127,55 +140,102 @@ export class CoreApi {
 		await this.request("DELETE", `/api/v1/device/${deviceId}`);
 	}
 
+	private async getNetworkDetails(
+		networkId: number,
+	): Promise<Record<string, unknown>> {
+		return this.requestJson<Record<string, unknown>>(
+			"GET",
+			`/api/v1/network/${networkId}`,
+		);
+	}
+
 	async setLocationMfaMode(
 		networkId: number,
 		mode: LocationMfaMode,
 	): Promise<LocationMfaMode> {
-		const current = (await (
-			await this.request("GET", `/api/v1/network/${networkId}`)
-		).json()) as Record<string, unknown>;
+		const current = await this.getNetworkDetails(networkId);
 		const previous = current.location_mfa_mode as LocationMfaMode;
 		if (previous === mode) {
 			return previous;
 		}
 		const joinList = (value: unknown): string =>
-			Array.isArray(value) ? value.join(",") : ((value as string | null) ?? "");
+			Array.isArray(value)
+				? value.join(",")
+				: typeof value === "string"
+					? value
+					: "";
+		const peerDisconnectThreshold = Number(
+			current.peer_disconnect_threshold ?? 0,
+		);
 		await this.request("PUT", `/api/v1/network/${networkId}`, {
 			name: current.name,
 			address: joinList(current.address),
 			endpoint: current.endpoint,
 			port: current.port,
 			allowed_ips: joinList(current.allowed_ips) || null,
-			dns: (current.dns as string | null) ?? null,
+			dns: typeof current.dns === "string" ? current.dns : null,
 			mtu: current.mtu,
 			fwmark: current.fwmark,
-			allow_all_groups: current.allow_all_groups,
-			allowed_groups: current.allowed_groups ?? [],
+			allow_all_groups: current.allow_all_groups === true,
+			allowed_groups: Array.isArray(current.allowed_groups)
+				? current.allowed_groups
+				: [],
 			keepalive_interval: current.keepalive_interval,
-			peer_disconnect_threshold: Math.max(
-				Number(current.peer_disconnect_threshold ?? 0),
-				MIN_PEER_DISCONNECT_THRESHOLD_WITH_MFA,
-			),
-			acl_enabled: current.acl_enabled,
-			acl_default_allow: current.acl_default_allow,
+			peer_disconnect_threshold:
+				mode === "disabled"
+					? peerDisconnectThreshold
+					: Math.max(
+							peerDisconnectThreshold,
+							MIN_PEER_DISCONNECT_THRESHOLD_WITH_MFA,
+						),
+			acl_enabled: current.acl_enabled === true,
+			acl_default_allow: current.acl_default_allow === true,
 			location_mfa_mode: mode,
-			service_location_mode: current.service_location_mode ?? "disabled",
+			service_location_mode:
+				typeof current.service_location_mode === "string"
+					? current.service_location_mode
+					: "disabled",
 		});
 		return previous;
+	}
+
+	// Core reports `mfa_required` during enrollment when any location on the instance enforces
+	// internal MFA, so a test that expects no MFA has to clear every location, not just its own.
+	async disableAllLocationMfa(): Promise<Map<number, LocationMfaMode>> {
+		const previous = new Map<number, LocationMfaMode>();
+		try {
+			for (const network of await this.listNetworks()) {
+				previous.set(
+					network.id,
+					await this.setLocationMfaMode(network.id, "disabled"),
+				);
+			}
+		} catch (error) {
+			await this.restoreLocationMfaModes(previous).catch(() => undefined);
+			throw error;
+		}
+		return previous;
+	}
+
+	async restoreLocationMfaModes(
+		modes: Map<number, LocationMfaMode>,
+	): Promise<void> {
+		for (const [networkId, mode] of modes) {
+			await this.setLocationMfaMode(networkId, mode);
+		}
 	}
 
 	private async startEnrollment(
 		username: string,
 		ephemeral: boolean,
 	): Promise<EnrollmentFixture> {
-		const response = await this.request(
+		const data = await this.requestJson<{ enrollment_token: string }>(
 			"POST",
 			`/api/v1/user/${username}/start_enrollment`,
 			{
 				send_enrollment_notification: false,
 			},
 		);
-		const data = (await response.json()) as { enrollment_token: string };
 		return {
 			username,
 			enrollmentToken: data.enrollment_token,

@@ -6,17 +6,35 @@
       {
         "name": "last_handshake",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel_stats",
+            "name": "last_handshake"
+          }
+        }
       },
       {
         "name": "listen_port!: u32",
         "ordinal": 1,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel_stats",
+            "name": "listen_port"
+          }
+        }
       },
       {
         "name": "persistent_keepalive_interval?: u16",
         "ordinal": 2,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel_stats",
+            "name": "persistent_keepalive_interval"
+          }
+        }
       }
     ],
     "parameters": {

@@ -17,14 +17,10 @@ serde.workspace = true
 serde_json.workspace = true
 tonic.workspace = true
 
-[target.'cfg(target_os = "linux")'.dependencies]
-sysinfo = { version = "0.39", default-features = false, features = ["system"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "linux", windows))'.dependencies]
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]
-sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 time = { version = "0.3", features = ["formatting", "macros", "serde"] }
 wmi = { version = "0.18", default-features = false }
 

@@ -434,6 +434,7 @@ mod tests {
     use defguard_core::database::models::location::{
         LocationMfaMode, LocationMfaStepMethod, ServiceLocationMode,
     };
+    use sqlx::types::Json;
 
     use super::*;
 
@@ -445,8 +446,9 @@ mod tests {
         mfa: bool,
     ) -> Location<Id> {
         Location {
-            mfa_steps: Default::default(),
-            mfa_step_plan: Default::default(),
+            mfa_steps: Json::default(),
+            mfa_step_plan: Json::default(),
+            client_mtu: None,
             id,
             instance_id,
             network_id: 1,

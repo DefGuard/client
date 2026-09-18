@@ -28,8 +28,13 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     proxy::construct_platform_header,
-    version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
+    version::{
+        is_version_at_least, Version, CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER,
+        CORE_VERSION_HEADER, MIN_MULTI_STEP_MFA_VERSION, PKG_VERSION, PROXY_VERSION_HEADER,
+    },
 };
+
+const ATTEMPT_LIMIT_MESSAGE: &str = "Too many failed MFA attempts. Please try connecting again.";
 
 /// Error type returned by MFA operations.
 ///
@@ -50,6 +55,9 @@ pub enum MfaError {
     #[error("Posture check failed: {message}")]
     PostureRejected { message: String },
 
+    #[error("{message}")]
+    AttemptLimit { message: String },
+
     #[error("MFA operation timed out")]
     Timeout,
 
@@ -60,6 +68,24 @@ pub enum MfaError {
     Other { message: String },
 }
 
+#[derive(Debug)]
+pub struct MfaStartResult {
+    pub response: ClientMfaStartResponse,
+    pub multi_step_mfa_capable: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum MobileMfaResponse {
+    #[serde(rename = "mfa_success")]
+    Legacy { preshared_key: String },
+    #[serde(rename = "mfa_result")]
+    Result { result: MfaStepResult },
+}
+
+fn build_client() -> Client {
+    Client::new()
+}
 fn standard_headers() -> Vec<(&'static str, String)> {
     vec![
         (CLIENT_VERSION_HEADER, PKG_VERSION.to_string()),
@@ -82,10 +108,10 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
         .unwrap_or_else(|| format!("HTTP {status}"));
 
     match status {
-        // The proxy returns 403 only for a failed device posture check
-        // (ApiError::PostureRejected); 401 and other 4xx are ordinary MFA
-        // rejections. Keeping them distinct lets the frontend route posture
-        // failures to the dedicated posture-check-failed view.
+        // A 403 means either a posture failure or an attempt-limit error. The message tells them apart.
+        StatusCode::FORBIDDEN if message == ATTEMPT_LIMIT_MESSAGE => {
+            Err(MfaError::AttemptLimit { message })
+        }
         StatusCode::FORBIDDEN => Err(MfaError::PostureRejected { message }),
         StatusCode::UNAUTHORIZED => Err(MfaError::MfaRejected { message }),
         _ if status.is_client_error() => Err(MfaError::MfaRejected { message }),
@@ -105,7 +131,16 @@ pub async fn mfa_start(
     proxy_url: Url,
     request: ClientMfaStartRequest,
 ) -> Result<ClientMfaStartResponse, MfaError> {
-    let client = Client::new();
+    Ok(mfa_start_with_capability(proxy_url, request)
+        .await?
+        .response)
+}
+
+pub async fn mfa_start_with_capability(
+    proxy_url: Url,
+    request: ClientMfaStartRequest,
+) -> Result<MfaStartResult, MfaError> {
+    let client = build_client();
 
     let url = proxy_url
         .join("api/v1/client-mfa/start")
@@ -128,6 +163,7 @@ pub async fn mfa_start(
         Ok(response) => response,
         Err(err) => return Err(rewrap_mobile_start_error(request.method, err)),
     };
+    let multi_step_mfa_capable = is_multi_step_mfa_capable(response.headers());
     let start_response: ClientMfaStartResponse =
         response.json().await.map_err(|e| MfaError::Other {
             message: format!("Invalid MFA start response: {e}"),
@@ -144,7 +180,22 @@ pub async fn mfa_start(
         });
     }
 
-    Ok(start_response)
+    Ok(MfaStartResult {
+        response: start_response,
+        multi_step_mfa_capable,
+    })
+}
+
+fn is_multi_step_mfa_capable(headers: &reqwest::header::HeaderMap) -> bool {
+    [CORE_VERSION_HEADER, PROXY_VERSION_HEADER]
+        .into_iter()
+        .all(|header| {
+            headers
+                .get(header)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<Version>().ok())
+                .is_some_and(|version| is_version_at_least(&version, &MIN_MULTI_STEP_MFA_VERSION))
+        })
 }
 
 fn rejection_message(rejection: &MfaStepRejection) -> String {
@@ -269,16 +320,12 @@ const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 /// Keepalive period for the mobile-approve WebSocket.
 const MOBILE_APPROVE_PING_INTERVAL: Duration = Duration::from_secs(20);
 
-/// Poll Defguard Edge for OpenID MFA completion.
-///
-/// The caller must already have opened the browser to the OIDC provider
-/// URL (the token from `mfa_start` encodes the redirect).  This function
-/// POSTs a `ClientMfaFinishRequest` to `/api/v1/client-mfa/finish` every
-/// [`OIDC_POLL_INTERVAL`] until the server returns a 200 (success),
-/// the deadline expires, or the [`CancellationToken`] is fired.
+/// Polls Edge until OIDC MFA advances, completes, times out, or is cancelled.
+/// The browser must already be open. `AwaitingExternal` and legacy 428 responses keep polling.
 pub async fn poll_openid_mfa(
     proxy_url: Url,
     token: String,
+    step_attempt_id: Option<String>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
     let client = Client::new();
@@ -294,7 +341,7 @@ pub async fn poll_openid_mfa(
         token,
         code: None,
         auth_pub_key: None,
-        step_attempt_id: None,
+        step_attempt_id,
         auth_data: None,
         credential_id: None,
     };
@@ -323,18 +370,36 @@ pub async fn poll_openid_mfa(
 
                 let status = response.status();
                 if status == StatusCode::OK {
-                    return response.json().await.map_err(|e| MfaError::Other {
-                        message: format!("Invalid MFA finish response: {e}"),
-                    });
-                }
-                if status != StatusCode::PRECONDITION_REQUIRED {
+                    let response = response.json::<ClientMfaFinishResponse>().await.map_err(|e| {
+                        MfaError::Other {
+                            message: format!("Invalid MFA finish response: {e}"),
+                        }
+                    })?;
+
+                    match response.result.as_ref() {
+                        None => return Ok(response),
+                        Some(result) => match result.outcome.as_ref() {
+                            Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {}
+                            Some(
+                                mfa_step_result::Outcome::Advanced(_)
+                                | mfa_step_result::Outcome::Completed(_),
+                            ) => return Ok(response),
+                            None => {
+                                return Err(MfaError::Other {
+                                    message: "The server returned an unexpected verification state"
+                                        .to_string(),
+                                });
+                            }
+                        },
+                    }
+                } else if status != StatusCode::PRECONDITION_REQUIRED {
                     return Err(check_mfa_response(response).await.err().unwrap_or(
                         MfaError::Other {
                             message: format!("Unexpected status: {status}"),
                         },
                     ));
                 }
-                // 428: not complete yet — fall through to sleep.
+                // 428: not complete yet - fall through to sleep.
             }
         }
 
@@ -367,17 +432,8 @@ pub fn completed_preshared_key(response: &ClientMfaFinishResponse) -> Option<Str
     (!key.is_empty()).then(|| key.clone())
 }
 
-/// Connect to a WebSocket endpoint and wait for mobile-approve MFA
-/// completion.
-///
-/// The caller must have already displayed the QR code to the user
-/// (the token from `mfa_start` encodes the challenge).  This function
-/// opens a WebSocket to `ws_url` and waits for a
-/// `mfa_success` (legacy) or `mfa_result` text frame.
-/// A completed result contains the key. An intermediate result advances the
-/// session without one.
-/// Returns [`MfaError::Cancelled`] if the token fires or
-/// [`MfaError::Timeout`] if the deadline expires.
+/// Waits for mobile approval after the QR code is shown. Returns cancellation or
+/// timeout errors when applicable.
 pub async fn connect_mobile_approve(
     ws_url: &str,
     cancel: CancellationToken,
@@ -386,9 +442,7 @@ pub async fn connect_mobile_approve(
         connect_async(ws_url)
             .await
             .map_err(|err| MfaError::NetworkError {
-                // Never interpolate the raw error: `ws_url` carries the MFA
-                // token as a query parameter and can appear in the error's
-                // Display, which is surfaced to the frontend and logs.
+                // Avoid logging the URL: it contains the MFA token.
                 message: match &err {
                     WsError::Io(io_err) => {
                         format!("Failed to connect to Edge ({})", io_err.kind())
@@ -397,7 +451,7 @@ pub async fn connect_mobile_approve(
                 },
             })?;
 
-    wait_for_mfa_success(ws_stream, cancel).await
+    wait_for_mfa_outcome(ws_stream, cancel).await
 }
 
 /// Derive the WebSocket URL from the proxy's base URL and MFA token.
@@ -426,18 +480,6 @@ pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> 
     Ok(ws_url.to_string())
 }
 
-#[derive(Deserialize)]
-#[serde(tag = "type")]
-enum RemoteMfaFrame {
-    #[serde(rename = "mfa_success")]
-    Legacy {
-        #[serde(default)]
-        preshared_key: String,
-    },
-    #[serde(rename = "mfa_result")]
-    Result { result: MfaStepResult },
-}
-
 fn mobile_approve_closed(detail: Option<String>) -> MfaError {
     let message = match detail {
         Some(detail) => {
@@ -457,7 +499,8 @@ fn read_error_label(err: &WsError) -> String {
     }
 }
 
-async fn wait_for_mfa_success(
+/// Wait on the WebSocket for an MFA outcome frame.
+async fn wait_for_mfa_outcome(
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
@@ -503,22 +546,36 @@ async fn wait_for_mfa_success(
         };
 
         match msg {
-            Message::Text(text) => {
-                if let Ok(frame) = serde_json::from_str::<RemoteMfaFrame>(&text) {
-                    let (preshared_key, result) = match frame {
-                        RemoteMfaFrame::Legacy { preshared_key } => (preshared_key, None),
-                        // An intermediate result has no key; the caller checks
-                        // its outcome.
-                        RemoteMfaFrame::Result { result } => (String::new(), Some(result)),
-                    };
+            Message::Text(text) => match serde_json::from_str::<MobileMfaResponse>(&text) {
+                Ok(MobileMfaResponse::Legacy { preshared_key }) => {
+                    if preshared_key.is_empty() {
+                        return Err(MfaError::MfaRejected {
+                            message: "mobile approval failed: Edge returned an empty preshared key"
+                                .into(),
+                        });
+                    }
+
                     #[allow(deprecated)]
                     return Ok(ClientMfaFinishResponse {
                         preshared_key,
                         token: None,
-                        result,
+                        result: None,
                     });
                 }
-            }
+                // An intermediate result has no key; the caller checks its outcome.
+                Ok(MobileMfaResponse::Result { result }) => {
+                    #[allow(deprecated)]
+                    return Ok(ClientMfaFinishResponse {
+                        preshared_key: String::new(),
+                        token: None,
+                        result: Some(result),
+                    });
+                }
+                // Ignore unknown frames and keep waiting; they may contain a preshared key.
+                Err(err) => {
+                    debug!("Ignoring unrecognized mobile MFA frame: {err}");
+                }
+            },
             Message::Close(frame) => {
                 close_detail = Some(match frame {
                     Some(frame) if frame.reason.is_empty() => {

@@ -6,14 +6,20 @@
       {
         "name": "id!",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "location_stats",
+            "name": "id"
+          }
+        }
       }
     ],
     "parameters": {
       "Right": 9
     },
     "nullable": [
-      true
+      null
     ]
   },
   "hash": "7a39250f44f7415c09362f62efcc0b2eded31017ac7c2a531a4917db5100bfda"

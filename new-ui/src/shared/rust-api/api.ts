@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { isPresent } from '../utils/isPresent';
 import { mfaToApi } from '../utils/mfa';
 import type {
   ActiveConnectionSummary,
@@ -16,10 +15,8 @@ import type {
   LocationDetailsArgs,
   LocationInfo,
   LocationStats,
+  MfaBeginStepResult,
   MfaMethodValue,
-  MfaStartResult,
-  MfaStepSession,
-  MfaStepStartResult,
   NewAppVersionInfo,
   ProvisioningConfig,
   RoutingArgs,
@@ -196,20 +193,6 @@ const enrollmentFinish = (sessionId: string): Promise<void> =>
 
 // MFA (connect-time)
 
-const mfaStart = (
-  instanceId: number,
-  locationId: number,
-  methods: MfaMethodValue[],
-): Promise<MfaStartResult> =>
-  invoke(TauriCommand.MfaStart, { instanceId, locationId, methods });
-
-const mfaStepStart = (
-  instanceId: number,
-  token: string,
-  method: MfaMethodValue,
-): Promise<MfaStepStartResult> =>
-  invoke(TauriCommand.MfaStepStart, { instanceId, token, method });
-
 const mfaFinishCode = (
   instanceId: number,
   locationId: number,
@@ -229,8 +212,9 @@ const mfaPollOpenId = (
   instanceId: number,
   locationId: number,
   token: string,
+  stepAttemptId: string | null,
 ): Promise<string> =>
-  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token });
+  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token, stepAttemptId });
 
 const mfaConnectMobileApprove = (
   instanceId: number,
@@ -239,10 +223,8 @@ const mfaConnectMobileApprove = (
 ): Promise<string> =>
   invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, locationId, token });
 
-// Starts FIDO2 verification. The backend runs it as a task - it fetches the
-// challenge and credential id from Edge, drives the security key, submits the
-// assertion and brings the connection up - so this resolves with the task id
-// and the outcome arrives as an MfaFido2Complete / MfaFido2Error event.
+// Starts FIDO2 verification in the background. The result arrives as an
+// MfaFido2Complete, MfaFido2StepAdvanced, or MfaFido2Error event.
 const mfaFido2Pin = (
   instanceId: number,
   locationId: number,
@@ -255,29 +237,20 @@ const mfaFido2Pin = (
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
 
-const startMfaStep = async (
+const mfaBeginStep = (
   instanceId: number,
   locationId: number,
   method: MfaMethodValue,
   stepPlan: MfaMethodValue[],
-  mfaToken: string | null,
-): Promise<MfaStepSession> => {
-  if (isPresent(mfaToken) && stepPlan.length > 1) {
-    const startedStep = await mfaStepStart(instanceId, mfaToken, method);
-    return {
-      token: mfaToken,
-      challenge: startedStep.challenge,
-      stepAttemptId: startedStep.step_attempt_id,
-    };
-  }
-
-  const startedSession = await mfaStart(instanceId, locationId, stepPlan);
-  return {
-    token: startedSession.token,
-    challenge: startedSession.challenge,
-    stepAttemptId: null,
-  };
-};
+  token: string | null,
+): Promise<MfaBeginStepResult> =>
+  invoke(TauriCommand.MfaBeginStep, {
+    instanceId,
+    locationId,
+    method,
+    stepPlan,
+    token,
+  });
 
 export const api = {
   closeWelcomeWindow,
@@ -335,11 +308,10 @@ export const api = {
   enrollmentNetworkInfo,
   enrollmentFinish,
   // MFA
-  mfaStart,
+  mfaBeginStep,
   mfaFinishCode,
   mfaPollOpenId,
   mfaConnectMobileApprove,
   mfaFido2Pin,
   cancelMfa,
-  startMfaStep,
 };

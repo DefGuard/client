@@ -1,14 +1,13 @@
 import type { LocationInfo } from './types';
 
-/** Shape of the tagged `MfaError` the Rust backend serializes to JSON. */
+/** JSON error returned by the Rust backend. */
 export type ParsedMfaError = {
   type: string;
   message?: string;
   status?: number;
 };
 
-/** Parse a structured `MfaError` (JSON) thrown by a command or carried on an
- *  event payload. Returns null for plain-string errors. */
+/** Parses a JSON MFA error, or returns null for plain text. */
 export const parseMfaError = (err: unknown): ParsedMfaError | null => {
   try {
     const parsed = JSON.parse(String(err)) as ParsedMfaError;
@@ -18,22 +17,27 @@ export const parseMfaError = (err: unknown): ParsedMfaError | null => {
   }
 };
 
-/** Best-effort human-readable message: the structured `message` when present,
- *  otherwise the raw error string. */
+/** Returns the error message, or the original error text. */
 export const mfaErrorMessage = (err: unknown): string =>
   parseMfaError(err)?.message ?? String(err);
 
-/** True when the error is a posture rejection for a posture-gated location.
- *  The backend maps only HTTP 403 (a failed device posture check) to
- *  `posture_rejected`; ordinary MFA rejections stay `mfa_rejected`. */
+/** Returns true when MFA was rejected by the device posture check. */
 export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean =>
   location.posture_check_required && parseMfaError(err)?.type === 'posture_rejected';
 
-/** The proxy session/token is no longer valid. */
+/** The MFA attempt limit was reached and the session must be restarted. */
+export const isAttemptLimit = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'attempt_limit';
+
+/** The submitted proof belongs to an older MFA step attempt. */
+export const isStaleAttempt = (message: string): boolean =>
+  message.includes('stale MFA attempt');
+
+/** The Edge session/token is no longer valid. */
 export const isSessionExpired = (message: string): boolean =>
   message.includes('invalid token') || message.includes('login session not found');
 
-/** The MFA operation timed out (the backend poll deadline was reached). */
+/** The MFA operation timed out. */
 export const isTimeout = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'timeout';
 
@@ -41,16 +45,49 @@ export const isTimeout = (err: unknown): boolean =>
 export const isInvalidCode = (message: string): boolean =>
   message.includes('Unauthorized');
 
-/** The proxy/edge service is unavailable (network error or 5xx response).
- *  Maps to `MfaError::NetworkError` (type: "network_error") and
- *  `MfaError::ProxyError` (type: "proxy_error") from the Rust backend. */
+/** Returns true when the Edge service is unavailable. */
 export const isServiceUnavailable = (err: unknown): boolean => {
   const parsed = parseMfaError(err);
   if (!parsed) return false;
   return parsed.type === 'network_error' || parsed.type === 'proxy_error';
 };
 
-/** MFA succeeded but bringing up the VPN connection afterwards failed
- *  (see `connect_after_mfa` in the Rust backend). */
+/** Returns true when MFA succeeded but the VPN connection failed. */
 export const isConnectFailure = (message: string): boolean =>
   message.includes('VPN connection failed');
+
+/** Describes an OIDC polling error and its user-facing message. */
+export type OidcPollFailure = {
+  kind:
+    | 'attemptLimit'
+    | 'staleAttempt'
+    | 'timeout'
+    | 'connectFailure'
+    | 'sessionExpired'
+    | 'unknown';
+  message: string;
+};
+
+/** Maps an OIDC error event to a type and user-facing message. */
+export const classifyOidcPollFailure = (rawError: string): OidcPollFailure => {
+  const message = mfaErrorMessage(rawError);
+  if (isAttemptLimit(rawError)) {
+    return { kind: 'attemptLimit', message };
+  }
+  if (isStaleAttempt(message)) {
+    return {
+      kind: 'staleAttempt',
+      message: 'Authentication request could not be started. Please try again.',
+    };
+  }
+  if (isTimeout(rawError)) {
+    return { kind: 'timeout', message: 'Authentication timed out. Please try again.' };
+  }
+  if (isConnectFailure(message)) {
+    return { kind: 'connectFailure', message: 'Failed to establish VPN connection' };
+  }
+  if (isSessionExpired(message)) {
+    return { kind: 'sessionExpired', message: 'Session expired. Please try again.' };
+  }
+  return { kind: 'unknown', message: 'Authentication failed. Please try again.' };
+};

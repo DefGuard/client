@@ -42,7 +42,7 @@ interface LocationCardContextValue {
   stepLabel: string | null;
   mfaToken: string | null;
   setMfaMethod: (value: MfaMethodValue) => void;
-  setMfaToken: (token: string) => void;
+  setMfaToken: (token: string | null) => void;
   goToStep: (stepIndex: number) => void;
   setStepPlanOnce: (plan: MfaMethodValue[]) => void;
   setView: (view: LocationCardViewsValue, connectionError?: string) => void;

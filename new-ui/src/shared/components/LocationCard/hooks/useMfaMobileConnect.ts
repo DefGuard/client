@@ -16,6 +16,7 @@ import type {
   LocationInfo,
   MfaErrorPayload,
   MfaMethodValue,
+  MfaStepAdvancedPayload,
 } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { isPresent } from '../../../utils/isPresent';
@@ -28,7 +29,8 @@ type TokenData = {
 type Options = {
   stepPlan: MfaMethodValue[];
   mfaToken: string | null;
-  setMfaToken: (token: string) => void;
+  setMfaToken: (token: string | null) => void;
+  onStepAdvanced: (nextStepIndex: number) => void;
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
   onServiceUnavailable?: () => void;
@@ -40,6 +42,7 @@ export const useMfaMobileConnect = (
     stepPlan,
     mfaToken,
     setMfaToken,
+    onStepAdvanced,
     onConnected,
     onPostureError,
     onServiceUnavailable,
@@ -56,6 +59,14 @@ export const useMfaMobileConnect = (
 
   const taskIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const onConnectedRef = useRef(onConnected);
+  const onStepAdvancedRef = useRef(onStepAdvanced);
+  const setMfaTokenRef = useRef(setMfaToken);
+  const instanceId = instance?.id;
+
+  onConnectedRef.current = onConnected;
+  onStepAdvancedRef.current = onStepAdvanced;
+  setMfaTokenRef.current = setMfaToken;
 
   const cleanupListeners = useCallback(() => {
     if (unlistenRef.current !== null) {
@@ -77,7 +88,7 @@ export const useMfaMobileConnect = (
 
   // Connect WebSocket via Rust when tokenData is available
   useEffect(() => {
-    if (!tokenData || !instance) return;
+    if (!tokenData || instanceId === undefined) return;
 
     let cancelled = false;
     cleanupListeners();
@@ -87,7 +98,7 @@ export const useMfaMobileConnect = (
     (async () => {
       try {
         const taskId = await api.mfaConnectMobileApprove(
-          instance.id,
+          instanceId,
           location.id,
           tokenData.token,
         );
@@ -101,18 +112,29 @@ export const useMfaMobileConnect = (
         const completeUnlisten = await listen(TauriEvent.MfaMobileComplete, () => {
           cleanupListeners();
           setIsConnecting(false);
-          onConnected?.();
+          onConnectedRef.current?.();
         });
+
+        const stepAdvancedUnlisten = await listen<MfaStepAdvancedPayload>(
+          TauriEvent.MfaMobileStepAdvanced,
+          (event) => {
+            cleanupListeners();
+            setIsConnecting(false);
+            onStepAdvancedRef.current(event.payload.nextStep);
+          },
+        );
 
         const errorUnlisten = await listen<MfaErrorPayload>(
           TauriEvent.MfaMobileError,
           (event) => {
             cleanupListeners();
             setIsConnecting(false);
-            error(
+            void error(
               `Mobile MFA failed for location ${location.id}: ${event.payload.error}`,
             );
             const message = mfaErrorMessage(event.payload.error);
+            setTokenData(null);
+            setMfaTokenRef.current(null);
             setConnectionError(
               isConnectFailure(message)
                 ? 'Failed to establish VPN connection'
@@ -123,13 +145,16 @@ export const useMfaMobileConnect = (
 
         unlistenRef.current = () => {
           completeUnlisten();
+          stepAdvancedUnlisten();
           errorUnlisten();
         };
       } catch (e) {
         if (!cancelled) {
           setIsConnecting(false);
+          setTokenData(null);
+          setMfaTokenRef.current(null);
           setConnectionError('Failed to start mobile approval. Please try again.');
-          error(`Mobile MFA connect failed for location ${location.id}: ${e}`);
+          void error(`Mobile MFA connect failed for location ${location.id}: ${e}`);
         }
       }
     })();
@@ -139,7 +164,7 @@ export const useMfaMobileConnect = (
       cleanupListeners();
       setIsConnecting(false);
     };
-  }, [tokenData, instance, location, onConnected, cleanupListeners]);
+  }, [tokenData, instanceId, location.id, cleanupListeners]);
 
   const qrValue = useMemo(() => {
     if (!tokenData || !instance) return null;
@@ -164,7 +189,7 @@ export const useMfaMobileConnect = (
     setTokenData(null);
 
     try {
-      const session = await api.startMfaStep(
+      const session = await api.mfaBeginStep(
         instance.id,
         location.id,
         MfaMethod.MobileApprove,

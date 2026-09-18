@@ -54,6 +54,7 @@ fn into_cli(err: mfa::MfaError) -> CliError {
         | mfa::MfaError::Other { .. } => CliError::Other(msg),
         mfa::MfaError::MfaRejected { .. }
         | mfa::MfaError::PostureRejected { .. }
+        | mfa::MfaError::AttemptLimit { .. }
         | mfa::MfaError::Timeout => CliError::MfaFailed(msg),
         mfa::MfaError::Cancelled => CliError::Cancelled(msg),
     }
@@ -523,8 +524,14 @@ pub(crate) async fn authorize_multistep(
                 .map_err(into_cli)?
             }
             MfaMethod::Oidc => {
-                // OIDC polling uses the session token, not the step attempt.
-                run_oidc_step(&proxy_url, &token, Some(&step_ctx), json_mode).await?
+                run_oidc_step(
+                    &proxy_url,
+                    &token,
+                    step.map(|step| step.step_attempt_id),
+                    Some(&step_ctx),
+                    json_mode,
+                )
+                .await?
             }
             MfaMethod::MobileApprove => {
                 let challenge = match &step {
@@ -630,6 +637,7 @@ where
 async fn run_oidc_step(
     proxy_url: &Url,
     token: &str,
+    step_attempt_id: Option<String>,
     step: Option<&MfaStepContext>,
     json_mode: bool,
 ) -> Result<ClientMfaFinishResponse, CliError> {
@@ -646,9 +654,16 @@ async fn run_oidc_step(
     }
     open_url(browser_url.as_ref(), &badge, json_mode);
 
-    with_ctrl_c(|cancel| mfa::poll_openid_mfa(proxy_url.clone(), token.to_string(), cancel))
-        .await
-        .map_err(into_cli)
+    with_ctrl_c(|cancel| {
+        mfa::poll_openid_mfa(
+            proxy_url.clone(),
+            token.to_string(),
+            step_attempt_id,
+            cancel,
+        )
+    })
+    .await
+    .map_err(into_cli)
 }
 
 /// Show a mobile-approval QR code and wait for the WebSocket result.
@@ -699,7 +714,7 @@ pub(crate) async fn authorize_oidc(
     )
     .await?;
 
-    let finish = run_oidc_step(&proxy_url, &info.token, None, json_mode).await?;
+    let finish = run_oidc_step(&proxy_url, &info.token, None, None, json_mode).await?;
     finish_psk(finish)?.ok_or_else(|| {
         CliError::Other("The server returned an unexpected verification state".into())
     })
@@ -814,13 +829,15 @@ fn open_url(_url: &str, _badge: &str, _json_mode: bool) {
 #[cfg(test)]
 mod tests {
     use defguard_core::database::models::location::ServiceLocationMode;
+    use sqlx::types::Json;
 
     use super::*;
 
     fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
         Location {
-            mfa_steps: Default::default(),
-            mfa_step_plan: Default::default(),
+            mfa_steps: Json::default(),
+            mfa_step_plan: Json::default(),
+            client_mtu: None,
             id: 1,
             instance_id: 1,
             network_id: 1,
@@ -989,7 +1006,6 @@ mod tests {
     }
 
     use defguard_core::database::models::location::{LocationMfaStep, LocationMfaStepMethod};
-    use sqlx::types::Json;
 
     fn step(methods: &[(LocationMfaMethod, bool)]) -> LocationMfaStep {
         LocationMfaStep {

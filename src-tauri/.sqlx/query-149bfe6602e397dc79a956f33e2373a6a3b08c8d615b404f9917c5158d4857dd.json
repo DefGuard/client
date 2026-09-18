@@ -6,82 +6,178 @@
       {
         "name": "id: _",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "id"
+          }
+        }
       },
       {
         "name": "name",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "name"
+          }
+        }
       },
       {
         "name": "pubkey",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "pubkey"
+          }
+        }
       },
       {
         "name": "prvkey",
         "ordinal": 3,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "prvkey"
+          }
+        }
       },
       {
         "name": "address",
         "ordinal": 4,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "address"
+          }
+        }
       },
       {
         "name": "server_pubkey",
         "ordinal": 5,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "server_pubkey"
+          }
+        }
       },
       {
         "name": "preshared_key",
         "ordinal": 6,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "preshared_key"
+          }
+        }
       },
       {
         "name": "allowed_ips",
         "ordinal": 7,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "allowed_ips"
+          }
+        }
       },
       {
         "name": "endpoint",
         "ordinal": 8,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "endpoint"
+          }
+        }
       },
       {
         "name": "dns",
         "ordinal": 9,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "dns"
+          }
+        }
       },
       {
         "name": "persistent_keep_alive",
         "ordinal": 10,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "persistent_keep_alive"
+          }
+        }
       },
       {
         "name": "route_all_traffic",
         "ordinal": 11,
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "route_all_traffic"
+          }
+        }
       },
       {
         "name": "pre_up",
         "ordinal": 12,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "pre_up"
+          }
+        }
       },
       {
         "name": "post_up",
         "ordinal": 13,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "post_up"
+          }
+        }
       },
       {
         "name": "pre_down",
         "ordinal": 14,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "pre_down"
+          }
+        }
       },
       {
         "name": "post_down",
         "ordinal": 15,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tunnel",
+            "name": "post_down"
+          }
+        }
       }
     ],
     "parameters": {

@@ -1,26 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
 import {
-  isConnectFailure,
+  classifyOidcPollFailure,
   isMfaPostureError,
   isServiceUnavailable,
-  isSessionExpired,
-  isTimeout,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { MfaErrorPayload } from '../../../rust-api/types';
+import type { MfaErrorPayload, MfaStepAdvancedPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
+import { buildOpenIdMfaUrl } from '../../../utils/openIdMfaUrl';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
-export const useMfaOidcConnect = () => {
-  const { location, setPostureError, setView, stepPlan, mfaToken, setMfaToken } =
-    useLocationCardContext();
+export const useMfaOidcConnect = (autoStart = false) => {
+  const {
+    location,
+    setPostureError,
+    setView,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    goToStep,
+  } = useLocationCardContext();
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -30,26 +36,7 @@ export const useMfaOidcConnect = () => {
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location.instance_id);
 
-  const taskIdRef = useRef<string | null>(null);
-  const unlistenRef = useRef<UnlistenFn | null>(null);
-
-  const cleanup = useCallback(() => {
-    if (unlistenRef.current !== null) {
-      unlistenRef.current();
-      unlistenRef.current = null;
-    }
-  }, []);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      cleanup();
-      const taskId = taskIdRef.current;
-      if (taskId) {
-        void api.cancelMfa(taskId).catch(() => {});
-      }
-    };
-  }, [cleanup]);
+  const { startAttempt } = useMfaClientAttempt();
 
   const start = useCallback(async () => {
     if (!instance) {
@@ -57,60 +44,76 @@ export const useMfaOidcConnect = () => {
       return;
     }
 
+    const attempt = startAttempt();
     setIsStarting(true);
     setStartError(null);
     setPollError(null);
-    cleanup();
 
     try {
-      const session = await api.startMfaStep(
+      const session = await api.mfaBeginStep(
         instance.id,
         location.id,
         MfaMethod.Oidc,
         stepPlan,
         mfaToken,
       );
-      setMfaToken(session.token);
+      if (!attempt.isLive()) return;
 
-      await api.openLink(`${instance.proxy_url}openid/mfa?token=${session.token}`);
+      const openIdUrl = buildOpenIdMfaUrl(
+        instance.proxy_url,
+        session.token,
+        session.stepAttemptId,
+      );
+      await api.openLink(openIdUrl.toString());
+      if (!attempt.isLive()) return;
+      setMfaToken(session.token);
 
       setIsStarting(false);
       setIsPolling(true);
 
-      const taskId = await api.mfaPollOpenId(instance.id, location.id, session.token);
-      taskIdRef.current = taskId;
-
-      // The backend brings up the connection itself; completion means connected.
-      const completeUnlisten = await listen(TauriEvent.MfaOpenIdComplete, () => {
-        cleanup();
-        setIsPolling(false);
-        setView(LocationCardViews.Connected);
-      });
-
-      const errorUnlisten = await listen<MfaErrorPayload>(
-        TauriEvent.MfaOpenIdError,
-        (event) => {
-          cleanup();
-          setIsPolling(false);
-          error(`OIDC MFA failed for location ${location.id}: ${event.payload.error}`);
-          const message = mfaErrorMessage(event.payload.error);
-          if (isTimeout(event.payload.error)) {
-            setPollError('Authentication timed out. Please try again.');
-          } else if (isConnectFailure(message)) {
-            setPollError('Failed to establish VPN connection');
-          } else if (isSessionExpired(message)) {
-            setPollError('Session expired. Please try again.');
-          } else {
-            setPollError('Authentication failed. Please try again.');
-          }
-        },
+      const taskId = await api.mfaPollOpenId(
+        instance.id,
+        location.id,
+        session.token,
+        session.stepAttemptId,
       );
+      attempt.ownTask(taskId);
+      if (!attempt.isLive()) return;
 
-      unlistenRef.current = () => {
-        completeUnlisten();
-        errorUnlisten();
-      };
+      // Add listeners one at a time so a late listener cannot leave later listeners active.
+      //
+      // The backend connects the VPN; completion means it is connected.
+      await attempt.ownListener(
+        listen(TauriEvent.MfaOpenIdComplete, () => {
+          if (!attempt.tryFinish()) return;
+          setIsPolling(false);
+          setView(LocationCardViews.Connected);
+        }),
+      );
+      if (!attempt.isLive()) return;
+
+      await attempt.ownListener(
+        listen<MfaStepAdvancedPayload>(TauriEvent.MfaOpenIdStepAdvanced, (event) => {
+          if (!attempt.tryFinish()) return;
+          setIsPolling(false);
+          goToStep(event.payload.nextStep);
+        }),
+      );
+      if (!attempt.isLive()) return;
+
+      await attempt.ownListener(
+        listen<MfaErrorPayload>(TauriEvent.MfaOpenIdError, (event) => {
+          if (!attempt.tryFinish()) return;
+          setIsPolling(false);
+          void error(
+            `OIDC MFA failed for location ${location.id}: ${event.payload.error}`,
+          );
+          setPollError(classifyOidcPollFailure(event.payload.error).message);
+        }),
+      );
     } catch (e) {
+      if (!attempt.isLive()) return;
+      attempt.abandon();
       void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
         setPostureError(mfaErrorMessage(e));
@@ -123,9 +126,12 @@ export const useMfaOidcConnect = () => {
       }
       setStartError(mfaErrorMessage(e));
     } finally {
-      setIsStarting(false);
+      if (attempt.isLive()) {
+        setIsStarting(false);
+      }
     }
   }, [
+    startAttempt,
     instance,
     location,
     stepPlan,
@@ -133,8 +139,21 @@ export const useMfaOidcConnect = () => {
     setMfaToken,
     setPostureError,
     setView,
-    cleanup,
+    goToStep,
   ]);
+
+  // Wait one tick so React Strict Mode or an immediate unmount can cancel the
+  // start before it runs.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
+  useEffect(() => {
+    if (!autoStart) return;
+
+    const timer = window.setTimeout(() => {
+      void start();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [autoStart]);
 
   return { start, isStarting, startError, isPolling, pollError };
 };

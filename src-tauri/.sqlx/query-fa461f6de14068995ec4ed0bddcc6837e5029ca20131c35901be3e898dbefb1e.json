@@ -6,7 +6,13 @@
       {
         "name": "disable_tunnels!",
         "ordinal": 0,
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "disable_tunnels"
+          }
+        }
       }
     ],
     "parameters": {
