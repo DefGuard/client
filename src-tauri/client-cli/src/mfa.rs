@@ -41,6 +41,7 @@ fn into_cli(err: mfa::MfaError) -> CliError {
         | mfa::MfaError::Other { .. } => CliError::Other(msg),
         mfa::MfaError::MfaRejected { .. }
         | mfa::MfaError::PostureRejected { .. }
+        | mfa::MfaError::AttemptLimit { .. }
         | mfa::MfaError::Timeout => CliError::MfaFailed(msg),
         mfa::MfaError::Cancelled => CliError::Cancelled(msg),
     }
@@ -258,7 +259,7 @@ pub(crate) async fn authorize_oidc(
         cancel_clone.cancel();
     });
 
-    let result = mfa::poll_openid_mfa(proxy_url, info.token, cancel).await;
+    let result = mfa::poll_openid_mfa(proxy_url, info.token, None, cancel).await;
     ctrlc_handle.abort();
 
     let psk = result.map_err(into_cli)?;
@@ -413,13 +414,15 @@ fn open_url(_url: &str, _json_mode: bool) {
 #[cfg(test)]
 mod tests {
     use defguard_core::database::models::location::ServiceLocationMode;
+    use sqlx::types::Json;
 
     use super::*;
 
     fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
         Location {
-            mfa_steps: Default::default(),
-            mfa_step_plan: Default::default(),
+            mfa_steps: Json::default(),
+            mfa_step_plan: Json::default(),
+            client_mtu: None,
             id: 1,
             instance_id: 1,
             network_id: 1,

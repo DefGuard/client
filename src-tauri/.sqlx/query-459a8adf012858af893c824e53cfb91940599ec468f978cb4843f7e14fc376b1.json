@@ -6,22 +6,46 @@
       {
         "name": "id",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel_connection",
+            "name": "id"
+          }
+        }
       },
       {
         "name": "tunnel_id",
         "ordinal": 1,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "tunnel_connection",
+            "name": "tunnel_id"
+          }
+        }
       },
       {
         "name": "start",
         "ordinal": 2,
-        "type_info": "Datetime"
+        "type_info": "Datetime",
+        "origin": {
+          "Table": {
+            "table": "tunnel_connection",
+            "name": "start"
+          }
+        }
       },
       {
         "name": "end",
         "ordinal": 3,
-        "type_info": "Datetime"
+        "type_info": "Datetime",
+        "origin": {
+          "Table": {
+            "table": "tunnel_connection",
+            "name": "end"
+          }
+        }
       }
     ],
     "parameters": {

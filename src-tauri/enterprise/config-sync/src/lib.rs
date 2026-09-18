@@ -15,7 +15,7 @@ use defguard_client_core::{
     },
     error::Error,
     proxy::post_with_headers,
-    version::{MIN_CORE_VERSION, MIN_PROXY_VERSION},
+    version::{CORE_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION, PROXY_VERSION_HEADER},
 };
 use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
 use reqwest::{StatusCode, Url};
@@ -29,9 +29,7 @@ use crate::commands::{
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
 
-const CORE_VERSION_HEADER: &str = "defguard-core-version";
 const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
-const PROXY_VERSION_HEADER: &str = "defguard-component-version";
 
 /// Result of a successful config fetch from the proxy.
 #[derive(Debug)]
@@ -684,6 +682,7 @@ mod tests {
             posture_check_required: false,
             mfa_steps: Default::default(),
             mfa_step_plan: Default::default(),
+            client_mtu: None,
         }
         .save(pool)
         .await

@@ -24,7 +24,8 @@ export const LocationCardMfaOidcView = () => {
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
   const { setView, setPostureError, autoConnectOpenid, stepLabel } =
     useLocationCardContext();
-  const { start, isStarting, startError, isPolling, pollError } = useMfaOidcConnect();
+  const { start, isStarting, startError, isPolling, pollError } =
+    useMfaOidcConnect(autoConnectOpenid);
   const [screen, setScreen] = useState<Screen>('idle');
 
   useEffect(() => {
@@ -46,13 +47,6 @@ export const LocationCardMfaOidcView = () => {
     setPostureError(null);
     setView(LocationCardViews.Default);
   };
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on mount effect
-  useEffect(() => {
-    if (autoConnectOpenid) {
-      handleStart();
-    }
-  }, []);
 
   return (
     <div className="location-card-mfa-oidc">

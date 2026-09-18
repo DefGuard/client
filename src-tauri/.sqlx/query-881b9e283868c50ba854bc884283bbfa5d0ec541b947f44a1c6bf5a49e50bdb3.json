@@ -6,62 +6,134 @@
       {
         "name": "id: _",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "id"
+          }
+        }
       },
       {
         "name": "name",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "name"
+          }
+        }
       },
       {
         "name": "uuid",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "uuid"
+          }
+        }
       },
       {
         "name": "url",
         "ordinal": 3,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "url"
+          }
+        }
       },
       {
         "name": "proxy_url",
         "ordinal": 4,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "proxy_url"
+          }
+        }
       },
       {
         "name": "username",
         "ordinal": 5,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "username"
+          }
+        }
       },
       {
         "name": "token",
         "ordinal": 6,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "token"
+          }
+        }
       },
       {
         "name": "client_traffic_policy",
         "ordinal": 7,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "client_traffic_policy"
+          }
+        }
       },
       {
         "name": "enterprise_enabled",
         "ordinal": 8,
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "enterprise_enabled"
+          }
+        }
       },
       {
         "name": "disable_tunnels",
         "ordinal": 9,
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "disable_tunnels"
+          }
+        }
       },
       {
         "name": "openid_display_name",
         "ordinal": 10,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "openid_display_name"
+          }
+        }
       },
       {
         "name": "mfa_configured_methods: _",
         "ordinal": 11,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "mfa_configured_methods"
+          }
+        }
       }
     ],
     "parameters": {

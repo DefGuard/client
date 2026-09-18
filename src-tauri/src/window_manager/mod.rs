@@ -286,14 +286,6 @@ pub fn close_tray_window(app: AppHandle) {
 pub fn close_welcome_window(app: AppHandle) {
     info!("close_welcome_window called");
 
-    if let Some(window) = app.get_webview_window(WELCOME_WINDOW_ID) {
-        if let Err(err) = window.hide() {
-            error!("close_welcome_window task: Failed to hide welcome window: {err:?}");
-        }
-    } else {
-        warn!("close_welcome_window task: welcome window not found");
-    }
-
     let config_dir = app
         .path()
         .app_data_dir()
@@ -301,6 +293,21 @@ pub fn close_welcome_window(app: AppHandle) {
     mark_welcome_shown(&config_dir, &app.package_info().version);
 
     show_tray_or_full_view(&app);
+
+    // Destroy rather than hide: a hidden webview keeps running, and the looping welcome
+    // video holds a media power request that stops the system from sleeping.
+    let destroy_handle = app.clone();
+    if let Err(err) = app.run_on_main_thread(move || {
+        if let Some(window) = destroy_handle.get_webview_window(WELCOME_WINDOW_ID) {
+            if let Err(err) = window.destroy() {
+                error!("close_welcome_window task: Failed to destroy welcome window: {err:?}");
+            }
+        } else {
+            warn!("close_welcome_window task: welcome window not found");
+        }
+    }) {
+        error!("close_welcome_window task: Failed to schedule welcome window teardown: {err:?}");
+    }
 }
 
 #[tauri::command]

@@ -25,6 +25,8 @@ export const LocationCardMfaFido2View = () => {
     canPickOtherMethod,
     stepPlan,
     mfaToken,
+    setMfaToken,
+    goToStep,
     setPostureError,
   } = useLocationCardContext();
   const { verify, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
@@ -32,7 +34,9 @@ export const LocationCardMfaFido2View = () => {
     {
       stepPlan,
       mfaToken,
+      setMfaToken,
       onConnected: () => setView(LocationCardViews.Connected),
+      onStepAdvanced: goToStep,
       onPostureError: (message) => {
         setPostureError(message);
         setView(LocationCardViews.PostureCheckFail);

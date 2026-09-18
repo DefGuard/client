@@ -97,20 +97,31 @@ const submitTunnelEdit = async () => {
 describe("WireGuard tunnel", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfaMode: LocationMfaMode;
+	let previousMfaMode: LocationMfaMode | undefined;
 	let config: TunnelConfig;
 
 	before(async () => {
 		core = await loggedInCoreApi();
-		networkId = (await core.listNetworks())[0].id;
+		const networkName = process.env.NETWORK_NAME ?? "e2e";
+		const network = (await core.listNetworks()).find(
+			(item) => item.name === networkName,
+		);
+		if (!network) {
+			throw new Error(`Core network "${networkName}" was not found`);
+		}
+		networkId = network.id;
 		previousMfaMode = await core.setLocationMfaMode(networkId, "disabled");
 		config = await provisionTunnel(core, networkId, `e2e-tunnel-${Date.now()}`);
 	});
 
 	after(async () => {
-		await core.setLocationMfaMode(networkId, previousMfaMode);
-		await deleteTunnel(config.name);
-		await core.deleteDevice(config.deviceId);
+		if (previousMfaMode) {
+			await core.setLocationMfaMode(networkId, previousMfaMode);
+		}
+		if (config) {
+			await deleteTunnel(config.name);
+			await core.deleteDevice(config.deviceId);
+		}
 	});
 
 	it("adds a tunnel from a core-provisioned config", async () => {

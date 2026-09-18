@@ -105,16 +105,16 @@ pub struct RegistrationCeremony {
 
 /// Core's `Base64UrlSafeData` reads either alphabet, padded or not, so be equally forgiving.
 pub fn decode_base64(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    fn engine(alphabet: alphabet::Alphabet) -> GeneralPurpose {
+    fn engine(alphabet: &alphabet::Alphabet) -> GeneralPurpose {
         GeneralPurpose::new(
-            &alphabet,
+            alphabet,
             GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
         )
     }
 
-    engine(alphabet::URL_SAFE)
+    engine(&alphabet::URL_SAFE)
         .decode(value)
-        .or_else(|err| engine(alphabet::STANDARD).decode(value).map_err(|_| err))
+        .or_else(|err| engine(&alphabet::STANDARD).decode(value).map_err(|_| err))
 }
 
 fn malformed(detail: &str) -> Fido2Error {
