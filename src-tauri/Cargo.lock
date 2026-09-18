@@ -1594,6 +1594,7 @@ dependencies = [
  "defguard-client-core",
  "defguard-client-proto",
  "defguard-client-service-locations",
+ "futures-util",
  "http",
  "log",
  "reqwest 0.13.5",

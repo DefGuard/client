@@ -52,6 +52,8 @@ struct MockDaemon {
 
 #[tonic::async_trait]
 impl DesktopDaemonService for MockDaemon {
+    type ReadInterfaceDataStream = ReceiverStream<StreamItem>;
+
     async fn create_interface(
         &self,
         _req: Request<CreateInterfaceRequest>,
@@ -72,8 +74,6 @@ impl DesktopDaemonService for MockDaemon {
             .remove(&req.into_inner().interface_name);
         Ok(Response::new(()))
     }
-
-    type ReadInterfaceDataStream = ReceiverStream<StreamItem>;
 
     async fn read_interface_data(
         &self,

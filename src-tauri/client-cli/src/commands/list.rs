@@ -9,22 +9,19 @@ use defguard_core::database::models::{
 use serde_json::{json, Value};
 
 use crate::{
-    commands::location::mfa_label,
+    commands::location::{col_width, location_mfa_label},
     output::{CommandOutput, InstanceEntry, LocationEntry, TunnelEntry},
     state::{CliError, State},
 };
 
 const MIN_LOCATION_NAME_COL_WIDTH: usize = 8;
+const MIN_ADDRESS_COL_WIDTH: usize = 15;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_TUNNEL_NAME_COL_WIDTH: usize = 4;
 
 pub(crate) async fn handle(state: &State) -> Result<ListResult, CliError> {
     let instances = Instance::all(&state.pool).await?;
-    let locations = Location::all(&state.pool, false)
-        .await?
-        .into_iter()
-        .filter(|location| location.mfa_steps.len() <= 1)
-        .collect::<Vec<_>>();
+    let locations = Location::all(&state.pool, false).await?;
     let tunnels = if Instance::tunnels_disabled(&state.pool).await? {
         Vec::new()
     } else {
@@ -88,7 +85,7 @@ impl CommandOutput for ListResult {
                     address: l.address.clone(),
                     endpoint: l.endpoint.clone(),
                     mfa_enabled: Some(l.mfa_enabled()),
-                    mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                    mfa_method: Some(location_mfa_label(l)),
                     route_all_traffic: Some(route_all_traffic),
                 }
             })
@@ -126,18 +123,18 @@ fn format_list_table(
             .push(location);
     }
 
-    let location_name_col_width = locations
-        .iter()
-        .map(|l| l.name.len())
-        .max()
-        .unwrap_or(MIN_LOCATION_NAME_COL_WIDTH)
-        .max(MIN_LOCATION_NAME_COL_WIDTH);
-    let endpoint_col_width = locations
-        .iter()
-        .map(|l| l.endpoint.len())
-        .max()
-        .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
-        .max(MIN_ENDPOINT_COL_WIDTH);
+    let location_name_col_width = col_width(
+        locations.iter().map(|l| l.name.as_str()),
+        MIN_LOCATION_NAME_COL_WIDTH,
+    );
+    let address_col_width = col_width(
+        locations.iter().map(|l| l.address.as_str()),
+        MIN_ADDRESS_COL_WIDTH,
+    );
+    let endpoint_col_width = col_width(
+        locations.iter().map(|l| l.endpoint.as_str()),
+        MIN_ENDPOINT_COL_WIDTH,
+    );
 
     let mut lines = Vec::new();
 
@@ -145,7 +142,7 @@ fn format_list_table(
         lines.push(format!("\n{} ({})", instance.name, instance.url));
         if let Some(locations) = instance_locations.get(&instance.id) {
             lines.push(format!(
-                "  {:>4}  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:>3}  {:<11}",
+                "  {:>4}  {:<location_name_col_width$}  {:<address_col_width$}  {:<endpoint_col_width$}  {:<3}  {}",
                 "ID", "LOCATION", "ADDRESS", "ENDPOINT", "MFA", "Routing"
             ));
             for location in locations {
@@ -163,7 +160,7 @@ fn format_list_table(
                 };
 
                 lines.push(format!(
-                    "  {:>4}  {:<location_name_col_width$}  {:<15}  {:<endpoint_col_width$}  {mfa:>3}  {route_label:<11}",
+                    "  {:>4}  {:<location_name_col_width$}  {:<address_col_width$}  {:<endpoint_col_width$}  {mfa:<3}  {route_label}",
                     location.id, location.name, location.address, location.endpoint
                 ));
             }
@@ -173,27 +170,22 @@ fn format_list_table(
     }
 
     if !tunnels.is_empty() {
-        let tunnel_name_col_width = tunnels
-            .iter()
-            .map(|t| t.name.len())
-            .max()
-            .unwrap_or(MIN_TUNNEL_NAME_COL_WIDTH)
-            .max(location_name_col_width);
-        let tunnel_endpoint_col_width = tunnels
-            .iter()
-            .map(|t| t.endpoint.len())
-            .max()
-            .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
-            .max(endpoint_col_width);
-
+        let tunnel_name_col_width = col_width(
+            tunnels.iter().map(|t| t.name.as_str()),
+            MIN_TUNNEL_NAME_COL_WIDTH.max(location_name_col_width),
+        );
+        let tunnel_address_col_width = col_width(
+            tunnels.iter().map(|t| t.address.as_str()),
+            MIN_ADDRESS_COL_WIDTH.max(address_col_width),
+        );
         lines.push("\nTunnels".to_string());
         lines.push(format!(
-            "  {:>4}  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
+            "  {:>4}  {:<tunnel_name_col_width$}  {:<tunnel_address_col_width$}  {}",
             "ID", "NAME", "ADDRESS", "ENDPOINT"
         ));
         for tunnel in tunnels {
             lines.push(format!(
-                "  {:>4}  {:<tunnel_name_col_width$}  {:<15}  {:<tunnel_endpoint_col_width$}",
+                "  {:>4}  {:<tunnel_name_col_width$}  {:<tunnel_address_col_width$}  {}",
                 tunnel.id, tunnel.name, tunnel.address, tunnel.endpoint
             ));
         }

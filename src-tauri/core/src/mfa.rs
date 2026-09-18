@@ -10,7 +10,7 @@ use defguard_client_proto::defguard::client_types::{
     ClientMfaStartResponse, ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod,
     MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
 };
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use reqwest::{Client, Response, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -317,6 +317,9 @@ const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);
 #[cfg(test)]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Keepalive period for the mobile-approve WebSocket.
+const MOBILE_APPROVE_PING_INTERVAL: Duration = Duration::from_secs(20);
+
 /// Polls Edge until OIDC MFA advances, completes, times out, or is cancelled.
 /// The browser must already be open. `AwaitingExternal` and legacy 428 responses keep polling.
 pub async fn poll_openid_mfa(
@@ -409,6 +412,26 @@ pub async fn poll_openid_mfa(
     }
 }
 
+/// Return the preshared key only when the MFA session completed.
+///
+/// Intermediate responses contain no key. For legacy responses without a step
+/// result, use the top-level key.
+#[must_use]
+pub fn completed_preshared_key(response: &ClientMfaFinishResponse) -> Option<String> {
+    let key = match response
+        .result
+        .as_ref()
+        .and_then(|result| result.outcome.as_ref())
+    {
+        Some(mfa_step_result::Outcome::Completed(completed)) => &completed.preshared_key,
+        Some(_) => return None,
+        // Older Edge responses and mobile-approve frames have no step outcome.
+        #[allow(deprecated)]
+        None => &response.preshared_key,
+    };
+    (!key.is_empty()).then(|| key.clone())
+}
+
 /// Waits for mobile approval after the QR code is shown. Returns cancellation or
 /// timeout errors when applicable.
 pub async fn connect_mobile_approve(
@@ -457,13 +480,34 @@ pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> 
     Ok(ws_url.to_string())
 }
 
+fn mobile_approve_closed(detail: Option<String>) -> MfaError {
+    let message = match detail {
+        Some(detail) => {
+            format!("mobile approval failed: connection closed by Edge ({detail})")
+        }
+        None => "mobile approval failed: connection closed by Edge".to_string(),
+    };
+    MfaError::MfaRejected { message }
+}
+
+fn read_error_label(err: &WsError) -> String {
+    match err {
+        WsError::Io(io_err) => format!("I/O error: {}", io_err.kind()),
+        WsError::Protocol(protocol_err) => format!("protocol error: {protocol_err}"),
+        WsError::Capacity(_) | WsError::Utf8(_) => "malformed frame from Edge".to_string(),
+        _ => "stream error".to_string(),
+    }
+}
+
 /// Wait on the WebSocket for an MFA outcome frame.
 async fn wait_for_mfa_outcome(
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let (_write, mut read) = ws_stream.split();
+    let (mut write, mut read) = ws_stream.split();
     let deadline = Instant::now() + MOBILE_APPROVE_TIMEOUT;
+    // Preserve Edge's close reason for the user-facing error.
+    let mut close_detail: Option<String> = None;
 
     loop {
         let remaining = deadline
@@ -480,21 +524,29 @@ async fn wait_for_mfa_outcome(
             () = cancel.cancelled() => {
                 return Err(MfaError::Cancelled);
             }
+            // Keep the socket alive while the user approves; proxies may drop
+            // idle connections before the MFA timeout.
+            () = sleep(MOBILE_APPROVE_PING_INTERVAL) => {
+                if write.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    return Err(mobile_approve_closed(close_detail));
+                }
+                continue;
+            }
             msg = read.next() => {
                 match msg {
                     Some(Ok(msg)) => msg,
-                    Some(Err(_)) | None => {
-                        return Err(MfaError::MfaRejected {
-                            message: "mobile approval failed: connection closed by Edge"
-                                .into(),
-                        });
+                    Some(Err(err)) => {
+                        return Err(mobile_approve_closed(
+                            close_detail.or_else(|| Some(read_error_label(&err))),
+                        ));
                     }
+                    None => return Err(mobile_approve_closed(close_detail)),
                 }
             }
         };
 
-        if let Message::Text(text) = msg {
-            match serde_json::from_str::<MobileMfaResponse>(&text) {
+        match msg {
+            Message::Text(text) => match serde_json::from_str::<MobileMfaResponse>(&text) {
                 Ok(MobileMfaResponse::Legacy { preshared_key }) => {
                     if preshared_key.is_empty() {
                         return Err(MfaError::MfaRejected {
@@ -510,6 +562,7 @@ async fn wait_for_mfa_outcome(
                         result: None,
                     });
                 }
+                // An intermediate result has no key; the caller checks its outcome.
                 Ok(MobileMfaResponse::Result { result }) => {
                     #[allow(deprecated)]
                     return Ok(ClientMfaFinishResponse {
@@ -522,7 +575,17 @@ async fn wait_for_mfa_outcome(
                 Err(err) => {
                     debug!("Ignoring unrecognized mobile MFA frame: {err}");
                 }
+            },
+            Message::Close(frame) => {
+                close_detail = Some(match frame {
+                    Some(frame) if frame.reason.is_empty() => {
+                        format!("code {}", u16::from(frame.code))
+                    }
+                    Some(frame) => format!("code {}: {}", u16::from(frame.code), frame.reason),
+                    None => "no close reason".to_string(),
+                });
             }
+            _ => {}
         }
     }
 }

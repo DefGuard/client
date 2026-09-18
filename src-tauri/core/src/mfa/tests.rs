@@ -693,6 +693,85 @@ async fn test_mobile_approve_close_without_success() {
     assert!(matches!(err, MfaError::MfaRejected { .. }));
 }
 
+/// Build an `mfa_result` frame for the WebSocket stub.
+fn mfa_result_frame(result: &MfaStepResult) -> String {
+    serde_json::to_string(&json!({ "type": "mfa_result", "result": result }))
+        .expect("frame serializes")
+}
+
+#[tokio::test]
+async fn test_mobile_approve_advanced_result_is_a_passed_step() {
+    // An intermediate step returns no preshared key.
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(mfa_result_frame(
+        &MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+                next_step: 1,
+            })),
+        },
+    )))
+    .unwrap();
+    tx.send(WsStubCommand::Close).unwrap();
+
+    let response = handle.await.unwrap().unwrap();
+    assert!(completed_preshared_key(&response).is_none());
+}
+
+#[tokio::test]
+async fn test_mobile_approve_completed_result_carries_the_key() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::SendMessage(mfa_result_frame(
+        &MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(MfaCompleted {
+                preshared_key: "mobile-psk".into(),
+            })),
+        },
+    )))
+    .unwrap();
+    tx.send(WsStubCommand::Close).unwrap();
+
+    let response = handle.await.unwrap().unwrap();
+    assert_eq!(
+        completed_preshared_key(&response).as_deref(),
+        Some("mobile-psk")
+    );
+}
+
+#[tokio::test]
+async fn test_mobile_approve_close_frame_reaches_the_error() {
+    let stub = start_ws_stub().await;
+    let addr = stub.addr;
+    let tx = stub.tx;
+    let ws_url = format!("ws://{addr}/test");
+
+    let cancel = CancellationToken::new();
+    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+
+    tx.send(WsStubCommand::CloseWith(4001, "unknown mfa token".into()))
+        .unwrap();
+
+    let err = handle.await.unwrap().unwrap_err();
+    let MfaError::MfaRejected { message } = err else {
+        panic!("expected MfaRejected, got {err:?}");
+    };
+    assert!(message.contains("4001"), "{message}");
+    assert!(message.contains("unknown mfa token"), "{message}");
+}
+
 #[tokio::test]
 async fn test_mobile_approve_cancelled() {
     let stub = start_ws_stub().await;
@@ -787,4 +866,51 @@ async fn test_mfa_start_reads_fido2_credential_ids() {
     let info = mfa_start(mock_url(&server), start_request()).await.unwrap();
     assert_eq!(info.challenge.as_deref(), Some("chal"));
     assert_eq!(info.credential_ids, vec!["a-b_c", "ZmlkbzI"]);
+}
+
+fn finish_response(preshared_key: &str, result: Option<MfaStepResult>) -> ClientMfaFinishResponse {
+    ClientMfaFinishResponse {
+        preshared_key: preshared_key.into(),
+        token: None,
+        result,
+    }
+}
+
+#[test]
+fn test_completed_preshared_key_reads_the_legacy_field() {
+    let response = finish_response("psk", None);
+    assert_eq!(completed_preshared_key(&response).as_deref(), Some("psk"));
+}
+
+#[test]
+fn test_completed_preshared_key_rejects_an_empty_legacy_field() {
+    // An empty legacy key represents an incomplete intermediate step.
+    let response = finish_response("", None);
+    assert!(completed_preshared_key(&response).is_none());
+}
+
+#[test]
+fn test_completed_preshared_key_reads_the_completed_outcome() {
+    let response = finish_response(
+        "",
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Completed(MfaCompleted {
+                preshared_key: "psk".into(),
+            })),
+        }),
+    );
+    assert_eq!(completed_preshared_key(&response).as_deref(), Some("psk"));
+}
+
+#[test]
+fn test_completed_preshared_key_rejects_an_advanced_outcome() {
+    let response = finish_response(
+        "leftover",
+        Some(MfaStepResult {
+            outcome: Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+                next_step: 1,
+            })),
+        }),
+    );
+    assert!(completed_preshared_key(&response).is_none());
 }
