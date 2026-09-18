@@ -17,9 +17,6 @@
     <summary>Desktop client for Defguard - Wireguard VPN with MFA</summary>
     <description>Desktop client provides an easy way to access VPN locations of multiple Defguard instances via user-friendly UI.</description>
     <releaseNotes>https://github.com/DefGuard/client/releases</releaseNotes>
-    <dependencies>
-      <dependency id="vcredist140" />
-    </dependencies>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />
