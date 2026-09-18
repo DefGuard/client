@@ -2082,8 +2082,21 @@ async fn run_fido2_mfa(
     let _level = WindowLevelGuard::lower(&window);
     // Handed to the ceremony rather than raced against here, since only the platform can take
     // its own modal dialog down.
-    let assertion =
-        fido2_assertion(rp_id, challenge, pin, platform_context(&window), cancel).await?;
+    let assertion = fido2_assertion(
+        rp_id,
+        challenge,
+        pin,
+        platform_context(&window),
+        cancel.clone(),
+    )
+    .await?;
+
+    // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
+    // over. Finishing here would bring the tunnel up after the user backed out.
+    if cancel.is_cancelled() {
+        debug!("FIDO2 MFA was cancelled, discarding the assertion");
+        return Err(mfa::MfaError::Cancelled);
+    }
 
     let request = ClientMfaFinishRequest {
         token,
@@ -2445,6 +2458,13 @@ pub async fn mfa_config_setup_fido2(
         }),
         err => err_to_json(registration_error(&err)),
     })?;
+
+    // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
+    // over. Submitting here would register a factor the user had already backed out of.
+    if ceremony.token().is_cancelled() {
+        debug!("Security key registration was cancelled, discarding the attestation");
+        return Err(err_to_json(MfaConfigError::Cancelled));
+    }
 
     let response = mfa_config::mfa_config_setup_finish(
         session.proxy_url,

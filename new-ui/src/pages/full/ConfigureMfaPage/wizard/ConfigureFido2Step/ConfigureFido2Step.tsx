@@ -23,6 +23,13 @@ import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
 
 const DEFAULT_KEY_NAME = 'Security key';
 
+/** A second key registered from the same machine would otherwise propose the name the first one
+ *  took, leaving two entries the user cannot tell apart in Defguard. */
+const defaultKeyName = (host: string | null | undefined, hasKey: boolean): string => {
+  const base = isPresent(host) ? `${host} key` : DEFAULT_KEY_NAME;
+  return hasKey ? `${base} (${new Date().toISOString().slice(0, 10)})` : base;
+};
+
 interface Props {
   onCancel: () => void;
   /** The session outlived its deadline, so the whole flow has to start over. */
@@ -32,6 +39,11 @@ interface Props {
 /** Registers a security key, offered however many the account already holds. */
 export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
   const sessionId = useConfigureMfaStore((s) => s.sessionId);
+  // The snapshot is frozen at the start of the session, so this still reads false on the first
+  // key even after it is registered.
+  const hasKeyAlready = useConfigureMfaStore((s) =>
+    s.configuredMethods.includes(MfaMethod.Fido2),
+  );
 
   const [name, setName] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
@@ -42,17 +54,16 @@ export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
   // The machine's own name is what the user will recognize the key by in Defguard.
   useEffect(() => {
     void hostname().then((host) => {
-      setName(
-        (current) => current ?? (isPresent(host) ? `${host} key` : DEFAULT_KEY_NAME),
-      );
+      setName((current) => current ?? defaultKeyName(host, hasKeyAlready));
     });
-  }, []);
+  }, [hasKeyAlready]);
 
   const handleApiError = useMfaConfigErrorHandler({
     context: 'Security key registration failed',
     setError,
     onSessionExpired,
     fallback: 'Registration failed',
+    hasCodeInput: false,
   });
 
   const { mutate: register, isPending: isRegistering } = useMutation({

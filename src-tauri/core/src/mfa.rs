@@ -11,7 +11,7 @@ use defguard_client_proto::defguard::client_types::{
     MfaStepRejection,
 };
 use futures_util::StreamExt;
-use reqwest::{Client, Response, StatusCode, Url};
+use reqwest::{Response, StatusCode, Url};
 use serde::Serialize;
 use thiserror::Error;
 use tokio::{
@@ -27,7 +27,7 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    proxy::construct_platform_header,
+    proxy::{construct_platform_header, http_client},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
@@ -105,7 +105,7 @@ pub async fn mfa_start(
     proxy_url: Url,
     request: ClientMfaStartRequest,
 ) -> Result<ClientMfaStartResponse, MfaError> {
-    let client = Client::new();
+    let client = http_client();
 
     let url = proxy_url
         .join("api/v1/client-mfa/start")
@@ -172,7 +172,7 @@ pub async fn mfa_step_start(
     proxy_url: Url,
     request: ClientMfaStepStartRequest,
 ) -> Result<ClientMfaStepStartResponse, MfaError> {
-    let client = Client::new();
+    let client = http_client();
 
     let url = proxy_url
         .join("api/v1/client-mfa/step-start")
@@ -227,7 +227,7 @@ pub async fn mfa_finish_code(
     proxy_url: Url,
     request: ClientMfaFinishRequest,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let client = Client::new();
+    let client = http_client();
 
     let url = proxy_url
         .join("api/v1/client-mfa/finish")
@@ -278,7 +278,7 @@ pub async fn poll_openid_mfa(
     token: String,
     cancel: CancellationToken,
 ) -> Result<ClientMfaFinishResponse, MfaError> {
-    let client = Client::new();
+    let client = http_client();
     let url = proxy_url
         .join("api/v1/client-mfa/finish")
         .map_err(|e| MfaError::Other {

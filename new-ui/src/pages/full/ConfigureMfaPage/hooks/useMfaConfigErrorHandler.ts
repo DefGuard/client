@@ -15,6 +15,9 @@ type Options = {
   onSessionExpired: () => void;
   /** Copy for anything untagged, never the raw string, which may be a Rust message. */
   fallback: string;
+  /** Whether this step has a code field. Without one, a rejection gets Defguard's own message
+   *  instead, since "Invalid code" would point at an input the user cannot see. */
+  hasCodeInput?: boolean;
 };
 
 /** Shared `MfaConfigError` classification, so every step of the flow reacts the same way. */
@@ -23,6 +26,7 @@ export const useMfaConfigErrorHandler = ({
   setError,
   onSessionExpired,
   fallback,
+  hasCodeInput = true,
 }: Options) =>
   useCallback(
     (err: unknown) => {
@@ -32,7 +36,7 @@ export const useMfaConfigErrorHandler = ({
       }
       void logError(`${context}: ${err}`);
       if (isMfaConfigInvalidCode(err)) {
-        setError('Invalid code');
+        setError(hasCodeInput ? 'Invalid code' : mfaErrorMessage(err));
         return;
       }
       if (isMfaConfigSessionExpired(err)) {
@@ -51,5 +55,5 @@ export const useMfaConfigErrorHandler = ({
       }
       setError(fallback);
     },
-    [context, setError, onSessionExpired, fallback],
+    [context, setError, onSessionExpired, fallback, hasCodeInput],
   );

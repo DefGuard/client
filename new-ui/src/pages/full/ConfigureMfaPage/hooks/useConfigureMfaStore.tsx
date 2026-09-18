@@ -15,6 +15,7 @@ import {
   ConfigureMfaStep,
   type ConfigureMfaStepValue,
   isCodeMfaMethod,
+  isMfaFactorOfferable,
   isMfaSetupStep,
   MFA_WIZARD_STEPS,
   mfaFactorStep,
@@ -24,8 +25,11 @@ type StoreValues = {
   activeStep: ConfigureMfaStepValue;
   instance: InstanceInfo | null;
   sessionId: string | null;
-  /** Code factors come from the session, the rest from the instance snapshot. */
+  /** Snapshot taken at the start of the session and never moved, or a repeatable factor would
+   *  look configured before it was offered. */
   configuredMethods: MfaMethodValue[];
+  /** Factors this run has set up, which is what the wizard steps through. */
+  completedMethods: MfaMethodValue[];
   /** Null until the selection step is done. Empty is valid, the email fallback configures
    *  a factor on its own. */
   selectedMethods: MfaMethodValue[] | null;
@@ -40,13 +44,17 @@ type StoreValues = {
 
 type FlowState = Pick<
   StoreValues,
-  'configuredMethods' | 'selectedMethods' | 'recoveryCodes'
+  'configuredMethods' | 'completedMethods' | 'selectedMethods' | 'recoveryCodes'
 >;
 
 /** Picked factors still to set up, in wizard order. */
 const pendingMethods = (state: FlowState): MfaMethodValue[] =>
-  state.selectedMethods?.filter((method) => !state.configuredMethods.includes(method)) ??
-  [];
+  state.selectedMethods?.filter(
+    (method) =>
+      !state.completedMethods.includes(method) &&
+      // Guards against a pick the selection screen should already have refused.
+      isMfaFactorOfferable(method, state.configuredMethods),
+  ) ?? [];
 
 /** Setup steps with a factor still pending, plus the closing steps that have something to show. */
 const remainingSteps = (state: FlowState): ConfigureMfaStepValue[] => {
@@ -67,11 +75,17 @@ const remainingSteps = (state: FlowState): ConfigureMfaStepValue[] => {
 const firstStep = (state: FlowState): ConfigureMfaStepValue =>
   remainingSteps(state)[0] ?? ConfigureMfaStep.Finish;
 
+/** The session is only needed while a setup is still to come. Letting it run past the last one
+ *  would expire the flow under a user still reading their recovery codes. */
+const sessionDeadline = (state: FlowState, deadline: string | null): string | null =>
+  pendingMethods(state).length > 0 ? deadline : null;
+
 const defaults: StoreValues = {
   activeStep: ConfigureMfaStep.Configuration,
   instance: null,
   sessionId: null,
   configuredMethods: [],
+  completedMethods: [],
   selectedMethods: null,
   emailFallback: false,
   deadline: null,
@@ -82,7 +96,7 @@ const defaults: StoreValues = {
 interface Store extends StoreValues {
   start: (instance: InstanceInfo, response: MfaConfigStartResult) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
-  /** The fresh deadline bounds every setup in the session, not just the next one. */
+  /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
   factorConfigured: (method: MfaMethodValue, recoveryCodes: string[]) => void;
   next: () => void;
@@ -121,23 +135,35 @@ export const useConfigureMfaStore = create<Store>()(
         }));
       },
       authorize: (response) => {
-        set((current) => ({
-          authorized: true,
-          deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
+        set((current) => {
           // The fallback enables email as it verifies, so only this authorization issues codes.
-          recoveryCodes: response.recovery_codes,
-          activeStep: firstStep({ ...current, recoveryCodes: response.recovery_codes }),
-        }));
+          const next = { ...current, recoveryCodes: response.recovery_codes };
+          return {
+            authorized: true,
+            recoveryCodes: response.recovery_codes,
+            deadline: sessionDeadline(
+              next,
+              dayjs.unix(response.deadline_timestamp).toISOString(),
+            ),
+            activeStep: firstStep(next),
+          };
+        });
       },
       factorConfigured: (method, recoveryCodes) => {
-        set((current) => ({
-          configuredMethods: current.configuredMethods.includes(method)
-            ? current.configuredMethods
-            : [...current.configuredMethods, method],
-          recoveryCodes: recoveryCodes.length > 0 ? recoveryCodes : current.recoveryCodes,
-          // Last step that needs the session, so nothing is left to expire.
-          deadline: method === MfaMethod.Fido2 ? null : current.deadline,
-        }));
+        set((current) => {
+          const completedMethods = current.completedMethods.includes(method)
+            ? current.completedMethods
+            : [...current.completedMethods, method];
+          const codes = recoveryCodes.length > 0 ? recoveryCodes : current.recoveryCodes;
+          return {
+            completedMethods,
+            recoveryCodes: codes,
+            deadline: sessionDeadline(
+              { ...current, completedMethods, recoveryCodes: codes },
+              current.deadline,
+            ),
+          };
+        });
       },
       next: () => {
         const current = get();
@@ -166,8 +192,9 @@ export const useConfigureMfaStore = create<Store>()(
     {
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
-      // Bumped when the picks became one list, so older sessions resume with no selection.
-      version: 6,
+      // Bumped when setup progress moved to its own list, so older sessions start over rather
+      // than resume believing a configured factor is still pending.
+      version: 7,
     },
   ),
 );

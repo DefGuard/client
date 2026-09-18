@@ -2,7 +2,8 @@
 //! report the user verification Core requires.
 //!
 //! The crate's API is blocking and a waiting key cannot be interrupted, so ceremonies run on the
-//! blocking pool and cancelling abandons rather than aborts them.
+//! blocking pool and a cancelled one still runs to completion. Its result is discarded rather
+//! than returned, so nothing a cancelled ceremony produced can reach the caller.
 
 use ctap_hid_fido2::{
     fidokey::make_credential::{CredentialSupportedKeyType, MakeCredentialArgsBuilder},
@@ -70,13 +71,13 @@ pub(crate) async fn register(
     request: &RegisterRequest,
     pin: Option<String>,
     _context: PlatformContext,
-    _cancel: CancellationToken,
+    cancel: CancellationToken,
 ) -> Result<Registration, Fido2Error> {
     // CTAP cannot verify the user without one, and Core requires user verification.
     let pin = pin.ok_or(Fido2Error::PinRequired)?;
     let request = request.clone();
 
-    tokio::task::spawn_blocking(move || {
+    let result = tokio::task::spawn_blocking(move || {
         let device = open_device()?;
 
         let user = PublicKeyCredentialUserEntity::new(
@@ -117,19 +118,27 @@ pub(crate) async fn register(
     .map_err(|err| Fido2Error::Backend {
         message: format!("registration task failed: {err}"),
         code: None,
-    })?
+    })?;
+
+    // The key was touched only after the user backed out. Checked ahead of the ceremony's own
+    // outcome, since a cancelled attempt that went on to time out is still a cancellation.
+    if cancel.is_cancelled() {
+        return Err(Fido2Error::Cancelled);
+    }
+
+    result
 }
 
 pub(crate) async fn assert(
     request: &AssertRequest,
     pin: Option<String>,
     _context: PlatformContext,
-    _cancel: CancellationToken,
+    cancel: CancellationToken,
 ) -> Result<Assertion, Fido2Error> {
     let pin = pin.ok_or(Fido2Error::PinRequired)?;
     let request = request.clone();
 
-    tokio::task::spawn_blocking(move || {
+    let result = tokio::task::spawn_blocking(move || {
         let device = open_device()?;
 
         // The key picks the credential it holds and names it back, so nothing to narrow here.
@@ -163,7 +172,14 @@ pub(crate) async fn assert(
     .map_err(|err| Fido2Error::Backend {
         message: format!("assertion task failed: {err}"),
         code: None,
-    })?
+    })?;
+
+    // As in `register`: an assertion the user cancelled must not go on to authorize anything.
+    if cancel.is_cancelled() {
+        return Err(Fido2Error::Cancelled);
+    }
+
+    result
 }
 
 #[cfg(test)]
