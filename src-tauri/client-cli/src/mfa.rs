@@ -165,7 +165,11 @@ fn step_badge(index: usize, total: usize) -> String {
 
 /// Return the count of decimal digits in `n`.
 fn decimal_digits(n: usize) -> usize {
-    if n == 0 { 1 } else { n.ilog10() as usize + 1 }
+    if n == 0 {
+        1
+    } else {
+        n.ilog10() as usize + 1
+    }
 }
 
 /// Return the step prefix, or an empty string when no step context exists.
