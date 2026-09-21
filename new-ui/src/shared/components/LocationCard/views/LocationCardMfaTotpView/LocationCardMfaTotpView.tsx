@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
@@ -70,10 +71,11 @@ export const LocationCardMfaTotpView = () => {
     [totpCode, verifyCode],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
-  useEffect(() => {
-    setError(null);
-  }, [totpCode, setError]);
+  // Only real input clears the error, CodeInput's own reset passes ''.
+  const handleCodeChange = useCallback((value: string) => {
+    setTotpCode(value);
+    if (value.length > 0) setError(null);
+  }, []);
 
   // Reflect server-side verify errors into the local error state
   useEffect(() => {
@@ -90,7 +92,7 @@ export const LocationCardMfaTotpView = () => {
     <div
       className="location-card-mfa-totp-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
@@ -101,7 +103,7 @@ export const LocationCardMfaTotpView = () => {
       <CodeInput
         length={6}
         value={totpCode}
-        onChange={setTotpCode}
+        onChange={handleCodeChange}
         error={startError ?? error}
         onSuccessPaste={(value) => {
           handleVerify(value);

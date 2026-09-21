@@ -1519,11 +1519,11 @@ dependencies = [
  "base64 0.23.1",
  "block2",
  "chrono",
- "ctap-hid-fido2",
  "defguard-cli",
  "defguard-client-common",
  "defguard-client-config-sync",
  "defguard-client-core",
+ "defguard-client-fido2",
  "defguard-client-posture",
  "defguard-client-proto",
  "defguard-client-provisioning",
@@ -1646,6 +1646,23 @@ dependencies = [
  "windows-sys 0.61.2",
  "wiremock",
  "x25519-dalek",
+]
+
+[[package]]
+name = "defguard-client-fido2"
+version = "2.2.0"
+dependencies = [
+ "base64 0.23.1",
+ "ciborium",
+ "ctap-hid-fido2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+ "windows 0.62.2",
 ]
 
 [[package]]

@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
@@ -60,10 +61,11 @@ export const ConnectModalMfaTotp = () => {
     [totpCode, verifyCode],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
-  useEffect(() => {
-    setError(null);
-  }, [totpCode, setError]);
+  // Only real input clears the error, CodeInput's own reset passes ''.
+  const handleCodeChange = useCallback((value: string) => {
+    setTotpCode(value);
+    if (value.length > 0) setError(null);
+  }, []);
 
   useEffect(() => {
     if (verifyError) setError(verifyError);
@@ -77,7 +79,7 @@ export const ConnectModalMfaTotp = () => {
     <div
       id="mfa-totp-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <p className="view-description">
@@ -86,7 +88,7 @@ export const ConnectModalMfaTotp = () => {
       <CodeInput
         length={6}
         value={totpCode}
-        onChange={(val) => setTotpCode(val)}
+        onChange={handleCodeChange}
         error={startError ?? error}
         onSuccessPaste={(value) => {
           handleVerify(value);

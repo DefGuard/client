@@ -6,6 +6,7 @@ pub mod apple;
 pub mod appstate;
 pub mod commands;
 pub mod events;
+pub mod fido2_window;
 pub mod gui;
 pub mod log_watcher;
 pub mod periodic;

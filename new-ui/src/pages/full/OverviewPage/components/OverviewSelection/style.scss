@@ -50,6 +50,10 @@
         span {
           font: var(--t-body-sm-400);
           color: inherit;
+          min-width: 0;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
         }
 
         &:not(.selected):hover {

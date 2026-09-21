@@ -1,9 +1,4 @@
 #add-instance-view {
-  > .scroll-container {
-    display: flex;
-    flex-flow: column;
-  }
-
   .page-description {
     font: var(--t-body-sm-400);
     color: var(--fg-white-70);
@@ -12,9 +7,5 @@
 
   form {
     display: contents;
-  }
-
-  .controls {
-    margin-top: auto;
   }
 }

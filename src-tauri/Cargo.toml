@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
+members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
 default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
@@ -130,8 +130,8 @@ redundant_closure = "warn"
 [dependencies]
 base64.workspace = true
 chrono.workspace = true
-ctap-hid-fido2.workspace = true
 defguard-cli.path = "client-cli"
+defguard-client-fido2.path = "fido2"
 defguard-client-proto.path = "client-proto"
 defguard-client-core.path = "core"
 defguard-client-posture.path = "enterprise/posture"

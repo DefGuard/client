@@ -7,8 +7,6 @@ import type {
   Connection,
   ConnectionArgs,
   CreateDeviceResponse,
-  EnrollmentMfaFinishResult,
-  EnrollmentMfaStartResult,
   EnrollmentStartResult,
   InstanceInfo,
   LocationDetails,
@@ -16,7 +14,11 @@ import type {
   LocationInfo,
   LocationStats,
   MfaBeginStepResult,
+  MfaConfigAuthorizeResult,
+  MfaConfigStartResult,
   MfaMethodValue,
+  MfaSetupFinishResult,
+  MfaSetupStartResult,
   NewAppVersionInfo,
   ProvisioningConfig,
   RoutingArgs,
@@ -165,7 +167,7 @@ const enrollmentActivateUser = (
 const enrollmentRegisterMfaStart = (
   sessionId: string,
   method: MfaMethodValue,
-): Promise<EnrollmentMfaStartResult> =>
+): Promise<MfaSetupStartResult> =>
   invoke(TauriCommand.EnrollmentRegisterMfaStart, {
     sessionId,
     method: mfaToApi(method),
@@ -175,7 +177,7 @@ const enrollmentRegisterMfaFinish = (
   sessionId: string,
   code: string,
   method: MfaMethodValue,
-): Promise<EnrollmentMfaFinishResult> =>
+): Promise<MfaSetupFinishResult> =>
   invoke(TauriCommand.EnrollmentRegisterMfaFinish, {
     sessionId,
     code,
@@ -230,7 +232,8 @@ const mfaFido2Pin = (
   locationId: number,
   methods: MfaMethodValue[],
   token: string | null,
-  pin: string,
+  // Null where the platform collects the PIN itself - see `fido2CollectsPinInApp`.
+  pin: string | null,
 ): Promise<string> =>
   invoke(TauriCommand.MfaFido2Pin, { instanceId, locationId, methods, token, pin });
 
@@ -251,6 +254,47 @@ const mfaBeginStep = (
     stepPlan,
     token,
   });
+
+// MFA configuration
+
+const mfaConfigStart = (instanceId: number): Promise<MfaConfigStartResult> =>
+  invoke(TauriCommand.MfaConfigStart, { instanceId });
+
+const mfaConfigSendCode = (sessionId: string): Promise<void> =>
+  invoke(TauriCommand.MfaConfigSendCode, { sessionId });
+
+const mfaConfigAuthorize = (
+  sessionId: string,
+  method: MfaMethodValue,
+  code: string,
+): Promise<MfaConfigAuthorizeResult> =>
+  invoke(TauriCommand.MfaConfigAuthorize, { sessionId, method, code });
+
+const mfaConfigSetupStart = (
+  sessionId: string,
+  method: MfaMethodValue,
+): Promise<MfaSetupStartResult> =>
+  invoke(TauriCommand.MfaConfigSetupStart, { sessionId, method });
+
+const mfaConfigSetupFinish = (
+  sessionId: string,
+  method: MfaMethodValue,
+  code: string,
+): Promise<MfaSetupFinishResult> =>
+  invoke(TauriCommand.MfaConfigSetupFinish, { sessionId, method, code });
+
+// Challenge, key ceremony and attestation submit in one call, so it resolves only once the
+// user has touched the key. `mfa-config-fido2-touch` is emitted while it waits.
+const mfaConfigSetupFido2 = (
+  sessionId: string,
+  name: string,
+  // Null where the platform collects the PIN itself - see `fido2CollectsPinInApp`.
+  pin: string | null,
+): Promise<MfaSetupFinishResult> =>
+  invoke(TauriCommand.MfaConfigSetupFido2, { sessionId, name, pin });
+
+const mfaConfigCancel = (sessionId: string): Promise<void> =>
+  invoke(TauriCommand.MfaConfigCancel, { sessionId });
 
 export const api = {
   closeWelcomeWindow,
@@ -314,4 +358,12 @@ export const api = {
   mfaConnectMobileApprove,
   mfaFido2Pin,
   cancelMfa,
+  // MFA configuration
+  mfaConfigStart,
+  mfaConfigSendCode,
+  mfaConfigAuthorize,
+  mfaConfigSetupStart,
+  mfaConfigSetupFinish,
+  mfaConfigSetupFido2,
+  mfaConfigCancel,
 };

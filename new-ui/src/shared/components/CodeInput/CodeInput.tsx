@@ -1,4 +1,5 @@
 import './style.scss';
+import { ArrowLeft, ArrowRight, Backspace, Delete, Enter } from '@fluentui/keyboard-keys';
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -16,6 +17,7 @@ interface Props {
   error?: string | null;
   onChange: (value: string) => void;
   onSuccessPaste?: (value: string) => void;
+  onSubmit?: () => void;
 }
 
 const toDigits = (value: string | null, length: number): string[] => {
@@ -32,12 +34,14 @@ export const CodeInput = ({
   value,
   error,
   onSuccessPaste,
+  onSubmit,
   length = 6,
 }: Props) => {
   const [digits, setDigits] = useState<string[]>(() => toDigits(value, length));
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const prevLengthRef = useRef(length);
+  const hadErrorRef = useRef(false);
 
   useEffect(() => {
     const lengthChanged = prevLengthRef.current !== length;
@@ -53,6 +57,19 @@ export const CodeInput = ({
       });
     }
   }, [value, length]);
+
+  // Clears for retyping, callers must not treat the empty `onChange` as user input.
+  useEffect(() => {
+    const hasError = isPresent(error) && error.length > 0;
+    const shouldClear = hasError && !hadErrorRef.current;
+    hadErrorRef.current = hasError;
+
+    if (shouldClear) {
+      setDigits(Array.from({ length }, () => ''));
+      onChange('');
+      requestAnimationFrame(() => inputRefs.current[0]?.focus());
+    }
+  }, [error, length, onChange]);
 
   const focus = (index: number) => {
     const clamped = Math.max(0, Math.min(index, length - 1));
@@ -71,17 +88,20 @@ export const CodeInput = ({
   const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
     if (e.ctrlKey || e.metaKey) return;
 
-    if (e.key === 'Backspace') {
+    if (e.key === Enter) {
+      e.preventDefault();
+      onSubmit?.();
+    } else if (e.key === Backspace) {
       e.preventDefault();
       updateDigit(index, '');
       focus(index - 1);
-    } else if (e.key === 'Delete') {
+    } else if (e.key === Delete) {
       e.preventDefault();
       updateDigit(index, '');
-    } else if (e.key === 'ArrowLeft') {
+    } else if (e.key === ArrowLeft) {
       e.preventDefault();
       focus(index - 1);
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === ArrowRight) {
       e.preventDefault();
       focus(index + 1);
     } else if (/^[0-9]$/.test(e.key)) {

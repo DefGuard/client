@@ -7,7 +7,10 @@ pub mod commands;
 
 use defguard_client_core::{
     database::{
-        models::{instance::Instance, Id},
+        models::{
+            instance::{mfa_configured_methods, Instance},
+            Id,
+        },
         DbPool,
     },
     error::Error,
@@ -19,7 +22,7 @@ use futures_util::future::join_all;
 use reqwest::{StatusCode, Url};
 use semver::Version;
 use serde::Serialize;
-use sqlx::{Sqlite, Transaction};
+use sqlx::{types::Json, Sqlite, Transaction};
 
 use crate::commands::{
     disable_enterprise_features, do_update_instance, sync_service_locations_best_effort,
@@ -48,6 +51,9 @@ pub enum PollInstanceResult {
     },
     ChangedWhileActive {
         version_mismatch: Option<VersionMismatchPayload>,
+        /// Part of the config was safe to write mid-connection, so the frontend's copy of the
+        /// instance is stale even though the rest of the update was deferred.
+        instance_updated: bool,
     },
 }
 
@@ -203,8 +209,9 @@ async fn apply_fetched_config(
     );
 
     if has_active_connections {
-        // add dedicated override to disable tunnels without waiting for a disconnect
+        let mut instance_updated = false;
         if let Some(ref info) = device_config.instance {
+            // add dedicated override to disable tunnels without waiting for a disconnect
             let new_tunnels_disabled = info.disable_tunnels.unwrap_or(false);
             if new_tunnels_disabled && !instance.disable_tunnels {
                 debug!(
@@ -213,10 +220,30 @@ async fn apply_fetched_config(
                     instance.name, instance.id
                 );
                 instance.disable_tunnels = true;
+                instance_updated = true;
+            }
+            // Says nothing about the tunnel, and deferring it would keep the instance unable to
+            // configure MFA for as long as the VPN stayed up.
+            let configured_methods = mfa_configured_methods(info).map(Json);
+            if instance.mfa_configured_methods.as_ref().map(|json| &json.0)
+                != configured_methods.as_ref().map(|json| &json.0)
+            {
+                debug!(
+                    "MFA state changed for instance {}({}) while a connection is active, \
+                    persisting the snapshot immediately.",
+                    instance.name, instance.id
+                );
+                instance.mfa_configured_methods = configured_methods;
+                instance_updated = true;
+            }
+            if instance_updated {
                 instance.save(transaction.as_mut()).await?;
             }
         }
-        return Ok(PollInstanceResult::ChangedWhileActive { version_mismatch });
+        return Ok(PollInstanceResult::ChangedWhileActive {
+            version_mismatch,
+            instance_updated,
+        });
     }
 
     debug!(

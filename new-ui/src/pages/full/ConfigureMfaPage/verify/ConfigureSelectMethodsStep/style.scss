@@ -1,0 +1,22 @@
+#configure-select-methods-step {
+  .methods {
+    @include surface-row-stack;
+  }
+
+  .method-row {
+    @include surface-row;
+
+    &.configured {
+      .name {
+        font: var(--t-body-sm-400);
+        color: var(--fg-white-70);
+      }
+
+      .tag {
+        font: var(--t-body-xs-400);
+        color: var(--fg-white-70);
+        white-space: nowrap;
+      }
+    }
+  }
+}

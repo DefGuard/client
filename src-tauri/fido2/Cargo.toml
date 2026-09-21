@@ -1,0 +1,37 @@
+[package]
+name = "defguard-client-fido2"
+description = "FIDO2 security key ceremonies for the Defguard desktop client (Tauri-free)"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license-file.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+base64.workspace = true
+# Encodes the WebAuthn attestation object; the CTAP crate speaks the same CBOR.
+ciborium = "0.2"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# `rt` for the blocking pool and the cancellation watcher, `sync` for the oneshot the ceremony
+# thread reports through and the single-ceremony semaphore, `macros` to race that semaphore
+# against cancellation, `time` to re-issue a cancellation the platform was not ready for.
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
+tokio-util = "0.7"
+tracing.workspace = true
+url = "2.5"
+
+# Windows restricts direct HID access to a security key to elevated processes, so there the
+# ceremony goes through the platform WebAuthn API instead. Everywhere else it talks CTAP-HID.
+[target.'cfg(not(windows))'.dependencies]
+# Needs libudev on Linux, pulled in through hidapi.
+ctap-hid-fido2.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WindowsWebServices",
+    "Win32_System_LibraryLoader",
+] }
