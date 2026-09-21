@@ -317,6 +317,107 @@ async fn test_mfa_start_non_mobile_not_rewrapped() {
 }
 
 #[tokio::test]
+async fn test_mfa_start_keeps_legacy_method_beside_the_plan() {
+    // Pre-2.2 Edge ignores `selected_methods` and reads only the deprecated `method` field.
+    // Keep both fields so older Edge versions continue to work.
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .and(body_partial_json(json!({
+            "method": MfaMethod::Totp as i32,
+            "selected_methods": [MfaMethod::Totp as i32],
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(start_response_json("t")))
+        .mount(&server)
+        .await;
+
+    let url = mock_url(&server);
+    let request = ClientMfaStartRequest {
+        location_id: 1,
+        pubkey: "pk".into(),
+        method: MfaMethod::Totp as i32,
+        posture_data: None,
+        selected_methods: vec![MfaMethod::Totp as i32],
+    };
+    mfa_start(url, request)
+        .await
+        .expect("request body did not match the expected wire contract");
+}
+
+#[tokio::test]
+async fn test_mfa_start_rejection_keeps_mobile_guidance() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "token": "",
+            "challenge": null,
+            "rejections": [{
+                "step": 0,
+                "reason": MfaStartRejectionReason::MfaStartRejectionStepUnavailable as i32,
+            }],
+        })))
+        .mount(&server)
+        .await;
+
+    let url = mock_url(&server);
+    let request = ClientMfaStartRequest {
+        location_id: 1,
+        pubkey: "pk".into(),
+        method: MfaMethod::MobileApprove as i32,
+        posture_data: None,
+        selected_methods: vec![MfaMethod::MobileApprove as i32],
+    };
+    match mfa_start(url, request).await.unwrap_err() {
+        MfaError::MfaRejected { message } => {
+            assert!(
+                message.contains("mobile app"),
+                "unexpected message: {message}"
+            );
+        }
+        other => panic!("expected MfaRejected, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn test_mfa_start_rejection_non_mobile_step_stays_generic() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "token": "",
+            "challenge": null,
+            "rejections": [{
+                "step": 0,
+                "reason": MfaStartRejectionReason::MfaStartRejectionStepUnavailable as i32,
+            }],
+        })))
+        .mount(&server)
+        .await;
+
+    let url = mock_url(&server);
+    let request = ClientMfaStartRequest {
+        location_id: 1,
+        pubkey: "pk".into(),
+        method: MfaMethod::Totp as i32,
+        posture_data: None,
+        selected_methods: vec![MfaMethod::Totp as i32],
+    };
+    match mfa_start(url, request).await.unwrap_err() {
+        MfaError::MfaRejected { message } => {
+            assert!(
+                !message.contains("mobile app"),
+                "TOTP got mobile guidance: {message}"
+            );
+        }
+        other => panic!("expected MfaRejected, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn test_mfa_finish_code_success() {
     let server = MockServer::start().await;
     let body = finish_response_json("psk-123");

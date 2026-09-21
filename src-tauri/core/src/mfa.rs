@@ -36,6 +36,13 @@ use crate::{
 
 const ATTEMPT_LIMIT_MESSAGE: &str = "Too many failed MFA attempts. Please try connecting again.";
 
+/// Registration guidance for an unavailable mobile-approve step.
+///
+/// Both MFA start paths use this message when they report that case.
+const MOBILE_NOT_REGISTERED_MESSAGE: &str =
+    "No mobile authenticator is registered for your account. \
+     Register one in the Defguard mobile app, then retry.";
+
 /// Error type returned by MFA operations.
 ///
 /// Serialized as a tagged JSON union so the TypeScript frontend can
@@ -165,7 +172,15 @@ pub async fn mfa_start_with_capability(
         let messages: Vec<String> = start_response
             .rejections
             .iter()
-            .map(rejection_message)
+            .map(|rejection| {
+                rejection_message(
+                    rejection,
+                    request
+                        .selected_methods
+                        .get(rejection.step as usize)
+                        .copied(),
+                )
+            })
             .collect();
         return Err(MfaError::MfaRejected {
             message: messages.join(" "),
@@ -190,7 +205,7 @@ fn is_multi_step_mfa_capable(headers: &reqwest::header::HeaderMap) -> bool {
         })
 }
 
-fn rejection_message(rejection: &MfaStepRejection) -> String {
+fn rejection_message(rejection: &MfaStepRejection, selected_method: Option<i32>) -> String {
     let step = rejection.step + 1;
     match rejection.reason() {
         MfaStartRejectionReason::MfaStartRejectionMethodNotInStep => format!(
@@ -201,6 +216,11 @@ fn rejection_message(rejection: &MfaStepRejection) -> String {
             "Verification step {step} has no method available on this server. \
              Contact your administrator."
         ),
+        MfaStartRejectionReason::MfaStartRejectionStepUnavailable
+            if selected_method == Some(MfaMethod::MobileApprove as i32) =>
+        {
+            MOBILE_NOT_REGISTERED_MESSAGE.to_string()
+        }
         MfaStartRejectionReason::MfaStartRejectionStepUnavailable => format!(
             "The method chosen for verification step {step} cannot be used. \
              Set it up first, or pick a different one."
@@ -252,9 +272,7 @@ fn rewrap_mobile_start_error(method: i32, err: MfaError) -> MfaError {
         if let MfaError::MfaRejected { message } = &err {
             if message.contains("selected MFA method is not available") {
                 return MfaError::MfaRejected {
-                    message: "No mobile authenticator is registered for your account. \
-                              Register one in the Defguard mobile app, then retry."
-                        .into(),
+                    message: MOBILE_NOT_REGISTERED_MESSAGE.into(),
                 };
             }
         }

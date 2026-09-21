@@ -339,8 +339,9 @@ fn prompt_step_method(
 
 /// Start an MFA session and return its proxy URL and response.
 ///
-/// `selected_methods` is empty for legacy Edge. Keep `method` populated
-/// for pre-2.2 Edge; current Edge reads the per-step plan.
+/// `selected_methods` carries one method per verification step. An empty list makes
+/// Core use the legacy path, which rejects flows it cannot express through the legacy
+/// field and tells the user to update the client. Keep `method` populated for pre-2.2 Edge, which ignores the per-step plan.
 async fn start_session(
     location: &Location<Id>,
     instance: &Instance<Id>,
@@ -408,8 +409,15 @@ pub(crate) async fn authorize(
 ) -> Result<SecretString, CliError> {
     check_code_method(method)?;
 
-    let (proxy_url, info, _) =
-        start_session(location, instance, method, Vec::new(), posture_data, pool).await?;
+    let (proxy_url, info, _) = start_session(
+        location,
+        instance,
+        method,
+        vec![method as i32],
+        posture_data,
+        pool,
+    )
+    .await?;
 
     let ctx = MfaContext {
         instance: instance.name.clone(),
@@ -714,7 +722,7 @@ pub(crate) async fn authorize_oidc(
         location,
         instance,
         MfaMethod::Oidc,
-        Vec::new(),
+        vec![MfaMethod::Oidc as i32],
         posture_data,
         pool,
     )
@@ -745,7 +753,7 @@ pub(crate) async fn authorize_mobile_approve(
         location,
         instance,
         MfaMethod::MobileApprove,
-        Vec::new(),
+        vec![MfaMethod::MobileApprove as i32],
         posture_data,
         pool,
     )
