@@ -2,27 +2,37 @@ use std::collections::HashMap;
 
 use defguard_core::database::models::{
     instance::{ClientTrafficPolicy, Instance},
-    location::{Location, LocationMfaMethod},
+    location::{Location, LocationMfaMethod, LocationMfaStep},
     Id,
 };
 use serde_json::{json, Value};
 
 use crate::{
+    mfa::{join_methods, parse_method},
     output::{CommandOutput, LocationEntry},
     resolve::{self, ResolvedTarget, TargetSpec},
     state::{CliError, State},
 };
 
 const MIN_NAME_COL_WIDTH: usize = 8;
+const MIN_ADDRESS_COL_WIDTH: usize = 15;
 const MIN_ENDPOINT_COL_WIDTH: usize = 8;
 const MIN_INST_COL_WIDTH: usize = 8;
+const MIN_MFA_COL_WIDTH: usize = 3;
+
+/// Return the widest value, but never less than `min`.
+///
+/// Count characters because `format!` pads strings by character, not byte.
+pub(crate) fn col_width<'a>(values: impl Iterator<Item = &'a str>, min: usize) -> usize {
+    values
+        .map(|value| value.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max(min)
+}
 
 pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, CliError> {
-    let locations = Location::all(&state.pool, false)
-        .await?
-        .into_iter()
-        .filter(|location| location.mfa_steps.len() <= 1)
-        .collect::<Vec<_>>();
+    let locations = Location::all(&state.pool, false).await?;
 
     let instance_details = Instance::all(&state.pool)
         .await?
@@ -44,11 +54,36 @@ pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, Cli
     })
 }
 
+/// Reject MFA flags that do not match the location's step count.
+fn check_set_mfa_flags(
+    mfa_method: Option<&str>,
+    mfa_steps: &[String],
+    step_count: usize,
+) -> Result<(), CliError> {
+    if !mfa_steps.is_empty() && mfa_method.is_some() {
+        return Err(CliError::InvalidInput(
+            "--mfa-step conflicts with --mfa-method; use only one.".into(),
+        ));
+    }
+    if !mfa_steps.is_empty() && step_count <= 1 {
+        return Err(CliError::InvalidInput(
+            "--mfa-step requires a multi-step location; use --mfa-method for a single-step location.".into(),
+        ));
+    }
+    if mfa_method.is_some() && step_count > 1 {
+        return Err(CliError::InvalidInput(
+            "--mfa-method requires a single-step location; use --mfa-step for a multi-step location.".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub async fn handle_set(
     state: &State,
     name: &str,
     instance: Option<&str>,
     mfa_method: Option<&str>,
+    mfa_steps: &[String],
     route_all_traffic: Option<bool>,
     predefined_traffic: bool,
 ) -> Result<LocationSetResult, CliError> {
@@ -60,17 +95,26 @@ pub async fn handle_set(
     };
 
     let target = resolve::resolve_connect_target(&spec, &state.pool).await?;
-    let location_id = match &target {
-        ResolvedTarget::Location(loc) => loc.id,
+    let location = match &target {
+        ResolvedTarget::Location(loc) => loc,
         ResolvedTarget::Tunnel(_) => {
             return Err(CliError::NotFound(format!("Location '{name}' not found")));
         }
     };
+    let location_id = location.id;
 
     let mut changed = Vec::new();
 
+    check_set_mfa_flags(mfa_method, mfa_steps, location.mfa_steps.len())?;
+
+    if !mfa_steps.is_empty() {
+        let plan = parse_step_plan(name, mfa_steps, &location.mfa_steps)?;
+        Location::set_mfa_step_plan(&state.pool, location_id, plan).await?;
+        changed.push(format!("MFA steps → {}", mfa_steps.join(", ")));
+    }
+
     if let Some(method_str) = mfa_method {
-        let method = parse_mfa_method(method_str)?;
+        let method = parse_method(method_str)?;
         Location::set_mfa_method(&state.pool, location_id, method).await?;
         changed.push(format!("MFA method → {method_str}"));
     }
@@ -118,7 +162,13 @@ pub async fn handle_show(
         pubkey: location.pubkey.clone(),
         allowed_ips: location.allowed_ips.clone(),
         dns: location.dns.clone(),
-        mfa_method: mfa_label(location.mfa_method).to_string(),
+        mfa_method: location_mfa_label(location),
+        mfa_steps: location
+            .mfa_steps
+            .iter()
+            .map(|step| step.methods.iter().map(|entry| entry.method).collect())
+            .collect(),
+        mfa_step_plan: location.mfa_step_plan.to_vec(),
         route_all_traffic: match client_traffic_policy {
             ClientTrafficPolicy::None => location.route_all_traffic,
             ClientTrafficPolicy::DisableAllTraffic => false,
@@ -128,18 +178,39 @@ pub async fn handle_show(
     })
 }
 
-fn parse_mfa_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
-    match raw.to_lowercase().as_str() {
-        "totp" => Ok(LocationMfaMethod::Totp),
-        "email" => Ok(LocationMfaMethod::Email),
-        "oidc" => Ok(LocationMfaMethod::Oidc),
-        "biometric" => Ok(LocationMfaMethod::Biometric),
-        "mobile" | "mobile_approve" => Ok(LocationMfaMethod::MobileApprove),
-        "fido2" => Ok(LocationMfaMethod::Fido2),
-        _ => Err(CliError::Usage(format!(
-            "Invalid MFA method '{raw}'. Valid: totp, email, oidc, biometric, mobile, fido2."
-        ))),
+/// Parse one method per verification step for `location set --mfa-step`.
+///
+/// Unsupported methods can be saved because the desktop client reads the same
+/// plan; `connect` rejects methods the CLI cannot run.
+fn parse_step_plan(
+    name: &str,
+    raw: &[String],
+    steps: &[LocationMfaStep],
+) -> Result<Vec<LocationMfaMethod>, CliError> {
+    if raw.len() != steps.len() {
+        return Err(CliError::InvalidInput(format!(
+            "Location '{name}' has {} verification steps but {} --mfa-step values were given.",
+            steps.len(),
+            raw.len()
+        )));
     }
+    raw.iter()
+        .zip(steps.iter())
+        .enumerate()
+        .map(|(index, (value, step))| {
+            let method = parse_method(value)?;
+            let offered: Vec<LocationMfaMethod> =
+                step.methods.iter().map(|entry| entry.method).collect();
+            if !offered.contains(&method) {
+                return Err(CliError::InvalidInput(format!(
+                    "'{value}' is not available for step {} of '{name}' (offered: {}).",
+                    index + 1,
+                    join_methods(&offered)
+                )));
+            }
+            Ok(method)
+        })
+        .collect()
 }
 
 pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
@@ -147,6 +218,15 @@ pub(crate) fn mfa_label(method: Option<LocationMfaMethod>) -> &'static str {
         Some(method) => method.as_str(),
         None => "none",
     }
+}
+
+/// Format the MFA column for a location. Multi-step locations show their step
+/// count instead of a single method.
+pub(crate) fn location_mfa_label(location: &Location<Id>) -> String {
+    if location.mfa_steps.len() > 1 {
+        return format!("{} steps", location.mfa_steps.len());
+    }
+    mfa_label(location.mfa_method).to_string()
 }
 
 pub(crate) struct InstanceDetails {
@@ -189,7 +269,7 @@ impl CommandOutput for LocationListResult {
                     address: l.address.clone(),
                     endpoint: l.endpoint.clone(),
                     mfa_enabled: None,
-                    mfa_method: Some(mfa_label(l.mfa_method).to_string()),
+                    mfa_method: Some(location_mfa_label(l)),
                     route_all_traffic: Some(route_all_traffic),
                 }
             })
@@ -202,34 +282,35 @@ fn format_location_list_table(
     locations: &[Location<Id>],
     instance_details: &HashMap<Id, InstanceDetails>,
 ) -> String {
-    let name_col_width = locations
-        .iter()
-        .map(|l| l.name.len())
-        .max()
-        .unwrap_or(MIN_NAME_COL_WIDTH)
-        .max(MIN_NAME_COL_WIDTH);
-    let endpoint_col_width = locations
-        .iter()
-        .map(|l| l.endpoint.len())
-        .max()
-        .unwrap_or(MIN_ENDPOINT_COL_WIDTH)
-        .max(MIN_ENDPOINT_COL_WIDTH);
-    let inst_col_width = locations
-        .iter()
-        .filter_map(|l| {
+    let name_col_width = col_width(
+        locations.iter().map(|l| l.name.as_str()),
+        MIN_NAME_COL_WIDTH,
+    );
+    let address_col_width = col_width(
+        locations.iter().map(|l| l.address.as_str()),
+        MIN_ADDRESS_COL_WIDTH,
+    );
+    let endpoint_col_width = col_width(
+        locations.iter().map(|l| l.endpoint.as_str()),
+        MIN_ENDPOINT_COL_WIDTH,
+    );
+    let inst_col_width = col_width(
+        locations.iter().filter_map(|l| {
             instance_details
                 .get(&l.instance_id)
-                .map(|details| details.name.len())
-        })
-        .max()
-        .unwrap_or(MIN_INST_COL_WIDTH)
-        .max(MIN_INST_COL_WIDTH);
+                .map(|details| details.name.as_str())
+        }),
+        MIN_INST_COL_WIDTH,
+    );
+    // Measure MFA labels too so the Routing column stays aligned.
+    let mfa_labels: Vec<String> = locations.iter().map(location_mfa_label).collect();
+    let mfa_col_width = col_width(mfa_labels.iter().map(String::as_str), MIN_MFA_COL_WIDTH);
 
     let mut lines = vec![format!(
-        "  {:>4}  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:<11}",
+        "  {:>4}  {:<name_col_width$}  {:<address_col_width$}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:<mfa_col_width$}  {}",
         "ID", "LOCATION", "ADDRESS", "ENDPOINT", "INSTANCE", "MFA", "Routing"
     )];
-    for location in locations {
+    for (location, mfa_label) in locations.iter().zip(&mfa_labels) {
         let details = instance_details.get(&location.instance_id);
 
         let instance_name = details.map_or("?", |instance| instance.name.as_str());
@@ -250,13 +331,13 @@ fn format_location_list_table(
         };
 
         lines.push(format!(
-            "  {:>4}  {:<name_col_width$}  {:<15}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:>3}  {:>11}",
+            "  {:>4}  {:<name_col_width$}  {:<address_col_width$}  {:<endpoint_col_width$}  {:<inst_col_width$}  {:<mfa_col_width$}  {}",
             location.id,
             location.name,
             location.address,
             location.endpoint,
             instance_name,
-            mfa_label(location.mfa_method),
+            mfa_label,
             route_label
         ));
     }
@@ -271,6 +352,11 @@ pub struct LocationShowResult {
     pub allowed_ips: String,
     pub dns: Option<String>,
     pub mfa_method: String,
+    /// Methods offered by each verification step, in order. Empty when Edge
+    /// returned no step data.
+    pub mfa_steps: Vec<Vec<LocationMfaMethod>>,
+    /// Saved method for each step, set by `location set --mfa-step`.
+    pub mfa_step_plan: Vec<LocationMfaMethod>,
     pub route_all_traffic: bool,
     pub keepalive_interval: i64,
 }
@@ -287,6 +373,21 @@ impl CommandOutput for LocationShowResult {
             lines.push(format!("DNS:               {dns}"));
         }
         lines.push(format!("MFA method:        {}", self.mfa_method));
+        if self.mfa_steps.len() > 1 {
+            for (index, methods) in self.mfa_steps.iter().enumerate() {
+                lines.push(format!(
+                    "MFA step {}:        {}",
+                    index + 1,
+                    join_methods(methods)
+                ));
+            }
+            if !self.mfa_step_plan.is_empty() {
+                lines.push(format!(
+                    "MFA saved plan:    {}",
+                    join_methods(&self.mfa_step_plan)
+                ));
+            }
+        }
         lines.push(format!("Route all traffic: {}", self.route_all_traffic));
         lines.push(format!("Keepalive:         {}s", self.keepalive_interval));
         lines.join("\n")
@@ -300,6 +401,14 @@ impl CommandOutput for LocationShowResult {
             "pubkey": self.pubkey,
             "allowed_ips": self.allowed_ips,
             "mfa_method": self.mfa_method,
+            "mfa_steps": self.mfa_steps
+                .iter()
+                .map(|methods| methods.iter().map(|method| method.as_str()).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            "mfa_step_plan": self.mfa_step_plan
+                .iter()
+                .map(|method| method.as_str())
+                .collect::<Vec<_>>(),
             "route_all_traffic": self.route_all_traffic,
             "keepalive_interval": self.keepalive_interval,
         });
@@ -337,300 +446,4 @@ impl CommandOutput for LocationSetResult {
 }
 
 #[cfg(test)]
-mod tests {
-    use defguard_core::database::models::location::{LocationMfaMode, ServiceLocationMode};
-    use sqlx::types::Json;
-
-    use super::*;
-
-    fn make_location(
-        id: Id,
-        instance_id: Id,
-        name: &str,
-        endpoint: &str,
-        mfa: bool,
-    ) -> Location<Id> {
-        Location {
-            mfa_steps: Json::default(),
-            mfa_step_plan: Json::default(),
-            client_mtu: None,
-            id,
-            instance_id,
-            network_id: 1,
-            name: name.to_string(),
-            address: "10.0.0.0/24".to_string(),
-            pubkey: "pk".to_string(),
-            endpoint: endpoint.to_string(),
-            allowed_ips: "0.0.0.0/0".to_string(),
-            dns: None,
-            route_all_traffic: false,
-            keepalive_interval: 25,
-            location_mfa_mode: if mfa {
-                LocationMfaMode::Internal
-            } else {
-                LocationMfaMode::Disabled
-            },
-            service_location_mode: ServiceLocationMode::Disabled,
-            mfa_method: None,
-            posture_check_required: false,
-        }
-    }
-
-    fn make_instance_details(
-        name: &str,
-        client_traffic_policy: ClientTrafficPolicy,
-    ) -> InstanceDetails {
-        InstanceDetails {
-            name: name.to_string(),
-            client_traffic_policy,
-        }
-    }
-
-    #[test]
-    fn test_list_human_empty() {
-        let result = LocationListResult {
-            locations: Vec::new(),
-            instance_details: HashMap::new(),
-        };
-        assert_eq!(
-            result.human(),
-            "No locations configured. Use the desktop app to enroll an instance first."
-        );
-    }
-
-    #[test]
-    fn test_list_human_with_data() {
-        let loc = make_location(1, 10, "office", "1.2.3.4:51820", false);
-        let mut instance_details = HashMap::new();
-        instance_details.insert(10, make_instance_details("acme", ClientTrafficPolicy::None));
-        let result = LocationListResult {
-            locations: vec![loc],
-            instance_details,
-        };
-        let s = result.human();
-        assert!(s.contains("ID"));
-        assert!(s.contains("office"));
-        assert!(s.contains("acme"));
-        assert!(s.contains("1.2.3.4:51820"));
-    }
-
-    fn routing_column(
-        route_all_traffic: bool,
-        client_traffic_policy: ClientTrafficPolicy,
-    ) -> String {
-        let mut location = make_location(1, 10, "office", "1.2.3.4:51820", false);
-        location.route_all_traffic = route_all_traffic;
-        let mut instance_details = HashMap::new();
-        instance_details.insert(10, make_instance_details("acme", client_traffic_policy));
-        LocationListResult {
-            locations: vec![location],
-            instance_details,
-        }
-        .human()
-    }
-
-    #[test]
-    fn test_list_human_force_all_traffic_overrides_location() {
-        let table = routing_column(false, ClientTrafficPolicy::ForceAllTraffic);
-        assert!(table.contains("All-traffic"));
-        assert!(!table.contains("Predefined"));
-    }
-
-    #[test]
-    fn test_list_human_disable_all_traffic_overrides_location() {
-        let table = routing_column(true, ClientTrafficPolicy::DisableAllTraffic);
-        assert!(table.contains("Predefined"));
-        assert!(!table.contains("All-traffic"));
-    }
-
-    #[test]
-    fn test_list_human_no_policy_keeps_location_setting() {
-        assert!(routing_column(true, ClientTrafficPolicy::None).contains("All-traffic"));
-        assert!(routing_column(false, ClientTrafficPolicy::None).contains("Predefined"));
-    }
-
-    #[test]
-    fn test_list_json_empty() {
-        let result = LocationListResult {
-            locations: Vec::new(),
-            instance_details: HashMap::new(),
-        };
-        let json = result.json();
-        assert_eq!(json["locations"].as_array().unwrap().len(), 0);
-        assert!(json["message"].is_null());
-    }
-
-    #[test]
-    fn test_list_json_with_data() {
-        let loc = make_location(1, 10, "office", "1.2.3.4:51820", false);
-        let mut instance_details = HashMap::new();
-        instance_details.insert(10, make_instance_details("acme", ClientTrafficPolicy::None));
-        let result = LocationListResult {
-            locations: vec![loc],
-            instance_details,
-        };
-        let json = result.json();
-        let locations = json["locations"].as_array().unwrap();
-        assert_eq!(locations.len(), 1);
-        assert_eq!(locations[0]["id"], 1);
-        assert_eq!(locations[0]["name"], "office");
-        assert_eq!(locations[0]["instance"], "acme");
-    }
-
-    #[test]
-    fn test_show_human() {
-        let result = LocationShowResult {
-            name: "office".to_string(),
-            address: "10.0.0.0/24".to_string(),
-            endpoint: "1.2.3.4:51820".to_string(),
-            pubkey: "pk".to_string(),
-            allowed_ips: "0.0.0.0/0".to_string(),
-            dns: Some("8.8.8.8".to_string()),
-            mfa_method: "totp".to_string(),
-            route_all_traffic: false,
-            keepalive_interval: 25,
-        };
-        let s = result.human();
-        assert!(s.contains("Name:              office"));
-        assert!(s.contains("Address:           10.0.0.0/24"));
-        assert!(s.contains("DNS:               8.8.8.8"));
-        assert!(s.contains("MFA method:        totp"));
-    }
-
-    #[test]
-    fn test_show_human_without_dns() {
-        let result = LocationShowResult {
-            name: "office".to_string(),
-            address: "10.0.0.0/24".to_string(),
-            endpoint: "1.2.3.4:51820".to_string(),
-            pubkey: "pk".to_string(),
-            allowed_ips: "0.0.0.0/0".to_string(),
-            dns: None,
-            mfa_method: "none".to_string(),
-            route_all_traffic: true,
-            keepalive_interval: 30,
-        };
-        let s = result.human();
-        assert!(!s.contains("DNS"));
-        assert!(s.contains("Route all traffic: true"));
-    }
-
-    #[test]
-    fn test_show_json() {
-        let result = LocationShowResult {
-            name: "office".to_string(),
-            address: "10.0.0.0/24".to_string(),
-            endpoint: "1.2.3.4:51820".to_string(),
-            pubkey: "pk".to_string(),
-            allowed_ips: "0.0.0.0/0".to_string(),
-            dns: Some("8.8.8.8".to_string()),
-            mfa_method: "totp".to_string(),
-            route_all_traffic: false,
-            keepalive_interval: 25,
-        };
-        let json = result.json();
-        assert_eq!(json["name"], "office");
-        assert_eq!(json["dns"], "8.8.8.8");
-        assert_eq!(json["mfa_method"], "totp");
-        assert!(json["message"].is_null());
-    }
-
-    #[test]
-    fn test_show_json_without_dns() {
-        let result = LocationShowResult {
-            name: "office".to_string(),
-            address: "10.0.0.0/24".to_string(),
-            endpoint: "1.2.3.4:51820".to_string(),
-            pubkey: "pk".to_string(),
-            allowed_ips: "0.0.0.0/0".to_string(),
-            dns: None,
-            mfa_method: "none".to_string(),
-            route_all_traffic: true,
-            keepalive_interval: 30,
-        };
-        let json = result.json();
-        assert!(json["dns"].is_null());
-    }
-
-    #[test]
-    fn test_exit_code_zero() {
-        assert_eq!(
-            LocationListResult {
-                locations: Vec::new(),
-                instance_details: HashMap::new(),
-            }
-            .exit_code(),
-            0
-        );
-        assert_eq!(
-            LocationShowResult {
-                name: "x".to_string(),
-                address: "a".to_string(),
-                endpoint: "e".to_string(),
-                pubkey: "p".to_string(),
-                allowed_ips: "0.0.0.0/0".to_string(),
-                dns: None,
-                mfa_method: "n".to_string(),
-                route_all_traffic: false,
-                keepalive_interval: 25,
-            }
-            .exit_code(),
-            0
-        );
-        assert_eq!(
-            LocationSetResult {
-                name: "x".to_string(),
-                changes: Vec::new(),
-            }
-            .exit_code(),
-            0
-        );
-    }
-
-    #[test]
-    fn test_set_human_no_changes() {
-        let result = LocationSetResult {
-            name: "office".to_string(),
-            changes: Vec::new(),
-        };
-        assert_eq!(result.human(), "No changes for location 'office'.");
-    }
-
-    #[test]
-    fn test_set_human_with_changes() {
-        let result = LocationSetResult {
-            name: "office".to_string(),
-            changes: vec![
-                "MFA method → totp".to_string(),
-                "route-all-traffic → on".to_string(),
-            ],
-        };
-        let s = result.human();
-        assert!(s.contains("Updated location 'office'"));
-        assert!(s.contains("MFA method → totp"));
-        assert!(s.contains("route-all-traffic → on"));
-    }
-
-    #[test]
-    fn test_set_json() {
-        let result = LocationSetResult {
-            name: "office".to_string(),
-            changes: vec!["MFA method → totp".to_string()],
-        };
-        let json = result.json();
-        assert_eq!(json["location"], "office");
-        assert_eq!(json["changes"].as_array().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn test_set_json_empty_changes() {
-        let result = LocationSetResult {
-            name: "office".to_string(),
-            changes: Vec::new(),
-        };
-        let json = result.json();
-        assert_eq!(json["location"], "office");
-        assert_eq!(json["changes"].as_array().unwrap().len(), 0);
-        assert!(json["message"].is_null());
-    }
-}
+mod tests;

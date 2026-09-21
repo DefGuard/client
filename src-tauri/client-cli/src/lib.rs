@@ -61,6 +61,7 @@ pub async fn cli_main() -> ExitCode {
             code,
             code_command,
             mfa_method,
+            mfa_steps,
             qr_file,
             all_traffic,
             predefined_traffic,
@@ -74,6 +75,7 @@ pub async fn cli_main() -> ExitCode {
                 code.as_deref(),
                 code_command.as_deref(),
                 mfa_method.as_deref(),
+                &mfa_steps,
                 qr_file.as_deref(),
                 all_traffic,
                 predefined_traffic,
@@ -106,6 +108,7 @@ pub async fn cli_main() -> ExitCode {
                 name,
                 instance,
                 mfa_method,
+                mfa_steps,
                 route_all_traffic,
                 predefined_traffic,
             } => output::finish(
@@ -114,6 +117,7 @@ pub async fn cli_main() -> ExitCode {
                     &name,
                     instance.as_deref(),
                     mfa_method.as_deref(),
+                    &mfa_steps,
                     if route_all_traffic { Some(true) } else { None },
                     predefined_traffic,
                 )

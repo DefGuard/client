@@ -111,6 +111,19 @@ impl From<ProtoMfaMethod> for LocationMfaMethod {
     }
 }
 
+impl From<LocationMfaMethod> for ProtoMfaMethod {
+    fn from(value: LocationMfaMethod) -> Self {
+        match value {
+            LocationMfaMethod::Totp => Self::Totp,
+            LocationMfaMethod::Email => Self::Email,
+            LocationMfaMethod::Oidc => Self::Oidc,
+            LocationMfaMethod::Biometric => Self::Biometric,
+            LocationMfaMethod::MobileApprove => Self::MobileApprove,
+            LocationMfaMethod::Fido2 => Self::Fido2,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
 pub struct LocationMfaStepMethod {
     pub method: LocationMfaMethod,

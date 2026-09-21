@@ -12,10 +12,14 @@ use std::{
     process::Command,
 };
 
+use defguard_core::database::models::location::LocationMfaMethod;
 use secrecy::SecretString;
 use tracing::debug;
 
-use crate::state::CliError;
+use crate::{
+    mfa::{opt_step_badge, step_method_label},
+    state::CliError,
+};
 
 /// Describes where to source the MFA code from.
 ///
@@ -47,6 +51,32 @@ pub struct MfaContext {
     pub instance: String,
     /// `DG_LOCATION` - the location name.
     pub location: String,
+    /// Present when the code belongs to one step of a multi-step location.
+    pub step: Option<MfaStepContext>,
+}
+
+/// Additional context displayed to the user when entering an MFA code.
+#[derive(Clone, Copy)]
+pub struct MfaStepContext {
+    /// Zero-based step index.
+    pub index: usize,
+    /// Total number of steps.
+    pub total: usize,
+    /// The method this step verifies.
+    pub method: LocationMfaMethod,
+}
+
+/// Interactive prompt text.
+fn code_prompt(ctx: &MfaContext) -> String {
+    match &ctx.step {
+        Some(step) => format!(
+            "{}Enter the {} code for '{}': ",
+            opt_step_badge(Some(step)),
+            step_method_label(step.method),
+            ctx.location
+        ),
+        None => format!("Enter MFA code for {}: ", ctx.location),
+    }
 }
 
 /// Obtain a TOTP/email code from the configured source.
@@ -58,11 +88,20 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
         }
         CodeSource::Command(cmd) => {
             debug!("Running --code-command");
-            let output = Command::new("sh")
+            let mut command = Command::new("sh");
+            command
                 .arg("-c")
                 .arg(cmd)
                 .env("DG_INSTANCE", &ctx.instance)
-                .env("DG_LOCATION", &ctx.location)
+                .env("DG_LOCATION", &ctx.location);
+            // Add step context for multi-step code commands.
+            if let Some(step) = &ctx.step {
+                command
+                    .env("DG_MFA_STEP", (step.index + 1).to_string())
+                    .env("DG_MFA_STEP_COUNT", step.total.to_string())
+                    .env("DG_MFA_METHOD", step.method.as_str());
+            }
+            let output = command
                 .output()
                 .map_err(|e| CliError::MfaFailed(format!("Failed to run code command: {e}")))?;
 
@@ -92,7 +131,7 @@ pub fn obtain_code(source: &CodeSource, ctx: &MfaContext) -> Result<SecretString
             }
 
             // N.B. stderr - stdout is reserved for data.
-            eprint!("Enter MFA code for {}: ", ctx.location);
+            eprint!("{}", code_prompt(ctx));
             stderr().flush().ok();
 
             let mut code = String::new();
@@ -115,7 +154,27 @@ mod tests {
         MfaContext {
             instance: "test-inst".into(),
             location: "test-loc".into(),
+            step: None,
         }
+    }
+
+    #[test]
+    fn test_code_prompt_legacy_without_step() {
+        assert_eq!(code_prompt(&ctx()), "Enter MFA code for test-loc: ");
+    }
+
+    #[test]
+    fn test_code_prompt_step_aware() {
+        let mut ctx = ctx();
+        ctx.step = Some(MfaStepContext {
+            index: 1,
+            total: 2,
+            method: LocationMfaMethod::Totp,
+        });
+        assert_eq!(
+            code_prompt(&ctx),
+            "[2/2] Enter the Authenticator app code for 'test-loc': "
+        );
     }
 
     #[test]
@@ -150,12 +209,18 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "`echo -n` is not portable"]
-    fn test_command_receives_env_vars() {
-        // Print the env vars to stdout so we can assert they're set.
-        let source = CodeSource::Command("echo -n $DG_INSTANCE/$DG_LOCATION".into());
-        let secret = obtain_code(&source, &ctx()).unwrap();
-        assert_eq!(secret.expose_secret(), "test-inst/test-loc");
+    fn test_command_receives_step_env_vars() {
+        let mut ctx = ctx();
+        ctx.step = Some(MfaStepContext {
+            index: 0,
+            total: 2,
+            method: LocationMfaMethod::Email,
+        });
+        let source = CodeSource::Command(
+            r#"printf '%s/%s/%s/%s/%s' "$DG_INSTANCE" "$DG_LOCATION" "$DG_MFA_STEP" "$DG_MFA_STEP_COUNT" "$DG_MFA_METHOD""#.into(),
+        );
+        let secret = obtain_code(&source, &ctx).unwrap();
+        assert_eq!(secret.expose_secret(), "test-inst/test-loc/1/2/email");
     }
 
     #[test]
