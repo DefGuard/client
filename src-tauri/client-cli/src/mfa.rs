@@ -379,6 +379,21 @@ async fn start_session(
     Ok((proxy_url, start.response, start.multi_step_mfa_capable))
 }
 
+/// Reject methods that `authorize` cannot run.
+fn check_code_method(method: MfaMethod) -> Result<(), CliError> {
+    if !is_cli_drivable_method(method.into()) {
+        return Err(CliError::MfaFailed(format!(
+            "MFA method {method:?} is not supported by the CLI. Use the desktop or mobile client."
+        )));
+    }
+    if !matches!(method, MfaMethod::Totp | MfaMethod::Email) {
+        return Err(CliError::Other(format!(
+            "Internal error: {method:?} MFA must use its dedicated flow, not authorize"
+        )));
+    }
+    Ok(())
+}
+
 /// Run the VPN MFA handshake for a single-step location (TOTP or email).
 ///
 /// The HTTP calls are handled by `defguard_core::mfa`; this function
@@ -391,30 +406,7 @@ pub(crate) async fn authorize(
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
 ) -> Result<SecretString, CliError> {
-    match method {
-        MfaMethod::Biometric => {
-            return Err(CliError::MfaFailed(format!(
-                "MFA method {method:?} is not supported by the CLI. Use the mobile client."
-            )));
-        }
-        MfaMethod::MobileApprove => {
-            return Err(CliError::Other(
-                "Internal error: MobileApprove MFA must use authorize_mobile_approve, not authorize"
-                    .into(),
-            ));
-        }
-        MfaMethod::Oidc => {
-            return Err(CliError::Other(
-                "Internal error: OIDC MFA must use authorize_oidc, not authorize".into(),
-            ));
-        }
-        MfaMethod::Fido2 => {
-            return Err(CliError::MfaFailed(
-                "FIDO2 MFA is not supported by the CLI. Use the desktop client.".into(),
-            ));
-        }
-        _ => {}
-    }
+    check_code_method(method)?;
 
     let (proxy_url, info, _) =
         start_session(location, instance, method, Vec::new(), posture_data, pool).await?;
@@ -484,13 +476,11 @@ pub(crate) async fn authorize_multistep(
     let token = info.token;
     for (index, method) in plan.iter().enumerate() {
         debug!("Running MFA step {}/{} ({method:?})", index + 1, plan.len());
-        // The start request opens the first step; later steps need their own
-        // attempt. Servers without multi-step MFA support have no step-start
-        // endpoint and complete the session on the first step, so skip it.
-        let step = if index == 0 || !capable {
-            None
-        } else {
+
+        let step = if capable {
             Some(step_start(&proxy_url, &token, *method).await?)
+        } else {
+            None
         };
 
         let step_ctx = MfaStepContext {
@@ -634,8 +624,25 @@ where
     result
 }
 
-/// Open the OIDC page and poll for the result. The caller opens a step attempt
-/// before this call for every step after the first.
+/// Build the browser URL for an OIDC step.
+fn oidc_browser_url(
+    proxy_url: &Url,
+    token: &str,
+    step_attempt_id: Option<&str>,
+) -> Result<Url, CliError> {
+    let mut url = proxy_url
+        .join("openid/mfa")
+        .map_err(|e| CliError::Other(format!("Failed to build OIDC MFA URL: {e}")))?;
+    let mut query = url.query_pairs_mut();
+    query.append_pair("token", token);
+    if let Some(id) = step_attempt_id {
+        query.append_pair("step_attempt_id", id);
+    }
+    drop(query);
+    Ok(url)
+}
+
+/// Open the OIDC page and poll for the result.
 async fn run_oidc_step(
     proxy_url: &Url,
     token: &str,
@@ -643,10 +650,7 @@ async fn run_oidc_step(
     step: Option<&MfaStepContext>,
     json_mode: bool,
 ) -> Result<ClientMfaFinishResponse, CliError> {
-    let mut browser_url = proxy_url
-        .join("openid/mfa")
-        .map_err(|e| CliError::Other(format!("Failed to build OIDC MFA URL: {e}")))?;
-    browser_url.query_pairs_mut().append_pair("token", token);
+    let browser_url = oidc_browser_url(proxy_url, token, step_attempt_id.as_deref())?;
 
     let badge = opt_step_badge(step);
     if !json_mode {
@@ -856,6 +860,44 @@ mod tests {
             mfa_method: None,
             posture_check_required: false,
         }
+    }
+
+    #[test]
+    fn test_oidc_browser_url_carries_step_attempt_id() {
+        let proxy = Url::parse("https://proxy.example.com/").unwrap();
+        let url = oidc_browser_url(&proxy, "tok", Some("attempt-1")).unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://proxy.example.com/openid/mfa?token=tok&step_attempt_id=attempt-1"
+        );
+    }
+
+    #[test]
+    fn test_oidc_browser_url_legacy_omits_step_attempt_id() {
+        let proxy = Url::parse("https://proxy.example.com/").unwrap();
+        let url = oidc_browser_url(&proxy, "tok", None).unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://proxy.example.com/openid/mfa?token=tok"
+        );
+    }
+
+    #[test]
+    fn test_check_code_method_rejects_undrivable_as_mfa_failed() {
+        for method in [MfaMethod::Biometric, MfaMethod::Fido2] {
+            let err = check_code_method(method).unwrap_err();
+            assert!(matches!(err, CliError::MfaFailed(_)), "{method:?}");
+        }
+    }
+
+    #[test]
+    fn test_check_code_method_rejects_own_flow_methods_as_internal() {
+        for method in [MfaMethod::Oidc, MfaMethod::MobileApprove] {
+            let err = check_code_method(method).unwrap_err();
+            assert!(matches!(err, CliError::Other(_)), "{method:?}");
+        }
+        assert!(check_code_method(MfaMethod::Totp).is_ok());
+        assert!(check_code_method(MfaMethod::Email).is_ok());
     }
 
     #[test]

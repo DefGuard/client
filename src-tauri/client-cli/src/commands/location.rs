@@ -54,6 +54,30 @@ pub(crate) async fn handle_list(state: &State) -> Result<LocationListResult, Cli
     })
 }
 
+/// Reject MFA flags that do not match the location's step count.
+fn check_set_mfa_flags(
+    mfa_method: Option<&str>,
+    mfa_steps: &[String],
+    step_count: usize,
+) -> Result<(), CliError> {
+    if !mfa_steps.is_empty() && mfa_method.is_some() {
+        return Err(CliError::InvalidInput(
+            "--mfa-step conflicts with --mfa-method; use only one.".into(),
+        ));
+    }
+    if !mfa_steps.is_empty() && step_count <= 1 {
+        return Err(CliError::InvalidInput(
+            "--mfa-step requires a multi-step location; use --mfa-method for a single-step location.".into(),
+        ));
+    }
+    if mfa_method.is_some() && step_count > 1 {
+        return Err(CliError::InvalidInput(
+            "--mfa-method requires a single-step location; use --mfa-step for a multi-step location.".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub async fn handle_set(
     state: &State,
     name: &str,
@@ -81,17 +105,9 @@ pub async fn handle_set(
 
     let mut changed = Vec::new();
 
+    check_set_mfa_flags(mfa_method, mfa_steps, location.mfa_steps.len())?;
+
     if !mfa_steps.is_empty() {
-        if mfa_method.is_some() {
-            return Err(CliError::InvalidInput(
-                "--mfa-step conflicts with --mfa-method; use only one.".into(),
-            ));
-        }
-        if location.mfa_steps.len() <= 1 {
-            return Err(CliError::InvalidInput(
-                "--mfa-step requires a multi-step location; use --mfa-method for a single-step location.".into(),
-            ));
-        }
         let plan = parse_step_plan(name, mfa_steps, &location.mfa_steps)?;
         Location::set_mfa_step_plan(&state.pool, location_id, plan).await?;
         changed.push(format!("MFA steps → {}", mfa_steps.join(", ")));

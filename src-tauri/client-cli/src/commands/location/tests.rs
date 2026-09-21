@@ -404,3 +404,26 @@ fn test_location_mfa_label_reports_step_count() {
     ]));
     assert_eq!(location_mfa_label(&location), "2 steps");
 }
+
+#[test]
+fn test_check_set_mfa_flags_rejects_method_on_multistep_location() {
+    let err = check_set_mfa_flags(Some("totp"), &[], 2).unwrap_err();
+    assert!(matches!(err, CliError::InvalidInput(_)));
+    assert!(err.to_string().contains("--mfa-step"));
+}
+
+#[test]
+fn test_check_set_mfa_flags_accepts_matching_shape() {
+    assert!(check_set_mfa_flags(Some("totp"), &[], 1).is_ok());
+    assert!(check_set_mfa_flags(Some("totp"), &[], 0).is_ok());
+    assert!(check_set_mfa_flags(None, &["totp".to_string(), "email".to_string()], 2).is_ok());
+    assert!(check_set_mfa_flags(None, &[], 2).is_ok());
+}
+
+#[test]
+fn test_check_set_mfa_flags_rejects_steps_on_single_step_location() {
+    let err = check_set_mfa_flags(None, &["totp".to_string()], 1).unwrap_err();
+    assert!(matches!(err, CliError::InvalidInput(_)));
+    let err = check_set_mfa_flags(Some("totp"), &["totp".to_string()], 2).unwrap_err();
+    assert!(err.to_string().contains("conflicts"));
+}
