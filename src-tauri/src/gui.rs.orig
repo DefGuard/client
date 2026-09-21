@@ -416,10 +416,8 @@ pub fn run_app() {
             if let Err(e) = WindowManager::build_full_view_window(app_handle) {
                 warn!("Failed to pre-build full window: {e}");
             }
-            if open_welcome_view {
-                if let Err(e) = WindowManager::build_welcome_window(app_handle) {
-                    warn!("Failed to pre-build welcome window: {e}");
-                }
+            if let Err(e) = WindowManager::build_welcome_window(app_handle) {
+                warn!("Failed to pre-build welcome window: {e}");
             }
 
             // Decide which window to show based on available locations.
