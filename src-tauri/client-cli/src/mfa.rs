@@ -160,7 +160,12 @@ fn is_cli_drivable_method(method: LocationMfaMethod) -> bool {
 ///
 /// Pad the step number so all prefixes in a run have the same width.
 fn step_badge(index: usize, total: usize) -> String {
-    format!("[{:>w$}/{total}] ", index + 1, w = total.to_string().len())
+    format!("[{:>w$}/{total}] ", index + 1, w = decimal_digits(total))
+}
+
+/// Return the count of decimal digits in `n`.
+fn decimal_digits(n: usize) -> usize {
+    if n == 0 { 1 } else { n.ilog10() as usize + 1 }
 }
 
 /// Return the step prefix, or an empty string when no step context exists.
@@ -846,6 +851,13 @@ mod tests {
     use sqlx::types::Json;
 
     use super::*;
+
+    #[test]
+    fn decimal_digits_matches_string_length() {
+        for n in [0, 1, 9, 10, 99, 100, 999, 1000, usize::MAX] {
+            assert_eq!(decimal_digits(n), n.to_string().len());
+        }
+    }
 
     fn location(name: &str, mode: LocationMfaMode) -> Location<Id> {
         Location {
