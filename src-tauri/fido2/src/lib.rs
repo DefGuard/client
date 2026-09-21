@@ -11,11 +11,10 @@ pub mod protocol;
 
 use std::{sync::LazyLock, time::Duration};
 
+pub use protocol::Assertion;
 use tokio::sync::{Semaphore, SemaphorePermit};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-
-pub use protocol::Assertion;
 
 /// Advisory, only backends that can arm a timer honour it. Keep below Edge's MFA attempt TTL,
 /// or a slow user gets a confusing rejection at submit time instead of a clean timeout.
