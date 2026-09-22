@@ -4,7 +4,9 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { api } from '../../../../shared/rust-api/api';
 import {
+  type ConfigureFactorsSourceValue,
   type InstanceInfo,
+  type LocationInfo,
   type MfaConfigAuthorizeResult,
   type MfaConfigStartResult,
   MfaMethod,
@@ -40,6 +42,11 @@ type StoreValues = {
   authorized: boolean;
   /** Issued for the account's first factor only, so an empty list is an ordinary success. */
   recoveryCodes: string[];
+  /** Which entry point opened this flow. Recorded for later, nothing branches on it yet. */
+  source: ConfigureFactorsSourceValue | null;
+  /** The location that sent the user here, so the screens can speak to what that location
+   *  needs. Null when the flow was not started from a location. */
+  location: LocationInfo | null;
 };
 
 type FlowState = Pick<
@@ -91,10 +98,19 @@ const defaults: StoreValues = {
   deadline: null,
   authorized: false,
   recoveryCodes: [],
+  source: null,
+  location: null,
 };
 
+/** What the entry point knew about the flow it is opening. */
+type ConfigureMfaOrigin = Pick<StoreValues, 'source' | 'location'>;
+
 interface Store extends StoreValues {
-  start: (instance: InstanceInfo, response: MfaConfigStartResult) => void;
+  start: (
+    instance: InstanceInfo,
+    response: MfaConfigStartResult,
+    origin: ConfigureMfaOrigin,
+  ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
@@ -108,7 +124,7 @@ export const useConfigureMfaStore = create<Store>()(
   persist(
     (set, get) => ({
       ...defaults,
-      start: (instance, response) => {
+      start: (instance, response, origin) => {
         // The fallback mails a code to the address on file, registering email along the way.
         const codeFactors = response.email_fallback
           ? [MfaMethod.Email]
@@ -126,6 +142,7 @@ export const useConfigureMfaStore = create<Store>()(
           configuredMethods,
           emailFallback: response.email_fallback,
           deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
+          ...origin,
         });
       },
       selectMethods: (methods) => {
@@ -192,9 +209,8 @@ export const useConfigureMfaStore = create<Store>()(
     {
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
-      // Bumped when setup progress moved to its own list, so older sessions start over rather
-      // than resume believing a configured factor is still pending.
-      version: 7,
+      // Bumped on every shape change: a stored session is never resumable across one.
+      version: 9,
     },
   ),
 );
@@ -205,9 +221,25 @@ export const selectPendingMethod =
   (state: Store): MfaMethodValue | undefined =>
     pendingMethods(state).find((method) => mfaFactorStep(method) === step);
 
-export const startMfaConfiguration = async (instance: InstanceInfo): Promise<void> => {
+type StartOptions = Partial<ConfigureMfaOrigin> & {
+  /** Factors the caller already picked, so the selection step can be skipped. */
+  preselectedMethods?: MfaMethodValue[];
+};
+
+export const startMfaConfiguration = async (
+  instance: InstanceInfo,
+  { preselectedMethods = [], source = null, location = null }: StartOptions = {},
+): Promise<void> => {
   const response = await api.mfaConfigStart(instance.id);
-  useConfigureMfaStore.getState().start(instance, response);
+  useConfigureMfaStore.getState().start(instance, response, { source, location });
+  // A pick the selection step would have refused is dropped rather than carried into the wizard;
+  // with nothing left the step runs as usual.
+  const preselected = preselectedMethods.filter((method) =>
+    isMfaFactorOfferable(method, useConfigureMfaStore.getState().configuredMethods),
+  );
+  if (preselected.length > 0) {
+    useConfigureMfaStore.getState().selectMethods(preselected);
+  }
 };
 
 /** A copy the proxy still holds expires on its own, so a failed cancel is not worth raising. */

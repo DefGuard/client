@@ -8,11 +8,14 @@ import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkb
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
 import { MfaSelector } from '../../../../../../../shared/components/LocationCard/components/MfaSelector/MfaSelector';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
+import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../../../shared/rust-api/api';
 import type { MfaMethodValue } from '../../../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../../../shared/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import {
+  isMfaMethodConfigured,
+  isMfaMethodUsable,
   mfaStepCount,
   mfaStepsOf,
   pickableMfaMethods,
@@ -31,6 +34,9 @@ export const ConnectModalMfaSettings = () => {
   const [perviousView, location, stepPlan, stepIndex] = useConnectModal(
     useShallow((s) => [s.perviousView, s.location, s.stepPlan, s.stepIndex]),
   );
+
+  const { instances } = useAppData();
+  const instance = instances.find((entry) => entry.id === location?.instance_id);
 
   const isEditingDefaults = perviousView === null;
   const mfaSteps = isPresent(location) ? mfaStepsOf(location) : [];
@@ -51,8 +57,8 @@ export const ConnectModalMfaSettings = () => {
     }
     const currentStep = mfaSteps[stepIndex];
     if (!isPresent(currentStep)) return [];
-    return [{ stepIndex, methods: usableMfaMethods(currentStep) }];
-  }, [isEditingDefaults, mfaSteps, stepIndex]);
+    return [{ stepIndex, methods: usableMfaMethods(currentStep, instance) }];
+  }, [isEditingDefaults, mfaSteps, stepIndex, instance]);
 
   const selectMethodForStep = (targetStepIndex: number, method: MfaMethodValue) => {
     setSelectedStepMethods((currentPlan) =>
@@ -111,7 +117,8 @@ export const ConnectModalMfaSettings = () => {
                   factor={entry.method}
                   selected={selectedStepMethods[index] === entry.method}
                   isDefault={defaultPlan[index] === entry.method}
-                  configured={entry.configured}
+                  configured={isMfaMethodConfigured(entry, instance)}
+                  isSelectable={isMfaMethodUsable(entry, instance)}
                   onClick={() => selectMethodForStep(index, entry.method)}
                 />
               ))}

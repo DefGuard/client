@@ -80,6 +80,10 @@ pub enum Fido2Error {
     /// vague, because guessing a cause means telling the user something untrue about their key.
     #[error("the security key did not complete the request")]
     NotAllowed,
+    /// Something other than a removable security key answered: a phone over hybrid, or a
+    /// built-in authenticator. Only the Windows backend can see this, see its `used_transport`.
+    #[error("only a hardware security key can be used, and something else answered")]
+    NotASecurityKey,
     /// The platform cannot run the ceremony at all - too old, or the API is missing.
     #[error("security keys are not supported on this system: {0}")]
     Unsupported(String),

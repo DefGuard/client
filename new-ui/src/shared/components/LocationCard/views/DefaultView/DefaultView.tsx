@@ -13,7 +13,7 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 
 export const DefaultView = () => {
-  const { location, instance, setView } = useLocationCardContext();
+  const { location, instance, setView, connectionAbility } = useLocationCardContext();
 
   const { mutate: updateRouting } = useMutation({
     mutationFn: api.updateLocationRouting,
@@ -51,6 +51,8 @@ export const DefaultView = () => {
           <LocationCardMfaEdit
             variant="compact"
             location={location}
+            instance={instance}
+            connectionAbility={connectionAbility}
             onEdit={() => {
               setView(LocationCardViews.MfaSettings);
             }}

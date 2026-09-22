@@ -145,6 +145,7 @@ export const TauriCommand = {
   GetPostureData: 'get_posture_data',
   //Window
   SwapToFullView: 'swap_to_full_view',
+  InitiateConfigureFactorScreen: 'initiate_configure_factor_screen',
   SwapToTray: 'swap_to_tray',
   CloseTrayWindow: 'close_tray_window',
   // Session state
@@ -167,6 +168,7 @@ export const TauriEvent = {
   ApplicationConfigChanged: 'application-config-changed',
   AddInstance: 'add-instance',
   MfaTrigger: 'mfa-trigger',
+  ConfigureFactorsTrigger: 'configure-factors-trigger',
   VersionMismatch: 'version-mismatch',
   UuidMismatch: 'uuid-mismatch',
   GlobalLogUpdate: 'log-update-global',
@@ -207,6 +209,41 @@ export type DeadConnectionReconnectedPayload = {
 export type AddInstanceEventPayload = {
   token: string;
   url: string;
+};
+
+/**
+ * Which entry point asked for the Configure MFA screen. Defined here and nowhere else: the
+ * backend passes the value through untouched, so the UI owns the set.
+ */
+export const ConfigureFactorsSource = {
+  TrayConnect: 'tray_connect',
+  TrayMfaEdit: 'tray_mfa_edit',
+  FullConnect: 'full_connect',
+  FullMfaEdit: 'full_mfa_edit',
+  AddPage: 'add_page',
+} as const;
+
+export type ConfigureFactorsSourceValue =
+  (typeof ConfigureFactorsSource)[keyof typeof ConfigureFactorsSource];
+
+/** Payload for the `configure-factors-trigger` event. Mirrors `ConfigureFactorsPayload` in events.rs. */
+export type ConfigureFactorsPayload = {
+  /** Resolved by the backend, so the screen has everything it needs without a lookup of its own. */
+  instance: InstanceInfo;
+  /** Factors the caller already picked. Empty means the wizard asks, which is the usual case. */
+  methods: MfaMethodValue[];
+  source: ConfigureFactorsSourceValue;
+  /** The location the request came from, so the screen can speak to what that location needs.
+   *  Null when the flow was not started from a location. */
+  location: LocationInfo | null;
+};
+
+export type InitiateConfigureFactorScreenArgs = {
+  instanceId: number;
+  methods: MfaMethodValue[];
+  source: ConfigureFactorsSourceValue;
+  /** The location the request came from. The backend resolves it and passes it to the screen. */
+  locationId?: number;
 };
 
 /** Payload for the `tunnel-disabled-by-policy` event. Mirrors `TunnelsDisabled` in events.rs. */

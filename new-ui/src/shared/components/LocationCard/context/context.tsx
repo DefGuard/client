@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useConnectionAbility } from '../../../hooks/useConnectionAbility';
 import { useAppData } from '../../../providers/AppDataContext';
 import { api } from '../../../rust-api/api';
 import type { InstanceInfo, LocationInfo, MfaStep } from '../../../rust-api/types';
@@ -15,6 +16,7 @@ import { ConnectionType, MfaMethod, type MfaMethodValue } from '../../../rust-ap
 import { useAppStore } from '../../../store/useAppStore';
 import { isPresent } from '../../../utils/isPresent';
 import {
+  type ConnectionAbilityValue,
   mfaStepsOf,
   mfaToText,
   resolveMfaStepPlan,
@@ -36,6 +38,9 @@ interface LocationCardContextValue {
   connectionError: string | null;
   autoConnectOpenid: boolean;
   mfaMethod: MfaMethodValue;
+  /** Whether the MFA flow can be passed as is, after configuring factors, or not at
+   *  all - see `connectionAbilityOf`. */
+  connectionAbility: ConnectionAbilityValue;
   canPickOtherMethod: boolean;
   stepPlan: MfaMethodValue[];
   stepIndex: number;
@@ -175,9 +180,11 @@ export const LocationCardProvider = ({
     }
   }, [location.active]);
 
+  const connectionAbility = useConnectionAbility(location, instance);
+
   const currentStep = mfaSteps[stepIndex];
   const canPickOtherMethod =
-    isPresent(currentStep) && usableMfaMethods(currentStep).length > 1;
+    isPresent(currentStep) && usableMfaMethods(currentStep, instance).length > 1;
 
   const stepMethod = stepPlan[stepIndex];
   const showStepLabel = isMultiStep && isPresent(stepMethod);
@@ -196,6 +203,7 @@ export const LocationCardProvider = ({
         location,
         instance,
         mfaMethod,
+        connectionAbility,
         canPickOtherMethod,
         stepPlan,
         stepIndex,

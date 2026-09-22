@@ -1,5 +1,6 @@
 import {
   ConnectionType,
+  type InstanceInfo,
   type LocationInfo,
   MfaMethod,
   type MfaMethodValue,
@@ -14,7 +15,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Oidc]: 'OpenID',
   [MfaMethod.Totp]: 'Authenticator app',
   [MfaMethod.Biometric]: 'Biometrics',
-  [MfaMethod.Fido2]: 'Security key (FIDO2)',
+  [MfaMethod.Fido2]: 'Security key',
 };
 
 export const mfaToText = (factor: MfaMethodValue): string => mfaMethodLabels[factor];
@@ -58,11 +59,22 @@ export const mfaStepCount = (
 ): number => mfaStepsOf(location).length;
 
 /** Biometric is the mobile client's to drive; the desktop can run the rest. */
-const isDesktopDrivable = (entry: MfaStepMethod): boolean =>
-  entry.method !== MfaMethod.Biometric;
+export const isDesktopDrivableMethod = (method: MfaMethodValue): boolean =>
+  method !== MfaMethod.Biometric;
 
-export const usableMfaMethods = (step: MfaStep): MfaStepMethod[] =>
-  step.methods.filter((entry) => entry.configured && isDesktopDrivable(entry));
+const isDesktopDrivable = (entry: MfaStepMethod): boolean =>
+  isDesktopDrivableMethod(entry.method);
+
+/** Whether the desktop can carry this method for the user as it stands. */
+export const isMfaMethodUsable = (
+  entry: MfaStepMethod,
+  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
+): boolean => isDesktopDrivable(entry) && isMfaMethodConfigured(entry, instance);
+
+export const usableMfaMethods = (
+  step: MfaStep,
+  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
+): MfaStepMethod[] => step.methods.filter((entry) => isMfaMethodUsable(entry, instance));
 
 export const pickableMfaMethods = (step: MfaStep): MfaStepMethod[] => {
   const drivable = step.methods.filter(isDesktopDrivable);
@@ -88,17 +100,76 @@ export const resolveMfaStepPlan = (
   });
 
 /**
- * A step the desktop cannot drive at all blocks connecting: every method in it
- * needs the mobile client, so there is nothing the user could do here.
- *
- * A method Core reports as not yet configured does NOT block. Whether a factor
- * can actually be used is Core's call, and Edge says so with a message the user
- * can act on - "set it up first, or pick a different one" - which beats a mute
- * disabled button that explains nothing.
+ * Whether the user has this factor set up. The instance's own report of the
+ * account's factors wins when it has one; an instance that predates that API
+ * (`mfa_configured_methods === null`) falls back to the flag Core sent with the
+ * step, and an unknown instance to the step flag as well.
  */
-export const hasUnpassableMfaStep = (
+export const isMfaMethodConfigured = (
+  entry: MfaStepMethod,
+  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
+): boolean => {
+  const configuredMethods = instance?.mfa_configured_methods;
+  return isPresent(configuredMethods)
+    ? configuredMethods.includes(entry.method)
+    : entry.configured;
+};
+
+/**
+ * Factors this client can set up on its own, so a step missing only these is one the user can
+ * unblock without leaving the app. Email assumes the instance has SMTP; it is never reported.
+ */
+export const CLIENT_CONFIGURABLE_METHODS = [
+  MfaMethod.Totp,
+  MfaMethod.Email,
+  MfaMethod.Fido2,
+] as const;
+
+export type ClientConfigurableMethod = (typeof CLIENT_CONFIGURABLE_METHODS)[number];
+
+export const isClientConfigurableMethod = (method: MfaMethodValue): boolean =>
+  CLIENT_CONFIGURABLE_METHODS.some((candidate) => candidate === method);
+
+/** How far the user can get connecting this location with the factors they hold. */
+export const ConnectionAbility = {
+  /** A whole path through the steps runs on factors already on the account. */
+  Available: 'available',
+  /** Blocked, but every blocking step offers a factor this client can set up. */
+  Configurable: 'configurable',
+  /** Blocked on a factor the client cannot set up - the mobile client's, or an
+   *  instance too old to configure factors from here. */
+  Unavailable: 'unavailable',
+} as const;
+
+export type ConnectionAbilityValue =
+  (typeof ConnectionAbility)[keyof typeof ConnectionAbility];
+
+/**
+ * Single source of truth for whether a location is connectable, and if not,
+ * whether configuring factors would fix it. A location with no MFA steps - a
+ * bare tunnel, or MFA disabled - is always `Available`.
+ */
+export const connectionAbilityOf = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): boolean => mfaStepsOf(location).some((step) => !step.methods.some(isDesktopDrivable));
+  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
+): ConnectionAbilityValue => {
+  const blockedSteps = mfaStepsOf(location).filter(
+    (step) => usableMfaMethods(step, instance).length === 0,
+  );
+  if (blockedSteps.length === 0) return ConnectionAbility.Available;
+
+  // An instance that never reported its factors cannot configure them from here.
+  if (!isPresent(instance?.mfa_configured_methods)) return ConnectionAbility.Unavailable;
+
+  const isFixable = (step: MfaStep): boolean =>
+    step.methods.some(
+      (entry) => isDesktopDrivable(entry) && isClientConfigurableMethod(entry.method),
+    );
+
+  return blockedSteps.every(isFixable)
+    ? ConnectionAbility.Configurable
+    : ConnectionAbility.Unavailable;
+};
 
 export const mfaStepsToText = (stepCount: number): string =>
   `${stepCount}-step verification`;

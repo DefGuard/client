@@ -1,4 +1,8 @@
 import { MfaMethod, type MfaMethodValue } from '../../../shared/rust-api/types';
+import {
+  CLIENT_CONFIGURABLE_METHODS,
+  type ClientConfigurableMethod,
+} from '../../../shared/utils/mfa';
 
 /** Wizard steps, in the order they run. Setup steps are the ones a factor can claim. */
 export const ConfigureMfaStep = {
@@ -26,12 +30,18 @@ type MfaFactor = {
   repeatable: boolean;
 };
 
+/** Where the wizard sets each configurable factor up. Keyed on the shared list, so adding a
+ *  factor there is a type error until the wizard says what to do with it. */
+const WIZARD_FACTORS: Record<ClientConfigurableMethod, Omit<MfaFactor, 'method'>> = {
+  [MfaMethod.Totp]: { step: ConfigureMfaStep.Configuration, repeatable: false },
+  [MfaMethod.Email]: { step: ConfigureMfaStep.Configuration, repeatable: false },
+  [MfaMethod.Fido2]: { step: ConfigureMfaStep.Fido2, repeatable: true },
+};
+
 /** Every factor this client can set up, in selection and wizard order. */
-export const MFA_CONFIGURABLE_FACTORS: MfaFactor[] = [
-  { method: MfaMethod.Totp, step: ConfigureMfaStep.Configuration, repeatable: false },
-  { method: MfaMethod.Email, step: ConfigureMfaStep.Configuration, repeatable: false },
-  { method: MfaMethod.Fido2, step: ConfigureMfaStep.Fido2, repeatable: true },
-];
+export const MFA_CONFIGURABLE_FACTORS: MfaFactor[] = CLIENT_CONFIGURABLE_METHODS.map(
+  (method) => ({ method, ...WIZARD_FACTORS[method] }),
+);
 
 export const mfaFactor = (method: MfaMethodValue): MfaFactor | undefined =>
   MFA_CONFIGURABLE_FACTORS.find((factor) => factor.method === method);

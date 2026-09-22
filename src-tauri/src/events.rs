@@ -4,6 +4,8 @@ use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::{
+    commands::LocationInfo,
+    database::models::{instance::InstanceInfo, location::LocationMfaMethod, Id},
     window_manager::{WindowManager, COMPACT_WINDOW_ID},
     ConnectionType,
 };
@@ -66,6 +68,21 @@ impl DeadConnReconnected {
 pub struct AddInstancePayload<'a> {
     pub token: &'a str,
     pub url: &'a str,
+}
+
+/// Payload for the `configure-factors-trigger` event. Mirrors `ConfigureFactorsPayload` in
+/// `rust-api/types.ts`.
+#[derive(Clone, Serialize)]
+pub struct ConfigureFactorsPayload {
+    /// Resolved here, so the screen has everything it needs without a lookup of its own.
+    pub instance: InstanceInfo<Id>,
+    /// Factors the caller already picked. Empty means the wizard asks, which is the usual case.
+    pub methods: Vec<LocationMfaMethod>,
+    /// Which entry point asked, passed through untouched - the UI owns the set of values.
+    pub source: String,
+    /// The location the request came from, so the screen can speak to what that location needs.
+    /// `None` when the flow was not started from a location.
+    pub location: Option<LocationInfo>,
 }
 
 #[derive(Clone, Serialize)]
