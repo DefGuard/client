@@ -27,41 +27,38 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
           return
         }
 
+        let tunnelConfig: TunnelConfiguration
+        do {
 #if os(macOS)
-        guard let tunnelConfig = try? TunnelConfiguration.from(dictionary: providerConfig)
-        else {
-            log.error("Failed to parse tunnel configuration")
-            completionHandler(WireGuardTunnelError.invalidTunnelConfiguration)
-            return
-        }
+            tunnelConfig = try TunnelConfiguration.from(dictionary: providerConfig)
 #else
-        guard let startData = try? TunnelStartData.from(dictionary: providerConfig)
-        else {
-            log.error("Failed to parse tunnel configuration")
+            let startData = try TunnelStartData.from(dictionary: providerConfig)
+            tunnelConfig = TunnelConfiguration(fromStartData: startData)
+#endif
+        } catch {
+            log.error("Failed to parse tunnel configuration: \(error)")
             completionHandler(WireGuardTunnelError.invalidTunnelConfiguration)
             return
         }
-        let tunnelConfig = TunnelConfiguration(fromStartData: startData)
-#endif
 
         let networkSettings = tunnelConfig.asNetworkSettings()
         self.setTunnelNetworkSettings(networkSettings) { error in
-            if error != nil {
-                self.log.error("Failed to set tunnel network settings: \(String(describing: error))")
+            if let error = error {
+                self.log.error("Failed to set tunnel network settings: \(error)")
+                completionHandler(error)
+                return
             }
-            completionHandler(error)
-            return
-        }
 
-        do {
-            try adapter.start(tunnelConfiguration: tunnelConfig)
-        } catch {
-            log.error("Failed to start tunnel: \(error)")
-            completionHandler(error)
+            do {
+                try self.adapter.start(tunnelConfiguration: tunnelConfig)
+            } catch {
+                self.log.error("Failed to start tunnel: \(error)")
+                completionHandler(error)
+                return
+            }
+            self.log.info("Tunnel started successfully")
+            completionHandler(nil)
         }
-        log.info("Tunnel started successfully")
-
-        completionHandler(nil)
     }
 
     override func stopTunnel(
@@ -92,6 +89,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
     override func wake() {
         log.info("System waking up")
-        // Add code here to wake up.
+        adapter.wake()
     }
 }
