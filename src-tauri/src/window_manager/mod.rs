@@ -300,10 +300,14 @@ pub async fn initiate_configure_factor_screen(
     // A location that went away in the meantime is not worth refusing the screen over, it just
     // loses the steps it would have spoken to.
     let location = match location_id {
-        Some(location_id) => if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? { Some(build_location_info(location, &connected_location_ids)) } else {
-            warn!("Configure factors requested from unknown location {location_id}");
-            None
-        },
+        Some(location_id) => {
+            if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
+                Some(build_location_info(location, &connected_location_ids))
+            } else {
+                warn!("Configure factors requested from unknown location {location_id}");
+                None
+            }
+        }
         None => None,
     };
 
