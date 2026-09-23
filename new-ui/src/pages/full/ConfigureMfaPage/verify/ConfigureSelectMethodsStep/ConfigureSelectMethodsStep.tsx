@@ -154,8 +154,9 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         return;
       }
       // Every step reads as answered yet there is nothing to set up, so continuing would drop
-      // the user on the closing screen having configured nothing.
-      if (selected.length === 0) {
+      // the user on the closing screen having configured nothing. The fallback configures email
+      // on its own, so there it may be all the location asks for.
+      if (selected.length === 0 && !emailFallback) {
         setError('Select at least one method');
         return;
       }
