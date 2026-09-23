@@ -4,11 +4,7 @@
 
 #[cfg(not(target_os = "macos"))]
 use std::fs::read_dir;
-use std::{
-    path::PathBuf,
-    str::FromStr,
-    time::Duration,
-};
+use std::{path::PathBuf, str::FromStr, time::Duration};
 
 #[cfg(not(target_os = "macos"))]
 use chrono::NaiveDate;
