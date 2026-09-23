@@ -207,6 +207,7 @@ custom-protocol = ["tauri/custom-protocol"]
 macos_installer = ["dep:dispatch2", "dep:objc2-system-extensions"]
 
 [dev-dependencies]
+tempfile.workspace = true
 tokio = { workspace = true, features = ["full"] }
 wiremock.workspace = true
 

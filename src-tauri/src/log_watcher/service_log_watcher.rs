@@ -24,7 +24,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::Level;
 
 #[cfg(target_os = "macos")]
-use super::LogLineFields;
+use super::{log_file_reader::LogFileReader, LogLineFields};
 use super::{LogLine, LogWatcherError};
 #[cfg(not(target_os = "macos"))]
 use crate::utils::DEFAULT_SERVICE_LOG_DIR;
@@ -265,8 +265,7 @@ impl VpnExtensionLogWatcher {
             sleep(DELAY);
         }
 
-        let file = File::open(&self.log_file)?;
-        let mut reader = BufReader::new(file);
+        let mut reader = LogFileReader::open(&self.log_file)?;
         let mut line = String::new();
         let mut parsed_lines = Vec::new();
 

@@ -5,8 +5,6 @@
 #[cfg(not(target_os = "macos"))]
 use std::fs::read_dir;
 use std::{
-    fs::File,
-    io::{BufRead, BufReader},
     path::PathBuf,
     str::FromStr,
     time::Duration,
@@ -26,7 +24,9 @@ use crate::log_watcher::get_vpn_extension_log_dir_path;
 use crate::{
     appstate::AppState,
     error::Error,
-    log_watcher::{LogLine, LogLineFields, LogSource, LogWatcherError},
+    log_watcher::{
+        log_file_reader::LogFileReader, LogLine, LogLineFields, LogSource, LogWatcherError,
+    },
     LOG_FILENAME,
 };
 #[cfg(not(target_os = "macos"))]
@@ -125,11 +125,11 @@ impl LogDirs {
     }
 
     #[cfg(not(target_os = "macos"))]
-    fn get_current_service_file(&self) -> Result<File, LogWatcherError> {
+    fn get_current_service_file(&self) -> Result<LogFileReader, LogWatcherError> {
         match &self.current_service_log_file {
             Some(path) => {
                 trace!("Opening service log file: {}", path.display());
-                let file = File::open(path)?;
+                let file = LogFileReader::open(path)?;
                 trace!("Successfully opened service log file at {}", path.display());
                 Ok(file)
             }
@@ -139,10 +139,10 @@ impl LogDirs {
         }
     }
 
-    fn get_client_file(&self) -> Result<File, LogWatcherError> {
+    fn get_client_file(&self) -> Result<LogFileReader, LogWatcherError> {
         let path = self.client_log_dir.join(format!("{LOG_FILENAME}.log"));
         trace!("Constructed client log file path: {}", path.display());
-        let file = File::open(&path)?;
+        let file = LogFileReader::open(&path)?;
         trace!("Client log file at {} opened successfully", path.display());
         Ok(file)
     }
@@ -150,10 +150,10 @@ impl LogDirs {
     /// Get the VPN extension log file (macOS only)
     /// The VPN extension writes logs to the App Group shared container
     #[cfg(target_os = "macos")]
-    fn get_vpn_extension_file(&self) -> Result<File, LogWatcherError> {
+    fn get_vpn_extension_file(&self) -> Result<LogFileReader, LogWatcherError> {
         let path = self.vpn_extension_log_dir.join(VPN_EXTENSION_LOG_FILENAME);
         trace!("Opening VPN extension log file: {}", path.display());
-        let file = File::open(&path)?;
+        let file = LogFileReader::open(&path)?;
         trace!("VPN extension log file opened successfully");
         Ok(file)
     }
@@ -207,16 +207,8 @@ impl GlobalLogWatcher {
             self.log_dirs.current_service_log_file
         );
 
-        let mut service_reader = if let Ok(file) = self.log_dirs.get_current_service_file() {
-            Some(BufReader::new(file))
-        } else {
-            None
-        };
-        let mut client_reader = if let Ok(file) = self.log_dirs.get_client_file() {
-            Some(BufReader::new(file))
-        } else {
-            None
-        };
+        let mut service_reader = self.log_dirs.get_current_service_file().ok();
+        let mut client_reader = self.log_dirs.get_client_file().ok();
 
         debug!("Checking if log files are available");
         if service_reader.is_none() && client_reader.is_none() {
@@ -263,6 +255,7 @@ impl GlobalLogWatcher {
                                 "Found a new service log file: {latest_log_file:?}, switching to it."
                             );
                             self.log_dirs.current_service_log_file = latest_log_file;
+                            *reader = self.log_dirs.get_current_service_file()?;
                             break;
                         }
                     } else {
@@ -327,10 +320,7 @@ impl GlobalLogWatcher {
     #[cfg(target_os = "macos")]
     async fn parse_log_dirs(&self) -> Result<(), LogWatcherError> {
         debug!("Processing log directories for client and VPN extension.");
-        let mut client_reader = self
-            .log_dirs
-            .get_client_file()
-            .map_or_else(|_| None, |file| Some(BufReader::new(file)));
+        let mut client_reader = self.log_dirs.get_client_file().ok();
 
         let mut vpn_extension_reader = self.log_dirs.get_vpn_extension_file().map_or_else(
             |_| {
@@ -339,7 +329,7 @@ impl GlobalLogWatcher {
             },
             |file| {
                 debug!("VPN extension log file opened successfully");
-                Some(BufReader::new(file))
+                Some(file)
             },
         );
 
@@ -394,7 +384,7 @@ impl GlobalLogWatcher {
                 // Try to open the client log file if it wasn't available before
                 if let Ok(file) = self.log_dirs.get_client_file() {
                     debug!("Client log file is now available, opening reader");
-                    client_reader = Some(BufReader::new(file));
+                    client_reader = Some(file);
                 }
             }
 
@@ -420,7 +410,7 @@ impl GlobalLogWatcher {
                 // Try to open the VPN extension log file if it wasn't available before
                 if let Ok(file) = self.log_dirs.get_vpn_extension_file() {
                     debug!("VPN extension log file is now available, opening reader");
-                    vpn_extension_reader = Some(BufReader::new(file));
+                    vpn_extension_reader = Some(file);
                 }
             }
 
