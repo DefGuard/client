@@ -10,7 +10,10 @@ use wiremock::{
 };
 
 use super::*;
-use crate::test_helpers::{start_ws_stub, WsStubCommand};
+use crate::{
+    test_helpers::{start_ws_stub, WsStubCommand},
+    version::{CORE_CONNECTED_HEADER, CORE_VERSION_HEADER, PROXY_VERSION_HEADER},
+};
 
 fn mock_url(server: &MockServer) -> Url {
     Url::parse(&server.uri()).expect("MockServer URI should be valid")
@@ -38,7 +41,8 @@ fn start_response_template(
     proxy_version: Option<&str>,
 ) -> ResponseTemplate {
     let mut response = ResponseTemplate::new(StatusCode::OK.as_u16())
-        .set_body_json(start_response_json("mfa-token"));
+        .set_body_json(start_response_json("mfa-token"))
+        .insert_header(CORE_CONNECTED_HEADER, "true");
     if let Some(version) = core_version {
         response = response.insert_header(CORE_VERSION_HEADER, version);
     }

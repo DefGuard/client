@@ -5,10 +5,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use reqwest::header::HeaderMap;
 use semver::Prerelease;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
+use crate::mfa_contract::MfaContract;
 #[cfg(unix)]
 use crate::set_perms;
 
@@ -17,6 +19,7 @@ pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
 pub const MIN_MULTI_STEP_MFA_VERSION: Version = Version::new(2, 2, 0);
 pub const CORE_VERSION_HEADER: &str = "defguard-core-version";
 pub const PROXY_VERSION_HEADER: &str = "defguard-component-version";
+pub const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
 pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
 pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const LOG_FILENAME: &str = "defguard-client";
@@ -32,6 +35,34 @@ pub fn is_version_at_least(version: &Version, minimum: &Version) -> bool {
     version.pre = Prerelease::EMPTY;
     minimum.pre = Prerelease::EMPTY;
     version.cmp_precedence(&minimum) != Ordering::Less
+}
+
+/// Resolves the MFA contract advertised by a proxy response, failing closed to legacy.
+#[must_use]
+pub fn mfa_contract_from_headers(headers: &HeaderMap) -> MfaContract {
+    let core_connected = headers
+        .get(CORE_CONNECTED_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == "true");
+    if !core_connected {
+        return MfaContract::Legacy;
+    }
+
+    let compatible = [CORE_VERSION_HEADER, PROXY_VERSION_HEADER]
+        .into_iter()
+        .all(|header| {
+            headers
+                .get(header)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<Version>().ok())
+                .is_some_and(|version| is_version_at_least(&version, &MIN_MULTI_STEP_MFA_VERSION))
+        });
+
+    if compatible {
+        MfaContract::MultiStep
+    } else {
+        MfaContract::Legacy
+    }
 }
 
 /// Selects the version string the client should report: the build-version override when present
@@ -204,13 +235,16 @@ pub fn mark_welcome_shown(config_dir: &Path, current_version: &Version) {
 mod tests {
     use std::{env, fs};
 
+    use reqwest::header::{HeaderMap, HeaderValue};
     use tempfile::tempdir;
 
     use super::{
-        check_app_version, is_version_at_least, mark_welcome_shown, select_reported_app_version,
-        should_show_welcome, Version, VersionCheckResult, MIN_MULTI_STEP_MFA_VERSION,
-        VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR, WELCOME_SKIP_ENV_VAR,
+        check_app_version, is_version_at_least, mark_welcome_shown, mfa_contract_from_headers,
+        select_reported_app_version, should_show_welcome, Version, VersionCheckResult,
+        CORE_CONNECTED_HEADER, CORE_VERSION_HEADER, MIN_MULTI_STEP_MFA_VERSION,
+        PROXY_VERSION_HEADER, VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR, WELCOME_SKIP_ENV_VAR,
     };
+    use crate::mfa_contract::MfaContract;
 
     #[test]
     fn test_should_show_welcome_when_state_file_missing() {
@@ -280,6 +314,66 @@ mod tests {
     #[test]
     fn test_reported_app_version_ignores_empty_override() {
         assert_eq!(select_reported_app_version("1.6.8", Some("   ")), "1.6.8");
+    }
+
+    fn mfa_headers(
+        core_version: Option<&str>,
+        proxy_version: Option<&str>,
+        core_connected: Option<&str>,
+    ) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for (name, value) in [
+            (CORE_VERSION_HEADER, core_version),
+            (PROXY_VERSION_HEADER, proxy_version),
+            (CORE_CONNECTED_HEADER, core_connected),
+        ] {
+            if let Some(value) = value {
+                headers.insert(name, HeaderValue::from_str(value).unwrap());
+            }
+        }
+        headers
+    }
+
+    #[test]
+    fn test_mfa_contract_from_headers_accepts_connected_supported_versions() {
+        let headers = mfa_headers(Some("2.2.0-alpha1"), Some("2.2.0"), Some("true"));
+
+        assert_eq!(mfa_contract_from_headers(&headers), MfaContract::MultiStep);
+    }
+
+    #[test]
+    fn test_mfa_contract_from_headers_requires_connected_core() {
+        for core_connected in [None, Some("false"), Some("TRUE"), Some("invalid")] {
+            let headers = mfa_headers(Some("2.2.0"), Some("2.2.0"), core_connected);
+
+            assert_eq!(
+                mfa_contract_from_headers(&headers),
+                MfaContract::Legacy,
+                "core-connected={core_connected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_mfa_contract_from_headers_requires_supported_versions() {
+        let cases = [
+            ("missing core version", None, Some("2.2.0")),
+            ("missing proxy version", Some("2.2.0"), None),
+            ("invalid core version", Some("invalid"), Some("2.2.0")),
+            ("invalid proxy version", Some("2.2.0"), Some("invalid")),
+            ("old core version", Some("2.1.9"), Some("2.2.0")),
+            ("old proxy version", Some("2.2.0"), Some("2.1.9")),
+        ];
+
+        for (case, core_version, proxy_version) in cases {
+            let headers = mfa_headers(core_version, proxy_version, Some("true"));
+
+            assert_eq!(
+                mfa_contract_from_headers(&headers),
+                MfaContract::Legacy,
+                "{case}"
+            );
+        }
     }
 
     #[test]
