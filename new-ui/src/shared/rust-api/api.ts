@@ -8,6 +8,7 @@ import type {
   ConnectionArgs,
   CreateDeviceResponse,
   EnrollmentStartResult,
+  InitiateConfigureFactorScreenArgs,
   InstanceInfo,
   LocationDetails,
   LocationDetailsArgs,
@@ -130,6 +131,12 @@ const disconnectLocations = (locationIds: number[]): Promise<void> =>
 const getPostureData = async (): Promise<unknown> => invoke(TauriCommand.GetPostureData);
 
 const swapToFullView = async () => invoke(TauriCommand.SwapToFullView);
+
+/** Surfaces the full view and asks it to open the Configure MFA screen. Callable from either
+ *  window, which is why it goes through the backend instead of navigating. */
+const initiateConfigureFactorScreen = (
+  args: InitiateConfigureFactorScreenArgs,
+): Promise<void> => invoke(TauriCommand.InitiateConfigureFactorScreen, args);
 
 const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
@@ -338,6 +345,7 @@ export const api = {
   getPostureData,
   // Window
   swapToFullView,
+  initiateConfigureFactorScreen,
   swapToTray,
   closeTrayWindow,
   // Session state

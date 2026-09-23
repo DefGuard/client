@@ -6,7 +6,7 @@
   --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 0%);
 
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   column-gap: var(--spacing-sm);
   background: var(--bg);
   border: 1px solid var(--border);
@@ -52,6 +52,14 @@
       --border: var(--border-action-disabled);
       --color: var(--fg-white-40);
       --icon: var(--fg-white-40);
+    }
+
+    &.selected {
+      --border: var(--border-default);
+
+      &:hover {
+        --border: var(--border-default);
+      }
     }
   }
 
@@ -101,6 +109,15 @@
       transition-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1);
       transition-property: fill;
     }
+  }
+
+  .icon-col {
+    display: flex;
+    flex-flow: row nowrap;
+    box-sizing: border-box;
+    padding: 2px;
+    width: 24px;
+    height: 24px;
   }
 
   .name {

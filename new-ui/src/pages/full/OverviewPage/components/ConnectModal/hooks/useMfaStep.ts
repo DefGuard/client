@@ -1,4 +1,5 @@
 import { useShallow } from 'zustand/shallow';
+import { useAppData } from '../../../../../../shared/providers/AppDataContext';
 import { isPresent } from '../../../../../../shared/utils/isPresent';
 import { mfaStepsOf, usableMfaMethods } from '../../../../../../shared/utils/mfa';
 import { useConnectModal } from './useConnectModal';
@@ -16,11 +17,14 @@ export const useMfaStep = () => {
       ]),
     );
 
+  const { instances } = useAppData();
+  const instance = instances.find((entry) => entry.id === location?.instance_id);
+
   const currentStep = isPresent(location) ? mfaStepsOf(location)[stepIndex] : undefined;
 
   return {
     canPickOtherMethod:
-      isPresent(currentStep) && usableMfaMethods(currentStep).length > 1,
+      isPresent(currentStep) && usableMfaMethods(currentStep, instance).length > 1,
     stepPlan,
     mfaToken,
     setMfaToken,

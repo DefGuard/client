@@ -10,7 +10,7 @@ import { useTunnelWizardStore } from '../TunnelWizardPage/hooks/useTunnelWizardS
 export const AddTunnelPage = () => {
   const navigate = useNavigate();
   return (
-    <FullPage id="add-tunnel-page" withControls>
+    <FullPage id="add-tunnel-page" hideScrollContainer withControls>
       <FullPageTitle title="Add WireGuard Tunnel" />
       <div className="contents">
         <p className="page-description">{`A WireGuard tunnel is a secure, encrypted connection that allows your device or network to communicate safely over the internet.It ensures that your data is protected and transmitted through a private, trusted channel.`}</p>

@@ -63,7 +63,7 @@ export const UpdatePage = () => {
   const updateAvailable = useUpdateAvailable();
 
   return (
-    <FullPage id="update-page-view">
+    <FullPage id="update-page-view" hideScrollContainer>
       <img
         className="banner"
         src={updateAvailable ? updateAvailableBannerSrc : upToDateBannerSrc}

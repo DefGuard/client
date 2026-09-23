@@ -198,6 +198,7 @@ pub fn run_app() {
             open_full_view_window,
             swap_to_tray,
             swap_to_full_view,
+            initiate_configure_factor_screen,
             close_tray_window,
             close_welcome_window,
             all_active_connections,

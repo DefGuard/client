@@ -6,6 +6,8 @@ import type { MfaMethodValue } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { isPresent } from '../../../../utils/isPresent';
 import {
+  isMfaMethodConfigured,
+  isMfaMethodUsable,
   mfaStepCount,
   mfaStepsOf,
   pickableMfaMethods,
@@ -38,6 +40,7 @@ export const LocationCardMfaSettings = () => {
     previousView,
     setView,
     location,
+    instance,
     setMfaMethod: setContextMethod,
     stepPlan,
     stepIndex,
@@ -64,8 +67,8 @@ export const LocationCardMfaSettings = () => {
     }
     const currentStep = mfaSteps[stepIndex];
     if (!isPresent(currentStep)) return [];
-    return [{ stepIndex, methods: usableMfaMethods(currentStep) }];
-  }, [isEditingDefaults, mfaSteps, stepIndex]);
+    return [{ stepIndex, methods: usableMfaMethods(currentStep, instance) }];
+  }, [isEditingDefaults, mfaSteps, stepIndex, instance]);
 
   const selectMethodForStep = (targetStepIndex: number, method: MfaMethodValue) => {
     setSelectedStepMethods((currentPlan) =>
@@ -121,7 +124,8 @@ export const LocationCardMfaSettings = () => {
                   factor={entry.method}
                   selected={selectedStepMethods[index] === entry.method}
                   isDefault={defaultPlan[index] === entry.method}
-                  configured={entry.configured}
+                  configured={isMfaMethodConfigured(entry, instance)}
+                  isSelectable={isMfaMethodUsable(entry, instance)}
                   onClick={() => selectMethodForStep(index, entry.method)}
                 />
               ))}

@@ -26,7 +26,7 @@ export const AddPage = () => {
     useStartMfaConfiguration();
 
   return (
-    <FullPage id="add-page-view">
+    <FullPage id="add-page-view" hideScrollContainer>
       <FullPageTitle title="Add Defguard items" spacing={ThemeSpacing.Xl} />
       <div className="cards">
         <AddCard

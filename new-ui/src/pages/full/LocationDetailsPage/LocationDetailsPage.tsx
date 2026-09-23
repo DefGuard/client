@@ -26,7 +26,7 @@ export const LocationDetailsPage = () => {
   );
 
   return (
-    <FullPage id="location-details-page" withControls>
+    <FullPage id="location-details-page" hideScrollContainer withControls>
       <FullPageTitle title={`${locationName} details`} spacing={ThemeSpacing.Xl} />
       <DetailsFold
         sections={[

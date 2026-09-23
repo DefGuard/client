@@ -39,7 +39,9 @@ pub enum UserVerification {
 /// Which kind of authenticator may answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Attachment {
-    /// A removable security key, the only kind the direct-to-key backends can reach.
+    /// Not built into this machine. Wider than "a removable security key": a phone reached over
+    /// hybrid is cross-platform too, so a backend that can offer one has to reject it afterwards
+    /// on the transport that actually answered. The direct-to-key backends cannot reach one.
     CrossPlatform,
     /// Anything the platform offers, including built-in authenticators.
     Any,
@@ -79,6 +81,7 @@ pub struct AssertRequest {
     /// Every credential registered for this user, the key answers for the one it holds.
     pub allow_credentials: Vec<Vec<u8>>,
     pub user_verification: UserVerification,
+    pub attachment: Attachment,
     pub timeout: Duration,
 }
 
@@ -308,7 +311,8 @@ pub fn prepare_registration(
             exclude_credentials,
             resident_key,
             user_verification,
-            // Only removable keys, so a registered factor behaves the same on every platform.
+            // Keeps built-in authenticators out. Removable-key-only is not expressible here, so
+            // a backend that can also reach a phone enforces the rest on the way back.
             attachment: Attachment::CrossPlatform,
             timeout: CEREMONY_TIMEOUT,
         },
@@ -332,6 +336,9 @@ pub fn prepare_assertion(
         client_data: assertion_client_data(challenge),
         allow_credentials,
         user_verification: UserVerification::Required,
+        // The allow list already pins the credential, so this only keeps the platform from
+        // offering routes that cannot satisfy it. Matches registration either way.
+        attachment: Attachment::CrossPlatform,
         timeout: CEREMONY_TIMEOUT,
     })
 }

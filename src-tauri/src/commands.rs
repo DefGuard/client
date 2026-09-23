@@ -547,6 +547,35 @@ async fn push_service_locations(instance: &Instance<Id>) -> Result<Vec<Location<
     Ok(locations)
 }
 
+/// `connected_location_ids` is read once by the caller, so a listing does not take the
+/// connections lock per instance.
+pub(crate) async fn build_instance_info(
+    instance: Instance<Id>,
+    connected_location_ids: &[Id],
+) -> Result<InstanceInfo<Id>, Error> {
+    let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
+    let connected = locations
+        .iter()
+        .any(|location| connected_location_ids.contains(&location.id));
+    let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance.id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    Ok(InstanceInfo {
+        id: instance.id,
+        uuid: instance.uuid,
+        name: instance.name,
+        url: instance.url,
+        proxy_url: instance.proxy_url,
+        active: connected,
+        pubkey: keys.pubkey,
+        client_traffic_policy: instance.client_traffic_policy,
+        enterprise_enabled: instance.enterprise_enabled,
+        disable_tunnels: instance.disable_tunnels,
+        openid_display_name: instance.openid_display_name,
+        mfa_configured_methods: instance.mfa_configured_methods.map(|json| json.0),
+    })
+}
+
 #[tauri::command(async)]
 pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     debug!("Getting information about all instances.");
@@ -559,31 +588,7 @@ pub async fn all_instances() -> Result<Vec<InstanceInfo<Id>>, Error> {
     let mut instance_info = Vec::new();
     let connection_ids = get_connection_id_by_type(ConnectionType::Location).await;
     for instance in instances {
-        let locations = Location::find_by_instance_id(&*DB_POOL, instance.id, false).await?;
-        let location_ids = locations
-            .iter()
-            .map(|location| location.id)
-            .collect::<Vec<_>>();
-        let connected = connection_ids
-            .iter()
-            .any(|item1| location_ids.iter().any(|item2| item1 == item2));
-        let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance.id)
-            .await?
-            .ok_or(Error::NotFound)?;
-        instance_info.push(InstanceInfo {
-            id: instance.id,
-            uuid: instance.uuid,
-            name: instance.name,
-            url: instance.url,
-            proxy_url: instance.proxy_url,
-            active: connected,
-            pubkey: keys.pubkey,
-            client_traffic_policy: instance.client_traffic_policy,
-            enterprise_enabled: instance.enterprise_enabled,
-            disable_tunnels: instance.disable_tunnels,
-            openid_display_name: instance.openid_display_name,
-            mfa_configured_methods: instance.mfa_configured_methods.map(|json| json.0),
-        });
+        instance_info.push(build_instance_info(instance, &connection_ids).await?);
     }
     debug!(
         "Returning information about {} instances",
@@ -629,6 +634,31 @@ impl fmt::Display for LocationInfo {
     }
 }
 
+/// `connected_location_ids` is read once by the caller, so a listing does not take the
+/// connections lock per location.
+pub(crate) fn build_location_info(
+    location: Location<Id>,
+    connected_location_ids: &[Id],
+) -> LocationInfo {
+    LocationInfo {
+        id: location.id,
+        instance_id: location.instance_id,
+        name: location.name,
+        address: location.address,
+        endpoint: location.endpoint,
+        active: connected_location_ids.contains(&location.id),
+        route_all_traffic: location.route_all_traffic,
+        connection_type: ConnectionType::Location,
+        pubkey: location.pubkey,
+        network_id: location.network_id,
+        location_mfa_mode: location.location_mfa_mode,
+        posture_check_required: location.posture_check_required,
+        mfa_method: location.mfa_method,
+        mfa_steps: location.mfa_steps.0,
+        mfa_step_plan: location.mfa_step_plan.0,
+    }
+}
+
 #[tauri::command(async)]
 pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> {
     let Some(instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? else {
@@ -648,27 +678,10 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
         locations.len()
     );
     let active_locations_ids = get_connection_id_by_type(ConnectionType::Location).await;
-    let mut location_info = Vec::new();
-    for location in locations {
-        let info = LocationInfo {
-            id: location.id,
-            instance_id: location.instance_id,
-            name: location.name,
-            address: location.address,
-            endpoint: location.endpoint,
-            active: active_locations_ids.contains(&location.id),
-            route_all_traffic: location.route_all_traffic,
-            connection_type: ConnectionType::Location,
-            pubkey: location.pubkey,
-            network_id: location.network_id,
-            location_mfa_mode: location.location_mfa_mode,
-            posture_check_required: location.posture_check_required,
-            mfa_method: location.mfa_method,
-            mfa_steps: location.mfa_steps.0,
-            mfa_step_plan: location.mfa_step_plan.0,
-        };
-        location_info.push(info);
-    }
+    let location_info = locations
+        .into_iter()
+        .map(|location| build_location_info(location, &active_locations_ids))
+        .collect::<Vec<_>>();
     trace!(
         "Returning information about {} locations for instance {instance}",
         location_info.len()
@@ -2099,6 +2112,13 @@ fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
         }
         Fido2Error::CredentialExcluded => {
             "This security key is already registered for your account".to_string()
+        }
+        // Windows offers a phone and Windows Hello alongside the key, and only says which one
+        // answered afterwards, so this is where that choice is turned back. Name the option.
+        Fido2Error::NotASecurityKey => {
+            "Only a hardware security key can be used. Choose \"Security key\" in the Windows \
+             dialog rather than a phone or Windows Hello"
+                .to_string()
         }
         Fido2Error::PinRequired => "This security key needs a PIN".to_string(),
         Fido2Error::PinInvalid | Fido2Error::PinBlocked => {
