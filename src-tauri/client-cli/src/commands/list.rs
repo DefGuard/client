@@ -202,6 +202,7 @@ mod tests {
         tunnel::Tunnel,
         Id,
     };
+    use defguard_core::mfa_contract::MfaContract;
     use sqlx::types::Json;
 
     use super::*;
@@ -220,6 +221,7 @@ mod tests {
             disable_tunnels: false,
             openid_display_name: None,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
         }
     }
 

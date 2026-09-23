@@ -26,6 +26,7 @@ use defguard_core::{
         },
         DbPool,
     },
+    mfa_contract::MfaContract,
     proto::{client::v1::ListInterfacesResponse, enterprise::posture::v2::DevicePostureData},
     ConnectionType,
 };
@@ -173,6 +174,7 @@ async fn test_active_state_lists_interfaces(pool: DbPool) {
         disable_tunnels: false,
         openid_display_name: None,
         mfa_configured_methods: None,
+        mfa_contract: MfaContract::Legacy,
     }
     .save(&pool)
     .await

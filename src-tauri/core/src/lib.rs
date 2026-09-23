@@ -25,6 +25,7 @@ pub mod error;
 pub mod events;
 pub mod mfa;
 pub mod mfa_config;
+pub mod mfa_contract;
 pub mod proxy;
 #[cfg(test)]
 mod test_helpers;

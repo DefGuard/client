@@ -728,6 +728,7 @@ mod tests {
 
     use super::*;
     use crate::database::models::instance::{ClientTrafficPolicy, Instance};
+    use crate::mfa_contract::MfaContract;
 
     fn new_instance() -> Instance<NoId> {
         Instance {
@@ -743,6 +744,7 @@ mod tests {
             disable_tunnels: false,
             openid_display_name: None,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
         }
     }
 

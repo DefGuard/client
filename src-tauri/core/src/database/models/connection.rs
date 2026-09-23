@@ -170,6 +170,7 @@ mod tests {
         instance::{ClientTrafficPolicy, Instance},
         location::{Location, LocationMfaMode, ServiceLocationMode},
     };
+    use crate::mfa_contract::MfaContract;
 
     async fn seed_location(pool: &SqlitePool) -> (Id, Id) {
         let instance = Instance {
@@ -185,6 +186,7 @@ mod tests {
             disable_tunnels: false,
             openid_display_name: None,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
         }
         .save(pool)
         .await

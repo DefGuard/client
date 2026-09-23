@@ -11,6 +11,7 @@ use defguard_client_core::database::models::{
     location::{Location, LocationMfaMode, ServiceLocationMode},
     NoId,
 };
+use defguard_client_core::mfa_contract::MfaContract;
 use defguard_client_proto::defguard::client_types::{
     DeviceConfig, DeviceConfigResponse, InstanceInfo, MfaUserState,
 };
@@ -113,6 +114,7 @@ fn instance_with_token(token: Option<&str>) -> Instance<Id> {
         disable_tunnels: false,
         openid_display_name: None,
         mfa_configured_methods: None,
+        mfa_contract: MfaContract::Legacy,
     }
 }
 
@@ -192,6 +194,7 @@ async fn seed_instance(
         disable_tunnels: false,
         openid_display_name: None,
         mfa_configured_methods: None,
+        mfa_contract: MfaContract::Legacy,
     }
     .save(pool)
     .await
