@@ -12,6 +12,39 @@ enum State {
     case dormant
 }
 
+enum AdapterError: LocalizedError {
+    /// Adapter was asked to start while not stopped.
+    case invalidState(State)
+    /// Tunnel configuration has no peers.
+    case noPeers
+    /// Peer has no endpoint to connect to.
+    case noEndpoint
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidState(let state):
+            return "Cannot start tunnel in state \(state)"
+        case .noPeers:
+            return "Tunnel configuration has no peers"
+        case .noEndpoint:
+            return "Peer has no endpoint"
+        }
+    }
+}
+
+/// Physical interfaces and gateways of a network path; a change means we should roam.
+private struct PathSignature: Equatable {
+    let interfaces: [String]
+    let gateways: [Network.NWEndpoint]
+
+    init(_ path: Network.NWPath) {
+        interfaces = path.availableInterfaces
+            .filter { $0.type != .other && $0.type != .loopback }
+            .map { $0.name }
+        gateways = path.gateways
+    }
+}
+
 @preconcurrency final class Adapter /*: Sendable*/ {
     /// Packet tunnel provider.
     private weak var packetTunnelProvider: NEPacketTunnelProvider?
@@ -29,6 +62,14 @@ enum State {
     private let log = Log(category: "Adapter")
     /// Adapter state.
     private var state: State = .stopped
+    /// Last observed network path.
+    private var lastPathSignature: PathSignature?
+    /// Pending delayed reconnection.
+    private var reconnectWorkItem: DispatchWorkItem?
+    /// Consecutive reconnection attempts.
+    private var reconnectAttempts = 0
+    /// Log "not ready to send" once per connection.
+    private var loggedNotReady = false
     /// Serialize tunnel I/O and connection state changes off the main queue.
     private let ioQueue = DispatchQueue(label: "net.defguard.VPNExtension.adapter")
     private let ioQueueKey = DispatchSpecificKey<Void>()
@@ -62,6 +103,13 @@ enum State {
         }
     }
 
+    /// Reconnect after system wake-up.
+    func wake() {
+        ioQueue.async { [weak self] in
+            self?.reconnect(reason: "system woke up")
+        }
+    }
+
     // Obtain tunnel statistics.
     func stats() -> Stats? {
         syncOnQueue {
@@ -87,9 +135,16 @@ enum State {
 
     private func startOnQueue(tunnelConfiguration: TunnelConfiguration) throws {
         guard case .stopped = self.state else {
-            log.error("Invalid state - cannot start tunnel")
-            // TODO: throw invalid state
-            return
+            log.error("Invalid state - cannot start tunnel (state: \(state))")
+            throw AdapterError.invalidState(state)
+        }
+        guard let peer = tunnelConfiguration.peers.first else {
+            log.error("Tunnel configuration has no peers, cannot connect")
+            throw AdapterError.noPeers
+        }
+        guard let endpoint = peer.endpoint else {
+            log.error("Endpoint is nil, cannot connect")
+            throw AdapterError.noEndpoint
         }
 
         if tunnel != nil {
@@ -98,6 +153,26 @@ enum State {
             connection = nil
         }
 
+        log.info("Initializing Tunnel")
+        tunnel = try Tunnel.init(
+            privateKey: tunnelConfiguration.privateKey,
+            serverPublicKey: peer.publicKey,
+            presharedKey: peer.preSharedKey,
+            keepAlive: peer.persistentKeepAlive,
+            index: 0
+        )
+        locationId = tunnelConfiguration.locationId
+        tunnelId = tunnelConfiguration.tunnelId
+        state = .running
+        reconnectAttempts = 0
+        lastPathSignature = nil
+
+        log.info(
+            "Connecting to endpoint (locationId: \(tunnelConfiguration.locationId ?? 0), tunnelId: \(tunnelConfiguration.tunnelId ?? 0))"
+        )
+        self.endpoint = endpoint.asNWEndpoint()
+        initEndpoint()
+
         let networkMonitor = NWPathMonitor()
         networkMonitor.pathUpdateHandler = { [weak self] path in
             self?.networkPathUpdate(path: path)
@@ -105,31 +180,9 @@ enum State {
         networkMonitor.start(queue: ioQueue)
         self.networkMonitor = networkMonitor
 
-        log.info("Initializing Tunnel")
-        tunnel = try Tunnel.init(
-            privateKey: tunnelConfiguration.privateKey,
-            serverPublicKey: tunnelConfiguration.peers[0].publicKey,
-            presharedKey: tunnelConfiguration.peers[0].preSharedKey,
-            keepAlive: tunnelConfiguration.peers[0].persistentKeepAlive,
-            index: 0
-        )
-        locationId = tunnelConfiguration.locationId
-        tunnelId = tunnelConfiguration.tunnelId
-
-        log.info(
-            "Connecting to endpoint (locationId: \(tunnelConfiguration.locationId ?? 0), tunnelId: \(tunnelConfiguration.tunnelId ?? 0))"
-        )
-        guard let endpoint = tunnelConfiguration.peers[0].endpoint else {
-            log.error("Endpoint is nil, cannot connect")
-            return
-        }
-        self.endpoint = endpoint.asNWEndpoint()
-        initEndpoint()
-
         log.info("Starting to sniff packets")
         readPackets()
 
-        state = .running
         log.info("Tunnel started successfully")
     }
 
@@ -138,6 +191,8 @@ enum State {
         connection?.cancel()
         connection = nil
         tunnel = nil
+        reconnectWorkItem?.cancel()
+        reconnectWorkItem = nil
         keepAliveTimer?.cancel()
         keepAliveTimer = nil
         // Cancel network monitor
@@ -165,17 +220,9 @@ enum State {
             switch error {
             case .InvalidAeadTag:
                 log.error("Invalid pre-shared key; stopping tunnel")
-                // The correct way is to call the packet tunnel provider, if there is one.
-                if let provider = packetTunnelProvider {
-                    provider.cancelTunnelWithError(error)
-                } else {
-                    stop()
-                }
+                fail(error)
             case .ConnectionExpired:
-                log.warning("Connection has expired; re-connecting")
-                packetTunnelProvider?.reasserting = true
-                initEndpoint()
-                packetTunnelProvider?.reasserting = false
+                reconnect(reason: "connection has expired")
             default:
                 break
             }
@@ -193,20 +240,86 @@ enum State {
         packetTunnelProvider?.packetFlow.writePacketObjects(tunnelPackets)
     }
 
+    /// Recreate UDP connection on the current network path.
+    private func reconnect(reason: String) {
+        guard state == .running else {
+            log.debug("Not reconnecting (\(reason)) in state \(state)")
+            return
+        }
+        log.info("Reconnecting to endpoint: \(reason)")
+        packetTunnelProvider?.reasserting = true
+        initEndpoint()
+    }
+
+    /// Reconnect with exponential backoff.
+    private func scheduleReconnect(after error: NWError) {
+        guard state == .running else { return }
+        connection?.cancel()
+        connection = nil
+        packetTunnelProvider?.reasserting = true
+
+        let delay = min(1 << min(reconnectAttempts, 5), 30)
+        reconnectAttempts += 1
+        log.error(
+            "Endpoint connection error: \(error); reconnecting in \(delay)s (attempt \(reconnectAttempts))")
+
+        reconnectWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.reconnect(reason: "retry after error")
+        }
+        reconnectWorkItem = workItem
+        ioQueue.asyncAfter(deadline: .now() + .seconds(delay), execute: workItem)
+    }
+
+    /// Stop the tunnel due to an unrecoverable error.
+    private func fail(_ error: Error) {
+        log.error("Stopping tunnel due to error: \(error)")
+        // The correct way is to call the packet tunnel provider, if there is one.
+        if let provider = packetTunnelProvider {
+            provider.cancelTunnelWithError(error)
+        } else {
+            stopOnQueue()
+        }
+    }
+
     /// Initialise UDP connection to endpoint.
     private func initEndpoint() {
-        guard let endpoint = endpoint else { return }
+        guard let endpoint = endpoint else {
+            log.error("No endpoint to connect to")
+            return
+        }
 
         log.info("Initializing endpoint connection to: \(endpoint)")
+        reconnectWorkItem?.cancel()
+        reconnectWorkItem = nil
         // Cancel previous connection
         connection?.cancel()
         connection = nil
+        loggedNotReady = false
 
         let params = NWParameters.udp
         params.allowLocalEndpointReuse = true
         let connection = NWConnection.init(to: endpoint, using: params)
-        connection.stateUpdateHandler = { [weak self] state in
-            self?.endpointStateChange(state: state)
+        // Ignore callbacks from replaced connections.
+        connection.stateUpdateHandler = { [weak self, weak connection] state in
+            guard let self = self, let connection = connection, connection === self.connection
+            else { return }
+            self.endpointStateChange(state: state)
+        }
+        connection.betterPathUpdateHandler = { [weak self, weak connection] available in
+            guard available, let self = self, let connection = connection,
+                connection === self.connection
+            else { return }
+            self.reconnect(reason: "better network path available")
+        }
+        connection.viabilityUpdateHandler = { [weak self, weak connection] viable in
+            guard let self = self, let connection = connection, connection === self.connection
+            else { return }
+            if viable {
+                self.log.info("UDP connection is viable")
+            } else {
+                self.log.warning("UDP connection is not viable")
+            }
         }
 
         connection.start(queue: ioQueue)
@@ -214,8 +327,9 @@ enum State {
     }
 
     /// Setup UDP connection to endpoint. This method should be called when UDP connection is ready to send and receive.
-    private func setupEndpoint() {
+    private func setupEndpoint(connection: NWConnection) {
         log.info("Setting up endpoint")
+        packetTunnelProvider?.reasserting = false
 
         // Send initial handshake packet
         if let tunnel = self.tunnel {
@@ -223,24 +337,25 @@ enum State {
             handleTunnelResult(tunnel.forceHandshake())
         }
         log.info("Starting UDP receive loop")
-        log.debug("NWConnection path: \(String(describing: self.connection?.currentPath))")
-        receive()
+        log.debug("NWConnection path: \(String(describing: connection.currentPath))")
+        receive(on: connection)
 
         // Use a dispatch timer to avoid bouncing keep-alives through the main run loop.
-        keepAliveTimer?.cancel()
-        log.info("Creating keep-alive timer")
-        let timer = DispatchSource.makeTimerSource(queue: ioQueue)
-        timer.schedule(
-            deadline: .now() + .seconds(1),
-            repeating: .seconds(1),
-            leeway: .milliseconds(25)
-        )
-        timer.setEventHandler { [weak self] in
-            guard let self = self, let tunnel = self.tunnel else { return }
-            self.handleTunnelResult(tunnel.tick())
+        if keepAliveTimer == nil {
+            log.info("Creating keep-alive timer")
+            let timer = DispatchSource.makeTimerSource(queue: ioQueue)
+            timer.schedule(
+                deadline: .now() + .seconds(1),
+                repeating: .seconds(1),
+                leeway: .milliseconds(25)
+            )
+            timer.setEventHandler { [weak self] in
+                guard let self = self, let tunnel = self.tunnel else { return }
+                self.handleTunnelResult(tunnel.tick())
+            }
+            keepAliveTimer = timer
+            timer.resume()
         }
-        keepAliveTimer = timer
-        timer.resume()
     }
 
     /// Send packets to UDP endpoint.
@@ -254,25 +369,29 @@ enum State {
                         self?.log.error("UDP connection send error: \(error)")
                     }
                 })
-        } else {
-            log.warning("UDP connection not ready to send")
+        } else if !loggedNotReady {
+            loggedNotReady = true
+            log.warning("UDP connection not ready to send (state: \(connection.state)); dropping packets")
         }
     }
 
     /// Handle UDP packets from the endpoint.
-    private func receive() {
-        connection?.receiveMessage { [weak self] data, context, isComplete, error in
-            guard let self = self else { return }
+    private func receive(on connection: NWConnection) {
+        connection.receiveMessage { [weak self, weak connection] data, context, isComplete, error in
+            guard let self = self, let connection = connection, connection === self.connection
+            else { return }
             if let data = data, let tunnel = self.tunnel {
+                self.reconnectAttempts = 0
                 autoreleasepool {
                     self.handleTunnelResult(tunnel.read(src: data))
                 }
             }
-            if error == nil {
-                // continue receiving
-                self.receive()
+            if let error = error {
+                self.log.error("UDP receive error: \(error)")
+                self.scheduleReconnect(after: error)
             } else {
-                self.log.error("receive() error: \(String(describing: error))")
+                // continue receiving
+                self.receive(on: connection)
             }
         }
     }
@@ -312,22 +431,15 @@ enum State {
         log.debug("UDP connection state changed: \(state)")
         switch state {
         case .ready:
-            setupEndpoint()
-        //case .waiting(let error):
-        //    switch error {
-        //        case .posix(_):
-        //            connection?.restart()
-        //        default:
-        //            self.stop()
-        //    }
+            if let connection = connection {
+                setupEndpoint(connection: connection)
+            }
+        case .waiting(let error):
+            log.warning("UDP connection waiting for network: \(error)")
+            packetTunnelProvider?.reasserting = true
         case .failed(let error):
             log.error("Failed to establish endpoint connection: \(error)")
-            // The correct way is to call the packet tunnel provider, if there is one.
-            if let provider = packetTunnelProvider {
-                provider.cancelTunnelWithError(error)
-            } else {
-                stop()
-            }
+            scheduleReconnect(after: error)
         default:
             break
         }
@@ -335,21 +447,40 @@ enum State {
 
     /// Handle network path updates.
     private func networkPathUpdate(path: Network.NWPath) {
+        let signature = PathSignature(path)
+        let previousSignature = lastPathSignature
+        lastPathSignature = signature
         log.debug(
-            "Network path update - status: \(path.status), interfaces: \(path.availableInterfaces)")
-        if path.status == .unsatisfied {
+            "Network path update - status: \(path.status), interfaces: \(path.availableInterfaces), gateways: \(path.gateways)"
+        )
+
+        guard path.status == .satisfied else {
             if state == .running {
                 log.warning("Unsatisfied network path: going dormant")
+                reconnectWorkItem?.cancel()
+                reconnectWorkItem = nil
                 connection?.cancel()
                 connection = nil
                 state = .dormant
+                packetTunnelProvider?.reasserting = true
             }
-        } else {
-            if state == .dormant {
-                log.warning("Satisfied network path: going running")
-                initEndpoint()
-                state = .running
+            return
+        }
+
+        switch state {
+        case .dormant:
+            log.warning("Satisfied network path: going running")
+            state = .running
+            reconnect(reason: "network became available")
+        case .running:
+            if let previousSignature = previousSignature, previousSignature != signature {
+                reconnect(
+                    reason:
+                        "network changed (interfaces: \(previousSignature.interfaces) -> \(signature.interfaces))"
+                )
             }
+        case .stopped:
+            break
         }
     }
 }

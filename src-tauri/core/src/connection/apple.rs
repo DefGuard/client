@@ -172,21 +172,6 @@ pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
     let finished = Arc::new(AtomicBool::new(false));
     let finished_clone = Arc::clone(&finished);
 
-    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
-        if let Some(data) = unsafe { data_ptr.as_ref() } {
-            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
-                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
-                    *new_stats_locked = Some(stats);
-                }
-            } else {
-                warn!("Failed to deserialize tunnel stats");
-            }
-        } else {
-            debug!("No data received in tunnel stats response, skipping");
-        }
-        finished_clone.store(true, Ordering::Release);
-    });
-
     let manager = manager_for_key_and_value(
         match connection_type {
             ConnectionType::Location => LOCATION_ID,
@@ -213,6 +198,21 @@ pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
         return None;
     };
 
+    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
+        if let Some(data) = unsafe { data_ptr.as_ref() } {
+            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
+                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
+                    *new_stats_locked = Some(stats);
+                }
+            } else {
+                warn!("Failed to deserialize tunnel stats");
+            }
+        } else {
+            debug!("No data received in tunnel stats response, skipping");
+        }
+        finished_clone.store(true, Ordering::Release);
+    });
+
     let message_data = NSData::new();
     if unsafe {
         session.sendProviderMessage_returnError_responseHandler(
@@ -222,13 +222,12 @@ pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
         )
     } {
         debug!("Message sent to NETunnelProviderSession");
+        // Wait for the response handler to complete.
+        while !finished.load(Ordering::Acquire) {
+            spin_loop();
+        }
     } else {
         error!("Failed to send to NETunnelProviderSession while requesting stats");
-    }
-
-    // Wait for the response handler to complete.
-    while !finished.load(Ordering::Acquire) {
-        spin_loop();
     }
 
     new_stats

@@ -119,7 +119,7 @@ version.workspace = true
 name = "defguard-client"
 
 [build-dependencies]
-tauri-build = "2"
+tauri-build = { version = "2", features = [] }
 vergen-git2.workspace = true
 
 [workspace.lints.clippy]
