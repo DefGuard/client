@@ -3,16 +3,14 @@ import clsx from 'clsx';
 import { TooltipContent } from '../../../../providers/tooltip/TooltipContent';
 import { TooltipProvider } from '../../../../providers/tooltip/TooltipContext';
 import { TooltipTrigger } from '../../../../providers/tooltip/TooltipTrigger';
-import type { InstanceInfo, LocationInfo } from '../../../../rust-api/types';
+import type { LocationInfo } from '../../../../rust-api/types';
 import {
   ConnectionAbility,
   type ConnectionAbilityValue,
   mfaStepCount,
-  mfaStepsOf,
   mfaStepsToText,
   mfaToText,
   resolveMfaStepPlan,
-  usableMfaMethods,
 } from '../../../../utils/mfa';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
@@ -21,7 +19,6 @@ import { IconButtonVariant } from '../../../IconButton/types';
 interface Props {
   variant: 'compact' | 'full';
   location: LocationInfo;
-  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>;
   /** Supplied by the caller - the tray card reads it off the LocationCard context,
    *  the desktop card computes it with `useConnectionAbility`. */
   connectionAbility: ConnectionAbilityValue;
@@ -33,7 +30,6 @@ const CONFIGURE_REQUIRED_TOOLTIP =
 
 export const LocationCardMfaEdit = ({
   location,
-  instance,
   onEdit,
   variant,
   connectionAbility,
@@ -44,9 +40,8 @@ export const LocationCardMfaEdit = ({
       ? mfaStepsToText(stepCount)
       : mfaToText(resolveMfaStepPlan(location)[0]);
 
-  const canEdit =
-    mfaStepsOf(location).some((step) => usableMfaMethods(step, instance).length > 1) &&
-    connectionAbility === ConnectionAbility.Available;
+  // `Configurable` stays editable, configuring a factor unblocks it.
+  const canEdit = connectionAbility !== ConnectionAbility.Unavailable;
 
   const canConfigure = connectionAbility === ConnectionAbility.Configurable;
 

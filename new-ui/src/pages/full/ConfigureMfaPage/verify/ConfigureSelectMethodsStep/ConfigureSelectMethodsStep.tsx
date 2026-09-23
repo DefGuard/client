@@ -23,7 +23,7 @@ import {
   discardMfaConfiguration,
   useConfigureMfaStore,
 } from '../../hooks/useConfigureMfaStore';
-import { isMfaFactorOfferable, MFA_CONFIGURABLE_FACTORS } from '../../types';
+import { isMfaFactorOfferable, MFA_CONFIGURABLE_FACTORS } from '../../utils';
 import '../style.scss';
 import './style.scss';
 import { MethodRow, type MethodRowState } from './components/MethodRow';
@@ -40,8 +40,12 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
   const configuredMethods = useConfigureMfaStore((s) => s.configuredMethods);
   const emailFallback = useConfigureMfaStore((s) => s.emailFallback);
   const location = useConfigureMfaStore((s) => s.location);
+  const initialSelection = useConfigureMfaStore((s) => s.initialSelection);
 
-  const [selected, setSelected] = useState<MfaMethodValue[]>([]);
+  // Listing order, matching what `toggle` keeps.
+  const [selected, setSelected] = useState<MfaMethodValue[]>(() =>
+    CLIENT_CONFIGURABLE_METHODS.filter((method) => initialSelection.includes(method)),
+  );
   const [error, setError] = useState<string | null>(null);
 
   const locationSteps = useMemo(

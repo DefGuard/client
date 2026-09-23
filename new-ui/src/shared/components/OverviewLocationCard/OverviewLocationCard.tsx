@@ -2,7 +2,6 @@ import './style.scss';
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { error as logError } from '@tauri-apps/plugin-log';
 import clsx from 'clsx';
 import { Fragment, useMemo } from 'react';
 import {
@@ -10,8 +9,8 @@ import {
   mfaMethodToConnectModalView,
 } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
+import { useConfigureFactorsScreen } from '../../hooks/useConfigureFactorsScreen';
 import { useConnectionAbility } from '../../hooks/useConnectionAbility';
-import { Snackbar } from '../../providers/snackbar/snackbar';
 import { api } from '../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../rust-api/query';
 import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
@@ -87,13 +86,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
     },
   });
 
-  const { mutate: configureMfa, isPending: isOpeningConfiguration } = useMutation({
-    mutationFn: api.initiateConfigureFactorScreen,
-    onError: (err) => {
-      void logError(`Failed to open the MFA configuration screen: ${err}`);
-      Snackbar.error('Could not open MFA configuration.');
-    },
-  });
+  const { mutate: configureMfa, isPending: isOpeningConfiguration } =
+    useConfigureFactorsScreen();
 
   const isBusy = isConnecting || isDisconnecting || isOpeningConfiguration;
 
@@ -199,7 +193,6 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
               <LocationCardMfaEdit
                 variant="full"
                 location={location}
-                instance={instance}
                 connectionAbility={connectionAbility}
                 onEdit={() => {
                   if (isPresent(location)) {

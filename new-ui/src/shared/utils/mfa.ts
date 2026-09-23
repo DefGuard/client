@@ -127,7 +127,9 @@ export const CLIENT_CONFIGURABLE_METHODS = [
 
 export type ClientConfigurableMethod = (typeof CLIENT_CONFIGURABLE_METHODS)[number];
 
-export const isClientConfigurableMethod = (method: MfaMethodValue): boolean =>
+export const isClientConfigurableMethod = (
+  method: MfaMethodValue,
+): method is ClientConfigurableMethod =>
   CLIENT_CONFIGURABLE_METHODS.some((candidate) => candidate === method);
 
 /** How far the user can get connecting this location with the factors they hold. */

@@ -1,7 +1,7 @@
 .configure-mfa-verify-page {
   padding: var(--spacing-md) var(--spacing-lg);
 
-  .description {
+  > .description {
     display: flex;
     flex-flow: column;
     row-gap: var(--spacing-xl);

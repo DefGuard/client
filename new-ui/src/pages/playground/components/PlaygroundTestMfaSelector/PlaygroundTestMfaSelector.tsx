@@ -48,6 +48,18 @@ export const PlaygroundTestMfaSelector = () => {
             <MfaSelector key={factor} factor={factor} isSelectable selected />
           ))}
         </div>
+        <h3>Active</h3>
+        <div className="track">
+          {allFactors.map((factor) => (
+            <MfaSelector key={factor} factor={factor} isSelectable active />
+          ))}
+        </div>
+        <h3>Active (not selectable)</h3>
+        <div className="track">
+          {allFactors.map((factor) => (
+            <MfaSelector key={factor} factor={factor} isSelectable={false} active />
+          ))}
+        </div>
         <h3>Default badge</h3>
         <div className="track">
           <MfaSelector factor={MfaMethod.Totp} isDefault isSelectable />
@@ -59,6 +71,7 @@ export const PlaygroundTestMfaSelector = () => {
             isSelectable={false}
           />
           <MfaSelector factor={MfaMethod.Biometric} isDefault isSelectable={false} />
+          <MfaSelector factor={MfaMethod.Oidc} isDefault isSelectable active />
         </div>
         <h3>Interactive (selected: {selected ?? 'none'})</h3>
         <div className="track">
@@ -69,6 +82,7 @@ export const PlaygroundTestMfaSelector = () => {
                 key={factor}
                 factor={factor}
                 selected={selected === factor}
+                active={factor === MfaMethod.Email}
                 isDefault={factor === MfaMethod.Totp}
                 configured={configured}
                 isSelectable={!configured && factor !== MfaMethod.Biometric}
