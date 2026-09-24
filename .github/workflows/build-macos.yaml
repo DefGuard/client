@@ -132,3 +132,8 @@ jobs:
             ((RETRIES++))
           done
           rm -f -r "${UPLOAD_DIR}"
+
+  build-macos-dmg:
+    if: github.ref == 'refs/heads/dev'
+    uses: ./.github/workflows/release-macos.yaml
+    secrets: inherit

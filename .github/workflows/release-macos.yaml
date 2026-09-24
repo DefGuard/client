@@ -3,9 +3,10 @@ on:
   workflow_call:
     inputs:
       upload_url:
-        description: 'Upload URL for release'
-        required: true
+        description: 'Upload URL for release; if empty, the DMG is uploaded as a workflow artifact instead'
+        required: false
         type: string
+        default: ''
 
 env:
   SCCACHE_GHA_ENABLED: "true"
@@ -99,6 +100,7 @@ jobs:
           args: --ignore-version-mismatches --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
 
       - name: Upload DMG
+        if: inputs.upload_url != ''
         uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -107,3 +109,13 @@ jobs:
           asset_path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/Defguard_${{ env.VERSION }}_universal.dmg
           asset_content_type: application/x-apple-diskimage
           overwrite: true
+
+      - name: Upload DMG artifact
+        if: inputs.upload_url == ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: defguard-client-macos-dmg-${{ github.run_number }}
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
