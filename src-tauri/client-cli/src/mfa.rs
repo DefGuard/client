@@ -218,7 +218,7 @@ fn step_candidates(step: &LocationMfaStep) -> Vec<LocationMfaMethod> {
 pub(crate) fn join_methods(methods: &[LocationMfaMethod]) -> String {
     methods
         .iter()
-        .map(|method| method.as_str())
+        .map(LocationMfaMethod::as_str)
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -612,15 +612,12 @@ fn finish_psk(finish: ClientMfaFinishResponse) -> Result<Option<SecretString>, C
             "The server returned an unexpected verification state".into(),
         ));
     }
-    match mfa::completed_preshared_key(&finish) {
-        Some(psk) => {
-            info!("MFA session completed, preshared key obtained");
-            Ok(Some(SecretString::from(psk)))
-        }
-        None => {
-            debug!("MFA step passed, the session advanced to the next step");
-            Ok(None)
-        }
+    if let Some(psk) = mfa::completed_preshared_key(&finish) {
+        info!("MFA session completed, preshared key obtained");
+        Ok(Some(SecretString::from(psk)))
+    } else {
+        debug!("MFA step passed, the session advanced to the next step");
+        Ok(None)
     }
 }
 

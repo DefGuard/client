@@ -28,7 +28,7 @@ const SYSTEM_SYNC_DELAY: Duration = Duration::from_millis(500);
 /// This is an async function.
 /// It has access to the `AppHandle` to be able to emit events.
 pub async fn connection_state_update_thread(app_handle: &AppHandle) {
-    let receiver = {
+    let mut receiver = {
         let mut rx_opt = VPN_STATE_UPDATE_COMMS
             .1
             .lock()
@@ -37,7 +37,7 @@ pub async fn connection_state_update_thread(app_handle: &AppHandle) {
     };
 
     debug!("Waiting for status update message from channel...");
-    while receiver.recv().is_ok() {
+    while receiver.recv().await.is_some() {
         debug!("Status update message received, synchronizing state...");
         sleep(SYSTEM_SYNC_DELAY).await;
         sync_connections_with_system(app_handle).await;
