@@ -7,6 +7,11 @@ on:
         required: false
         type: string
         default: ''
+  workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
 
 env:
   SCCACHE_GHA_ENABLED: "true"
@@ -15,6 +20,8 @@ env:
 
 jobs:
   build-macos-dmg:
+    # For pull requests, only build from the apple_signing branch.
+    if: github.event_name != 'pull_request' || github.head_ref == 'apple_signing'
     runs-on:
       - self-hosted
       - macOS
@@ -83,8 +90,14 @@ jobs:
           pnpm build
 
       - name: Unlock keychain
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.BUILD_KEYCHAIN_PASSWORD }}
         run: |
-          security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" build.keychain
+          # Don't auto-lock during the long build.
+          security set-keychain-settings build.keychain
+          # Let codesign/Xcode use the private keys without the "allow access" GUI prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" build.keychain > /dev/null
 
       - name: Build app
         uses: tauri-apps/tauri-action@v1
