@@ -489,11 +489,13 @@ pub fn run_app() {
             debug!("Setting up Ctrl-C handler.");
             let app_handle_clone = app_handle.clone();
             async_runtime::spawn(async move {
-                tokio::signal::ctrl_c()
-                    .await
-                    .expect("Signal handler failure");
-                debug!("Ctrl-C handler: quitting the app");
-                app_handle_clone.exit(0);
+                loop {
+                    tokio::signal::ctrl_c()
+                        .await
+                        .expect("Signal handler failure");
+                    debug!("Ctrl-C handler: quitting the app");
+                    app_handle_clone.exit(0);
+                }
             });
             debug!("Ctrl-C handler has been set up successfully");
         }
