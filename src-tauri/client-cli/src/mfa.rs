@@ -13,6 +13,7 @@ use std::{
     io::{stderr, stdin, Write},
 };
 
+use clap::builder::{PossibleValue, PossibleValuesParser};
 use defguard_client_proto::defguard::{
     client_types::MfaMethod, enterprise::posture::v2::DevicePostureData,
 };
@@ -188,7 +189,7 @@ pub(crate) fn step_method_label(method: LocationMfaMethod) -> &'static str {
         LocationMfaMethod::Totp => "Authenticator app",
         LocationMfaMethod::Email => "Email",
         LocationMfaMethod::Oidc => "OpenID",
-        LocationMfaMethod::MobileApprove => "Mobile Client",
+        LocationMfaMethod::MobileApprove => "Mobile App Approval",
         _ => method.as_str(),
     }
 }
@@ -784,19 +785,46 @@ pub(crate) async fn authorize_mobile_approve(
     })
 }
 
+/// MFA methods that a CLI flag can name, in `--help` order.
+const MFA_METHODS: [LocationMfaMethod; 6] = [
+    LocationMfaMethod::Totp,
+    LocationMfaMethod::Email,
+    LocationMfaMethod::Oidc,
+    LocationMfaMethod::Biometric,
+    LocationMfaMethod::MobileApprove,
+    LocationMfaMethod::Fido2,
+];
+
+fn method_value(method: LocationMfaMethod) -> PossibleValue {
+    let value = PossibleValue::new(method.as_str());
+    if method == LocationMfaMethod::MobileApprove {
+        value.alias("mobile_approve")
+    } else {
+        value
+    }
+}
+
+/// Value parser that lists the MFA methods in `--help`.
+///
+/// With `cli_drivable_only`, `--help` omits the methods that the CLI cannot run.
+/// The parser still accepts them, so the command can tell the user which client to use.
+pub(crate) fn method_parser(cli_drivable_only: bool) -> PossibleValuesParser {
+    PossibleValuesParser::new(MFA_METHODS.map(|method| {
+        method_value(method).hide(cli_drivable_only && !is_cli_drivable_method(method))
+    }))
+}
+
 /// Parse an MFA method name from a CLI flag.
 pub(crate) fn parse_method(raw: &str) -> Result<LocationMfaMethod, CliError> {
-    match raw.to_lowercase().as_str() {
-        "totp" => Ok(LocationMfaMethod::Totp),
-        "email" => Ok(LocationMfaMethod::Email),
-        "oidc" => Ok(LocationMfaMethod::Oidc),
-        "biometric" => Ok(LocationMfaMethod::Biometric),
-        "mobile" | "mobile_approve" => Ok(LocationMfaMethod::MobileApprove),
-        "fido2" => Ok(LocationMfaMethod::Fido2),
-        _ => Err(CliError::Usage(format!(
-            "Invalid MFA method '{raw}'. Valid: totp, email, oidc, biometric, mobile, fido2."
-        ))),
-    }
+    MFA_METHODS
+        .into_iter()
+        .find(|method| method_value(*method).matches(raw, true))
+        .ok_or_else(|| {
+            CliError::Usage(format!(
+                "Invalid MFA method '{raw}'. Valid: {}.",
+                join_methods(&MFA_METHODS)
+            ))
+        })
 }
 
 /// Determine the MFA method to use for a single-step location.
@@ -1133,6 +1161,20 @@ mod tests {
         let err = resolve_method(&l, Some("fido2")).unwrap_err();
         assert!(matches!(err, CliError::InvalidInput(_)));
         assert!(err.to_string().contains("fido2"));
+    }
+
+    #[test]
+    fn test_parse_method_accepts_alias_in_any_case() {
+        assert_eq!(parse_method("TOTP").unwrap(), LocationMfaMethod::Totp);
+        assert_eq!(
+            parse_method("Mobile_Approve").unwrap(),
+            LocationMfaMethod::MobileApprove
+        );
+        let err = parse_method("sms").unwrap_err();
+        assert!(matches!(err, CliError::Usage(_)));
+        assert!(err
+            .to_string()
+            .contains("Valid: totp, email, oidc, biometric, mobile, fido2."));
     }
 
     #[test]

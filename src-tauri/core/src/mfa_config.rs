@@ -107,8 +107,8 @@ fn method_name(method: MfaMethod) -> &'static str {
         MfaMethod::Totp => "authenticator app",
         MfaMethod::Email => "email",
         MfaMethod::Oidc => "OpenID",
-        MfaMethod::Biometric => "biometrics",
-        MfaMethod::MobileApprove => "mobile client",
+        MfaMethod::Biometric => "mobile biometric authentication",
+        MfaMethod::MobileApprove => "mobile app approval",
         MfaMethod::Fido2 => "security key",
     }
 }
