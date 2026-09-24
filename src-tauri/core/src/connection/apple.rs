@@ -26,6 +26,7 @@ use objc2_network_extension::{
     NEVPNStatusDidChangeNotification,
 };
 use serde::Deserialize;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
     database::{
@@ -47,13 +48,12 @@ pub static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLo
     (Mutex::new(tx), Mutex::new(Some(rx)))
 });
 
-type VpnStateSender = Mutex<Sender<()>>;
-type VpnStateReceiver = Mutex<Option<Receiver<()>>>;
+type VpnStateReceiver = Mutex<Option<UnboundedReceiver<()>>>;
 
-pub static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> =
+pub static VPN_STATE_UPDATE_COMMS: LazyLock<(UnboundedSender<()>, VpnStateReceiver)> =
     LazyLock::new(|| {
-        let (tx, rx) = mpsc::channel();
-        (Mutex::new(tx), Mutex::new(Some(rx)))
+        let (tx, rx) = unbounded_channel();
+        (tx, Mutex::new(Some(rx)))
     });
 
 /// Thread responsible for observing VPN status changes.
@@ -234,8 +234,6 @@ fn vpn_status_change_handler(notification: &NSNotification) {
     debug!("Received VPN status change notification: {name:?}");
     VPN_STATE_UPDATE_COMMS
         .0
-        .lock()
-        .expect("Failed to lock state update sender")
         .send(())
         .expect("Failed to send to state update channel");
     debug!("Sent status update request to channel");
