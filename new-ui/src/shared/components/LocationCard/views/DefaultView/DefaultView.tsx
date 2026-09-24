@@ -51,7 +51,6 @@ export const DefaultView = () => {
           <LocationCardMfaEdit
             variant="compact"
             location={location}
-            instance={instance}
             connectionAbility={connectionAbility}
             onEdit={() => {
               setView(LocationCardViews.MfaSettings);

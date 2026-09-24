@@ -13,3 +13,8 @@ export const connectConfigureFactorsSource = (): ConfigureFactorsSourceValue =>
   getCurrentWindow().label === WindowId.FullView
     ? ConfigureFactorsSource.FullConnect
     : ConfigureFactorsSource.TrayConnect;
+
+export const mfaEditConfigureFactorsSource = (): ConfigureFactorsSourceValue =>
+  getCurrentWindow().label === WindowId.FullView
+    ? ConfigureFactorsSource.FullMfaEdit
+    : ConfigureFactorsSource.TrayMfaEdit;

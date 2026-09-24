@@ -1,14 +1,16 @@
 import './style.scss';
 import clsx from 'clsx';
-import { type HTMLProps, type MouseEventHandler, useMemo } from 'react';
+import type { HTMLProps, MouseEventHandler } from 'react';
+import { mfaMethodIcon } from '../../../../consts';
 import { MfaMethod, type MfaMethodValue } from '../../../../rust-api/types';
 import { mfaToText } from '../../../../utils/mfa';
-import { Icon, type IconKindValue } from '../../../Icon';
+import { Icon } from '../../../Icon';
 import checkboxSrc from './assets/checkbox.svg';
 
 interface Props {
   factor: MfaMethodValue;
   selected?: boolean;
+  active?: boolean;
   isDefault?: boolean;
   configured?: boolean;
   isSelectable: boolean;
@@ -21,27 +23,11 @@ export const MfaSelector = ({
   onClick,
   containerProps,
   selected = false,
+  active = false,
   isDefault = false,
   configured = true,
   isSelectable,
 }: Props) => {
-  const iconKind = useMemo((): IconKindValue => {
-    switch (factor) {
-      case 'email':
-        return 'mail';
-      case 'mobileapprove':
-        return 'qr';
-      case 'oidc':
-        return 'token';
-      case 'totp':
-        return 'lock-closed';
-      case 'biometric':
-        return 'biometric';
-      case 'fido2':
-        return 'software-key';
-    }
-  }, [factor]);
-
   const isMobileOnly = factor === MfaMethod.Biometric;
   const showCheckbox = isSelectable && selected;
 
@@ -52,6 +38,7 @@ export const MfaSelector = ({
       data-factor={factor}
       className={clsx(containerProps?.className, 'mfa-selector', {
         selected,
+        active,
         disabled: !isSelectable,
       })}
       onClick={(event) => {
@@ -63,7 +50,7 @@ export const MfaSelector = ({
       {showCheckbox && <img src={checkboxSrc} alt="" width={24} height={24} />}
       {!showCheckbox && (
         <div className="icon-col">
-          <Icon className="factor-icon" icon={iconKind} size={20} />
+          <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
         </div>
       )}
       <div className="middle">

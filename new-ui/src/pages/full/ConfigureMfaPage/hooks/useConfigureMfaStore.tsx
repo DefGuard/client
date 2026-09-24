@@ -16,12 +16,15 @@ import { isPresent } from '../../../../shared/utils/isPresent';
 import {
   ConfigureMfaStep,
   type ConfigureMfaStepValue,
+  MFA_WIZARD_STEPS,
+  type MfaVerificationMethod,
+} from '../types';
+import {
   isCodeMfaMethod,
   isMfaFactorOfferable,
   isMfaSetupStep,
-  MFA_WIZARD_STEPS,
   mfaFactorStep,
-} from '../types';
+} from '../utils';
 
 type StoreValues = {
   activeStep: ConfigureMfaStepValue;
@@ -35,6 +38,10 @@ type StoreValues = {
   /** Null until the selection step is done. Empty is valid, the email fallback configures
    *  a factor on its own. */
   selectedMethods: MfaMethodValue[] | null;
+  /** Pre-ticked in the selection step, from the entry point or an earlier pass. */
+  initialSelection: MfaMethodValue[];
+  /** Null until picked. Asked only when more than one code factor is configured. */
+  verificationMethod: MfaVerificationMethod | null;
   /** No factor was configured, so an emailed code was the only way in. */
   emailFallback: boolean;
   /** ISO timestamp the session dies at, null once nothing in the flow needs it. */
@@ -94,6 +101,8 @@ const defaults: StoreValues = {
   configuredMethods: [],
   completedMethods: [],
   selectedMethods: null,
+  initialSelection: [],
+  verificationMethod: null,
   emailFallback: false,
   deadline: null,
   authorized: false,
@@ -112,6 +121,9 @@ interface Store extends StoreValues {
     origin: ConfigureMfaOrigin,
   ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
+  selectVerificationMethod: (method: MfaVerificationMethod) => void;
+  /** Keeps the current picks ticked and the session alive. */
+  backToSelection: () => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
   factorConfigured: (method: MfaMethodValue, recoveryCodes: string[]) => void;
@@ -149,6 +161,17 @@ export const useConfigureMfaStore = create<Store>()(
         set((current) => ({
           selectedMethods: methods,
           activeStep: firstStep({ ...current, selectedMethods: methods }),
+        }));
+      },
+      selectVerificationMethod: (method) => {
+        set({ verificationMethod: method });
+      },
+      backToSelection: () => {
+        set((current) => ({
+          initialSelection: current.selectedMethods ?? current.initialSelection,
+          selectedMethods: null,
+          verificationMethod: null,
+          activeStep: defaults.activeStep,
         }));
       },
       authorize: (response) => {
@@ -210,7 +233,7 @@ export const useConfigureMfaStore = create<Store>()(
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
       // Bumped on every shape change: a stored session is never resumable across one.
-      version: 9,
+      version: 11,
     },
   ),
 );
@@ -222,7 +245,6 @@ export const selectPendingMethod =
     pendingMethods(state).find((method) => mfaFactorStep(method) === step);
 
 type StartOptions = Partial<ConfigureMfaOrigin> & {
-  /** Factors the caller already picked, so the selection step can be skipped. */
   preselectedMethods?: MfaMethodValue[];
 };
 
@@ -232,14 +254,11 @@ export const startMfaConfiguration = async (
 ): Promise<void> => {
   const response = await api.mfaConfigStart(instance.id);
   useConfigureMfaStore.getState().start(instance, response, { source, location });
-  // A pick the selection step would have refused is dropped rather than carried into the wizard;
-  // with nothing left the step runs as usual.
-  const preselected = preselectedMethods.filter((method) =>
+  // Only pre-ticks, the user still confirms in the selection step.
+  const initialSelection = preselectedMethods.filter((method) =>
     isMfaFactorOfferable(method, useConfigureMfaStore.getState().configuredMethods),
   );
-  if (preselected.length > 0) {
-    useConfigureMfaStore.getState().selectMethods(preselected);
-  }
+  useConfigureMfaStore.setState({ initialSelection });
 };
 
 /** A copy the proxy still holds expires on its own, so a failed cancel is not worth raising. */

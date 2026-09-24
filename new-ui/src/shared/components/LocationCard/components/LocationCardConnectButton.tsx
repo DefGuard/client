@@ -1,6 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { error as logError } from '@tauri-apps/plugin-log';
-import { Snackbar } from '../../../providers/snackbar/snackbar';
+import { useConfigureFactorsScreen } from '../../../hooks/useConfigureFactorsScreen';
 import { api } from '../../../rust-api/api';
 import { connectConfigureFactorsSource } from '../../../utils/configureFactorsSource';
 import { ConnectionAbility, shouldStartMfa } from '../../../utils/mfa';
@@ -41,13 +40,8 @@ export const LocationCardConnectButton = () => {
     },
   });
 
-  const { mutate: configureMfa, isPending: isOpeningConfiguration } = useMutation({
-    mutationFn: api.initiateConfigureFactorScreen,
-    onError: (err) => {
-      void logError(`Failed to open the MFA configuration screen: ${err}`);
-      Snackbar.error('Could not open MFA configuration.');
-    },
-  });
+  const { mutate: configureMfa, isPending: isOpeningConfiguration } =
+    useConfigureFactorsScreen();
 
   const { mutate: disconnect, isPending: isDisconnecting } = useMutation({
     mutationFn: api.disconnect,

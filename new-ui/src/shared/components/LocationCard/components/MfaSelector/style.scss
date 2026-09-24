@@ -31,7 +31,8 @@
     --icon: var(--fg-white-100);
   }
 
-  &.selected {
+  &.selected,
+  &.active {
     --bg: var(--bg-white-10);
     --color: var(--fg-white-100);
     --border: var(--border-action-disabled);
@@ -54,7 +55,8 @@
       --icon: var(--fg-white-40);
     }
 
-    &.selected {
+    &.selected,
+    &.active {
       --border: var(--border-default);
 
       &:hover {
@@ -121,7 +123,7 @@
   }
 
   .name {
-    color: inherit;
+    color: var(--color, --fg-white-100);
     font: var(--t-body-sm-400);
   }
 }
