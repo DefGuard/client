@@ -6,6 +6,7 @@ on:
       - main
       - dev
       - 'release/**'
+      - 'stable/**'
     paths-ignore:
       - '*.md'
       - 'LICENSE'
@@ -14,6 +15,7 @@ on:
       - main
       - dev
       - 'release/**'
+      - 'stable/**'
     paths-ignore:
       - '*.md'
       - 'LICENSE'

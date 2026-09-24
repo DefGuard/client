@@ -4,7 +4,9 @@ import {
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../../../shared/rust-api/types';
-import type { ConnectModalViewValue } from './types';
+import { isPresent } from '../../../../../../shared/utils/isPresent';
+import { resolveMfaStepPlan } from '../../../../../../shared/utils/mfa';
+import { type ConnectModalViewValue, mfaMethodToConnectModalView } from './types';
 
 interface StoreValues {
   visible: boolean;
@@ -12,8 +14,12 @@ interface StoreValues {
   view: ConnectModalViewValue | null;
   perviousView: ConnectModalViewValue | null;
   postureError: string | null;
+  connectionError: string | null;
   autoStartOpenId: boolean;
   mfaMethod: MfaMethodValue;
+  stepIndex: number;
+  stepPlan: MfaMethodValue[];
+  mfaToken: string | null;
 }
 
 const defaults: StoreValues = {
@@ -23,12 +29,18 @@ const defaults: StoreValues = {
   view: null,
   perviousView: null,
   postureError: null,
+  connectionError: null,
   autoStartOpenId: false,
+  stepIndex: 0,
+  stepPlan: [],
+  mfaToken: null,
 } as const;
 
 interface Store extends StoreValues {
   open: (init?: Partial<StoreValues>) => void;
   setView: (view: ConnectModalViewValue, values?: Partial<StoreValues>) => void;
+  setMfaToken: (token: string | null) => void;
+  goToStep: (stepIndex: number) => void;
   reset: () => void;
 }
 
@@ -38,7 +50,16 @@ export const useConnectModal = create<Store>((set, get) => ({
     set(defaults);
   },
   open: (init) => {
-    set({ ...defaults, ...init, visible: true });
+    const location = init?.location ?? null;
+    const stepPlan = isPresent(location) ? resolveMfaStepPlan(location) : [];
+    set({ ...defaults, ...init, stepPlan, visible: true });
+  },
+  setMfaToken: (token) => {
+    set({ mfaToken: token });
+  },
+  goToStep: (stepIndex) => {
+    const { stepPlan, setView } = get();
+    setView(mfaMethodToConnectModalView(stepPlan[stepIndex]), { stepIndex });
   },
   setView: (view, vals) => {
     const pervious = get().view ?? null;

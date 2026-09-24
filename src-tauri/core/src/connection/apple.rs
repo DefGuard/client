@@ -13,6 +13,7 @@ use std::{
 };
 
 const OBSERVER_CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
+const STATS_TIMEOUT: Duration = Duration::from_secs(2);
 
 use block2::RcBlock;
 use objc2::{rc::Retained, runtime::ProtocolObject};
@@ -25,6 +26,7 @@ use objc2_network_extension::{
     NEVPNStatusDidChangeNotification,
 };
 use serde::Deserialize;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
     database::{
@@ -46,13 +48,12 @@ pub static OBSERVER_COMMS: LazyLock<(ObserverSender, ObserverReceiver)> = LazyLo
     (Mutex::new(tx), Mutex::new(Some(rx)))
 });
 
-type VpnStateSender = Mutex<Sender<()>>;
-type VpnStateReceiver = Mutex<Option<Receiver<()>>>;
+type VpnStateReceiver = Mutex<Option<UnboundedReceiver<()>>>;
 
-pub static VPN_STATE_UPDATE_COMMS: LazyLock<(VpnStateSender, VpnStateReceiver)> =
+pub static VPN_STATE_UPDATE_COMMS: LazyLock<(UnboundedSender<()>, VpnStateReceiver)> =
     LazyLock::new(|| {
-        let (tx, rx) = mpsc::channel();
-        (Mutex::new(tx), Mutex::new(Some(rx)))
+        let (tx, rx) = unbounded_channel();
+        (tx, Mutex::new(Some(rx)))
     });
 
 /// Thread responsible for observing VPN status changes.
@@ -164,28 +165,7 @@ pub struct Stats {
 
 /// Retrieve VPN tunnel statistics from VPNExtension.
 pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
-    let new_stats = Arc::new(Mutex::new(None));
     let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
-
-    let new_stats_clone = Arc::clone(&new_stats);
-
-    let finished = Arc::new(AtomicBool::new(false));
-    let finished_clone = Arc::clone(&finished);
-
-    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
-        if let Some(data) = unsafe { data_ptr.as_ref() } {
-            if let Ok(stats) = serde_json::from_slice(data.to_vec().as_slice()) {
-                if let Ok(mut new_stats_locked) = new_stats_clone.lock() {
-                    *new_stats_locked = Some(stats);
-                }
-            } else {
-                warn!("Failed to deserialize tunnel stats");
-            }
-        } else {
-            debug!("No data received in tunnel stats response, skipping");
-        }
-        finished_clone.store(true, Ordering::Release);
-    });
 
     let manager = manager_for_key_and_value(
         match connection_type {
@@ -213,6 +193,19 @@ pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
         return None;
     };
 
+    let (tx, rx) = channel();
+    let response_handler = RcBlock::new(move |data_ptr: *mut NSData| {
+        let stats = if let Some(data) = unsafe { data_ptr.as_ref() } {
+            serde_json::from_slice(data.to_vec().as_slice())
+                .inspect_err(|_| warn!("Failed to deserialize tunnel stats"))
+                .ok()
+        } else {
+            debug!("No data received in tunnel stats response, skipping");
+            None
+        };
+        let _ = tx.send(stats);
+    });
+
     let message_data = NSData::new();
     if unsafe {
         session.sendProviderMessage_returnError_responseHandler(
@@ -222,18 +215,17 @@ pub fn tunnel_stats(id: Id, connection_type: &ConnectionType) -> Option<Stats> {
         )
     } {
         debug!("Message sent to NETunnelProviderSession");
+        match rx.recv_timeout(STATS_TIMEOUT) {
+            Ok(stats) => stats,
+            Err(err) => {
+                warn!("No tunnel stats response from VPNExtension: {err}");
+                None
+            }
+        }
     } else {
         error!("Failed to send to NETunnelProviderSession while requesting stats");
+        None
     }
-
-    // Wait for the response handler to complete.
-    while !finished.load(Ordering::Acquire) {
-        spin_loop();
-    }
-
-    new_stats
-        .lock()
-        .map_or(None, |mut new_stats_locked| new_stats_locked.take())
 }
 
 /// Handle VPN status change.
@@ -242,8 +234,6 @@ fn vpn_status_change_handler(notification: &NSNotification) {
     debug!("Received VPN status change notification: {name:?}");
     VPN_STATE_UPDATE_COMMS
         .0
-        .lock()
-        .expect("Failed to lock state update sender")
         .send(())
         .expect("Failed to send to state update channel");
     debug!("Sent status update request to channel");

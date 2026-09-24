@@ -1,0 +1,158 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, mfa_configured_methods \"mfa_configured_methods: _\" FROM instance WHERE token IS NOT NULL ORDER BY name ASC;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "uuid",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "uuid"
+          }
+        }
+      },
+      {
+        "name": "url",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "name": "proxy_url",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "proxy_url"
+          }
+        }
+      },
+      {
+        "name": "username",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "username"
+          }
+        }
+      },
+      {
+        "name": "token",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "token"
+          }
+        }
+      },
+      {
+        "name": "client_traffic_policy",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "client_traffic_policy"
+          }
+        }
+      },
+      {
+        "name": "enterprise_enabled",
+        "ordinal": 8,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "enterprise_enabled"
+          }
+        }
+      },
+      {
+        "name": "disable_tunnels",
+        "ordinal": 9,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "disable_tunnels"
+          }
+        }
+      },
+      {
+        "name": "openid_display_name",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "openid_display_name"
+          }
+        }
+      },
+      {
+        "name": "mfa_configured_methods: _",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "mfa_configured_methods"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "881b9e283868c50ba854bc884283bbfa5d0ec541b947f44a1c6bf5a49e50bdb3"
+}

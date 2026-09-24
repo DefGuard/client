@@ -6,7 +6,7 @@
   --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 0%);
 
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   column-gap: var(--spacing-sm);
   background: var(--bg);
   border: 1px solid var(--border);
@@ -31,12 +31,38 @@
     --icon: var(--fg-white-100);
   }
 
-  &.selected {
+  &.selected,
+  &.active {
     --bg: var(--bg-white-10);
     --color: var(--fg-white-100);
     --border: var(--border-action-disabled);
     --icon: var(--fg-white-100);
     --box-shadow: box-shadow: 0 4px 4px 0 rgb(0 0 0 / 5%);
+  }
+
+  &.disabled {
+    --bg: transparent;
+    --border: var(--border-action-disabled);
+    --color: var(--fg-white-40);
+    --icon: var(--fg-white-40);
+
+    cursor: not-allowed;
+
+    &:hover {
+      --bg: transparent;
+      --border: var(--border-action-disabled);
+      --color: var(--fg-white-40);
+      --icon: var(--fg-white-40);
+    }
+
+    &.selected,
+    &.active {
+      --border: var(--border-default);
+
+      &:hover {
+        --border: var(--border-default);
+      }
+    }
   }
 
   > .middle {
@@ -45,6 +71,14 @@
     align-items: center;
     justify-content: flex-start;
     column-gap: var(--spacing-md);
+  }
+
+  > .right {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    column-gap: var(--spacing-sm);
   }
 
   .default-badge {
@@ -63,6 +97,12 @@
     }
   }
 
+  .disabled-label {
+    color: var(--fg-white-40);
+    font: var(--t-body-sm-400);
+    white-space: nowrap;
+  }
+
   .factor-icon {
     --icon-color: var(--icon);
 
@@ -73,8 +113,17 @@
     }
   }
 
+  .icon-col {
+    display: flex;
+    flex-flow: row nowrap;
+    box-sizing: border-box;
+    padding: 2px;
+    width: 24px;
+    height: 24px;
+  }
+
   .name {
-    color: inherit;
+    color: var(--color, --fg-white-100);
     font: var(--t-body-sm-400);
   }
 }

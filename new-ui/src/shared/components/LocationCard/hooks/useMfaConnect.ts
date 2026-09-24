@@ -3,20 +3,27 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../rust-api/api';
 import {
+  isAttemptLimit,
   isConnectFailure,
   isInvalidCode,
   isMfaPostureError,
   isServiceUnavailable,
   isSessionExpired,
+  isStaleAttempt,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
-import type { LocationInfo, MfaMethod } from '../../../rust-api/types';
+import type { LocationInfo, MfaMethod, MfaMethodValue } from '../../../rust-api/types';
+import { isPresent } from '../../../utils/isPresent';
 
 type CodeMfaMethod = typeof MfaMethod.Totp | typeof MfaMethod.Email;
 
 type UseMfaConnectOptions = {
   debounceMs?: number;
+  stepPlan: MfaMethodValue[];
+  mfaToken: string | null;
+  setMfaToken: (token: string) => void;
+  onStepAdvanced: (nextStepIndex: number) => void;
   onConnected?: () => void;
   onSessionExpired?: () => void;
   onPostureError?: (message: string) => void;
@@ -35,13 +42,18 @@ export const useMfaConnect = (
   method: CodeMfaMethod,
   {
     debounceMs = 0,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    onStepAdvanced,
     onConnected,
     onSessionExpired,
     onPostureError,
     onServiceUnavailable,
-  }: UseMfaConnectOptions = {},
+  }: UseMfaConnectOptions,
 ) => {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(mfaToken);
+  const [stepAttemptId, setStepAttemptId] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(debounceMs > 0);
   const [startError, setStartError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -65,9 +77,17 @@ export const useMfaConnect = (
 
     (async () => {
       try {
-        const info = await api.mfaStart(instance.id, location.id, method);
+        const session = await api.mfaBeginStep(
+          instance.id,
+          location.id,
+          method,
+          stepPlan,
+          mfaToken,
+        );
         await waitForMinimumDuration(startedAt, debounceMs);
-        setToken(info.token);
+        setToken(session.token);
+        setStepAttemptId(session.stepAttemptId);
+        setMfaToken(session.token);
       } catch (err) {
         void error(`MFA start failed: ${err}`);
         await waitForMinimumDuration(startedAt, debounceMs);
@@ -88,20 +108,34 @@ export const useMfaConnect = (
 
   const verifyCode = useCallback(
     async (code: string) => {
-      if (!token || !instance) return;
+      if (isStarting || !token || !instance) return;
 
       setIsVerifying(true);
       setVerifyError(null);
 
       try {
-        // mfaFinishCode completes MFA and brings up the connection in the
-        // backend; the preshared key never reaches the frontend.
-        await api.mfaFinishCode(instance.id, location.id, token, code);
+        const nextStepIndex = await api.mfaFinishCode(
+          instance.id,
+          location.id,
+          token,
+          code,
+          stepAttemptId,
+        );
+        if (isPresent(nextStepIndex)) {
+          onStepAdvanced(nextStepIndex);
+          return;
+        }
         onConnected?.();
       } catch (err) {
         void error(`MFA verification failed: ${err}`);
         const message = mfaErrorMessage(err);
-        if (isConnectFailure(message)) {
+        if (isAttemptLimit(err)) {
+          setVerifyError(message);
+        } else if (isStaleAttempt(message)) {
+          setVerifyError(
+            'Authentication request could not be started. Please try again.',
+          );
+        } else if (isConnectFailure(message)) {
           setVerifyError('Failed to establish VPN connection');
         } else if (isInvalidCode(message)) {
           setVerifyError('Invalid code');
@@ -114,7 +148,16 @@ export const useMfaConnect = (
         setIsVerifying(false);
       }
     },
-    [token, instance, location, onConnected, onSessionExpired],
+    [
+      isStarting,
+      token,
+      stepAttemptId,
+      instance,
+      location,
+      onStepAdvanced,
+      onConnected,
+      onSessionExpired,
+    ],
   );
 
   return { token, isStarting, startError, verifyCode, isVerifying, verifyError };

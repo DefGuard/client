@@ -17,23 +17,12 @@ import { formChangeLogic } from '../../../../../shared/formLogic';
 import { Snackbar } from '../../../../../shared/providers/snackbar/snackbar';
 import { api } from '../../../../../shared/rust-api/api';
 import { ThemeSpacing } from '../../../../../shared/types';
-import {
-  patternValidIpV6WithMask,
-  patternValidIpWithMask,
-} from '../../../../../shared/utils/patterns';
+import { interfaceAddressesSchema } from '../../../../../shared/utils/zod';
 import { useTunnelWizardStore } from '../../hooks/useTunnelWizardStore';
 
 const formSchema = z.object({
   name: z.string().trim().min(1, 'Field is required'),
-  address: z.string().refine((value) => {
-    if (value) {
-      const ips = value.split(',').map((ip) => ip.trim());
-      return ips.every(
-        (ip) => patternValidIpWithMask.test(ip) || patternValidIpV6WithMask.test(ip),
-      );
-    }
-    return false;
-  }, 'Field is invalid'),
+  address: interfaceAddressesSchema,
 });
 
 type FormFields = z.infer<typeof formSchema>;

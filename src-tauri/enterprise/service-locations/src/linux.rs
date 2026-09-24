@@ -9,8 +9,9 @@ use std::{
 };
 
 use defguard_client_common::{dns_borrow, find_free_tcp_port, get_interface_name};
-use defguard_client_proto::defguard::client::v1::{
-    SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode,
+use defguard_client_proto::{
+    conversions::normalize_allowed_ips,
+    defguard::client::v1::{SaveServiceLocationsRequest, ServiceLocation, ServiceLocationMode},
 };
 use defguard_wireguard_rs::{
     key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration, WGApi, WireguardInterfaceApi,
@@ -18,7 +19,8 @@ use defguard_wireguard_rs::{
 use log::{debug, error, info, warn};
 
 use crate::{
-    is_unchanged_on_disk, load_service_locations_from_directory, load_service_locations_from_file,
+    instance_file_path, is_unchanged_on_disk, load_service_locations_from_directory,
+    load_service_locations_from_file,
     reconciler::{
         reconcile_action, PostureAuthorizationRequest, PostureAuthorizations, ReconcileAction,
     },
@@ -35,8 +37,8 @@ fn get_shared_directory() -> PathBuf {
     PathBuf::from(DEFGUARD_DIR).join(SERVICE_LOCATIONS_SUBDIR)
 }
 
-fn get_instance_file_path(instance_id: &str) -> PathBuf {
-    get_shared_directory().join(format!("{instance_id}.json"))
+fn get_instance_file_path(instance_id: &str) -> Result<PathBuf, ServiceLocationError> {
+    instance_file_path(&get_shared_directory(), instance_id)
 }
 
 fn ensure_shared_directory() -> Result<PathBuf, ServiceLocationError> {
@@ -119,7 +121,7 @@ impl ServiceLocationManager {
             ServiceLocationData::from_save_request(request, service_locations.clone());
 
         ensure_shared_directory()?;
-        let instance_file_path = get_instance_file_path(instance_id);
+        let instance_file_path = get_instance_file_path(instance_id)?;
         let json = serde_json::to_string_pretty(&service_location_data)?;
 
         // Saving is pushed unconditionally on every poll cycle, so nothing having changed is the
@@ -374,7 +376,7 @@ impl ServiceLocationManager {
             .collect::<Result<Vec<_>, _>>()?;
 
         let ifname = get_interface_name(&location.name);
-        let config = InterfaceConfiguration {
+        let mut config = InterfaceConfiguration {
             name: ifname.clone(),
             prvkey: private_key.to_string(),
             addresses,
@@ -383,6 +385,7 @@ impl ServiceLocationManager {
             mtu: None,
             fwmark: None,
         };
+        normalize_allowed_ips(&mut config);
 
         let mut wgapi = WGApi::new(&ifname).map_err(|err| {
             ServiceLocationError::InterfaceError(format!(
@@ -653,7 +656,7 @@ impl ServiceLocationManager {
     ) -> Result<(), ServiceLocationError> {
         debug!("Deleting Linux service locations for instance {instance_id}");
 
-        let instance_file_path = get_instance_file_path(instance_id);
+        let instance_file_path = get_instance_file_path(instance_id)?;
         if instance_file_path.exists() {
             fs::remove_file(&instance_file_path)?;
             debug!("Deleted Linux service locations for instance {instance_id}");
@@ -676,7 +679,7 @@ impl ServiceLocationManager {
         &self,
         instance_id: &str,
     ) -> Result<Option<ServiceLocationData>, ServiceLocationError> {
-        let instance_file_path = get_instance_file_path(instance_id);
+        let instance_file_path = get_instance_file_path(instance_id)?;
         load_service_locations_from_file(&instance_file_path)
     }
 }

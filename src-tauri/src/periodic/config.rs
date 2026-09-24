@@ -191,7 +191,16 @@ fn emit_poll_result_events(
                 }
             }
         }
-        PollInstanceResult::ChangedWhileActive { .. } => {
+        PollInstanceResult::ChangedWhileActive {
+            instance_updated, ..
+        } => {
+            // Whatever was safe to write mid-connection is already in the database, so the
+            // frontend's copy is stale even though the reconnect prompt below still applies.
+            if instance_updated {
+                if let Err(err) = handle.emit(EventKey::InstanceUpdated.into(), ()) {
+                    error!("Failed to emit instance-updated event: {err}");
+                }
+            }
             debug!("Emitting config-changed event for instance {instance_name}({instance_id})");
             let _ = handle.emit(EventKey::ConfigChanged.into(), instance_name);
             info!("Emitted config-changed event for instance {instance_name}({instance_id})");
@@ -205,7 +214,9 @@ fn version_mismatch(result: &PollInstanceResult) -> Option<&VersionMismatchPaylo
         | PollInstanceResult::Updated {
             version_mismatch, ..
         }
-        | PollInstanceResult::ChangedWhileActive { version_mismatch } => version_mismatch.as_ref(),
+        | PollInstanceResult::ChangedWhileActive {
+            version_mismatch, ..
+        } => version_mismatch.as_ref(),
     }
 }
 

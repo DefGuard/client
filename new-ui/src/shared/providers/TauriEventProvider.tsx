@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { debug } from '@tauri-apps/plugin-log';
 import { Fragment, type PropsWithChildren, useEffect } from 'react';
+import { runConfigureFactorsRequest } from '../../pages/full/ConfigureMfaPage/hooks/runConfigureFactorsRequest';
 import { mfaMethodToConnectModalView } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import { WindowId } from '../consts';
@@ -11,16 +12,16 @@ import { useAppData } from '../providers/AppDataContext';
 import { api } from '../rust-api/api';
 import {
   type AddInstanceEventPayload,
+  type ConfigureFactorsPayload,
   ConnectionType,
   type DeadConnectionDroppedPayload,
   type DeadConnectionReconnectedPayload,
   type LocationInfo,
-  MfaMethod,
   TauriEvent,
   type TunnelsDisabledPayload,
 } from '../rust-api/types';
 import { useAppStore } from '../store/useAppStore';
-import { decideLocationMfaMethod } from '../utils/decideLocationMfaMethod';
+import { resolveMfaStepPlan } from '../utils/mfa';
 
 export const TauriEventProvider = ({ children }: PropsWithChildren) => {
   const navigate = useNavigate();
@@ -69,8 +70,7 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             };
             void (async () => {
               const appConfig = await api.getAppConfig();
-              const mfaMethod =
-                decideLocationMfaMethod(location, location.mfa_method) ?? MfaMethod.Totp;
+              const mfaMethod = resolveMfaStepPlan(location)[0];
 
               await navigate({ to: '/full/overview' });
               useConnectModal.getState().open({
@@ -83,6 +83,15 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
           }
         },
       ),
+
+      // Backend asks the full view to open the Configure MFA screen, from either window.
+      listen<ConfigureFactorsPayload>(TauriEvent.ConfigureFactorsTrigger, (event) => {
+        void debug(
+          `UI Received event ConfigureFactorsTrigger: ${JSON.stringify(event.payload)}`,
+        );
+        if (getCurrentWindow().label !== WindowId.FullView) return;
+        void runConfigureFactorsRequest(event.payload, { navigate });
+      }),
 
       listen(TauriEvent.ConnectionChanged, (event) => {
         void debug(

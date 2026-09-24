@@ -36,7 +36,7 @@ pub(crate) fn build_qr_payload(token: &str, challenge: &str, instance_id: &str) 
 /// Render the QR code for a payload string to available output(s).
 ///
 /// * When **stderr is a TTY** and `json_mode` is false, prints a Unicode
-///   `Dense1x2` QR to stderr.
+///   `Dense1x2` QR to stderr. If `badge` is not empty, prints it first.
 /// * When **`qr_file` is `Some`**, always writes a PNG image to that path
 ///   (regardless of `json_mode` - the file is machine-readable output).
 /// * If **neither** output is viable (non-TTY + no `qr_file`), returns
@@ -48,6 +48,7 @@ pub(crate) fn build_qr_payload(token: &str, challenge: &str, instance_id: &str) 
 pub(crate) fn render_qr(
     payload: &str,
     qr_file: Option<&str>,
+    badge: &str,
     json_mode: bool,
 ) -> Result<(), CliError> {
     let is_tty = stderr().is_terminal();
@@ -61,9 +62,14 @@ pub(crate) fn render_qr(
     }
 
     if is_tty && !json_mode {
+        if !badge.is_empty() {
+            eprintln!("{badge}Scan this QR code with the Defguard mobile app:");
+        }
         let code = QrCode::new(payload.as_bytes())
             .map_err(|e| CliError::Other(format!("Failed to generate QR code: {e}")))?;
         let rendered = code.render::<Dense1x2>().build();
+        // Keep the QR flush left. Indentation can wrap the block and prevent
+        // scanning.
         eprintln!("{rendered}");
     }
 
@@ -93,6 +99,7 @@ pub(crate) fn render_qr(
 pub(crate) fn render_qr(
     payload: &str,
     qr_file: Option<&str>,
+    _badge: &str,
     _json_mode: bool,
 ) -> Result<(), CliError> {
     // Test mode: never render to the terminal.  Write to --qr-file

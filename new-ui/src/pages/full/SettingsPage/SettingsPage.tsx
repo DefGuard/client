@@ -51,7 +51,7 @@ export const SettingsPage = () => {
   if (!appConfig) return null;
 
   return (
-    <FullPage id="settings-page-view">
+    <FullPage id="settings-page-view" hideScrollContainer>
       <FullPageTitle title="Settings" spacing={ThemeSpacing.Xl} />
       <div className="sections">
         <SettingRow

@@ -6,6 +6,7 @@ on:
       - main
       - dev
       - "release/**"
+      - "stable/**"
     paths-ignore:
       - "*.md"
       - "LICENSE"
@@ -14,6 +15,7 @@ on:
       - main
       - dev
       - "release/**"
+      - "stable/**"
     paths-ignore:
       - "*.md"
       - "LICENSE"
@@ -63,7 +65,7 @@ jobs:
       - name: Install required packages
         run: |
           apt-get update
-          apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev unzip protobuf-compiler
+          apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libudev-dev libxdo-dev unzip protobuf-compiler
 
       - name: Check format
         run: |

@@ -4,7 +4,7 @@ use defguard_client_posture::{authorize_posture_session, get_posture_data};
 use defguard_client_proto::defguard::client_types::MfaMethod;
 use defguard_core::{
     connection::{active_state::active_state, bring_up, ConnectionTarget},
-    database::models::instance::Instance,
+    database::models::{instance::Instance, location::LocationMfaMethod, Id},
     ConnectionType,
 };
 use secrecy::ExposeSecret;
@@ -29,6 +29,7 @@ pub async fn handle(
     code: Option<&str>,
     code_command: Option<&str>,
     mfa_method: Option<&str>,
+    mfa_steps: &[String],
     qr_file: Option<&str>,
     all_traffic: bool,
     predefined_traffic: bool,
@@ -62,11 +63,12 @@ pub async fn handle(
         ResolvedTarget::Location(loc) => (loc.id, ConnectionType::Location, loc.name.as_str()),
         ResolvedTarget::Tunnel(tun) => (tun.id, ConnectionType::Tunnel, tun.name.as_str()),
     };
-    let active = active_state(&state.pool).await?;
-    if active
+    let active: Vec<(Id, ConnectionType)> = active_state(&state.pool)
+        .await?
         .iter()
-        .any(|c| c.connection_type == target_connection_type && c.target_id == target_id)
-    {
+        .map(|c| (c.target_id, c.connection_type))
+        .collect();
+    if active.contains(&(target_id, target_connection_type)) {
         return Ok(ConnectResult::AlreadyConnected {
             name: target_name.to_string(),
         });
@@ -74,12 +76,42 @@ pub async fn handle(
 
     let (target_name, psk, mtu) = match &target {
         ResolvedTarget::Location(location) => {
-            if location.mfa_enabled() {
-                // Resolve the effective MFA method.
-                let method = mfa::resolve_method(location, mfa_method)?;
+            // Multi-step locations choose one method per step; single-step
+            // locations keep the legacy method selection.
+            let multistep = location.mfa_steps.len() > 1;
+            if multistep || location.mfa_enabled() {
+                let (plan, interacted) = if multistep {
+                    if mfa_method.is_some() {
+                        return Err(CliError::InvalidInput(format!(
+                            "Location '{}' uses multiple MFA steps; use --mfa-step instead of --mfa-method.",
+                            location.name
+                        )));
+                    }
+                    mfa::resolve_step_plan(location, mfa_steps, stdin().is_terminal())?
+                } else {
+                    if !mfa_steps.is_empty() {
+                        return Err(CliError::InvalidInput(format!(
+                            "Location '{}' has one MFA step; use --mfa-method instead of --mfa-step.",
+                            location.name
+                        )));
+                    }
+                    (vec![mfa::resolve_method(location, mfa_method)?], false)
+                };
 
-                // Reject flags that are incompatible with the resolved method.
-                mfa::validate_mfa_flags(method, &location.name, code, code_command, qr_file)?;
+                mfa::validate_mfa_flags(&plan, &location.name, code, code_command, qr_file)?;
+
+                // A headless process needs --qr-file before starting a mobile
+                // approval step.
+                if plan.contains(&MfaMethod::MobileApprove)
+                    && !stderr().is_terminal()
+                    && qr_file.is_none()
+                {
+                    return Err(CliError::InvalidInput(
+                        "No QR display available (stderr is not a TTY). \
+                         Use --qr-file <path> to save the QR as a PNG image."
+                            .into(),
+                    ));
+                }
 
                 let instance = Instance::find_by_id(&state.pool, location.instance_id)
                     .await
@@ -100,19 +132,38 @@ pub async fn handle(
                     None
                 };
 
-                let psk = if method == MfaMethod::Oidc {
+                let psk = if multistep {
+                    let psk = mfa::authorize_multistep(
+                        location,
+                        code_command,
+                        &plan,
+                        &instance,
+                        posture_data,
+                        &state.pool,
+                        qr_file,
+                        json,
+                    )
+                    .await?;
+                    // Interactive choices are one-off; show the command needed
+                    // to save the plan.
+                    if interacted && !json {
+                        eprintln!(
+                            "Save this plan with `defguard-client location set '{}' {}`.",
+                            location.name,
+                            plan.iter()
+                                .map(|method| format!(
+                                    "--mfa-step {}",
+                                    LocationMfaMethod::from(*method).as_str()
+                                ))
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        );
+                    }
+                    psk
+                } else if plan[0] == MfaMethod::Oidc {
                     mfa::authorize_oidc(location, &instance, posture_data, &state.pool, json)
                         .await?
-                } else if method == MfaMethod::MobileApprove {
-                    // Fail-fast: if neither stderr is a TTY nor --qr-file is set,
-                    // the user cannot scan the QR.  Do not call /start.
-                    if !stderr().is_terminal() && qr_file.is_none() {
-                        return Err(CliError::InvalidInput(
-                            "No QR display available (stderr is not a TTY). \
-                             Use --qr-file <path> to save the QR as a PNG image."
-                                .into(),
-                        ));
-                    }
+                } else if plan[0] == MfaMethod::MobileApprove {
                     mfa::authorize_mobile_approve(
                         location,
                         &instance,
@@ -143,7 +194,7 @@ pub async fn handle(
                         location,
                         &source,
                         &instance,
-                        method,
+                        plan[0],
                         posture_data,
                         &state.pool,
                     )

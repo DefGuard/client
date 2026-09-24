@@ -1,9 +1,9 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
-use super::{Id, NoId};
+use super::{location::LocationMfaMethod, Id, NoId};
 use crate::proto;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -19,6 +19,24 @@ pub struct Instance<I = NoId> {
     pub enterprise_enabled: bool,
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
+    /// `None` when the proxy never sent `MfaUserState`, so factors cannot be configured there.
+    pub mfa_configured_methods: Option<Json<Vec<LocationMfaMethod>>>,
+}
+
+/// Keeps "not reported" distinct from "reported as none", and sorts so a reordered report is
+/// not mistaken for a change.
+#[must_use]
+pub fn mfa_configured_methods(
+    instance_info: &proto::client_types::InstanceInfo,
+) -> Option<Vec<LocationMfaMethod>> {
+    instance_info.mfa_user_state.as_ref().map(|state| {
+        let mut methods: Vec<_> = state
+            .configured_methods()
+            .map(LocationMfaMethod::from)
+            .collect();
+        methods.sort_unstable();
+        methods
+    })
 }
 
 impl fmt::Display for Instance<Id> {
@@ -30,6 +48,7 @@ impl fmt::Display for Instance<Id> {
 impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
     fn from(instance_info: proto::client_types::InstanceInfo) -> Self {
         let client_traffic_policy = ClientTrafficPolicy::from(&instance_info);
+        let mfa_configured_methods = mfa_configured_methods(&instance_info).map(Json);
         Self {
             id: NoId,
             name: instance_info.name,
@@ -42,6 +61,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             enterprise_enabled: instance_info.enterprise_enabled,
             disable_tunnels: instance_info.disable_tunnels.unwrap_or(false),
             openid_display_name: instance_info.openid_display_name,
+            mfa_configured_methods,
         }
     }
 }
@@ -54,8 +74,8 @@ impl Instance<Id> {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
             client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, \
-            openid_display_name = $10 \
-            WHERE id = $11;",
+            openid_display_name = $10, mfa_configured_methods = $11 \
+            WHERE id = $12;",
             self.name,
             self.uuid,
             self.url,
@@ -66,6 +86,7 @@ impl Instance<Id> {
             self.disable_tunnels,
             self.token,
             self.openid_display_name,
+            self.mfa_configured_methods,
             self.id
         )
         .execute(executor)
@@ -80,7 +101,8 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            mfa_configured_methods \"mfa_configured_methods: _\" \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -95,7 +117,8 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            mfa_configured_methods \"mfa_configured_methods: _\" \
             FROM instance WHERE id = $1;",
             id
         )
@@ -111,7 +134,8 @@ impl Instance<Id> {
         let instance = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
-            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            mfa_configured_methods \"mfa_configured_methods: _\" \
             FROM instance WHERE name = $1;",
             name
         )
@@ -146,7 +170,8 @@ impl Instance<Id> {
         let instances = query_as!(
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
-            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name \
+            client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            mfa_configured_methods \"mfa_configured_methods: _\" \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
@@ -193,6 +218,8 @@ impl PartialEq<proto::client_types::InstanceInfo> for Instance<Id> {
             && self.enterprise_enabled == other.enterprise_enabled
             && self.disable_tunnels == other.disable_tunnels.unwrap_or(false)
             && self.openid_display_name == other.openid_display_name
+            && self.mfa_configured_methods.as_ref().map(|json| &json.0)
+                == mfa_configured_methods(other).as_ref()
     }
 }
 
@@ -205,8 +232,9 @@ impl Instance<NoId> {
         let proxy_url = self.proxy_url.clone();
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
-            client_traffic_policy , enterprise_enabled, disable_tunnels) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
+            client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name, \
+            mfa_configured_methods) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -215,7 +243,9 @@ impl Instance<NoId> {
             self.token,
             self.client_traffic_policy,
             self.enterprise_enabled,
-            self.disable_tunnels
+            self.disable_tunnels,
+            self.openid_display_name,
+            self.mfa_configured_methods
         )
         .fetch_one(executor)
         .await?;
@@ -231,6 +261,7 @@ impl Instance<NoId> {
             enterprise_enabled: self.enterprise_enabled,
             disable_tunnels: self.disable_tunnels,
             openid_display_name: self.openid_display_name,
+            mfa_configured_methods: self.mfa_configured_methods,
         })
     }
 }
@@ -248,6 +279,9 @@ pub struct InstanceInfo<I = NoId> {
     pub enterprise_enabled: bool,
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
+    /// `None` when the instance never reported its MFA state, which the frontend reads as
+    /// "cannot configure factors here".
+    pub mfa_configured_methods: Option<Vec<LocationMfaMethod>>,
 }
 
 impl fmt::Display for InstanceInfo<Id> {
@@ -328,6 +362,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            mfa_configured_methods: None,
         }
     }
 
@@ -356,6 +391,23 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_openid_display_name_persisted_on_insert(pool: SqlitePool) {
+        let mut instance = new_instance();
+        instance.openid_display_name = Some("Defguard SSO".into());
+
+        let saved = instance.save(&pool).await.unwrap();
+        let persisted = Instance::find_by_id(&pool, saved.id)
+            .await
+            .unwrap()
+            .expect("instance should exist");
+
+        assert_eq!(
+            persisted.openid_display_name.as_deref(),
+            Some("Defguard SSO")
+        );
     }
 
     #[test]
@@ -537,8 +589,90 @@ mod tests {
             enterprise_enabled: info.enterprise_enabled,
             disable_tunnels: false,
             openid_display_name: info.openid_display_name.clone(),
+            mfa_configured_methods: None,
         };
         // Model has false, proto has true → not equal.
         assert_ne!(instance, info);
+    }
+
+    #[test]
+    fn test_instance_from_proto_mfa_user_state_absent() {
+        let info = base_info();
+        let instance: Instance<NoId> = info.into();
+        // A proxy that never reported the state is not the same as one reporting no factors.
+        assert!(instance.mfa_configured_methods.is_none());
+    }
+
+    #[test]
+    fn test_instance_from_proto_mfa_user_state_present() {
+        let mut info = base_info();
+        info.mfa_user_state = Some(proto::client_types::MfaUserState {
+            configured_methods: vec![
+                proto::client_types::MfaMethod::Totp as i32,
+                proto::client_types::MfaMethod::Fido2 as i32,
+            ],
+        });
+        let instance: Instance<NoId> = info.into();
+        assert_eq!(
+            instance.mfa_configured_methods.map(|json| json.0),
+            Some(vec![LocationMfaMethod::Totp, LocationMfaMethod::Fido2])
+        );
+    }
+
+    #[test]
+    fn test_instance_partial_eq_detects_configured_methods_change() {
+        let mut info = base_info();
+        info.mfa_user_state = Some(proto::client_types::MfaUserState {
+            configured_methods: vec![proto::client_types::MfaMethod::Totp as i32],
+        });
+        let mut instance = Instance::<Id> {
+            id: 1,
+            name: info.name.clone(),
+            uuid: info.id.clone(),
+            url: info.url.clone(),
+            proxy_url: info.proxy_url.clone(),
+            username: info.username.clone(),
+            token: Some("tok".into()),
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: info.enterprise_enabled,
+            disable_tunnels: false,
+            openid_display_name: info.openid_display_name.clone(),
+            mfa_configured_methods: None,
+        };
+        // Never reported vs reported as [totp], a change the poller has to persist.
+        assert_ne!(instance, info);
+
+        instance.mfa_configured_methods = Some(Json(vec![LocationMfaMethod::Totp]));
+        assert_eq!(instance, info);
+    }
+
+    #[test]
+    fn test_instance_partial_eq_ignores_configured_methods_order() {
+        let mut info = base_info();
+        info.mfa_user_state = Some(proto::client_types::MfaUserState {
+            configured_methods: vec![
+                proto::client_types::MfaMethod::Fido2 as i32,
+                proto::client_types::MfaMethod::Totp as i32,
+            ],
+        });
+        let instance = Instance::<Id> {
+            id: 1,
+            name: info.name.clone(),
+            uuid: info.id.clone(),
+            url: info.url.clone(),
+            proxy_url: info.proxy_url.clone(),
+            username: info.username.clone(),
+            token: Some("tok".into()),
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: info.enterprise_enabled,
+            disable_tunnels: false,
+            openid_display_name: info.openid_display_name.clone(),
+            mfa_configured_methods: Some(Json(vec![
+                LocationMfaMethod::Totp,
+                LocationMfaMethod::Fido2,
+            ])),
+        };
+        // The same factors in another order are not a change worth a full config update.
+        assert_eq!(instance, info);
     }
 }

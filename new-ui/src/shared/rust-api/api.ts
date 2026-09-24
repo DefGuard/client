@@ -7,16 +7,19 @@ import type {
   Connection,
   ConnectionArgs,
   CreateDeviceResponse,
-  EnrollmentMfaFinishResult,
-  EnrollmentMfaStartResult,
   EnrollmentStartResult,
+  InitiateConfigureFactorScreenArgs,
   InstanceInfo,
   LocationDetails,
   LocationDetailsArgs,
   LocationInfo,
   LocationStats,
+  MfaBeginStepResult,
+  MfaConfigAuthorizeResult,
+  MfaConfigStartResult,
   MfaMethodValue,
-  MfaStartResult,
+  MfaSetupFinishResult,
+  MfaSetupStartResult,
   NewAppVersionInfo,
   ProvisioningConfig,
   RoutingArgs,
@@ -24,7 +27,7 @@ import type {
   SaveDeviceConfigResponse,
   SessionState,
   SessionStatePatch,
-  SetLocationMfaMethodArgs,
+  SetLocationMfaStepPlanArgs,
   StatsArgs,
   TunnelInfo,
   TunnelRequest,
@@ -56,8 +59,8 @@ const getLocationDetails = (args: LocationDetailsArgs): Promise<LocationDetails>
 const updateLocationRouting = (args: RoutingArgs): Promise<Connection> =>
   invoke(TauriCommand.UpdateLocationRouting, args);
 
-const setLocationMfaMethod = (args: SetLocationMfaMethodArgs): Promise<void> =>
-  invoke(TauriCommand.SetLocationMfaMethod, args);
+const setLocationMfaStepPlan = (args: SetLocationMfaStepPlanArgs): Promise<void> =>
+  invoke(TauriCommand.SetLocationMfaStepPlan, args);
 
 const connect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Connect, args);
@@ -129,6 +132,12 @@ const getPostureData = async (): Promise<unknown> => invoke(TauriCommand.GetPost
 
 const swapToFullView = async () => invoke(TauriCommand.SwapToFullView);
 
+/** Surfaces the full view and asks it to open the Configure MFA screen. Callable from either
+ *  window, which is why it goes through the backend instead of navigating. */
+const initiateConfigureFactorScreen = (
+  args: InitiateConfigureFactorScreenArgs,
+): Promise<void> => invoke(TauriCommand.InitiateConfigureFactorScreen, args);
+
 const swapToTray = async () => invoke(TauriCommand.SwapToTray);
 
 const closeTrayWindow = async () => invoke(TauriCommand.CloseTrayWindow);
@@ -165,7 +174,7 @@ const enrollmentActivateUser = (
 const enrollmentRegisterMfaStart = (
   sessionId: string,
   method: MfaMethodValue,
-): Promise<EnrollmentMfaStartResult> =>
+): Promise<MfaSetupStartResult> =>
   invoke(TauriCommand.EnrollmentRegisterMfaStart, {
     sessionId,
     method: mfaToApi(method),
@@ -175,7 +184,7 @@ const enrollmentRegisterMfaFinish = (
   sessionId: string,
   code: string,
   method: MfaMethodValue,
-): Promise<EnrollmentMfaFinishResult> =>
+): Promise<MfaSetupFinishResult> =>
   invoke(TauriCommand.EnrollmentRegisterMfaFinish, {
     sessionId,
     code,
@@ -193,29 +202,28 @@ const enrollmentFinish = (sessionId: string): Promise<void> =>
 
 // MFA (connect-time)
 
-const mfaStart = (
-  instanceId: number,
-  locationId: number,
-  method: string,
-): Promise<MfaStartResult> =>
-  invoke(TauriCommand.MfaStart, { instanceId, locationId, method });
-
-// Completes MFA and brings up the connection in the backend; the preshared key
-// never crosses back to the frontend.
 const mfaFinishCode = (
   instanceId: number,
   locationId: number,
   token: string,
   code: string,
-): Promise<void> =>
-  invoke(TauriCommand.MfaFinishCode, { instanceId, locationId, token, code });
+  stepAttemptId: string | null,
+): Promise<number | null> =>
+  invoke(TauriCommand.MfaFinishCode, {
+    instanceId,
+    locationId,
+    token,
+    code,
+    stepAttemptId,
+  });
 
 const mfaPollOpenId = (
   instanceId: number,
   locationId: number,
   token: string,
+  stepAttemptId: string | null,
 ): Promise<string> =>
-  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token });
+  invoke(TauriCommand.MfaPollOpenId, { instanceId, locationId, token, stepAttemptId });
 
 const mfaConnectMobileApprove = (
   instanceId: number,
@@ -224,8 +232,76 @@ const mfaConnectMobileApprove = (
 ): Promise<string> =>
   invoke(TauriCommand.MfaConnectMobileApprove, { instanceId, locationId, token });
 
+// Starts FIDO2 verification in the background. The result arrives as an
+// MfaFido2Complete, MfaFido2StepAdvanced, or MfaFido2Error event.
+const mfaFido2Pin = (
+  instanceId: number,
+  locationId: number,
+  methods: MfaMethodValue[],
+  token: string | null,
+  // Null where the platform collects the PIN itself - see `fido2CollectsPinInApp`.
+  pin: string | null,
+): Promise<string> =>
+  invoke(TauriCommand.MfaFido2Pin, { instanceId, locationId, methods, token, pin });
+
 const cancelMfa = (taskId: string): Promise<void> =>
   invoke(TauriCommand.CancelMfa, { taskId });
+
+const mfaBeginStep = (
+  instanceId: number,
+  locationId: number,
+  method: MfaMethodValue,
+  stepPlan: MfaMethodValue[],
+  token: string | null,
+): Promise<MfaBeginStepResult> =>
+  invoke(TauriCommand.MfaBeginStep, {
+    instanceId,
+    locationId,
+    method,
+    stepPlan,
+    token,
+  });
+
+// MFA configuration
+
+const mfaConfigStart = (instanceId: number): Promise<MfaConfigStartResult> =>
+  invoke(TauriCommand.MfaConfigStart, { instanceId });
+
+const mfaConfigSendCode = (sessionId: string): Promise<void> =>
+  invoke(TauriCommand.MfaConfigSendCode, { sessionId });
+
+const mfaConfigAuthorize = (
+  sessionId: string,
+  method: MfaMethodValue,
+  code: string,
+): Promise<MfaConfigAuthorizeResult> =>
+  invoke(TauriCommand.MfaConfigAuthorize, { sessionId, method, code });
+
+const mfaConfigSetupStart = (
+  sessionId: string,
+  method: MfaMethodValue,
+): Promise<MfaSetupStartResult> =>
+  invoke(TauriCommand.MfaConfigSetupStart, { sessionId, method });
+
+const mfaConfigSetupFinish = (
+  sessionId: string,
+  method: MfaMethodValue,
+  code: string,
+): Promise<MfaSetupFinishResult> =>
+  invoke(TauriCommand.MfaConfigSetupFinish, { sessionId, method, code });
+
+// Challenge, key ceremony and attestation submit in one call, so it resolves only once the
+// user has touched the key. `mfa-config-fido2-touch` is emitted while it waits.
+const mfaConfigSetupFido2 = (
+  sessionId: string,
+  name: string,
+  // Null where the platform collects the PIN itself - see `fido2CollectsPinInApp`.
+  pin: string | null,
+): Promise<MfaSetupFinishResult> =>
+  invoke(TauriCommand.MfaConfigSetupFido2, { sessionId, name, pin });
+
+const mfaConfigCancel = (sessionId: string): Promise<void> =>
+  invoke(TauriCommand.MfaConfigCancel, { sessionId });
 
 export const api = {
   closeWelcomeWindow,
@@ -239,7 +315,7 @@ export const api = {
   hasAnyVisibleLocations,
   getLocationDetails,
   updateLocationRouting,
-  setLocationMfaMethod,
+  setLocationMfaStepPlan,
   // Connections
   connect,
   disconnect,
@@ -269,6 +345,7 @@ export const api = {
   getPostureData,
   // Window
   swapToFullView,
+  initiateConfigureFactorScreen,
   swapToTray,
   closeTrayWindow,
   // Session state
@@ -283,9 +360,18 @@ export const api = {
   enrollmentNetworkInfo,
   enrollmentFinish,
   // MFA
-  mfaStart,
+  mfaBeginStep,
   mfaFinishCode,
   mfaPollOpenId,
   mfaConnectMobileApprove,
+  mfaFido2Pin,
   cancelMfa,
+  // MFA configuration
+  mfaConfigStart,
+  mfaConfigSendCode,
+  mfaConfigAuthorize,
+  mfaConfigSetupStart,
+  mfaConfigSetupFinish,
+  mfaConfigSetupFido2,
+  mfaConfigCancel,
 };

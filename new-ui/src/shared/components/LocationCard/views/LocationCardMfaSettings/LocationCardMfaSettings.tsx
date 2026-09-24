@@ -1,13 +1,11 @@
 import './style.scss';
 import { useMutation } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { useConfigureFactorsScreen } from '../../../../hooks/useConfigureFactorsScreen';
 import { api } from '../../../../rust-api/api';
-import {
-  LocationMfaMode,
-  MfaMethod,
-  type MfaMethodValue,
-} from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
+import { mfaEditConfigureFactorsSource } from '../../../../utils/configureFactorsSource';
+import { mfaStepCount } from '../../../../utils/mfa';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
@@ -16,15 +14,16 @@ import { Divider } from '../../../Divider/Divider';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { MfaSettingsSection } from '../../../MfaSettingsSection/MfaSettingsSection';
+import { useMfaSettingsSection } from '../../../MfaSettingsSection/useMfaSettingsSection';
 import { SizedBox } from '../../../SizedBox/SizedBox';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
-import { MfaSelector } from '../../components/MfaSelector/MfaSelector';
 import { useLocationCardContext } from '../../context/context';
-import { LocationCardViews } from '../../context/types';
+import { LocationCardViews, mfaMethodToLocationCardView } from '../../context/types';
 
 export const LocationCardMfaSettings = () => {
-  const { mutate: setMfaMethod } = useMutation({
-    mutationFn: api.setLocationMfaMethod,
+  const { mutate: setMfaStepPlan } = useMutation({
+    mutationFn: api.setLocationMfaStepPlan,
     meta: {
       invalidate: [['locations']],
     },
@@ -34,79 +33,85 @@ export const LocationCardMfaSettings = () => {
     previousView,
     setView,
     location,
-    mfaMethod: currentMethod,
+    instance,
     setMfaMethod: setContextMethod,
+    stepPlan,
+    stepIndex,
+    setStepPlanOnce,
   } = useLocationCardContext();
 
-  const locationDefaultMfaMethod = location.mfa_method ?? MfaMethod.Totp;
+  const isMultiStep = mfaStepCount(location) > 1;
 
-  const [selectedMethod, setSelectedPref] = useState<MfaMethodValue>(currentMethod);
+  const isEditingDefaults = previousView === LocationCardViews.Default;
 
-  const isFromDefault = previousView === LocationCardViews.Default;
-  const [setAsDefault, setSetAsDefault] = useState(true);
+  const mfaSection = useMfaSettingsSection({
+    location,
+    instance,
+    initialPlan: isEditingDefaults ? undefined : stepPlan,
+    stepIndices: isEditingDefaults ? undefined : [stepIndex],
+    // Configuring would abandon the connect attempt.
+    configurable: isEditingDefaults,
+  });
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
 
-  const MfaFactorsList = useMemo((): MfaMethodValue[] => {
-    if (location.location_mfa_mode === LocationMfaMode.Internal) {
-      return [MfaMethod.Totp, MfaMethod.Email, MfaMethod.MobileApprove];
-    }
-    return [MfaMethod.Oidc];
-  }, [location.location_mfa_mode]);
+  const { mutate: configureFactors, isPending: isOpeningConfiguration } =
+    useConfigureFactorsScreen({
+      onSuccess: () => setView(LocationCardViews.Default),
+    });
+
+  const configureCount = mfaSection.configureMethods.length;
+  const isConfiguring = isEditingDefaults && configureCount > 0;
 
   const handleSubmit = () => {
-    setContextMethod(selectedMethod);
-    if ((isFromDefault || setAsDefault) && selectedMethod !== locationDefaultMfaMethod) {
-      setMfaMethod({
-        locationId: location.id,
-        mfaMethod: selectedMethod,
-      });
-    }
-    if (isFromDefault) {
+    if (isEditingDefaults) {
+      setMfaStepPlan({ locationId: location.id, mfaStepPlan: mfaSection.plan });
+      if (isConfiguring) {
+        configureFactors({
+          instanceId: location.instance_id,
+          methods: mfaSection.configureMethods,
+          source: mfaEditConfigureFactorsSource(),
+          locationId: location.id,
+        });
+        return;
+      }
       setView(LocationCardViews.Default);
       return;
     }
-    switch (selectedMethod) {
-      case 'totp':
-        setView(LocationCardViews.MfaTotp);
-        break;
-      case 'email':
-        setView(LocationCardViews.MfaEmail);
-        break;
-      case 'mobileapprove':
-        setView(LocationCardViews.MfaMobile);
-        break;
-      case 'oidc':
-        setView(LocationCardViews.MfaOidc);
-        break;
-      default:
-        setView(LocationCardViews.Default);
+
+    if (!isMultiStep && saveAsDefault) {
+      setMfaStepPlan({ locationId: location.id, mfaStepPlan: mfaSection.plan });
     }
+
+    const methodForCurrentStep = mfaSection.plan[stepIndex];
+    setStepPlanOnce(mfaSection.plan);
+    setContextMethod(methodForCurrentStep);
+    setView(mfaMethodToLocationCardView(methodForCurrentStep));
   };
+
+  let submitText = isEditingDefaults ? 'Save changes' : 'Continue';
+  if (isConfiguring) submitText = `Configure MFA (${configureCount})`;
 
   return (
     <div className="location-card-mfa-settings">
       <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title="Change MFA Method">
-        <p>
-          If you're having issues with your current verification method, you can choose
-          another one or set a new default.
-        </p>
+        {isEditingDefaults && (
+          <p>{`Choose the default verification method for each step of this location.`}</p>
+        )}
+        {!isEditingDefaults && (
+          <p>
+            {isMultiStep
+              ? `If you're having issues with your current verification method, you can choose another one for this login.`
+              : `If you're having issues with your current verification method, you can choose another one or set a new default.`}
+          </p>
+        )}
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
-      <div className="methods">
-        {MfaFactorsList.map((factor) => (
-          <MfaSelector
-            key={factor}
-            factor={factor}
-            selected={selectedMethod === factor}
-            isDefault={locationDefaultMfaMethod === factor}
-            onClick={() => setSelectedPref(factor)}
-          />
-        ))}
-      </div>
-      {!isFromDefault && (
+      <MfaSettingsSection {...mfaSection.sectionProps} />
+      {!isEditingDefaults && !isMultiStep && (
         <Checkbox
-          active={isFromDefault ? true : setAsDefault}
-          onClick={() => setSetAsDefault((prev) => !prev)}
+          active={saveAsDefault}
+          onClick={() => setSaveAsDefault((current) => !current)}
           text="Set as default MFA method"
         />
       )}
@@ -123,7 +128,8 @@ export const LocationCardMfaSettings = () => {
           <Button
             variant={ButtonVariant.Primary}
             size={'primary'}
-            text="Save changes"
+            text={submitText}
+            disabled={isOpeningConfiguration}
             onClick={handleSubmit}
           />
         </div>

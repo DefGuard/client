@@ -68,6 +68,7 @@ export const MfaMethod = {
   Oidc: 'oidc',
   Biometric: 'biometric',
   MobileApprove: 'mobileapprove',
+  Fido2: 'fido2',
 } as const;
 
 export type MfaMethodValue = (typeof MfaMethod)[keyof typeof MfaMethod];
@@ -90,11 +91,20 @@ export const TauriCommand = {
   EnrollmentNetworkInfo: 'enrollment_network_info',
   EnrollmentFinish: 'enrollment_finish',
   // MFA
-  MfaStart: 'mfa_start',
+  MfaBeginStep: 'mfa_begin_step',
   MfaFinishCode: 'mfa_finish_code',
   MfaPollOpenId: 'mfa_poll_openid',
   MfaConnectMobileApprove: 'mfa_connect_mobile_approve',
+  MfaFido2Pin: 'mfa_fido2_pin',
   CancelMfa: 'cancel_mfa',
+  // MFA configuration
+  MfaConfigStart: 'mfa_config_start',
+  MfaConfigSendCode: 'mfa_config_send_code',
+  MfaConfigAuthorize: 'mfa_config_authorize',
+  MfaConfigSetupStart: 'mfa_config_setup_start',
+  MfaConfigSetupFinish: 'mfa_config_setup_finish',
+  MfaConfigSetupFido2: 'mfa_config_setup_fido2',
+  MfaConfigCancel: 'mfa_config_cancel',
   // Instances
   AllInstances: 'all_instances',
   DeleteInstance: 'delete_instance',
@@ -105,7 +115,7 @@ export const TauriCommand = {
   HasAnyVisibleLocations: 'has_any_visible_locations',
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
-  SetLocationMfaMethod: 'set_location_mfa_method',
+  SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
   // Connections
   Connect: 'connect',
   Disconnect: 'disconnect',
@@ -135,6 +145,7 @@ export const TauriCommand = {
   GetPostureData: 'get_posture_data',
   //Window
   SwapToFullView: 'swap_to_full_view',
+  InitiateConfigureFactorScreen: 'initiate_configure_factor_screen',
   SwapToTray: 'swap_to_tray',
   CloseTrayWindow: 'close_tray_window',
   // Session state
@@ -157,6 +168,7 @@ export const TauriEvent = {
   ApplicationConfigChanged: 'application-config-changed',
   AddInstance: 'add-instance',
   MfaTrigger: 'mfa-trigger',
+  ConfigureFactorsTrigger: 'configure-factors-trigger',
   VersionMismatch: 'version-mismatch',
   UuidMismatch: 'uuid-mismatch',
   GlobalLogUpdate: 'log-update-global',
@@ -164,8 +176,15 @@ export const TauriEvent = {
   SessionStateChanged: 'session-state-changed',
   MfaOpenIdComplete: 'mfa-openid-complete',
   MfaOpenIdError: 'mfa-openid-error',
+  MfaOpenIdStepAdvanced: 'mfa-openid-step-advanced',
   MfaMobileComplete: 'mfa-mobile-complete',
   MfaMobileError: 'mfa-mobile-error',
+  MfaMobileStepAdvanced: 'mfa-mobile-step-advanced',
+  MfaFido2Complete: 'mfa-fido2-complete',
+  MfaFido2StepAdvanced: 'mfa-fido2-step-advanced',
+  MfaFido2Error: 'mfa-fido2-error',
+  MfaFido2Touch: 'mfa-fido2-touch',
+  MfaConfigFido2Touch: 'mfa-config-fido2-touch',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
   TunnelsEnabled: 'tunnel-enabled-by-policy',
 } as const;
@@ -190,6 +209,41 @@ export type DeadConnectionReconnectedPayload = {
 export type AddInstanceEventPayload = {
   token: string;
   url: string;
+};
+
+/**
+ * Which entry point asked for the Configure MFA screen. Defined here and nowhere else: the
+ * backend passes the value through untouched, so the UI owns the set.
+ */
+export const ConfigureFactorsSource = {
+  TrayConnect: 'tray_connect',
+  TrayMfaEdit: 'tray_mfa_edit',
+  FullConnect: 'full_connect',
+  FullMfaEdit: 'full_mfa_edit',
+  AddPage: 'add_page',
+} as const;
+
+export type ConfigureFactorsSourceValue =
+  (typeof ConfigureFactorsSource)[keyof typeof ConfigureFactorsSource];
+
+/** Payload for the `configure-factors-trigger` event. Mirrors `ConfigureFactorsPayload` in events.rs. */
+export type ConfigureFactorsPayload = {
+  /** Resolved by the backend, so the screen has everything it needs without a lookup of its own. */
+  instance: InstanceInfo;
+  /** Factors the caller already picked. Empty means the wizard asks, which is the usual case. */
+  methods: MfaMethodValue[];
+  source: ConfigureFactorsSourceValue;
+  /** The location the request came from, so the screen can speak to what that location needs.
+   *  Null when the flow was not started from a location. */
+  location: LocationInfo | null;
+};
+
+export type InitiateConfigureFactorScreenArgs = {
+  instanceId: number;
+  methods: MfaMethodValue[];
+  source: ConfigureFactorsSourceValue;
+  /** The location the request came from. The backend resolves it and passes it to the screen. */
+  locationId?: number;
 };
 
 /** Payload for the `tunnel-disabled-by-policy` event. Mirrors `TunnelsDisabled` in events.rs. */
@@ -231,6 +285,17 @@ export type InstanceInfo = {
   enterprise_enabled: boolean;
   disable_tunnels: boolean;
   openid_display_name: string | null;
+  /** Factors set up on the account, as last reported. Null when the instance predates the API. */
+  mfa_configured_methods: MfaMethodValue[] | null;
+};
+
+export type MfaStepMethod = {
+  method: MfaMethodValue;
+  configured: boolean;
+};
+
+export type MfaStep = {
+  methods: MfaStepMethod[];
 };
 
 export type LocationInfo = {
@@ -247,6 +312,8 @@ export type LocationInfo = {
   location_mfa_mode: LocationMfaMode;
   mfa_method?: MfaMethodValue;
   posture_check_required: boolean;
+  mfa_steps: MfaStep[];
+  mfa_step_plan: MfaMethodValue[];
 };
 
 export type LocationStats = {
@@ -399,9 +466,9 @@ export type UpdateInstanceArgs = {
   response: CreateDeviceResponse;
 };
 
-export type SetLocationMfaMethodArgs = {
+export type SetLocationMfaStepPlanArgs = {
   locationId: number;
-  mfaMethod: MfaMethodValue;
+  mfaStepPlan: MfaMethodValue[];
 };
 
 export type OverviewViewSelection = {
@@ -476,25 +543,54 @@ export type EnrollmentStartResult = {
   final_page_content: string;
 };
 
-/** Result from enrollment_register_mfa_start. */
-export type EnrollmentMfaStartResult = {
+/** Result from enrollment_register_mfa_start and mfa_config_setup_start. */
+export type MfaSetupStartResult = {
   totp_secret: string | null;
 };
 
-/** Result from enrollment_register_mfa_finish. */
-export type EnrollmentMfaFinishResult = {
+/** Result from enrollment_register_mfa_finish and mfa_config_setup_finish. Core issues recovery
+ *  codes for the first factor only, so an empty list is an ordinary success. */
+export type MfaSetupFinishResult = {
   recovery_codes: string[];
 };
 
-/** Result from mfa_start Tauri command. */
-export type MfaStartResult = {
+/** Result from mfa_config_start. `available_methods` holds only factors that can authorize. */
+export type MfaConfigStartResult = {
+  session_id: string;
+  available_methods: MfaMethodValue[];
+  email_fallback: boolean;
+  deadline_timestamp: number;
+};
+
+/** Result from mfa_config_authorize. `recovery_codes` is filled only by the email fallback,
+ *  where verifying the code also enables the email factor. */
+export type MfaConfigAuthorizeResult = {
+  deadline_timestamp: number;
+  recovery_codes: string[];
+};
+
+/** Result from mfa_begin_step Tauri command. */
+export type MfaBeginStepResult = {
   token: string;
   challenge: string | null;
+  stepAttemptId: string | null;
+  credentialIds: string[];
 };
 
 /** Payload for mfa-openid-error / mfa-mobile-error events. */
 export type MfaErrorPayload = {
   error: string;
+};
+
+/** Payload for mfa-openid-step-advanced / mfa-mobile-step-advanced events. */
+export type MfaStepAdvancedPayload = {
+  nextStep: number;
+};
+
+/** Payload for the FIDO2 step-advanced event, including the session token. */
+export type MfaFido2StepAdvancedPayload = {
+  nextStep: number;
+  token: string;
 };
 
 /** `network`: the request could not be sent, most likely a bad URL.

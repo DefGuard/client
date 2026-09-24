@@ -1,14 +1,24 @@
+use defguard_client_core::version::mark_welcome_shown;
 use tauri::{
     async_runtime::block_on, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
 
 use crate::{
+    commands::{build_instance_info, build_location_info},
+    connection::active_connections::get_connection_id_by_type,
     database::{
-        models::{location::Location, tunnel::Tunnel, Id},
+        models::{
+            instance::Instance,
+            location::{Location, LocationMfaMethod},
+            tunnel::Tunnel,
+            Id,
+        },
         DB_POOL,
     },
-    events::EventKey,
+    error::Error,
+    events::{ConfigureFactorsPayload, EventKey},
+    tauri_err_to_app_err, ConnectionType,
 };
 
 /// Returns `true` if there are any non-service locations in the database.
@@ -29,7 +39,7 @@ pub const COMPACT_WINDOW_ID: &str = "compact-view";
 pub const FULL_VIEW_WINDOW_ID: &str = "full-view";
 pub const WELCOME_WINDOW_ID: &str = "welcome";
 pub const WELCOME_WINDOW_WIDTH: f64 = 640.0;
-pub const WELCOME_WINDOW_HEIGHT: f64 = 640.0;
+pub const WELCOME_WINDOW_HEIGHT: f64 = 585.0;
 pub const COMPACT_WINDOW_WIDTH: f64 = 380.0;
 pub const COMPACT_WINDOW_HEIGHT: f64 = 680.0;
 pub const FULL_VIEW_WINDOW_WIDTH: f64 = 800.0;
@@ -124,7 +134,7 @@ impl WindowManager {
             .maximizable(false)
             .decorations(false)
             .skip_taskbar(false)
-            .always_on_top(false)
+            .always_on_top(true)
             .visible(false);
         #[cfg(target_os = "macos")]
         let window = window.hidden_title(true);
@@ -267,6 +277,63 @@ pub fn swap_to_full_view(app: AppHandle) {
     }
 }
 
+/// Surface the full view and hand it an MFA configuration request. Callable from either window,
+/// so the tray gets out of the way the way `swap_to_full_view` does.
+///
+/// Both webviews are pre-built hidden at startup, so the full view is already listening by the
+/// time this runs and the event cannot race window creation.
+#[tauri::command(async)]
+pub async fn initiate_configure_factor_screen(
+    app: AppHandle,
+    instance_id: Id,
+    methods: Option<Vec<LocationMfaMethod>>,
+    source: String,
+    location_id: Option<Id>,
+) -> Result<(), Error> {
+    debug!("Received a command to open the configure factors screen for instance {instance_id} (source: {source})");
+    let Some(instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? else {
+        error!("Configure factors requested for unknown instance {instance_id}");
+        return Err(Error::NotFound);
+    };
+    let connected_location_ids = get_connection_id_by_type(ConnectionType::Location).await;
+    let instance = build_instance_info(instance, &connected_location_ids).await?;
+    // A location that went away in the meantime is not worth refusing the screen over, it just
+    // loses the steps it would have spoken to.
+    let location = match location_id {
+        Some(location_id) => {
+            if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
+                Some(build_location_info(location, &connected_location_ids))
+            } else {
+                warn!("Configure factors requested from unknown location {location_id}");
+                None
+            }
+        }
+        None => None,
+    };
+
+    if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
+        if let Err(err) = window.hide() {
+            error!("initiate_configure_factor_screen: Failed to hide new-ui window: {err:?}");
+        }
+    }
+    let window = WindowManager::open_full_view(&app).map_err(tauri_err_to_app_err)?;
+    // The Windows `open_full_view` positions and shows the window, but never focuses it.
+    let _ = window.set_focus();
+    app.emit_to(
+        FULL_VIEW_WINDOW_ID,
+        EventKey::ConfigureFactorsTrigger.into(),
+        ConfigureFactorsPayload {
+            instance,
+            methods: methods.unwrap_or_default(),
+            source,
+            location,
+        },
+    )
+    .map_err(tauri_err_to_app_err)?;
+    info!("Configure factors screen requested for instance {instance_id}");
+    Ok(())
+}
+
 #[tauri::command]
 pub fn close_tray_window(app: AppHandle) {
     info!("close_tray_window called");
@@ -285,15 +352,28 @@ pub fn close_tray_window(app: AppHandle) {
 pub fn close_welcome_window(app: AppHandle) {
     info!("close_welcome_window called");
 
-    if let Some(window) = app.get_webview_window(WELCOME_WINDOW_ID) {
-        if let Err(err) = window.hide() {
-            error!("close_welcome_window task: Failed to hide welcome window: {err:?}");
-        }
-    } else {
-        warn!("close_welcome_window task: welcome window not found");
-    }
+    let config_dir = app
+        .path()
+        .app_data_dir()
+        .expect("Failed to access app data");
+    mark_welcome_shown(&config_dir, &app.package_info().version);
 
     show_tray_or_full_view(&app);
+
+    // Destroy rather than hide: a hidden webview keeps running, and the looping welcome
+    // video holds a media power request that stops the system from sleeping.
+    let destroy_handle = app.clone();
+    if let Err(err) = app.run_on_main_thread(move || {
+        if let Some(window) = destroy_handle.get_webview_window(WELCOME_WINDOW_ID) {
+            if let Err(err) = window.destroy() {
+                error!("close_welcome_window task: Failed to destroy welcome window: {err:?}");
+            }
+        } else {
+            warn!("close_welcome_window task: welcome window not found");
+        }
+    }) {
+        error!("close_welcome_window task: Failed to schedule welcome window teardown: {err:?}");
+    }
 }
 
 #[tauri::command]

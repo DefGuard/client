@@ -15,6 +15,15 @@ use crate::{
 pub static ACTIVE_CONNECTIONS: LazyLock<Mutex<Vec<ActiveConnection>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 
+pub(crate) async fn active_connection_ids() -> Vec<(Id, ConnectionType)> {
+    ACTIVE_CONNECTIONS
+        .lock()
+        .await
+        .iter()
+        .map(|con| (con.location_id, con.connection_type))
+        .collect()
+}
+
 pub async fn get_connection_id_by_type(connection_type: ConnectionType) -> Vec<Id> {
     let active_connections = ACTIVE_CONNECTIONS.lock().await;
 
@@ -42,7 +51,12 @@ pub async fn close_all_connections() -> Result<(), Error> {
         );
         trace!("Connection: {connection:#?}");
         debug!("Removing interface {}", connection.interface_name);
-        disconnect_interface(connection).await?;
+        if let Err(err) = disconnect_interface(connection).await {
+            error!(
+                "Failed to close the connection on interface {}: {err}",
+                connection.interface_name
+            );
+        }
     }
     if active_connections_count > 0 {
         info!("All active connections ({active_connections_count}) have been closed.");

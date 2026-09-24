@@ -12,16 +12,16 @@ version.workspace = true
 tonic-prost-build.workspace = true
 
 [dependencies]
+defguard_wireguard_rs.workspace = true
 prost.workspace = true
 serde.workspace = true
-serde_with = "3.11"
+serde_with.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
-
-defguard_wireguard_rs.workspace = true
+tracing.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-wmi = { version = "0.18", default-features = false }
+wmi.workspace = true
 
 [dev-dependencies]
 x25519-dalek = { workspace = true, features = ["getrandom", "static_secrets"] }

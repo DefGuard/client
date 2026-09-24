@@ -11,6 +11,7 @@ use std::{
 
 use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
+use defguard_client_proto::conversions::normalize_allowed_ips;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -36,6 +37,7 @@ use tracing_subscriber::EnvFilter;
 
 mod proto {
     pub mod defguard {
+        #[allow(clippy::enum_variant_names, dead_code)]
         pub mod client_types {
             include!(concat!(env!("OUT_DIR"), "/defguard.client_types.rs"));
         }
@@ -243,7 +245,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         .collect::<Vec<_>>();
     debug!("Parsed assigned IPs: {addresses:?}");
 
-    let config = InterfaceConfiguration {
+    let mut config = InterfaceConfiguration {
         name: config.instance_info.name.clone(),
         prvkey: config.private_key.to_string(),
         addresses,
@@ -252,6 +254,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         mtu: None,
         fwmark: None,
     };
+    normalize_allowed_ips(&mut config);
     let configure_interface_result = wgapi.configure_interface(&config);
 
     configure_interface_result.expect("Failed to configure WireGuard interface");

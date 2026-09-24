@@ -1,0 +1,25 @@
+#configure-select-methods-step {
+  .steps {
+    display: flex;
+    flex-flow: column;
+    width: 100%;
+    padding-bottom: var(--spacing-xl);
+  }
+
+  .step {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-md);
+
+    .step-label {
+      font: var(--t-body-xs-400);
+      color: var(--fg-white-70);
+    }
+
+    .methods {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-md);
+    }
+  }
+}

@@ -1,0 +1,18 @@
+#configure-finish-step {
+  .banner {
+    align-self: flex-start;
+    width: 504px;
+    height: 150px;
+    padding-bottom: var(--spacing-3xl);
+    padding-top: var(--spacing-md);
+  }
+
+  header {
+    padding-bottom: var(--spacing-sm);
+  }
+
+  .summary {
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-70);
+  }
+}

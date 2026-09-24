@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use semver::Prerelease;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -13,12 +14,25 @@ use crate::set_perms;
 
 pub const MIN_CORE_VERSION: Version = Version::new(1, 6, 0);
 pub const MIN_PROXY_VERSION: Version = Version::new(1, 6, 0);
+pub const MIN_MULTI_STEP_MFA_VERSION: Version = Version::new(2, 2, 0);
+pub const CORE_VERSION_HEADER: &str = "defguard-core-version";
+pub const PROXY_VERSION_HEADER: &str = "defguard-component-version";
 pub const CLIENT_VERSION_HEADER: &str = "defguard-client-version";
 pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const LOG_FILENAME: &str = "defguard-client";
 pub const WELCOME_FORCE_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_FORCE";
 pub const WELCOME_SKIP_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_SKIP";
+pub const WELCOME_CONTENT_VERSION: Version = Version::new(2, 1, 0);
 pub use defguard_client_common::VERSION as PKG_VERSION;
+
+/// Returns whether `version` meets or exceeds `minimum`, ignoring pre-release and build metadata.
+#[must_use]
+pub fn is_version_at_least(version: &Version, minimum: &Version) -> bool {
+    let (mut version, mut minimum) = (version.clone(), minimum.clone());
+    version.pre = Prerelease::EMPTY;
+    minimum.pre = Prerelease::EMPTY;
+    version.cmp_precedence(&minimum) != Ordering::Less
+}
 
 /// Selects the version string the client should report: the build-version override when present
 /// and non-blank, otherwise the package version.
@@ -61,6 +75,8 @@ fn get_version_state_file(config_dir: &Path, for_write: bool) -> File {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct VersionState {
     version: Version,
+    #[serde(default)]
+    welcome_shown: Option<Version>,
 }
 
 impl VersionState {
@@ -116,6 +132,7 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
     if !path.exists() {
         VersionState {
             version: current_version.clone(),
+            welcome_shown: None,
         }
         .save(config_dir);
         return VersionCheckResult::Init;
@@ -129,6 +146,7 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
                 let previous = state.version;
                 VersionState {
                     version: current_version.clone(),
+                    welcome_shown: state.welcome_shown,
                 }
                 .save(config_dir);
                 VersionCheckResult::Upgraded {
@@ -141,11 +159,45 @@ pub fn check_app_version(config_dir: &Path, current_version: &Version) -> Versio
             error!("Failed to deserialize version state file: {err}. Treating as first run.");
             VersionState {
                 version: current_version.clone(),
+                welcome_shown: None,
             }
             .save(config_dir);
             VersionCheckResult::Init
         }
     }
+}
+
+fn read_version_state(config_dir: &Path) -> Option<VersionState> {
+    let path = get_version_state_file_path(config_dir);
+    if !path.exists() {
+        return None;
+    }
+    let file = get_version_state_file(config_dir, false);
+    serde_json::from_reader::<_, VersionState>(file).ok()
+}
+
+#[must_use]
+pub fn should_show_welcome(config_dir: &Path) -> bool {
+    if welcome_skip_enabled() {
+        return false;
+    }
+
+    if welcome_force_enabled() {
+        return true;
+    }
+
+    read_version_state(config_dir)
+        .and_then(|state| state.welcome_shown)
+        .is_none_or(|shown| shown < WELCOME_CONTENT_VERSION)
+}
+
+pub fn mark_welcome_shown(config_dir: &Path, current_version: &Version) {
+    let mut state = read_version_state(config_dir).unwrap_or(VersionState {
+        version: current_version.clone(),
+        welcome_shown: None,
+    });
+    state.welcome_shown = Some(WELCOME_CONTENT_VERSION);
+    state.save(config_dir);
 }
 
 #[cfg(test)]
@@ -155,9 +207,62 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        check_app_version, select_reported_app_version, Version, VersionCheckResult,
+        check_app_version, is_version_at_least, mark_welcome_shown, select_reported_app_version,
+        should_show_welcome, Version, VersionCheckResult, MIN_MULTI_STEP_MFA_VERSION,
         VERSION_STATE_FILE_NAME, WELCOME_FORCE_ENV_VAR, WELCOME_SKIP_ENV_VAR,
     };
+
+    #[test]
+    fn test_should_show_welcome_when_state_file_missing() {
+        let dir = tempdir().unwrap();
+
+        assert!(should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_should_show_welcome_when_never_marked() {
+        let dir = tempdir().unwrap();
+        let _ = check_app_version(dir.path(), &Version::new(2, 1, 0));
+
+        assert!(should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_should_not_show_welcome_after_marking() {
+        let dir = tempdir().unwrap();
+        let current = Version::new(2, 1, 0);
+        let _ = check_app_version(dir.path(), &current);
+
+        mark_welcome_shown(dir.path(), &current);
+
+        assert!(!should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_should_show_welcome_when_marked_below_content_version() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join(VERSION_STATE_FILE_NAME),
+            br#"{"version":"2.1.0","welcome_shown":"2.0.0"}"#,
+        )
+        .unwrap();
+
+        assert!(should_show_welcome(dir.path()));
+    }
+
+    #[test]
+    fn test_check_app_version_preserves_welcome_shown_on_upgrade() {
+        let dir = tempdir().unwrap();
+        let previous = Version::new(2, 1, 0);
+        let _ = check_app_version(dir.path(), &previous);
+        mark_welcome_shown(dir.path(), &previous);
+
+        let current = Version::new(2, 1, 1);
+        let result = check_app_version(dir.path(), &current);
+
+        assert_eq!(result, VersionCheckResult::Upgraded { previous, current });
+        assert!(!should_show_welcome(dir.path()));
+    }
 
     #[test]
     fn test_reported_app_version_uses_override_when_present() {
@@ -175,6 +280,20 @@ mod tests {
     #[test]
     fn test_reported_app_version_ignores_empty_override() {
         assert_eq!(select_reported_app_version("1.6.8", Some("   ")), "1.6.8");
+    }
+
+    #[test]
+    fn test_version_at_least_ignores_prerelease() {
+        let version = Version::parse("2.2.0-alpha1").unwrap();
+
+        assert!(is_version_at_least(&version, &MIN_MULTI_STEP_MFA_VERSION));
+    }
+
+    #[test]
+    fn test_version_at_least_rejects_older_version() {
+        let version = Version::parse("2.1.9").unwrap();
+
+        assert!(!is_version_at_least(&version, &MIN_MULTI_STEP_MFA_VERSION));
     }
 
     #[test]

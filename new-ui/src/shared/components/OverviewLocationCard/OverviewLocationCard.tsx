@@ -9,14 +9,17 @@ import {
   mfaMethodToConnectModalView,
 } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
+import { useConfigureFactorsScreen } from '../../hooks/useConfigureFactorsScreen';
+import { useConnectionAbility } from '../../hooks/useConnectionAbility';
 import { api } from '../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../rust-api/query';
 import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
-import { MfaMethod } from '../../rust-api/types';
 import { ThemeSpacing } from '../../types';
+import { connectConfigureFactorsSource } from '../../utils/configureFactorsSource';
 import { isPresent } from '../../utils/isPresent';
-import { shouldStartMfa } from '../../utils/mfa';
+import { ConnectionAbility, resolveMfaStepPlan, shouldStartMfa } from '../../utils/mfa';
 import { Divider } from '../Divider/Divider';
+import { IconKind } from '../Icon';
 import { parseConnectError } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
 import { LocationCardConnectionInfo } from '../LocationCard/components/LocationCardConnectionInfo/LocationCardConnectionInfo';
@@ -53,6 +56,12 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
           view: ConnectModalView.PostureCheckFail,
           postureError: connectError.message,
         });
+      } else if (connectError?.kind === 'allTrafficConflict') {
+        useConnectModal.getState().open({
+          location,
+          view: ConnectModalView.ConnectionError,
+          connectionError: connectError.message,
+        });
       } else if (connectError?.kind === 'serviceUnavailable') {
         useConnectModal.getState().open({
           location,
@@ -77,7 +86,12 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
     },
   });
 
-  const isBusy = isConnecting || isDisconnecting;
+  const { mutate: configureMfa, isPending: isOpeningConfiguration } =
+    useConfigureFactorsScreen();
+
+  const isBusy = isConnecting || isDisconnecting || isOpeningConfiguration;
+
+  const connectionAbility = useConnectionAbility(location, instance);
 
   const handleConnectClick = () => {
     if (!appConfig) return;
@@ -86,18 +100,32 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
       return;
     }
 
+    if (connectionAbility === ConnectionAbility.Configurable) {
+      // Goes through the backend like the tray card does, so both open the same screen.
+      configureMfa({
+        instanceId: location.instance_id,
+        methods: [],
+        source: connectConfigureFactorsSource(),
+        locationId: location.id,
+      });
+      return;
+    }
+
     if (shouldStartMfa(location)) {
+      const stepPlan = resolveMfaStepPlan(location);
       useConnectModal.getState().open({
-        view: mfaMethodToConnectModalView(location.mfa_method ?? MfaMethod.Totp),
+        view: mfaMethodToConnectModalView(stepPlan[0]),
         location,
         autoStartOpenId: appConfig.auto_start_openid_mfa,
-        mfaMethod: location.mfa_method,
+        mfaMethod: stepPlan[0],
       });
       return;
     }
 
     connect({ connectionType: location.connection_type, locationId: location.id });
   };
+
+  const canConfigureMfa = connectionAbility === ConnectionAbility.Configurable;
 
   const traficLabel = useMemo(() => {
     if (location.route_all_traffic) {
@@ -125,9 +153,14 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
         />
         <div className="right">
           <ConnectButton
+            icon={canConfigureMfa ? IconKind.ManageKeys : null}
+            text={canConfigureMfa ? 'Configure MFA' : null}
             active={location.active}
             onClick={handleConnectClick}
-            disabled={isBusy}
+            disabled={
+              isBusy ||
+              (!location.active && connectionAbility === ConnectionAbility.Unavailable)
+            }
           />
         </div>
       </div>
@@ -156,20 +189,23 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
                 }}
               />
             )}
-            <LocationCardMfaEdit
-              variant="full"
-              location={location}
-              onEdit={() => {
-                if (isPresent(location)) {
-                  useConnectModal.getState().open({
-                    view: ConnectModalView.MfaSettings,
-                    location: location,
-                    perviousView: null,
-                    mfaMethod: location.mfa_method,
-                  });
-                }
-              }}
-            />
+            {shouldStartMfa(location) && (
+              <LocationCardMfaEdit
+                variant="full"
+                location={location}
+                connectionAbility={connectionAbility}
+                onEdit={() => {
+                  if (isPresent(location)) {
+                    useConnectModal.getState().open({
+                      view: ConnectModalView.MfaSettings,
+                      location: location,
+                      perviousView: null,
+                      mfaMethod: resolveMfaStepPlan(location)[0],
+                    });
+                  }
+                }}
+              />
+            )}
           </Fragment>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
@@ -20,11 +21,25 @@ import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/Locati
 const MIN_POSTURE_LOADER_MS = 500;
 
 export const LocationCardMfaTotpView = () => {
-  const { setView, location, setPostureError } = useLocationCardContext();
+  const {
+    setView,
+    location,
+    setPostureError,
+    stepLabel,
+    canPickOtherMethod,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    goToStep,
+  } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location,
     MfaMethod.Totp,
     {
+      stepPlan,
+      mfaToken,
+      setMfaToken,
+      onStepAdvanced: goToStep,
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),
       onSessionExpired: () => setView(LocationCardViews.Default),
@@ -56,10 +71,11 @@ export const LocationCardMfaTotpView = () => {
     [totpCode, verifyCode],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
-  useEffect(() => {
-    setError(null);
-  }, [totpCode, setError]);
+  // Only real input clears the error, CodeInput's own reset passes ''.
+  const handleCodeChange = useCallback((value: string) => {
+    setTotpCode(value);
+    if (value.length > 0) setError(null);
+  }, []);
 
   // Reflect server-side verify errors into the local error state
   useEffect(() => {
@@ -76,18 +92,18 @@ export const LocationCardMfaTotpView = () => {
     <div
       className="location-card-mfa-totp-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title="Two-factor authentication">
+      <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
         <p>Paste the code from your Authenticator Application.</p>
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
       <CodeInput
         length={6}
         value={totpCode}
-        onChange={setTotpCode}
+        onChange={handleCodeChange}
         error={startError ?? error}
         onSuccessPaste={(value) => {
           handleVerify(value);
@@ -103,19 +119,20 @@ export const LocationCardMfaTotpView = () => {
           }}
         />
         <div className="right">
-          <Button
-            text="Other methods"
-            variant={ButtonVariant.Outlined}
-            onClick={() => {
-              setView(LocationCardViews.MfaSettings);
-            }}
-          />
+          {canPickOtherMethod && (
+            <Button
+              text="Other methods"
+              variant={ButtonVariant.Outlined}
+              onClick={() => {
+                setView(LocationCardViews.MfaSettings);
+              }}
+            />
+          )}
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
             onClick={() => handleVerify(totpCode)}
             loading={isVerifying}
-            disabled={isStarting}
           />
         </div>
       </Controls>

@@ -6,14 +6,20 @@
       {
         "name": "id!",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "wireguard_keys",
+            "name": "id"
+          }
+        }
       }
     ],
     "parameters": {
       "Right": 3
     },
     "nullable": [
-      true
+      null
     ]
   },
   "hash": "48cbbca02294eb342b4040b315c71301e06c48260f003893a27ed283f943551f"

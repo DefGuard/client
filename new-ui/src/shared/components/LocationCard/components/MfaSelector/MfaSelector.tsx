@@ -1,14 +1,19 @@
 import './style.scss';
 import clsx from 'clsx';
-import { type HTMLProps, type MouseEventHandler, useMemo } from 'react';
-import type { MfaMethodValue } from '../../../../rust-api/types';
+import type { HTMLProps, MouseEventHandler } from 'react';
+import { mfaMethodIcon } from '../../../../consts';
+import { MfaMethod, type MfaMethodValue } from '../../../../rust-api/types';
 import { mfaToText } from '../../../../utils/mfa';
-import { Icon, IconKind, type IconKindValue } from '../../../Icon';
+import { Icon } from '../../../Icon';
+import checkboxSrc from './assets/checkbox.svg';
 
 interface Props {
   factor: MfaMethodValue;
   selected?: boolean;
+  active?: boolean;
   isDefault?: boolean;
+  configured?: boolean;
+  isSelectable: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
   containerProps?: Omit<HTMLProps<HTMLDivElement>, 'onClick'>;
 }
@@ -18,42 +23,51 @@ export const MfaSelector = ({
   onClick,
   containerProps,
   selected = false,
+  active = false,
   isDefault = false,
+  configured = true,
+  isSelectable,
 }: Props) => {
-  const iconKind = useMemo((): IconKindValue => {
-    switch (factor) {
-      case 'email':
-        return 'mail';
-      case 'mobileapprove':
-        return 'mobile';
-      case 'oidc':
-        return 'token';
-      case 'totp':
-        return 'lock-closed';
-      case 'biometric':
-        return 'biometric';
-    }
-  }, [factor]);
+  const isMobileOnly = factor === MfaMethod.Biometric;
+  const showCheckbox = isSelectable && selected;
 
   return (
     <div
       {...containerProps}
+      aria-disabled={!isSelectable}
+      data-factor={factor}
       className={clsx(containerProps?.className, 'mfa-selector', {
         selected,
+        active,
+        disabled: !isSelectable,
       })}
-      onClick={onClick}
-      data-factor={factor}
+      onClick={(event) => {
+        if (isSelectable) {
+          onClick?.(event);
+        }
+      }}
     >
-      <Icon className="factor-icon" icon={iconKind} size={20} />
+      {showCheckbox && <img src={checkboxSrc} alt="" width={24} height={24} />}
+      {!showCheckbox && (
+        <div className="icon-col">
+          <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
+        </div>
+      )}
       <div className="middle">
         <p className="name">{mfaToText(factor)}</p>
-        {isDefault && (
+      </div>
+      <div className="right">
+        {(isMobileOnly || !configured) && (
+          <p className="disabled-label">
+            {isMobileOnly ? 'Mobile client only' : 'Not configured'}
+          </p>
+        )}
+        {isSelectable && configured && isDefault && (
           <div className="default-badge">
             <p>Default</p>
           </div>
         )}
       </div>
-      {selected && <Icon icon={IconKind.Check} size={16} />}
     </div>
   );
 };

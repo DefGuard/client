@@ -12,10 +12,7 @@
     }
   }
 
-  > .methods {
-    display: flex;
-    flex-flow: column;
-    row-gap: var(--spacing-md);
+  > .mfa-settings-section {
     padding-bottom: var(--spacing-md);
   }
 }

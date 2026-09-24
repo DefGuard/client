@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Mutex};
 
 use defguard_client_core::{
     connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
+    mfa_config::MfaConfigSession,
 };
 use defguard_client_provisioning::ProvisioningConfig;
 use tauri::{
@@ -19,10 +20,22 @@ use crate::{
     ConnectionType,
 };
 
+/// One security key ceremony. The id tells two ceremonies for the same session apart, so a
+/// finished one never removes the entry a newer one left in its place.
+#[derive(Clone)]
+pub struct Ceremony {
+    pub id: Uuid,
+    pub token: CancellationToken,
+}
+
 pub struct AppState {
     pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
+    pub mfa_config_sessions: Mutex<HashMap<Uuid, MfaConfigSession>>,
+    /// Keyed by configuration session, so abandoning one dismisses the prompt it left on screen.
+    pub mfa_config_ceremonies: Mutex<HashMap<Uuid, Ceremony>>,
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
+    multi_step_mfa_capabilities: Mutex<HashMap<Id, bool>>,
     pub app_config: Mutex<AppConfig>,
     pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
@@ -35,14 +48,34 @@ impl AppState {
     pub fn new(config: AppConfig, provisioning_config: Option<ProvisioningConfig>) -> Self {
         Self {
             enrollment_sessions: Mutex::new(HashMap::new()),
+            mfa_config_sessions: Mutex::new(HashMap::new()),
+            mfa_config_ceremonies: Mutex::new(HashMap::new()),
             log_watchers: Mutex::new(HashMap::new()),
             mfa_tasks: Mutex::new(HashMap::new()),
+            multi_step_mfa_capabilities: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
             tray_click_position: Mutex::new(None),
             stat_threads: Mutex::new(HashMap::new()),
             provisioning_config: Mutex::new(provisioning_config),
             session_state: Mutex::new(SessionState::default()),
         }
+    }
+
+    pub(crate) fn set_multi_step_mfa_capable(&self, instance_id: Id, capable: bool) {
+        self.multi_step_mfa_capabilities
+            .lock()
+            .expect("multi_step_mfa_capabilities mutex poisoned")
+            .insert(instance_id, capable);
+    }
+
+    #[must_use]
+    pub(crate) fn is_multi_step_mfa_capable(&self, instance_id: Id) -> bool {
+        self.multi_step_mfa_capabilities
+            .lock()
+            .expect("multi_step_mfa_capabilities mutex poisoned")
+            .get(&instance_id)
+            .copied()
+            .unwrap_or(false)
     }
 
     pub(crate) async fn add_connection<S: Into<String>>(
@@ -115,5 +148,21 @@ impl AppState {
             debug!("No active connection found with location ID: {location_id}");
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_multi_step_mfa_capability_defaults_to_false() {
+        let state = AppState::new(AppConfig::default(), None);
+
+        assert!(!state.is_multi_step_mfa_capable(1));
+        state.set_multi_step_mfa_capable(1, true);
+        assert!(state.is_multi_step_mfa_capable(1));
+        state.set_multi_step_mfa_capable(1, false);
+        assert!(!state.is_multi_step_mfa_capable(1));
     }
 }

@@ -10,7 +10,10 @@ use tokio::{
     net::TcpListener,
     sync::mpsc::{unbounded_channel, UnboundedSender},
 };
-use tokio_tungstenite::{accept_async, tungstenite::Message};
+use tokio_tungstenite::{
+    accept_async,
+    tungstenite::{protocol::CloseFrame, Message},
+};
 
 /// Command to control the WebSocket stub's behavior after a client connects.
 pub enum WsStubCommand {
@@ -18,6 +21,8 @@ pub enum WsStubCommand {
     SendMessage(String),
     /// Close the WebSocket connection gracefully.
     Close,
+    /// Close the connection with the given code and reason.
+    CloseWith(u16, String),
 }
 
 /// A controllable WebSocket stub for testing MFA mobile-approve flows.
@@ -66,6 +71,16 @@ pub async fn start_ws_stub() -> WebSocketStub {
                     let _ = write.send(Message::Text(text.into())).await;
                 }
                 WsStubCommand::Close => {
+                    let _ = write.close().await;
+                    return;
+                }
+                WsStubCommand::CloseWith(code, reason) => {
+                    let _ = write
+                        .send(Message::Close(Some(CloseFrame {
+                            code: code.into(),
+                            reason: reason.into(),
+                        })))
+                        .await;
                     let _ = write.close().await;
                     return;
                 }

@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf};
+use std::{fmt, path::PathBuf, str::FromStr};
 #[cfg(unix)]
 use std::{
     fs::{set_permissions, Permissions},
@@ -7,11 +7,15 @@ use std::{
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use database::models::{
-    location::{infer_mfa_method, Location, LocationMfaMode, ServiceLocationMode},
+    location::{
+        infer_mfa_method, legacy_mfa_steps, Location, LocationMfaMode, LocationMfaStep,
+        ServiceLocationMode,
+    },
     Id,
 };
 use defguard_client_proto::defguard::client_types::DeviceConfig;
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
 
 pub mod app_config;
 pub mod connection;
@@ -20,6 +24,7 @@ pub mod enrollment;
 pub mod error;
 pub mod events;
 pub mod mfa;
+pub mod mfa_config;
 pub mod proxy;
 #[cfg(test)]
 mod test_helpers;
@@ -124,6 +129,14 @@ pub struct CommonConnectionInfo {
 pub const DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub const DEFAULT_ROUTE_IPV6: &str = "::/0";
 
+#[must_use]
+pub fn contains_default_route(allowed_ips: &str) -> bool {
+    allowed_ips
+        .split(',')
+        .filter_map(|entry| defguard_wireguard_rs::net::IpAddrMask::from_str(entry.trim()).ok())
+        .any(|addr| addr.address.is_unspecified() && addr.cidr == 0)
+}
+
 pub enum DateTimeAggregation {
     Hour,
     Second,
@@ -156,6 +169,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
     use LocationMfaMode as MfaMode;
     use ServiceLocationMode as SLocationMode;
 
+    #[allow(deprecated)]
     let location_mfa_mode = match dev_config.location_mfa_mode {
         Some(_location_mfa_mode) => dev_config.location_mfa_mode().into(),
         None =>
@@ -190,13 +204,28 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
         service_location_mode,
         mfa_method: infer_mfa_method(location_mfa_mode, None),
         posture_check_required: dev_config.posture_check_required.unwrap_or_default(),
+        mfa_steps: Json(if dev_config.steps.is_empty() {
+            legacy_mfa_steps(location_mfa_mode)
+        } else {
+            dev_config
+                .steps
+                .into_iter()
+                .map(LocationMfaStep::from)
+                .collect::<Vec<_>>()
+        }),
+        mfa_step_plan: Json::default(),
+        client_mtu: dev_config.mtu,
     }
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use chrono::{Duration, Utc};
-    use defguard_client_proto::defguard::client_types::DeviceConfig;
+    use defguard_client_proto::defguard::client_types::{
+        DeviceConfig, MfaMethod as ProtoMfaMethod, MfaStep as ProtoMfaStep,
+        MfaStepMethod as ProtoMfaStepMethod,
+    };
 
     use super::{get_aggregation, into_location, DateTimeAggregation};
     use crate::database::models::location::{LocationMfaMethod, LocationMfaMode};
@@ -256,6 +285,18 @@ mod tests {
     }
 
     #[test]
+    fn test_into_location_maps_client_mtu() {
+        // Cores that don't send an MTU leave the location without one.
+        let location = into_location(base_dev_config(), 3);
+        assert_eq!(location.client_mtu, None);
+
+        let mut cfg = base_dev_config();
+        cfg.mtu = Some(1380);
+        let location = into_location(cfg, 3);
+        assert_eq!(location.client_mtu, Some(1380));
+    }
+
+    #[test]
     fn test_into_location_mfa_mode_from_deprecated_flag() {
         // With no explicit mode, the deprecated mfa_enabled flag drives the mode.
         let mut cfg = base_dev_config();
@@ -267,6 +308,57 @@ mod tests {
         assert_eq!(location.location_mfa_mode, LocationMfaMode::Internal);
         // Internal mode with no configured method resolves to Totp.
         assert_eq!(location.mfa_method, Some(LocationMfaMethod::Totp));
+    }
+
+    #[test]
+    fn test_into_location_legacy_internal_synthesizes_single_step() {
+        let mut cfg = base_dev_config();
+        cfg.location_mfa_mode = Some(crate::proto::client_types::LocationMfaMode::Internal as i32);
+        let location = into_location(cfg, 1);
+        assert_eq!(location.mfa_steps.0.len(), 1);
+        assert_eq!(
+            location.mfa_steps.0[0]
+                .methods
+                .iter()
+                .map(|entry| entry.method)
+                .collect::<Vec<_>>(),
+            vec![
+                LocationMfaMethod::Totp,
+                LocationMfaMethod::Email,
+                LocationMfaMethod::MobileApprove
+            ]
+        );
+        assert!(location.mfa_steps.0[0]
+            .methods
+            .iter()
+            .all(|entry| entry.configured));
+    }
+
+    #[test]
+    fn test_into_location_legacy_disabled_has_no_steps() {
+        let location = into_location(base_dev_config(), 1);
+        assert_eq!(location.location_mfa_mode, LocationMfaMode::Disabled);
+        assert!(location.mfa_steps.0.is_empty());
+    }
+
+    #[test]
+    fn test_into_location_steps_win_over_deprecated_mode() {
+        let mut cfg = base_dev_config();
+        cfg.location_mfa_mode = Some(crate::proto::client_types::LocationMfaMode::Internal as i32);
+        cfg.steps = vec![ProtoMfaStep {
+            methods: vec![ProtoMfaStepMethod {
+                method: ProtoMfaMethod::Oidc as i32,
+                configured: false,
+            }],
+        }];
+        let location = into_location(cfg, 1);
+        assert_eq!(location.mfa_steps.0.len(), 1);
+        assert_eq!(location.mfa_steps.0[0].methods.len(), 1);
+        assert_eq!(
+            location.mfa_steps.0[0].methods[0].method,
+            LocationMfaMethod::Oidc
+        );
+        assert!(!location.mfa_steps.0[0].methods[0].configured);
     }
 
     #[test]

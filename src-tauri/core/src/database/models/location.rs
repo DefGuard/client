@@ -5,19 +5,21 @@ use std::str::FromStr;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, SqliteExecutor};
+use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
 use crate::{
+    contains_default_route,
     database::{
         models::instance::{ClientTrafficPolicy, Instance},
         DbPool,
     },
     error::Error,
     proto::client_types::{
-        LocationMfaMode as ProtoLocationMfaMode, ServiceLocationMode as ProtoServiceLocationMode,
+        LocationMfaMode as ProtoLocationMfaMode, MfaMethod as ProtoMfaMethod,
+        MfaStep as ProtoMfaStep, ServiceLocationMode as ProtoServiceLocationMode,
     },
 };
 #[cfg(not(target_os = "macos"))]
@@ -65,8 +67,12 @@ impl From<ProtoServiceLocationMode> for ServiceLocationMode {
     }
 }
 
-/// Discriminants match the proto `MfaMethod` enum.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Type)]
+/// Discriminants match the proto `MfaMethod` enum, except for `Fido2`, which the
+/// protocol does not carry yet and which is therefore handled entirely on the
+/// client.
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Type,
+)]
 #[repr(u32)]
 #[serde(rename_all = "lowercase")]
 pub enum LocationMfaMethod {
@@ -75,6 +81,7 @@ pub enum LocationMfaMethod {
     Oidc = 2,
     Biometric = 3,
     MobileApprove = 4,
+    Fido2 = 5,
 }
 
 impl LocationMfaMethod {
@@ -86,8 +93,83 @@ impl LocationMfaMethod {
             Self::Oidc => "oidc",
             Self::Biometric => "biometric",
             Self::MobileApprove => "mobile",
+            Self::Fido2 => "fido2",
         }
     }
+}
+
+impl From<ProtoMfaMethod> for LocationMfaMethod {
+    fn from(value: ProtoMfaMethod) -> Self {
+        match value {
+            ProtoMfaMethod::Totp => Self::Totp,
+            ProtoMfaMethod::Email => Self::Email,
+            ProtoMfaMethod::Oidc => Self::Oidc,
+            ProtoMfaMethod::Biometric => Self::Biometric,
+            ProtoMfaMethod::MobileApprove => Self::MobileApprove,
+            ProtoMfaMethod::Fido2 => Self::Fido2,
+        }
+    }
+}
+
+impl From<LocationMfaMethod> for ProtoMfaMethod {
+    fn from(value: LocationMfaMethod) -> Self {
+        match value {
+            LocationMfaMethod::Totp => Self::Totp,
+            LocationMfaMethod::Email => Self::Email,
+            LocationMfaMethod::Oidc => Self::Oidc,
+            LocationMfaMethod::Biometric => Self::Biometric,
+            LocationMfaMethod::MobileApprove => Self::MobileApprove,
+            LocationMfaMethod::Fido2 => Self::Fido2,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
+pub struct LocationMfaStepMethod {
+    pub method: LocationMfaMethod,
+    pub configured: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
+pub struct LocationMfaStep {
+    pub methods: Vec<LocationMfaStepMethod>,
+}
+
+impl From<ProtoMfaStep> for LocationMfaStep {
+    fn from(value: ProtoMfaStep) -> Self {
+        Self {
+            methods: value
+                .methods
+                .iter()
+                .map(|entry| LocationMfaStepMethod {
+                    method: entry.method().into(),
+                    configured: entry.configured,
+                })
+                .collect(),
+        }
+    }
+}
+
+#[must_use]
+pub fn legacy_mfa_steps(mode: LocationMfaMode) -> Vec<LocationMfaStep> {
+    let methods = match mode {
+        LocationMfaMode::Disabled => return Vec::new(),
+        LocationMfaMode::Internal => vec![
+            LocationMfaMethod::Totp,
+            LocationMfaMethod::Email,
+            LocationMfaMethod::MobileApprove,
+        ],
+        LocationMfaMode::External => vec![LocationMfaMethod::Oidc],
+    };
+    vec![LocationMfaStep {
+        methods: methods
+            .into_iter()
+            .map(|method| LocationMfaStepMethod {
+                method,
+                configured: true,
+            })
+            .collect(),
+    }]
 }
 
 #[must_use]
@@ -124,6 +206,14 @@ pub struct Location<I = NoId> {
     pub mfa_method: Option<LocationMfaMethod>,
     #[serde(default)]
     pub posture_check_required: bool,
+    #[serde(default)]
+    pub mfa_steps: Json<Vec<LocationMfaStep>>,
+    #[serde(default)]
+    pub mfa_step_plan: Json<Vec<LocationMfaMethod>>,
+    /// MTU suggested by Defguard Core for this location. Used only when MTU not set in the
+    /// application settings.
+    #[serde(default)]
+    pub client_mtu: Option<u32>,
 }
 
 impl fmt::Display for Location<Id> {
@@ -152,7 +242,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
             FROM location WHERE service_location_mode <= $1 \
             ORDER BY name ASC",
             max_service_location_mode
@@ -190,7 +281,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
             FROM location WHERE name = $1 AND service_location_mode <= $2 ORDER BY name ASC",
             name,
             max,
@@ -208,8 +300,9 @@ impl Location<Id> {
             "UPDATE location SET instance_id = $1, name = $2, address = $3, pubkey = $4, \
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
             keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12, \
-            mfa_method = $13, posture_check_required = $14 \
-            WHERE id = $15",
+            mfa_method = $13, posture_check_required = $14, mfa_steps = $15, \
+            mfa_step_plan = $16, client_mtu = $17 \
+            WHERE id = $18",
             self.instance_id,
             self.name,
             self.address,
@@ -224,6 +317,9 @@ impl Location<Id> {
             self.service_location_mode,
             self.mfa_method,
             self.posture_check_required,
+            self.mfa_steps,
+            self.mfa_step_plan,
+            self.client_mtu,
             self.id,
         )
         .execute(executor)
@@ -242,7 +338,8 @@ impl Location<Id> {
             network_id, route_all_traffic,  keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
             FROM location WHERE id = $1",
             location_id
         )
@@ -266,7 +363,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
             FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
             ORDER BY name ASC",
             instance_id,
@@ -286,7 +384,8 @@ impl Location<Id> {
             network_id, route_all_traffic, keepalive_interval, \
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
-            mfa_method \"mfa_method: _\", posture_check_required \
+            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
             FROM location WHERE pubkey = $1",
             pubkey
         )
@@ -329,6 +428,36 @@ impl Location<Id> {
         }
     }
 
+    pub async fn effective_route_all_traffic(
+        &self,
+        pool: &DbPool,
+        route_all_traffic: Option<bool>,
+    ) -> Result<bool, Error> {
+        let Some(instance) = Instance::find_by_id(pool, self.instance_id).await? else {
+            error!("Instance {} not found", self.instance_id);
+            return Err(Error::InternalError(format!(
+                "Instance {} not found",
+                self.instance_id
+            )));
+        };
+        Ok(match instance.client_traffic_policy {
+            ClientTrafficPolicy::ForceAllTraffic => true,
+            ClientTrafficPolicy::DisableAllTraffic => false,
+            ClientTrafficPolicy::None => route_all_traffic.unwrap_or(self.route_all_traffic),
+        })
+    }
+
+    pub async fn holds_default_route(
+        &self,
+        pool: &DbPool,
+        route_all_traffic: Option<bool>,
+    ) -> Result<bool, Error> {
+        Ok(self
+            .effective_route_all_traffic(pool, route_all_traffic)
+            .await?
+            || contains_default_route(&self.allowed_ips))
+    }
+
     #[cfg(not(target_os = "macos"))]
     pub async fn interface_configuration(
         &self,
@@ -338,8 +467,6 @@ impl Location<Id> {
         mtu: Option<u32>,
         route_all_traffic: Option<bool>,
     ) -> Result<InterfaceConfiguration, Error> {
-        use crate::database::models::instance::{ClientTrafficPolicy, Instance};
-
         debug!("Looking for WireGuard keys for location {self} instance");
         let Some(keys) = WireguardKeys::find_by_instance_id(pool, self.instance_id).await? else {
             error!("No keys found for instance: {}", self.instance_id);
@@ -368,18 +495,9 @@ impl Location<Id> {
         }
 
         debug!("Parsing location {self} allowed IPs: {}", self.allowed_ips);
-        let Some(instance) = Instance::find_by_id(pool, self.instance_id).await? else {
-            error!("Instance {} not found", self.instance_id);
-            return Err(Error::InternalError(format!(
-                "Instance {} not found",
-                self.instance_id
-            )));
-        };
-        let route_all_traffic = match instance.client_traffic_policy {
-            ClientTrafficPolicy::ForceAllTraffic => true,
-            ClientTrafficPolicy::DisableAllTraffic => false,
-            ClientTrafficPolicy::None => route_all_traffic.unwrap_or(self.route_all_traffic),
-        };
+        let route_all_traffic = self
+            .effective_route_all_traffic(pool, route_all_traffic)
+            .await?;
         let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
@@ -426,7 +544,7 @@ impl Location<Id> {
             addresses,
             port: 0,
             peers: vec![peer],
-            mtu,
+            mtu: self.effective_mtu(mtu),
             fwmark: None, // TODO: add
         };
 
@@ -445,6 +563,19 @@ impl Location<Id> {
             .ok_or(Error::NotFound)?;
         let inferred = infer_mfa_method(location.location_mfa_mode, Some(method));
         location.mfa_method = inferred;
+        location.save(pool).await?;
+        Ok(())
+    }
+
+    pub async fn set_mfa_step_plan(
+        pool: &DbPool,
+        location_id: Id,
+        plan: Vec<LocationMfaMethod>,
+    ) -> Result<(), Error> {
+        let mut location = Self::find_by_id(pool, location_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+        location.mfa_step_plan = Json(plan);
         location.save(pool).await?;
         Ok(())
     }
@@ -505,8 +636,9 @@ impl Location<NoId> {
         let id = query_scalar!(
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
             dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, \
-            service_location_mode, mfa_method, posture_check_required) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) \
+            service_location_mode, mfa_method, posture_check_required, mfa_steps, \
+            mfa_step_plan, client_mtu) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) \
             RETURNING id \"id!\"",
             self.instance_id,
             self.name,
@@ -522,6 +654,9 @@ impl Location<NoId> {
             self.service_location_mode,
             self.mfa_method,
             self.posture_check_required,
+            self.mfa_steps,
+            self.mfa_step_plan,
+            self.client_mtu,
         )
         .fetch_one(executor)
         .await?;
@@ -542,11 +677,20 @@ impl Location<NoId> {
             service_location_mode: self.service_location_mode,
             mfa_method: self.mfa_method,
             posture_check_required: self.posture_check_required,
+            mfa_steps: self.mfa_steps,
+            mfa_step_plan: self.mfa_step_plan,
+            client_mtu: self.client_mtu,
         })
     }
 }
 
 impl<I> Location<I> {
+    /// Resolve the MTU to set on this location's interface.
+    #[must_use]
+    pub fn effective_mtu(&self, mtu: Option<u32>) -> Option<u32> {
+        mtu.or(self.client_mtu)
+    }
+
     pub fn is_service_location(&self) -> bool {
         self.service_location_mode != ServiceLocationMode::Disabled
             && self.location_mfa_mode == LocationMfaMode::Disabled
@@ -571,6 +715,9 @@ impl From<Location<Id>> for Location {
             service_location_mode: location.service_location_mode,
             mfa_method: location.mfa_method,
             posture_check_required: location.posture_check_required,
+            mfa_steps: location.mfa_steps,
+            mfa_step_plan: location.mfa_step_plan,
+            client_mtu: location.client_mtu,
         }
     }
 }
@@ -595,6 +742,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            mfa_configured_methods: None,
         }
     }
 
@@ -615,6 +763,9 @@ mod tests {
             service_location_mode: ServiceLocationMode::Disabled,
             mfa_method: None,
             posture_check_required: false,
+            mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
+            client_mtu: None,
         }
     }
 
@@ -635,6 +786,61 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[test]
+    fn test_mfa_method_serde_matches_frontend_contract() {
+        // The frontend compares these strings, and `as_str` says "mobile" for the same variant.
+        assert_eq!(
+            serde_json::to_string(&LocationMfaMethod::MobileApprove).unwrap(),
+            "\"mobileapprove\""
+        );
+        assert_eq!(
+            serde_json::to_string(&LocationMfaMethod::Fido2).unwrap(),
+            "\"fido2\""
+        );
+    }
+
+    #[test]
+    fn test_effective_mtu_precedence() {
+        let mut location = new_location(1);
+
+        // Nothing configured anywhere: let the system pick.
+        assert_eq!(location.effective_mtu(None), None);
+
+        // Core-provided MTU is used when settings leave it unset.
+        location.client_mtu = Some(1380);
+        assert_eq!(location.effective_mtu(None), Some(1380));
+
+        // An MTU pinned in the settings overrides the core-provided one.
+        assert_eq!(location.effective_mtu(Some(1420)), Some(1420));
+
+        // ...and is used even when the core sent nothing.
+        location.client_mtu = None;
+        assert_eq!(location.effective_mtu(Some(1420)), Some(1420));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_client_mtu_round_trip(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.client_mtu = Some(1380);
+        let mut location = location.save(&pool).await.unwrap();
+
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert_eq!(found.client_mtu, Some(1380));
+
+        // The core dropping the value clears it on the next save.
+        location.client_mtu = None;
+        location.save(&pool).await.unwrap();
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert_eq!(found.client_mtu, None);
     }
 
     #[test]
@@ -676,6 +882,65 @@ mod tests {
             LocationMfaMode::from(ProtoLocationMfaMode::External),
             LocationMfaMode::External
         );
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_effective_route_all_traffic(pool: SqlitePool) {
+        use ClientTrafficPolicy::{DisableAllTraffic, ForceAllTraffic, None as NoPolicy};
+
+        // (policy, stored flag, per-call override, expected)
+        let cases = [
+            (NoPolicy, false, None, false),
+            (NoPolicy, false, Some(true), true),
+            (NoPolicy, true, None, true),
+            (NoPolicy, true, Some(false), false),
+            (ForceAllTraffic, false, None, true),
+            (ForceAllTraffic, false, Some(false), true),
+            (DisableAllTraffic, true, None, false),
+            (DisableAllTraffic, true, Some(true), false),
+        ];
+
+        let mut instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id).save(&pool).await.unwrap();
+
+        for (policy, route_all_traffic, override_value, expected) in cases {
+            instance.client_traffic_policy = policy.clone();
+            instance.save(&pool).await.unwrap();
+            location.route_all_traffic = route_all_traffic;
+
+            let effective = location
+                .effective_route_all_traffic(&pool, override_value)
+                .await
+                .unwrap();
+            assert_eq!(
+                effective, expected,
+                "policy {policy:?}, flag {route_all_traffic}, override {override_value:?}"
+            );
+        }
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_holds_default_route_detects_default_route_in_allowed_ips(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.allowed_ips = "10.0.0.0/8, 0.0.0.0/0".into();
+        let location = location.save(&pool).await.unwrap();
+
+        assert!(!location
+            .effective_route_all_traffic(&pool, None)
+            .await
+            .unwrap());
+        assert!(location.holds_default_route(&pool, None).await.unwrap());
+
+        let mut location = new_location(instance.id);
+        location.allowed_ips = "10.0.0.0/8, 192.168.1.0/24".into();
+        let location = location.save(&pool).await.unwrap();
+
+        assert!(!location.holds_default_route(&pool, None).await.unwrap());
+        assert!(location
+            .holds_default_route(&pool, Some(true))
+            .await
+            .unwrap());
     }
 
     #[test]

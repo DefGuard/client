@@ -1,0 +1,10 @@
+#configure-fido2-step {
+  .input {
+    padding-top: var(--spacing-lg);
+  }
+
+  .fido2-touch-prompt {
+    width: 100%;
+    padding-top: var(--spacing-xl);
+  }
+}

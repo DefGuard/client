@@ -13,6 +13,7 @@ const SERVICE_LOG_PREFIX: &str = "defguard-service.";
 const SERVICE_LOG_SUFFIX: &str = ".log";
 
 pub mod global_log_watcher;
+mod log_file_reader;
 pub mod service_log_watcher;
 
 #[derive(Error, Debug)]

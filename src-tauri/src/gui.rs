@@ -8,6 +8,17 @@ use std::{
     thread::spawn,
 };
 
+#[cfg(target_os = "macos")]
+use defguard_client_core::connection::sync_locations_and_tunnels;
+use defguard_client_core::{
+    connection::active_connections::close_all_connections,
+    version::{check_app_version, should_show_welcome, VersionCheckResult},
+};
+use log::{Level, LevelFilter};
+use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_log::{Target, TargetKind};
+
 #[cfg(unix)]
 use crate::set_perms;
 #[cfg(windows)]
@@ -38,18 +49,6 @@ use crate::{
 };
 #[cfg(all(target_os = "macos", feature = "macos_installer"))]
 use crate::{connection::apple::PLUGIN_BUNDLE_ID, system_extension::activate_system_extension};
-#[cfg(target_os = "macos")]
-use defguard_client_core::connection::sync_locations_and_tunnels;
-use defguard_client_core::{
-    connection::active_connections::close_all_connections,
-    version::{check_app_version, VersionCheckResult},
-};
-use log::{Level, LevelFilter};
-use tauri::{async_runtime, AppHandle, Builder, Manager, RunEvent, WindowEvent};
-use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_log::{Target, TargetKind};
-
-const ENABLE_WELCOME_SCREEN: bool = false;
 
 // For tauri logging plugin:
 // if found in metadata target name it will ignore the log if it was below info level.
@@ -194,11 +193,12 @@ pub fn run_app() {
             get_provisioning_config,
             get_platform_header,
             get_posture_data,
-            set_location_mfa_method,
+            set_location_mfa_step_plan,
             open_tray_window,
             open_full_view_window,
             swap_to_tray,
             swap_to_full_view,
+            initiate_configure_factor_screen,
             close_tray_window,
             close_welcome_window,
             all_active_connections,
@@ -210,11 +210,19 @@ pub fn run_app() {
             enrollment_register_mfa_finish,
             enrollment_network_info,
             enrollment_finish,
-            mfa_start,
+            mfa_begin_step,
             mfa_finish_code,
             mfa_poll_openid,
             mfa_connect_mobile_approve,
+            mfa_fido2_pin,
             cancel_mfa,
+            mfa_config_start,
+            mfa_config_send_code,
+            mfa_config_authorize,
+            mfa_config_setup_start,
+            mfa_config_setup_finish,
+            mfa_config_setup_fido2,
+            mfa_config_cancel,
             session_state::get_session_state,
             session_state::patch_session_state,
         ])
@@ -320,24 +328,19 @@ pub fn run_app() {
                 .expect("Failed to access app data");
             let config = AppConfig::new(&config_dir);
             let current_version = app_handle.package_info().version.clone();
-            let mut open_welcome_view = match check_app_version(&config_dir, &current_version) {
+            let version_check = check_app_version(&config_dir, &current_version);
+            match &version_check {
                 VersionCheckResult::Init => {
                     debug!("No previous version recorded; initializing at {current_version}.");
-                    true
                 }
                 VersionCheckResult::Unchanged => {
                     debug!("Application version unchanged ({current_version}).");
-                     false
                 }
                 VersionCheckResult::Upgraded { previous, current } => {
                     info!("Application upgraded from {previous} to {current}.");
-                     true
                 }
-            };
-            if !ENABLE_WELCOME_SCREEN {
-                open_welcome_view = false;
             }
-
+            let open_welcome_view = should_show_welcome(&config_dir);
             // Setup logging.
 
             // If deriving from env value fails, use config default (env overrides config file).
@@ -422,8 +425,10 @@ pub fn run_app() {
             if let Err(e) = WindowManager::build_full_view_window(app_handle) {
                 warn!("Failed to pre-build full window: {e}");
             }
-            if let Err(e) = WindowManager::build_welcome_window(app_handle) {
-                warn!("Failed to pre-build welcome window: {e}");
+            if open_welcome_view {
+                if let Err(e) = WindowManager::build_welcome_window(app_handle) {
+                    warn!("Failed to pre-build welcome window: {e}");
+                }
             }
 
             // Decide which window to show based on available locations.
@@ -493,11 +498,13 @@ pub fn run_app() {
             debug!("Setting up Ctrl-C handler.");
             let app_handle_clone = app_handle.clone();
             async_runtime::spawn(async move {
-                tokio::signal::ctrl_c()
-                    .await
-                    .expect("Signal handler failure");
-                debug!("Ctrl-C handler: quitting the app");
-                app_handle_clone.exit(0);
+                loop {
+                    tokio::signal::ctrl_c()
+                        .await
+                        .expect("Signal handler failure");
+                    debug!("Ctrl-C handler: quitting the app");
+                    app_handle_clone.exit(0);
+                }
             });
             debug!("Ctrl-C handler has been set up successfully");
         }

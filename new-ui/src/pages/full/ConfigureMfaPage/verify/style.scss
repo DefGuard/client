@@ -1,0 +1,26 @@
+.configure-mfa-verify-page {
+  padding: var(--spacing-md) var(--spacing-lg);
+
+  > .description {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-xl);
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-70);
+    padding-bottom: var(--spacing-2xl);
+
+    span {
+      color: inherit;
+      font: inherit;
+    }
+  }
+
+  .code-track {
+    padding-bottom: var(--spacing-3xl);
+
+    .code-input > .inputs-grid {
+      width: fit-content;
+      justify-content: flex-start;
+    }
+  }
+}

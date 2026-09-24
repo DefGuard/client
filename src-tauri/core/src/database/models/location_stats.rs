@@ -258,6 +258,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            mfa_configured_methods: None,
         }
         .save(pool)
         .await
@@ -279,6 +280,9 @@ mod tests {
             service_location_mode: ServiceLocationMode::Disabled,
             mfa_method: None,
             posture_check_required: false,
+            mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
+            client_mtu: None,
         }
         .save(pool)
         .await

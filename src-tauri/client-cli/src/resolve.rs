@@ -170,6 +170,7 @@ mod tests {
         tunnel::Tunnel,
         Id, NoId,
     };
+    use sqlx::types::Json;
 
     use super::*;
 
@@ -186,6 +187,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            mfa_configured_methods: None,
         }
     }
 
@@ -206,6 +208,9 @@ mod tests {
             service_location_mode: ServiceLocationMode::Disabled,
             mfa_method: None,
             posture_check_required: false,
+            mfa_steps: Json::default(),
+            mfa_step_plan: Json::default(),
+            client_mtu: None,
         }
     }
 

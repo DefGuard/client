@@ -2,7 +2,7 @@
   --bg: var(--bg-white-100);
   --shadow: 0 4px 5px 0 rgb(53 84 179 / 7%);
   --color: var(--fg-action);
-  --border: var(--bg);
+  --border: transparent;
 
   background: var(--bg);
   border: 1px solid var(--border);
@@ -42,7 +42,13 @@
 
     --bg: var(--bg-white-20);
     --color: var(--fg-white-40);
-    --border: var(--bg);
+    --border: transparent;
+  }
+
+  .icon {
+    --icon-color: var(--color);
+
+    margin-right: var(--spacing-sm);
   }
 
   p {

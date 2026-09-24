@@ -1,0 +1,19 @@
+.playground-card:has(> .playground-test-mfa-verificator-factor-selector) {
+  background-color: var(--bg-dark-blue-40);
+}
+
+.playground-test-mfa-verificator-factor-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+
+  .track {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 480px;
+  }
+}

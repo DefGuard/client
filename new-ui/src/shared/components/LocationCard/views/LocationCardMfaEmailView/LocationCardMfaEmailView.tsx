@@ -1,3 +1,4 @@
+import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
@@ -20,11 +21,25 @@ import { LocationCardMfaStartLoader } from '../LocationCardMfaStartLoader/Locati
 const MIN_POSTURE_LOADER_MS = 500;
 
 export const LocationCardMfaEmailView = () => {
-  const { setView, location, setPostureError } = useLocationCardContext();
+  const {
+    setView,
+    location,
+    setPostureError,
+    stepLabel,
+    canPickOtherMethod,
+    stepPlan,
+    mfaToken,
+    setMfaToken,
+    goToStep,
+  } = useLocationCardContext();
   const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
     location,
     MfaMethod.Email,
     {
+      stepPlan,
+      mfaToken,
+      setMfaToken,
+      onStepAdvanced: goToStep,
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),
       onSessionExpired: () => setView(LocationCardViews.Default),
@@ -56,10 +71,11 @@ export const LocationCardMfaEmailView = () => {
     [emailCode, verifyCode],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of code input
-  useEffect(() => {
-    setError(null);
-  }, [emailCode, setError]);
+  // Only real input clears the error, CodeInput's own reset passes ''.
+  const handleCodeChange = useCallback((value: string) => {
+    setEmailCode(value);
+    if (value.length > 0) setError(null);
+  }, []);
 
   // Reflect server-side verify errors into the local error state
   useEffect(() => {
@@ -75,18 +91,18 @@ export const LocationCardMfaEmailView = () => {
     <div
       className="location-card-mfa-email-view"
       onKeyDown={(e) => {
-        if (e.key === 'Enter') handleVerify();
+        if (e.key === Enter) handleVerify();
       }}
     >
       <Divider spacing={ThemeSpacing.Md} />
-      <LocationViewHeader title="Email verification">
+      <LocationViewHeader title={stepLabel ?? 'Email verification'}>
         <p>Enter the 6-digit code sent to your email address.</p>
       </LocationViewHeader>
       <SizedBox height={ThemeSpacing.Xl} />
       <CodeInput
         length={6}
         value={emailCode}
-        onChange={setEmailCode}
+        onChange={handleCodeChange}
         error={startError ?? error}
         onSuccessPaste={(value) => {
           handleVerify(value);
@@ -102,13 +118,15 @@ export const LocationCardMfaEmailView = () => {
           }}
         />
         <div className="right">
-          <Button
-            variant={ButtonVariant.Outlined}
-            text="Other methods"
-            onClick={() => {
-              setView(LocationCardViews.MfaSettings);
-            }}
-          />
+          {canPickOtherMethod && (
+            <Button
+              variant={ButtonVariant.Outlined}
+              text="Other methods"
+              onClick={() => {
+                setView(LocationCardViews.MfaSettings);
+              }}
+            />
+          )}
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}

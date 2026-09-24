@@ -2,6 +2,7 @@ pub mod conversions;
 pub mod posture_ext;
 
 pub mod defguard {
+    #[allow(clippy::enum_variant_names)]
     pub mod client_types {
         tonic::include_proto!("defguard.client_types");
     }

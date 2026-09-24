@@ -101,7 +101,7 @@ export const AddInstancePage = () => {
   });
 
   return (
-    <FullPage id="add-instance-view">
+    <FullPage id="add-instance-view" hideScrollContainer withControls>
       <FullPageTitle title="Add instance" />
       <p className="page-description">{`To add an instance, provide the instance URL along with a valid provisioning token. These credentials are issued by your administrator and are required to initiate the setup.`}</p>
       <form
