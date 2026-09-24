@@ -189,7 +189,7 @@ pub(crate) fn step_method_label(method: LocationMfaMethod) -> &'static str {
         LocationMfaMethod::Totp => "Authenticator app",
         LocationMfaMethod::Email => "Email",
         LocationMfaMethod::Oidc => "OpenID",
-        LocationMfaMethod::MobileApprove => "Mobile Client",
+        LocationMfaMethod::MobileApprove => "Mobile App Approval",
         _ => method.as_str(),
     }
 }

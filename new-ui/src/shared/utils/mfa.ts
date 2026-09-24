@@ -11,10 +11,10 @@ import { isPresent } from './isPresent';
 
 const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Email]: 'Email',
-  [MfaMethod.MobileApprove]: 'Mobile Client',
+  [MfaMethod.MobileApprove]: 'Mobile App Approval',
   [MfaMethod.Oidc]: 'OpenID',
   [MfaMethod.Totp]: 'Authenticator app',
-  [MfaMethod.Biometric]: 'Biometrics',
+  [MfaMethod.Biometric]: 'Mobile Biometric Authentication',
   [MfaMethod.Fido2]: 'Security key',
 };
 
