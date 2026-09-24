@@ -1,7 +1,7 @@
 import './style.scss';
 import { useState } from 'react';
-import { ConfigureMfaVerificatorFactorSelector } from '../../../full/ConfigureMfaPage/components/ConfigureMfaVerificatorFactorSelector/ConfigureMfaVerificatorFactorSelector';
 import { MfaMethod, type MfaMethodValue } from '../../../../shared/rust-api/types';
+import { ConfigureMfaVerificatorFactorSelector } from '../../../full/ConfigureMfaPage/components/ConfigureMfaVerificatorFactorSelector/ConfigureMfaVerificatorFactorSelector';
 import { PlaygroundCard } from '../PlaygroundCard/PlaygroundCard';
 
 const factors: MfaMethodValue[] = [MfaMethod.Totp, MfaMethod.Email];
