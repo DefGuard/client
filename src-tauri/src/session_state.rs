@@ -65,7 +65,7 @@ impl From<PersistedSessionState> for SessionState {
     }
 }
 
-/// Subset of [`SessionState`] persisted to window-session.json; restoring is best-effort.
+/// Subset of [`SessionState`] persisted to window-session.json in app data directory.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct PersistedSessionState {
     #[serde(default)]
@@ -87,7 +87,6 @@ fn field_or_default<T: Default + DeserializeOwned>(
 }
 
 impl PersistedSessionState {
-    /// Never fails; errors are logged and defaults returned.
     #[must_use]
     pub fn load(dir: &Path) -> Self {
         let path = dir.join(WINDOW_SESSION_FILE_NAME);
@@ -120,7 +119,6 @@ impl PersistedSessionState {
         }
     }
 
-    /// Failures are only logged.
     pub fn save(&self, dir: &Path) {
         let contents = match serde_json::to_vec(self) {
             Ok(contents) => contents,
@@ -147,8 +145,6 @@ impl PersistedSessionState {
         }
     }
 
-    /// Replaces a selection missing from the DB with the latest instance, or none.
-    /// Returns whether anything changed.
     pub async fn resolve(&mut self, pool: &SqlitePool) -> bool {
         let Some(selection) = &self.view_selection else {
             return false;
