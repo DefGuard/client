@@ -61,6 +61,12 @@ impl AppState {
         }
     }
 
+    #[must_use]
+    pub fn with_session_state(mut self, session_state: SessionState) -> Self {
+        self.session_state = Mutex::new(session_state);
+        self
+    }
+
     pub(crate) fn set_multi_step_mfa_capable(&self, instance_id: Id, capable: bool) {
         self.multi_step_mfa_capabilities
             .lock()
