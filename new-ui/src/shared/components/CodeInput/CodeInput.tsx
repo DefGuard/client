@@ -61,6 +61,7 @@ export const CodeInput = ({
       setDigits(Array.from({ length }, () => ''));
       requestAnimationFrame(() => inputRefs.current[0]?.focus());
     } else {
+      if (!value) hasSubmittedRef.current = false;
       setDigits((current) => {
         if (current.join('') === (value ?? '')) return current;
         return toDigits(value, length);

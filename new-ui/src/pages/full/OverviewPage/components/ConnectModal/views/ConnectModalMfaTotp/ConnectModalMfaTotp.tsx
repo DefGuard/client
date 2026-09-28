@@ -1,4 +1,3 @@
-import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
@@ -76,12 +75,7 @@ export const ConnectModalMfaTotp = () => {
   }
 
   return (
-    <div
-      id="mfa-totp-view"
-      onKeyDown={(e) => {
-        if (e.key === Enter) handleVerify();
-      }}
-    >
+    <div id="mfa-totp-view">
       <p className="view-description">
         Paste the code from your Authenticator Application.
       </p>
@@ -91,7 +85,7 @@ export const ConnectModalMfaTotp = () => {
         onChange={handleCodeChange}
         error={startError ?? error}
         onSubmit={handleVerify}
-        loading={isVerifying}
+        loading={isStarting || isVerifying}
       />
       <Controls>
         {canPickOtherMethod && (
@@ -108,7 +102,7 @@ export const ConnectModalMfaTotp = () => {
             text="Verify"
             variant={ButtonVariant.Primary}
             onClick={() => handleVerify()}
-            loading={isVerifying}
+            loading={isStarting || isVerifying}
           />
         </div>
       </Controls>

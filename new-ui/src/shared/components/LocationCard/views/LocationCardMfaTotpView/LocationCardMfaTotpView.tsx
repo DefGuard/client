@@ -1,4 +1,3 @@
-import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
@@ -89,12 +88,7 @@ export const LocationCardMfaTotpView = () => {
   }
 
   return (
-    <div
-      className="location-card-mfa-totp-view"
-      onKeyDown={(e) => {
-        if (e.key === Enter) handleVerify();
-      }}
-    >
+    <div className="location-card-mfa-totp-view">
       <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
         <p>Paste the code from your Authenticator Application.</p>
@@ -106,7 +100,7 @@ export const LocationCardMfaTotpView = () => {
         onChange={handleCodeChange}
         error={startError ?? error}
         onSubmit={handleVerify}
-        loading={isVerifying}
+        loading={isStarting || isVerifying}
       />
       <Controls>
         <IconButton
@@ -131,7 +125,7 @@ export const LocationCardMfaTotpView = () => {
             text="Verify"
             variant={ButtonVariant.Primary}
             onClick={() => handleVerify(totpCode)}
-            loading={isVerifying}
+            loading={isStarting || isVerifying}
           />
         </div>
       </Controls>
