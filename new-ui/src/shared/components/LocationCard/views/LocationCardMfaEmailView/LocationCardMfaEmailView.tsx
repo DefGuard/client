@@ -104,9 +104,8 @@ export const LocationCardMfaEmailView = () => {
         value={emailCode}
         onChange={handleCodeChange}
         error={startError ?? error}
-        onSuccessPaste={(value) => {
-          handleVerify(value);
-        }}
+        onSubmit={handleVerify}
+        loading={isStarting || isVerifying}
       />
       <Controls>
         <IconButton

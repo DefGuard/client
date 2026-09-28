@@ -145,12 +145,8 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
           value={code}
           onChange={handleCodeChange}
           error={error}
-          onSubmit={() => {
-            handleSubmit();
-          }}
-          onSuccessPaste={(value) => {
-            handleSubmit(value);
-          }}
+          onSubmit={handleSubmit}
+          loading={isBusy}
         />
       </div>
       <Controls>
