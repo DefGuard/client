@@ -45,7 +45,7 @@ export const CodeInput = ({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const prevLengthRef = useRef(length);
   const hadErrorRef = useRef(false);
-  // Typing auto-submits only before the first submit, so corrections after a failed attempt need an explicit submit.
+  // Typing auto-submits once per entry, the error reset below starts a new one.
   const hasSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -76,6 +76,7 @@ export const CodeInput = ({
     hadErrorRef.current = hasError;
 
     if (shouldClear) {
+      hasSubmittedRef.current = false;
       setDigits(Array.from({ length }, () => ''));
       onChange('');
       requestAnimationFrame(() => inputRefs.current[0]?.focus());
