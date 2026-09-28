@@ -3,11 +3,13 @@ import { useCallback } from 'react';
 import {
   isMfaConfigCancelled,
   isMfaConfigInvalidCode,
+  isMfaConfigNetworkError,
   isMfaConfigProxyError,
   isMfaConfigSecurityKeyError,
   isMfaConfigSessionExpired,
   mfaErrorMessage,
 } from '../../../../shared/rust-api/mfaError';
+import { showEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
 
 type Options = {
   context: string;
@@ -47,6 +49,10 @@ export const useMfaConfigErrorHandler = ({
       // The backend writes these for the user (no key, wrong PIN, no touch), so show as is.
       if (isMfaConfigSecurityKeyError(err)) {
         setError(mfaErrorMessage(err));
+        return;
+      }
+      if (isMfaConfigNetworkError(err)) {
+        showEdgeComsError();
         return;
       }
       if (isMfaConfigProxyError(err)) {

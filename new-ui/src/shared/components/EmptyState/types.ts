@@ -5,7 +5,7 @@ export type EmptyStateProps = {
   ref?: Ref<HTMLDivElement>;
   title?: string;
   subtitle?: string;
-  icon?: string;
+  icon?: EmptyIconValue;
   className?: string;
   testId?: string;
   id?: string;
@@ -13,3 +13,10 @@ export type EmptyStateProps = {
   secondaryAction?: () => void;
   secondaryActionText?: string;
 };
+
+export const EmptyIcon = {
+  SessionTimeout: 'session-timeout',
+  ServiceUnavailable: 'service-unavailable',
+} as const;
+
+export type EmptyIconValue = (typeof EmptyIcon)[keyof typeof EmptyIcon];
