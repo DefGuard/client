@@ -1,5 +1,6 @@
 import './style.scss';
 import { ArrowLeft, ArrowRight, Backspace, Delete, Enter } from '@fluentui/keyboard-keys';
+import clsx from 'clsx';
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -168,6 +169,7 @@ export const CodeInput = ({
               ref={(el) => {
                 inputRefs.current[i] = el;
               }}
+              className={clsx({ empty: digit === '' })}
               type="text"
               inputMode="numeric"
               value={digit}
