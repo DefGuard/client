@@ -24,9 +24,9 @@ export const EmptyState = ({
     if (!isPresent(icon)) return null;
     switch (icon) {
       case 'session-timeout':
-        return EmptyStateSessionTimeout;
+        return <EmptyStateSessionTimeout />;
       case 'service-unavailable':
-        return EmptyStateServiceUnavailable;
+        return <EmptyStateServiceUnavailable />;
     }
   };
 

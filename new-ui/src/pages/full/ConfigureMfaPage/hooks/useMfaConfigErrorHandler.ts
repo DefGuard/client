@@ -31,7 +31,7 @@ export const useMfaConfigErrorHandler = ({
   hasCodeInput = true,
 }: Options) =>
   useCallback(
-    (err: unknown) => {
+    (err: unknown, retry?: () => void) => {
       // A cancel is the user's own doing, so it is neither logged nor shown.
       if (isMfaConfigCancelled(err)) {
         return;
@@ -52,7 +52,7 @@ export const useMfaConfigErrorHandler = ({
         return;
       }
       if (isMfaConfigNetworkError(err)) {
-        showEdgeComsError();
+        showEdgeComsError(retry);
         return;
       }
       if (isMfaConfigProxyError(err)) {

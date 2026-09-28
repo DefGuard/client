@@ -1,9 +1,14 @@
 import './style.scss';
-import type { PropsWithChildren } from 'react';
+import { useRouterState } from '@tanstack/react-router';
+import { type PropsWithChildren, useEffect } from 'react';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { EmptyState } from '../../../../../shared/components/EmptyState/EmptyState';
 import { EmptyIcon } from '../../../../../shared/components/EmptyState/types';
-import { dismissEdgeComsError, useEdgeComsErrorStore } from './useEdgeComsErrorStore';
+import {
+  dismissEdgeComsError,
+  retryEdgeComsError,
+  useEdgeComsErrorStore,
+} from './useEdgeComsErrorStore';
 
 const DESCRIPTION = `An unexpected error occurred while processing your request. Please try again later.`;
 
@@ -17,7 +22,7 @@ export const EdgeComsError = () => {
         primaryAction={{
           text: 'Refresh',
           variant: ButtonVariant.Primary,
-          onClick: dismissEdgeComsError,
+          onClick: retryEdgeComsError,
         }}
       />
     </div>
@@ -27,6 +32,12 @@ export const EdgeComsError = () => {
 /** Hides the caller rather than unmounting it, so dismissing returns to it as it was. */
 export const EdgeComsErrorHost = ({ children }: PropsWithChildren) => {
   const visible = useEdgeComsErrorStore((s) => s.visible);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires on route change only
+  useEffect(() => {
+    dismissEdgeComsError();
+  }, [pathname]);
 
   return (
     <>

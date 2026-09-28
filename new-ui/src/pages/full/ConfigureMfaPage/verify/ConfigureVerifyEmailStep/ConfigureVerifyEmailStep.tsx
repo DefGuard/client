@@ -50,7 +50,10 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
     },
     onError: (err) => {
       requestedFor.current = null;
-      handleApiError(err);
+      handleApiError(err, () => {
+        requestedFor.current = sessionId;
+        requestCode();
+      });
     },
   });
 
@@ -69,7 +72,7 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
       const result = await api.mfaConfigAuthorize(sessionId, MfaMethod.Email, value);
       useConfigureMfaStore.getState().authorize(result);
     },
-    onError: handleApiError,
+    onError: (err) => handleApiError(err),
   });
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
