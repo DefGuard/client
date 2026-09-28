@@ -39,9 +39,13 @@ export const MfaConfigurationStep = () => {
   const handleError = useEnrollmentErrorHandler();
 
   const { mutate, isPending } = useMutation({
-    mutationFn: async () => {
-      // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
-      const resp = await api.enrollmentRegisterMfaFinish(sessionId!, code!, method);
+    mutationFn: async (submittedCode: string) => {
+      const resp = await api.enrollmentRegisterMfaFinish(
+        // biome-ignore lint/style/noNonNullAssertion: checked in handleSubmit
+        sessionId!,
+        submittedCode,
+        method,
+      );
       await activateUser();
       return resp;
     },
@@ -62,13 +66,17 @@ export const MfaConfigurationStep = () => {
     },
   });
 
-  const handleSubmit = useCallback(() => {
-    if (code?.trim().length !== 6) {
-      setError('Enter a valid code');
-      return;
-    }
-    mutate();
-  }, [code, mutate]);
+  const handleSubmit = useCallback(
+    (value?: string) => {
+      const submitted = value ?? code;
+      if (submitted?.trim().length !== 6) {
+        setError('Enter a valid code');
+        return;
+      }
+      mutate(submitted);
+    },
+    [code, mutate],
+  );
 
   // Only real input clears the error, CodeInput's own reset passes ''.
   const handleCodeChange = useCallback((value: string) => {
@@ -96,16 +104,15 @@ export const MfaConfigurationStep = () => {
         length={6}
         value={code}
         onChange={handleCodeChange}
-        onSuccessPaste={() => {
-          handleSubmit();
-        }}
+        onSubmit={handleSubmit}
+        loading={isPending}
         error={error}
       />
       <EnrollmentControls
         onBack={() => {
           useEnrollmentStore.getState().back();
         }}
-        onNext={handleSubmit}
+        onNext={() => handleSubmit()}
         loading={isPending}
       />
     </div>
