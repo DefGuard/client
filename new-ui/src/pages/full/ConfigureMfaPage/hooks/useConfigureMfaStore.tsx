@@ -13,6 +13,7 @@ import {
   type MfaMethodValue,
 } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
+import { dismissEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
 import {
   ConfigureMfaStep,
   type ConfigureMfaStepValue,
@@ -253,6 +254,7 @@ export const startMfaConfiguration = async (
   { preselectedMethods = [], source = null, location = null }: StartOptions = {},
 ): Promise<void> => {
   const response = await api.mfaConfigStart(instance.id);
+  dismissEdgeComsError();
   useConfigureMfaStore.getState().start(instance, response, { source, location });
   // Only pre-ticks, the user still confirms in the selection step.
   const initialSelection = preselectedMethods.filter((method) =>

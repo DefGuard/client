@@ -1,15 +1,12 @@
-import { useMemo } from 'react';
 import './style.scss';
 import clsx from 'clsx';
 import { ThemeSpacing } from '../../types';
 import { isPresent } from '../../utils/isPresent';
 import { Button } from '../Button/Button';
 import { SizedBox } from '../SizedBox/SizedBox';
+import { EmptyStateServiceUnavailable } from './components/EmptyStateIcon/icons/EmptyStateServiceUnavailable';
+import { EmptyStateSessionTimeout } from './components/EmptyStateIcon/icons/EmptyStateSessionTimeout';
 import type { EmptyStateProps } from './types';
-
-const Empty = () => {
-  return null;
-};
 
 export const EmptyState = ({
   ref,
@@ -23,10 +20,15 @@ export const EmptyState = ({
   id,
   testId,
 }: EmptyStateProps) => {
-  const RenderIcon = useMemo(() => {
-    if (!icon) return Empty;
-    return Empty;
-  }, [icon]);
+  const renderIcon = () => {
+    if (!isPresent(icon)) return null;
+    switch (icon) {
+      case 'session-timeout':
+        return <EmptyStateSessionTimeout />;
+      case 'service-unavailable':
+        return <EmptyStateServiceUnavailable />;
+    }
+  };
 
   return (
     <div
@@ -37,28 +39,30 @@ export const EmptyState = ({
     >
       {isPresent(icon) && (
         <>
-          <RenderIcon />
+          {renderIcon()}
           <SizedBox height={ThemeSpacing.Sm} />
         </>
       )}
-      {isPresent(title) && (
+      {isPresent(title) && <p className="title">{title}</p>}
+      {isPresent(subtitle) && (
         <>
-          <p className="title">{title}</p>
           <SizedBox height={4} />
+          <p className="subtitle">{subtitle}</p>
         </>
       )}
-      {isPresent(subtitle) && <p className="subtitle">{subtitle}</p>}
-      <SizedBox height={ThemeSpacing.Lg} />
       {isPresent(primaryAction) && (
         <>
-          <Button {...primaryAction} />
           <SizedBox height={ThemeSpacing.Lg} />
+          <Button {...primaryAction} />
         </>
       )}
       {isPresent(secondaryAction) && isPresent(secondaryActionText) && (
-        <button className="secondary-action" onClick={secondaryAction}>
-          {secondaryActionText}
-        </button>
+        <>
+          <SizedBox height={ThemeSpacing.Lg} />
+          <button className="secondary-action" onClick={secondaryAction}>
+            {secondaryActionText}
+          </button>
+        </>
       )}
     </div>
   );

@@ -77,6 +77,10 @@ export const isMfaConfigSecurityKeyError = (err: unknown): boolean =>
 export const isMfaConfigCancelled = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'cancelled';
 
+/** The request never reached the proxy, unlike `proxy_error` where it answered. */
+export const isMfaConfigNetworkError = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'network_error';
+
 /** A status with no specific handling, 403 / 429 / 5xx all land here. */
 export const isMfaConfigProxyError = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'proxy_error';

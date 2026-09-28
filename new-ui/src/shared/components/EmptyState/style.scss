@@ -10,16 +10,19 @@
   & > p,
   & > span {
     text-align: center;
+    max-width: 424px;
   }
 
   .title {
-    color: var(--fg-muted);
+    color: var(--fg-white-100);
     font: var(--t-body-primary-500);
+    max-width: 424px;
   }
 
   .subtitle {
-    color: var(--fg-muted);
-    font: var(--t-body-sm-400);
+    color: var(--fg-white-60);
+    font: var(--t-body-xs-400);
+    max-width: 424px;
   }
 
   .secondary-action {

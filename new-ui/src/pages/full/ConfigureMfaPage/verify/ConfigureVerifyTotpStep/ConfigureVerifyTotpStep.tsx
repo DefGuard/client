@@ -46,7 +46,7 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
       const result = await api.mfaConfigAuthorize(sessionId, MfaMethod.Totp, value);
       useConfigureMfaStore.getState().authorize(result);
     },
-    onError: handleApiError,
+    onError: (err) => handleApiError(err),
   });
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({

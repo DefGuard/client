@@ -2,6 +2,7 @@ import './style.scss';
 import { FullPage } from '../../shared/layouts/FullPage/FullPage';
 import { PlaygroundSnackbarTest } from './components/PlaygroundSnackbarTest/PlaygroundSnackbarTest';
 import { PlaygroundTestConnectButton } from './components/PlaygroundTestConnectButton/PlaygroundTestConnectButton';
+import { PlaygroundTestInstanceSelector } from './components/PlaygroundTestInstanceSelector/PlaygroundTestInstanceSelector';
 import { PlaygroundTestMenu } from './components/PlaygroundTestMenu/PlaygroundTestMenu';
 import { PlaygroundTestMfaSelector } from './components/PlaygroundTestMfaSelector/PlaygroundTestMfaSelector';
 import { PlaygroundTestMfaSettingsSection } from './components/PlaygroundTestMfaSettingsSection/PlaygroundTestMfaSettingsSection';
@@ -18,6 +19,7 @@ export const PlaygroundIndex = () => {
         <PlaygroundTestConnectButton />
         <PlaygroundTestMfaSelector />
         <PlaygroundTestMfaVerificatorFactorSelector />
+        <PlaygroundTestInstanceSelector />
         <PlaygroundTestMfaSettingsSection />
         <PlaygroundTestSelect />
         <PlaygroundSnackbarTest />

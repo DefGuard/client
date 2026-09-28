@@ -1,13 +1,12 @@
+import '../ConfigureMfaPage/verify/style.scss';
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import clsx from 'clsx';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
-import { LoaderSpinner } from '../../../shared/components/LoaderSpinner/LoaderSpinner';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import {
   getInstancesQueryOptions,
@@ -15,22 +14,26 @@ import {
 } from '../../../shared/rust-api/query';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useStartMfaConfiguration } from '../AddPage/hooks/useStartMfaConfiguration';
+import { InstanceSelector } from '../ConfigureMfaPage/components/InstanceSelector/InstanceSelector';
 
 /** Shown when the client is enrolled into more than one instance, to pick which to configure. */
 export const SelectMfaInstancePage = () => {
   const navigate = useNavigate();
   const { data: instances } = useQuery(getInstancesQueryOptions);
+  const [selectedId, setSelectedId] = useState<number>();
 
   const mfaInstances = useMemo(
     () => mfaConfigurableInstances(instances ?? []),
     [instances],
   );
 
-  const {
-    mutate: startConfigureMfa,
-    isPending,
-    variables: opening,
-  } = useStartMfaConfiguration();
+  // Derived so a poll dropping the picked instance also clears the selection.
+  const selectedInstance = useMemo(
+    () => mfaInstances.find((instance) => instance.id === selectedId),
+    [mfaInstances, selectedId],
+  );
+
+  const { mutate: startConfigureMfa, isPending } = useStartMfaConfiguration();
 
   const leave = useCallback(() => {
     navigate({ to: '/full/add' });
@@ -50,33 +53,41 @@ export const SelectMfaInstancePage = () => {
       hideScrollContainer
       withControls
     >
-      <FullPageTitle title="Choose an instance" />
+      <FullPageTitle title="Select instance" />
       <p className="description">
-        <span>{`Pick the Defguard instance to add a multi-factor authentication method to.`}</span>
+        <span>{`To configure a new MFA method, first select the instance you want to configure it for.`}</span>
       </p>
+      <p className="label">Your instances</p>
       <div className="instances">
-        {mfaInstances.map((instance) => {
-          const pending = isPending && opening?.id === instance.id;
-          return (
-            <div className="instance-row" key={instance.id}>
-              <button
-                className={clsx('instance', { pending })}
-                // One session at a time, the rest wait until this one resolves.
-                disabled={isPending}
-                type="button"
-                onClick={() => {
-                  startConfigureMfa(instance);
-                }}
-              >
-                <span>{instance.name}</span>
-                {pending && <LoaderSpinner size={18} variant="primary" />}
-              </button>
-            </div>
-          );
-        })}
+        {mfaInstances.map((instance) => (
+          <InstanceSelector
+            key={instance.id}
+            instanceId={instance.id}
+            instanceName={instance.name}
+            selected={selectedInstance?.id === instance.id}
+            onClick={() => {
+              // Keep the pick fixed while its session is opening.
+              if (!isPending) {
+                setSelectedId(instance.id);
+              }
+            }}
+          />
+        ))}
       </div>
       <Controls>
         <Button text="Cancel" variant={ButtonVariant.Secondary} onClick={leave} />
+        <div className="right">
+          <Button
+            text="Continue"
+            variant={ButtonVariant.Primary}
+            disabled={!isPresent(selectedInstance)}
+            loading={isPending}
+            onClick={() => {
+              if (!isPresent(selectedInstance)) return;
+              startConfigureMfa(selectedInstance);
+            }}
+          />
+        </div>
       </Controls>
     </FullPage>
   );
