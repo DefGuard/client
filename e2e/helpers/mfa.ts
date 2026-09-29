@@ -2,6 +2,7 @@ import { $, browser } from "@wdio/globals";
 import { totpCode } from "./totp.js";
 
 const MAX_ATTEMPTS = 3;
+const ACCEPT_TIMEOUT_MS = 6_000;
 
 const fillCode = async (scope: string, code: string) => {
 	const input = $(`${scope} .code-input input`);
@@ -15,18 +16,19 @@ export const submitTotpCode = async (
 	submit: () => Promise<void>,
 	accepted: () => Promise<boolean>,
 ) => {
+	const waitAccepted = () =>
+		browser
+			.waitUntil(accepted, { timeout: ACCEPT_TIMEOUT_MS, interval: 250 })
+			.then(
+				() => true,
+				() => false,
+			);
+
 	for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
 		await fillCode(scope, totpCode(secret));
-		await submit();
-		try {
-			await browser.waitUntil(accepted, {
-				timeout: 6_000,
-				interval: 500,
-				timeoutMsg: "TOTP code was not accepted after several attempts",
-			});
-			return;
-		} catch (error) {
-			if (attempt === MAX_ATTEMPTS) throw error;
-		}
+		if (await waitAccepted()) return;
+		await submit().catch(() => undefined);
+		if (await waitAccepted()) return;
 	}
+	throw new Error("TOTP code was not accepted after several attempts");
 };
