@@ -727,8 +727,10 @@ mod tests {
     use sqlx::SqlitePool;
 
     use super::*;
-    use crate::database::models::instance::{ClientTrafficPolicy, Instance};
-    use crate::mfa_contract::MfaContract;
+    use crate::{
+        database::models::instance::{ClientTrafficPolicy, Instance},
+        mfa_contract::MfaContract,
+    };
 
     fn new_instance() -> Instance<NoId> {
         Instance {

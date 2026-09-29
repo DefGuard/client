@@ -164,13 +164,15 @@ async fn resolve_sole_location(pool: &DbPool) -> Result<ResolvedTarget, CliError
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::database::models::{
-        instance::{ClientTrafficPolicy, Instance},
-        location::{Location, LocationMfaMode, ServiceLocationMode},
-        tunnel::Tunnel,
-        Id, NoId,
+    use defguard_core::{
+        database::models::{
+            instance::{ClientTrafficPolicy, Instance},
+            location::{Location, LocationMfaMode, ServiceLocationMode},
+            tunnel::Tunnel,
+            Id, NoId,
+        },
+        mfa_contract::MfaContract,
     };
-    use defguard_core::mfa_contract::MfaContract;
     use sqlx::types::Json;
 
     use super::*;

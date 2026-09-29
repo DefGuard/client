@@ -196,13 +196,15 @@ fn format_list_table(
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::database::models::{
-        instance::{ClientTrafficPolicy, Instance},
-        location::{Location, LocationMfaMode, ServiceLocationMode},
-        tunnel::Tunnel,
-        Id,
+    use defguard_core::{
+        database::models::{
+            instance::{ClientTrafficPolicy, Instance},
+            location::{Location, LocationMfaMode, ServiceLocationMode},
+            tunnel::Tunnel,
+            Id,
+        },
+        mfa_contract::MfaContract,
     };
-    use defguard_core::mfa_contract::MfaContract;
     use sqlx::types::Json;
 
     use super::*;

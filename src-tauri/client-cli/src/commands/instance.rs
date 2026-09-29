@@ -125,8 +125,9 @@ impl CommandOutput for InstanceShowResult {
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::database::models::instance::ClientTrafficPolicy;
-    use defguard_core::mfa_contract::MfaContract;
+    use defguard_core::{
+        database::models::instance::ClientTrafficPolicy, mfa_contract::MfaContract,
+    };
 
     use super::*;
 

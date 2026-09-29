@@ -240,11 +240,13 @@ mod tests {
     use sqlx::SqlitePool;
 
     use super::*;
-    use crate::database::models::{
-        instance::{ClientTrafficPolicy, Instance},
-        location::{LocationMfaMode, ServiceLocationMode},
+    use crate::{
+        database::models::{
+            instance::{ClientTrafficPolicy, Instance},
+            location::{LocationMfaMode, ServiceLocationMode},
+        },
+        mfa_contract::MfaContract,
     };
-    use crate::mfa_contract::MfaContract;
 
     async fn seed_location(pool: &SqlitePool) -> Id {
         let instance = Instance {

@@ -40,6 +40,17 @@ pub fn mfa_configured_methods(
     })
 }
 
+#[must_use]
+pub fn mfa_contract_from_instance_info(
+    instance_info: &proto::client_types::InstanceInfo,
+) -> MfaContract {
+    if instance_info.mfa_user_state.is_some() {
+        MfaContract::MultiStep
+    } else {
+        MfaContract::Legacy
+    }
+}
+
 impl fmt::Display for Instance<Id> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}(ID: {})", self.name, self.id)
@@ -50,6 +61,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
     fn from(instance_info: proto::client_types::InstanceInfo) -> Self {
         let client_traffic_policy = ClientTrafficPolicy::from(&instance_info);
         let mfa_configured_methods = mfa_configured_methods(&instance_info).map(Json);
+        let mfa_contract = mfa_contract_from_instance_info(&instance_info);
         Self {
             id: NoId,
             name: instance_info.name,
@@ -63,7 +75,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             disable_tunnels: instance_info.disable_tunnels.unwrap_or(false),
             openid_display_name: instance_info.openid_display_name,
             mfa_configured_methods,
-            mfa_contract: MfaContract::Legacy,
+            mfa_contract,
         }
     }
 }
@@ -95,6 +107,24 @@ impl Instance<Id> {
         .execute(executor)
         .await?;
         Ok(())
+    }
+
+    pub async fn update_mfa_contract<'e, E>(
+        executor: E,
+        id: Id,
+        mfa_contract: MfaContract,
+    ) -> Result<bool, sqlx::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let result = query!(
+            "UPDATE instance SET mfa_contract = $1 WHERE id = $2;",
+            mfa_contract,
+            id
+        )
+        .execute(executor)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 
     pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
@@ -403,6 +433,43 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../migrations")]
+    async fn test_update_mfa_contract_changes_only_contract(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+
+        assert!(
+            Instance::update_mfa_contract(&pool, instance.id, MfaContract::MultiStep)
+                .await
+                .unwrap()
+        );
+        let updated = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.mfa_contract, MfaContract::MultiStep);
+        assert_eq!(updated.name, instance.name);
+        assert_eq!(updated.proxy_url, instance.proxy_url);
+
+        assert!(
+            Instance::update_mfa_contract(&pool, instance.id, MfaContract::Legacy)
+                .await
+                .unwrap()
+        );
+        let updated = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.mfa_contract, MfaContract::Legacy);
+        assert_eq!(updated.name, instance.name);
+        assert_eq!(updated.proxy_url, instance.proxy_url);
+
+        assert!(
+            !Instance::update_mfa_contract(&pool, 999, MfaContract::MultiStep)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
     async fn test_mfa_contract_rejects_invalid_value(pool: SqlitePool) {
         let instance = new_instance().save(&pool).await.unwrap();
         let error = sqlx::query("UPDATE instance SET mfa_contract = 2 WHERE id = $1")
@@ -624,6 +691,21 @@ mod tests {
         let instance: Instance<NoId> = info.into();
         // A proxy that never reported the state is not the same as one reporting no factors.
         assert!(instance.mfa_configured_methods.is_none());
+        assert_eq!(instance.mfa_contract, MfaContract::Legacy);
+    }
+
+    #[test]
+    fn test_instance_from_proto_empty_mfa_user_state_selects_multi_step() {
+        let mut info = base_info();
+        info.mfa_user_state = Some(proto::client_types::MfaUserState::default());
+
+        let instance: Instance<NoId> = info.into();
+
+        assert_eq!(instance.mfa_contract, MfaContract::MultiStep);
+        assert_eq!(
+            instance.mfa_configured_methods.map(|json| json.0),
+            Some(vec![])
+        );
     }
 
     #[test]
@@ -640,6 +722,7 @@ mod tests {
             instance.mfa_configured_methods.map(|json| json.0),
             Some(vec![LocationMfaMethod::Totp, LocationMfaMethod::Fido2])
         );
+        assert_eq!(instance.mfa_contract, MfaContract::MultiStep);
     }
 
     #[test]

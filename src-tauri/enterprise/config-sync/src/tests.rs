@@ -6,14 +6,16 @@ use std::{
     time::Duration,
 };
 
-use defguard_client_core::database::models::{
-    instance::ClientTrafficPolicy,
-    location::{Location, LocationMfaMode, ServiceLocationMode},
-    NoId,
+use defguard_client_core::{
+    database::models::{
+        instance::ClientTrafficPolicy,
+        location::{Location, LocationMfaMode, ServiceLocationMode},
+        NoId,
+    },
+    mfa_contract::MfaContract,
 };
-use defguard_client_core::mfa_contract::MfaContract;
 use defguard_client_proto::defguard::client_types::{
-    DeviceConfig, DeviceConfigResponse, InstanceInfo, MfaUserState,
+    DeviceConfig, DeviceConfigResponse, InstanceInfo, InstanceInfoResponse, MfaUserState,
 };
 use sqlx::SqlitePool;
 
@@ -334,6 +336,39 @@ async fn test_config_changed_true_when_location_changes(pool: SqlitePool) {
         .unwrap();
 
     assert!(changed);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_poll_persists_mfa_contract_when_config_is_unchanged(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
+    let response = device_config_response(&instance, device_config(1, "office", "1.2.3.4:51820"));
+    sqlx::query("UPDATE instance SET name = 'database-name' WHERE id = ?")
+        .bind(instance.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let fetched = Ok(FetchedConfig {
+        response: InstanceInfoResponse {
+            device_config: Some(response),
+        },
+        version_mismatch: None,
+        mfa_contract: MfaContract::MultiStep,
+    });
+
+    let mut transaction = pool.begin().await.unwrap();
+    let result = apply_fetched_config(&mut transaction, &mut instance, false, fetched)
+        .await
+        .unwrap();
+    transaction.commit().await.unwrap();
+
+    assert!(matches!(result, PollInstanceResult::Unchanged { .. }));
+    let stored = Instance::find_by_id(&pool, instance.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.mfa_contract, MfaContract::MultiStep);
+    assert_eq!(stored.name, "database-name");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

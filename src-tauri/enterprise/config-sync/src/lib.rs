@@ -14,8 +14,12 @@ use defguard_client_core::{
         DbPool,
     },
     error::Error,
+    mfa_contract::MfaContract,
     proxy::post_with_headers,
-    version::{CORE_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION, PROXY_VERSION_HEADER},
+    version::{
+        mfa_contract_from_headers, CORE_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION,
+        PROXY_VERSION_HEADER,
+    },
 };
 use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
 use futures_util::future::join_all;
@@ -37,6 +41,7 @@ const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
 pub struct FetchedConfig {
     pub response: InstanceInfoResponse,
     pub version_mismatch: Option<VersionMismatchPayload>,
+    pub mfa_contract: MfaContract,
 }
 
 /// Result of polling a single instance once.
@@ -130,6 +135,7 @@ pub async fn fetch_instance_config(instance: &Instance<Id>) -> Result<FetchedCon
     }
 
     let version_mismatch = check_min_version(&response, instance);
+    let mfa_contract = mfa_contract_from_headers(response.headers());
 
     // Parse the response
     debug!(
@@ -155,6 +161,7 @@ pub async fn fetch_instance_config(instance: &Instance<Id>) -> Result<FetchedCon
     Ok(FetchedConfig {
         response,
         version_mismatch,
+        mfa_contract,
     })
 }
 
@@ -189,13 +196,21 @@ async fn apply_fetched_config(
         }
         fetched => fetched?,
     };
-    let version_mismatch = fetched.version_mismatch;
-
-    let device_config =
-        fetched.response.device_config.as_ref().ok_or_else(|| {
-            Error::InternalError("Device config not present in response".to_string())
-        })?;
+    let FetchedConfig {
+        response,
+        version_mismatch,
+        mfa_contract,
+    } = fetched;
+    let device_config = response
+        .device_config
+        .as_ref()
+        .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+    let mfa_contract_changed = instance.mfa_contract != mfa_contract;
     if !config_changed(transaction, instance, device_config).await? {
+        if mfa_contract_changed {
+            Instance::update_mfa_contract(transaction.as_mut(), instance.id, mfa_contract).await?;
+            instance.mfa_contract = mfa_contract;
+        }
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
@@ -236,9 +251,13 @@ async fn apply_fetched_config(
                 instance.mfa_configured_methods = configured_methods;
                 instance_updated = true;
             }
-            if instance_updated {
-                instance.save(transaction.as_mut()).await?;
-            }
+        }
+        if instance_updated {
+            instance.mfa_contract = mfa_contract;
+            instance.save(transaction.as_mut()).await?;
+        } else if mfa_contract_changed {
+            Instance::update_mfa_contract(transaction.as_mut(), instance.id, mfa_contract).await?;
+            instance.mfa_contract = mfa_contract;
         }
         return Ok(PollInstanceResult::ChangedWhileActive {
             version_mismatch,
@@ -250,6 +269,7 @@ async fn apply_fetched_config(
         "Updating instance {}({}) configuration: {device_config:?}",
         instance.name, instance.id,
     );
+    instance.mfa_contract = mfa_contract;
     let locations_changed =
         do_update_instance(transaction, instance, device_config.clone()).await?;
     info!(
