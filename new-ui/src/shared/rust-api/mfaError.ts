@@ -77,11 +77,31 @@ export const isMfaConfigSecurityKeyError = (err: unknown): boolean =>
 export const isMfaConfigCancelled = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'cancelled';
 
+/** e.g. the last security key was removed while the session was open */
+export const isMfaConfigMethodNotConfigured = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'method_not_configured';
+
+/** e.g. an inactive user or too many attempts, Core words these for the user */
+export const isMfaConfigForbidden = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'forbidden';
+
+/** the response that authorized it was lost, so only a new session gets past it */
+export const isMfaConfigAlreadyAuthorized = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'already_authorized';
+
+/** e.g. a consumed or replaced FIDO2 challenge, a fresh attempt fixes it */
+export const isMfaConfigFailedPrecondition = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'failed_precondition';
+
+/** only the OpenID wait times out */
+export const isMfaConfigTimeout = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'timeout';
+
 /** The request never reached the proxy, unlike `proxy_error` where it answered. */
 export const isMfaConfigNetworkError = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'network_error';
 
-/** A status with no specific handling, 403 / 429 / 5xx all land here. */
+/** a status with no specific handling, such as 429 or 5xx */
 export const isMfaConfigProxyError = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'proxy_error';
 

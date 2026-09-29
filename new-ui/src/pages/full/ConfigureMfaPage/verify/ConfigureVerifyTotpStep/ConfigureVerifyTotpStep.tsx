@@ -108,6 +108,14 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
         />
         <div className="right">
           <Button
+            text="Back"
+            variant={ButtonVariant.Outlined}
+            disabled={isSubmitting || isCancelling}
+            onClick={() => {
+              useConfigureMfaStore.getState().backFromVerification();
+            }}
+          />
+          <Button
             text="Verify"
             variant={ButtonVariant.Primary}
             loading={isSubmitting}

@@ -25,6 +25,7 @@ import {
   isMfaFactorOfferable,
   isMfaSetupStep,
   mfaFactorStep,
+  verificationMethodsOf,
 } from '../utils';
 
 type StoreValues = {
@@ -41,7 +42,9 @@ type StoreValues = {
   selectedMethods: MfaMethodValue[] | null;
   /** Pre-ticked in the selection step, from the entry point or an earlier pass. */
   initialSelection: MfaMethodValue[];
-  /** Null until picked. Asked only when more than one code factor is configured. */
+  /** most preferred first, from the session since an older Core rejects some factors */
+  verificationMethods: MfaVerificationMethod[];
+  /** null until picked, asked only when the session offers more than one method */
   verificationMethod: MfaVerificationMethod | null;
   /** No factor was configured, so an emailed code was the only way in. */
   emailFallback: boolean;
@@ -103,6 +106,7 @@ const defaults: StoreValues = {
   completedMethods: [],
   selectedMethods: null,
   initialSelection: [],
+  verificationMethods: [],
   verificationMethod: null,
   emailFallback: false,
   deadline: null,
@@ -125,6 +129,7 @@ interface Store extends StoreValues {
   selectVerificationMethod: (method: MfaVerificationMethod) => void;
   /** Keeps the current picks ticked and the session alive. */
   backToSelection: () => void;
+  backFromVerification: () => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
   factorConfigured: (method: MfaMethodValue, recoveryCodes: string[]) => void;
@@ -139,20 +144,24 @@ export const useConfigureMfaStore = create<Store>()(
       ...defaults,
       start: (instance, response, origin) => {
         // The fallback mails a code to the address on file, registering email along the way.
-        const codeFactors = response.email_fallback
+        const sessionMethods = response.email_fallback
           ? [MfaMethod.Email]
           : response.available_methods;
+        // the session and the snapshot may both list FIDO2
         const configuredMethods = [
-          ...codeFactors,
-          ...(instance.mfa_configured_methods ?? []).filter(
-            (method) => !isCodeMfaMethod(method),
-          ),
+          ...new Set([
+            ...sessionMethods,
+            ...(instance.mfa_configured_methods ?? []).filter(
+              (method) => !isCodeMfaMethod(method),
+            ),
+          ]),
         ];
         set({
           ...defaults,
           instance,
           sessionId: response.session_id,
           configuredMethods,
+          verificationMethods: verificationMethodsOf(sessionMethods),
           emailFallback: response.email_fallback,
           deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
           ...origin,
@@ -174,6 +183,13 @@ export const useConfigureMfaStore = create<Store>()(
           verificationMethod: null,
           activeStep: defaults.activeStep,
         }));
+      },
+      backFromVerification: () => {
+        if (isPresent(get().verificationMethod)) {
+          set({ verificationMethod: null });
+          return;
+        }
+        get().backToSelection();
       },
       authorize: (response) => {
         set((current) => {
@@ -234,7 +250,7 @@ export const useConfigureMfaStore = create<Store>()(
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
       // Bumped on every shape change: a stored session is never resumable across one.
-      version: 11,
+      version: 12,
     },
   ),
 );
@@ -264,6 +280,17 @@ export const startMfaConfiguration = async (
 };
 
 /** A copy the proxy still holds expires on its own, so a failed cancel is not worth raising. */
+/** applied even after the asking step unmounts, Core has authorized the session either way.
+ *  a cancel resets sessionId, so a late answer for a discarded session is dropped */
+export const applyAuthorization = (
+  sessionId: string,
+  result: MfaConfigAuthorizeResult,
+): void => {
+  const store = useConfigureMfaStore.getState();
+  if (store.sessionId !== sessionId) return;
+  store.authorize(result);
+};
+
 export const discardMfaConfiguration = async (): Promise<void> => {
   const { sessionId } = useConfigureMfaStore.getState();
   useConfigureMfaStore.getState().reset();

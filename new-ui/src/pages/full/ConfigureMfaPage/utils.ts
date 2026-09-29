@@ -48,12 +48,15 @@ export const isMfaFactorOfferable = (
   return factor.repeatable || !configuredMethods.includes(method);
 };
 
-/** A session reports only code factors, others come from the instance snapshot. */
-export const isCodeMfaMethod = (method: MfaMethodValue): boolean =>
-  MFA_VERIFICATION_METHODS.some((code) => code === method);
+const CODE_MFA_METHODS: MfaMethodValue[] = [MfaMethod.Totp, MfaMethod.Email];
 
-/** Most preferred first. */
+/** every Core reports code factors in a session but older ones leave out FIDO2,
+ *  so the instance snapshot stays the source for the rest */
+export const isCodeMfaMethod = (method: MfaMethodValue): boolean =>
+  CODE_MFA_METHODS.includes(method);
+
+/** ordered by preference, not by the input */
 export const verificationMethodsOf = (
-  configuredMethods: MfaMethodValue[],
+  availableMethods: MfaMethodValue[],
 ): MfaVerificationMethod[] =>
-  MFA_VERIFICATION_METHODS.filter((method) => configuredMethods.includes(method));
+  MFA_VERIFICATION_METHODS.filter((method) => availableMethods.includes(method));

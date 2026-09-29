@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
@@ -7,18 +7,12 @@ import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { ConfigureMfaVerificatorFactorSelector } from '../../components/ConfigureMfaVerificatorFactorSelector/ConfigureMfaVerificatorFactorSelector';
 import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import type { MfaVerificationMethod } from '../../types';
-import { verificationMethodsOf } from '../../utils';
 import '../style.scss';
 import './style.scss';
 
-/** Shown only when more than one code factor is configured. */
+/** shown only when the session offers more than one method */
 export const ConfigureSelectVerificationStep = () => {
-  const configuredMethods = useConfigureMfaStore((s) => s.configuredMethods);
-
-  const methods = useMemo(
-    () => verificationMethodsOf(configuredMethods),
-    [configuredMethods],
-  );
+  const methods = useConfigureMfaStore((s) => s.verificationMethods);
 
   const [selected, setSelected] = useState<MfaVerificationMethod | undefined>(methods[0]);
 

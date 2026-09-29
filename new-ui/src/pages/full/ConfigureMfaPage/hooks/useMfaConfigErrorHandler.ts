@@ -1,12 +1,17 @@
 import { error as logError } from '@tauri-apps/plugin-log';
 import { useCallback } from 'react';
 import {
+  isMfaConfigAlreadyAuthorized,
   isMfaConfigCancelled,
+  isMfaConfigFailedPrecondition,
+  isMfaConfigForbidden,
   isMfaConfigInvalidCode,
+  isMfaConfigMethodNotConfigured,
   isMfaConfigNetworkError,
   isMfaConfigProxyError,
   isMfaConfigSecurityKeyError,
   isMfaConfigSessionExpired,
+  isMfaConfigTimeout,
   mfaErrorMessage,
 } from '../../../../shared/rust-api/mfaError';
 import { showEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
@@ -41,9 +46,32 @@ export const useMfaConfigErrorHandler = ({
         setError(hasCodeInput ? 'Invalid code' : mfaErrorMessage(err));
         return;
       }
+      // an OpenID login as another user lands here too, Core ends the session for it
       if (isMfaConfigSessionExpired(err)) {
         setError('Configuration session expired, start again.');
         onSessionExpired();
+        return;
+      }
+      if (isMfaConfigAlreadyAuthorized(err)) {
+        setError('This session was already verified, start again.');
+        onSessionExpired();
+        return;
+      }
+      if (isMfaConfigMethodNotConfigured(err)) {
+        setError('This method is no longer set up for your account.');
+        return;
+      }
+      if (isMfaConfigForbidden(err)) {
+        setError(mfaErrorMessage(err));
+        return;
+      }
+      // a consumed or replaced challenge, the next attempt fetches a fresh one
+      if (isMfaConfigFailedPrecondition(err)) {
+        setError('Verification expired, try again.');
+        return;
+      }
+      if (isMfaConfigTimeout(err)) {
+        setError('Sign-in timed out, try again.');
         return;
       }
       // The backend writes these for the user (no key, wrong PIN, no touch), so show as is.

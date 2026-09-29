@@ -142,6 +142,14 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
         />
         <div className="right">
           <Button
+            text="Back"
+            variant={ButtonVariant.Outlined}
+            disabled={isSubmitting || isCancelling}
+            onClick={() => {
+              useConfigureMfaStore.getState().backFromVerification();
+            }}
+          />
+          <Button
             text="Resend code"
             variant={ButtonVariant.Secondary}
             loading={isRequestingCode}

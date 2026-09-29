@@ -12,7 +12,7 @@ use defguard_client_core::{
     },
     enrollment::{self},
     mfa,
-    mfa_config::{self, MfaConfigError, MfaConfigSession, SetupProof},
+    mfa_config::{self, AuthorizeProof, MfaConfigError, MfaConfigSession, SetupProof},
 };
 use defguard_client_fido2::{pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext};
 use defguard_client_posture::authorize_posture_session;
@@ -2038,8 +2038,8 @@ fn fido2_pin(pin: Option<String>) -> Result<Option<String>, &'static str> {
     Ok(Some(pin))
 }
 
-/// Registers a running security key ceremony for the life of the call. Claimed before the first
-/// await, so a cancel racing the setup never finds the slot empty.
+/// one attempt per session since FIDO2 and OIDC share state on Core. claimed before the first
+/// await, so a cancel racing the attempt never finds the slot empty
 struct CeremonyGuard<'a> {
     state: &'a AppState,
     session: Uuid,
@@ -2057,10 +2057,11 @@ impl<'a> CeremonyGuard<'a> {
             .mfa_config_ceremonies
             .lock()
             .expect("mfa_config_ceremonies mutex poisoned");
-        // There is one key, and a second claim would leave the first ceremony's cancel unreachable.
+        // a second claim would leave the first attempt's cancel unreachable
         if ceremonies.contains_key(&session) {
             return Err(MfaConfigError::SecurityKey {
-                message: "A security key registration is already in progress".to_string(),
+                message: "Another verification or security key registration is already in progress"
+                    .to_string(),
             });
         }
         ceremonies.insert(session, ceremony.clone());
@@ -2141,11 +2142,11 @@ fn assertion_error(err: &Fido2Error) -> mfa::MfaError {
 
 /// As on the assertion side, but a cancellation keeps its own variant rather than arriving as
 /// a security key error, since the user is the one who asked for it.
-fn registration_error(err: &Fido2Error) -> MfaConfigError {
+fn mfa_config_fido2_error(err: &Fido2Error, ceremony: &str) -> MfaConfigError {
     match err {
         Fido2Error::Cancelled => MfaConfigError::Cancelled,
         err => MfaConfigError::SecurityKey {
-            message: fido2_message(err, "complete the registration"),
+            message: fido2_message(err, ceremony),
         },
     }
 }
@@ -2323,7 +2324,7 @@ pub async fn mfa_fido2_pin(
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting FIDO2 MFA for location {location_id} of instance {instance_id}");
-    // The PIN is never logged, here or anywhere below.
+    // never log the PIN, here or below
     let pin = fido2_pin(pin).map_err(ToString::to_string)?;
 
     let step_methods = methods
@@ -2482,12 +2483,21 @@ pub async fn mfa_config_authorize(
     let method = parse_mfa_method(&method)?;
     let uid = parse_mfa_config_session_id(&session_id)?;
     let session = get_mfa_config_session(&state, &session_id)?;
-    let response =
-        mfa_config::mfa_config_authorize(session.proxy_url, session.session_token, method, code)
-            .await
-            .map_err(err_to_json)?;
+    let response = mfa_config::mfa_config_authorize(
+        session.proxy_url,
+        session.session_token,
+        AuthorizeProof::Code { method, code },
+    )
+    .await
+    .map_err(err_to_json)?;
 
-    // The new deadline bounds every setup in this session, not just the next one.
+    extend_mfa_config_session(&state, uid, &response);
+    info!("Authorized MFA configuration session");
+    Ok(response)
+}
+
+/// the new deadline bounds every setup in this session, not just the next one
+fn extend_mfa_config_session(state: &AppState, uid: Uuid, response: &MfaConfigAuthorizeResponse) {
     if let Some(session) = state
         .mfa_config_sessions
         .lock()
@@ -2496,8 +2506,132 @@ pub async fn mfa_config_authorize(
     {
         session.deadline_timestamp = response.deadline_timestamp;
     }
+}
 
-    info!("Authorized MFA configuration session");
+/// challenge, ceremony and assertion run in one call since the challenge is single-use.
+/// abort or cancel takes a platform prompt down
+#[tauri::command(async)]
+pub async fn mfa_config_authorize_fido2(
+    session_id: String,
+    pin: Option<String>,
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    handle: AppHandle,
+) -> Result<MfaConfigAuthorizeResponse, String> {
+    debug!("Authorizing MFA configuration session with a security key");
+    // never log the PIN, here or below
+    let pin = fido2_pin(pin).map_err(|message| {
+        err_to_json(MfaConfigError::SecurityKey {
+            message: message.to_string(),
+        })
+    })?;
+
+    let uid = parse_mfa_config_session_id(&session_id)?;
+    let ceremony = CeremonyGuard::register(&state, uid).map_err(err_to_json)?;
+    let session = get_mfa_config_session(&state, &session_id)?;
+    let instance = Instance::find_by_id(&*DB_POOL, session.instance_id)
+        .await
+        .map_err(|err| mfa_config_other(err.to_string()))?
+        .ok_or_else(|| mfa_config_other("Instance not found"))?;
+    let rp_id = fido2_rp_id(&instance).map_err(mfa_config_other)?;
+
+    let challenge = mfa_config::mfa_config_fido2_challenge(
+        session.proxy_url.clone(),
+        session.session_token.clone(),
+    )
+    .await
+    .map_err(err_to_json)?;
+
+    // the cancel may have landed while the challenge was in flight
+    if ceremony.is_cancelled() {
+        debug!("Security key verification was cancelled before the prompt opened");
+        return Err(err_to_json(MfaConfigError::Cancelled));
+    }
+
+    // the key blinks from here on and gives up without a touch
+    let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
+    // the prompt must not open behind the window that asked for it
+    let level = WindowLevelGuard::lower(&window);
+    let assertion = defguard_client_fido2::assert_for_mfa(
+        &rp_id,
+        &challenge.challenge,
+        &challenge.credential_ids,
+        pin,
+        platform_context(&window),
+        ceremony.token(),
+    )
+    .await
+    .map_err(|err| match err {
+        // Core minted the challenge, so a bad one is not the user's problem
+        Fido2Error::MalformedChallenge(detail) => mfa_config_other(format!(
+            "Defguard sent a malformed security key challenge: {detail}"
+        )),
+        err => err_to_json(mfa_config_fido2_error(&err, "authorize the request")),
+    })?;
+    drop(level);
+
+    // a platform that cannot abort a waiting key reports the cancel only once the ceremony ends
+    if ceremony.is_cancelled() {
+        debug!("Security key verification was cancelled, discarding the assertion");
+        return Err(err_to_json(MfaConfigError::Cancelled));
+    }
+
+    let response = mfa_config::mfa_config_authorize(
+        session.proxy_url,
+        session.session_token,
+        AuthorizeProof::Fido2 {
+            signature: BASE64_URL_SAFE_NO_PAD.encode(&assertion.signature),
+            auth_data: assertion.authenticator_data,
+            credential_id: assertion.credential_id,
+        },
+    )
+    .await
+    .map_err(err_to_json)?;
+
+    extend_mfa_config_session(&state, uid, &response);
+    info!("Authorized MFA configuration session with a security key");
+    Ok(response)
+}
+
+/// each open supersedes the previous attempt on Core, and a running poll picks it up.
+/// the token stays out of the persisted frontend store but does land in browser history
+#[tauri::command(async)]
+pub async fn mfa_config_oidc_url(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let session = get_mfa_config_session(&state, &session_id)?;
+    let mut url = session
+        .proxy_url
+        .join("openid/mfa")
+        .map_err(|err| mfa_config_other(format!("Failed to build OpenID URL: {err}")))?;
+    url.query_pairs_mut()
+        .append_pair("token", &session.session_token);
+    Ok(url.to_string())
+}
+
+/// the browser must already be open on mfa_config_oidc_url, this only waits for the login
+#[tauri::command(async)]
+pub async fn mfa_config_authorize_oidc(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<MfaConfigAuthorizeResponse, String> {
+    debug!("Waiting for OpenID to authorize the MFA configuration session");
+    let uid = parse_mfa_config_session_id(&session_id)?;
+    let attempt = CeremonyGuard::register(&state, uid).map_err(err_to_json)?;
+    let session = get_mfa_config_session(&state, &session_id)?;
+
+    let response = mfa_config::mfa_config_poll_oidc(
+        session.proxy_url,
+        session.session_token,
+        session.deadline_timestamp,
+        attempt.token(),
+    )
+    .await
+    .map_err(err_to_json)?;
+
+    extend_mfa_config_session(&state, uid, &response);
+    info!("Authorized MFA configuration session with OpenID");
     Ok(response)
 }
 
@@ -2562,7 +2696,7 @@ pub async fn mfa_config_setup_fido2(
     handle: AppHandle,
 ) -> Result<CodeMfaSetupFinishResponse, String> {
     debug!("Starting FIDO2 MFA factor setup");
-    // The PIN is never logged, here or anywhere below.
+    // never log the PIN, here or below
     let pin = fido2_pin(pin).map_err(|message| {
         err_to_json(MfaConfigError::SecurityKey {
             message: message.to_string(),
@@ -2597,13 +2731,13 @@ pub async fn mfa_config_setup_fido2(
         .fido2_creation_challenge
         .ok_or_else(|| mfa_config_other("Defguard did not return a security key challenge"))?;
 
-    // The cancel may have landed while the challenge was in flight.
+    // the cancel may have landed while the challenge was in flight
     if ceremony.is_cancelled() {
         debug!("Security key registration was cancelled before the prompt opened");
         return Err(err_to_json(MfaConfigError::Cancelled));
     }
 
-    // From here the key blinks and waits for a touch, and gives up if none comes.
+    // the key blinks from here on and gives up without a touch
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
     // The prompt must not open behind the window that asked for it.
     let _level = WindowLevelGuard::lower(&window);
@@ -2620,7 +2754,7 @@ pub async fn mfa_config_setup_fido2(
         Fido2Error::MalformedChallenge(detail) => mfa_config_other(format!(
             "Defguard sent a malformed security key challenge: {detail}"
         )),
-        err => err_to_json(registration_error(&err)),
+        err => err_to_json(mfa_config_fido2_error(&err, "complete the registration")),
     })?;
 
     // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
@@ -2656,13 +2790,8 @@ pub async fn mfa_config_setup_fido2(
     Ok(response)
 }
 
-fn cancel_mfa_config_session(state: &AppState, uid: Uuid) {
-    state
-        .mfa_config_sessions
-        .lock()
-        .expect("mfa_config_sessions mutex poisoned")
-        .remove(&uid);
-    // A ceremony may still be waiting for a touch, behind a prompt only the platform can close.
+/// a ceremony may still be waiting for a touch, behind a prompt only the platform can close
+fn abort_mfa_config_attempt(state: &AppState, uid: Uuid) {
     if let Some(ceremony) = state
         .mfa_config_ceremonies
         .lock()
@@ -2671,6 +2800,27 @@ fn cancel_mfa_config_session(state: &AppState, uid: Uuid) {
     {
         ceremony.token.cancel();
     }
+}
+
+fn cancel_mfa_config_session(state: &AppState, uid: Uuid) {
+    state
+        .mfa_config_sessions
+        .lock()
+        .expect("mfa_config_sessions mutex poisoned")
+        .remove(&uid);
+    abort_mfa_config_attempt(state, uid);
+}
+
+/// unlike mfa_config_cancel, the session survives for another method
+#[tauri::command(async)]
+pub async fn mfa_config_abort_attempt(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    debug!("Aborting the running MFA configuration attempt");
+    let uid = parse_mfa_config_session_id(&session_id)?;
+    abort_mfa_config_attempt(&state, uid);
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -3145,6 +3295,20 @@ mod tests {
 
         assert!(sessions_are_empty(&state));
         assert!(ceremonies_are_empty(&state));
+    }
+
+    #[test]
+    fn test_mfa_config_abort_attempt_cancels_the_token_and_keeps_the_session() {
+        let state = AppState::new(AppConfig::default(), None);
+        let uid = live_session(&state);
+        let attempt = CeremonyGuard::register(&state, uid).expect("attempt registers");
+
+        abort_mfa_config_attempt(&state, uid);
+
+        assert!(attempt.is_cancelled());
+        assert!(ceremonies_are_empty(&state));
+        assert!(get_mfa_config_session(&state, &uid.to_string()).is_ok());
+        drop(CeremonyGuard::register(&state, uid).expect("the slot is free again"));
     }
 
     #[test]

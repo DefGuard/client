@@ -239,7 +239,7 @@ const mfaFido2Pin = (
   locationId: number,
   methods: MfaMethodValue[],
   token: string | null,
-  // Null where the platform collects the PIN itself - see `fido2CollectsPinInApp`.
+  // null where the platform collects the PIN itself, see fido2CollectsPinInApp
   pin: string | null,
 ): Promise<string> =>
   invoke(TauriCommand.MfaFido2Pin, { instanceId, locationId, methods, token, pin });
@@ -277,6 +277,27 @@ const mfaConfigAuthorize = (
 ): Promise<MfaConfigAuthorizeResult> =>
   invoke(TauriCommand.MfaConfigAuthorize, { sessionId, method, code });
 
+// runs challenge, ceremony and assertion in one call, so a retry is just another call.
+// emits mfa-config-fido2-touch while the key waits
+const mfaConfigAuthorizeFido2 = (
+  sessionId: string,
+  // null where the platform collects the PIN itself, see fido2CollectsPinInApp
+  pin: string | null,
+): Promise<MfaConfigAuthorizeResult> =>
+  invoke(TauriCommand.MfaConfigAuthorizeFido2, { sessionId, pin });
+
+// each open of the returned page supersedes the previous OpenID attempt
+const mfaConfigOidcUrl = (sessionId: string): Promise<string> =>
+  invoke(TauriCommand.MfaConfigOidcUrl, { sessionId });
+
+// long-running, resolves once the login opened from mfaConfigOidcUrl completes
+const mfaConfigAuthorizeOidc = (sessionId: string): Promise<MfaConfigAuthorizeResult> =>
+  invoke(TauriCommand.MfaConfigAuthorizeOidc, { sessionId });
+
+// unlike mfaConfigCancel, the session stays usable for another method
+const mfaConfigAbortAttempt = (sessionId: string): Promise<void> =>
+  invoke(TauriCommand.MfaConfigAbortAttempt, { sessionId });
+
 const mfaConfigSetupStart = (
   sessionId: string,
   method: MfaMethodValue,
@@ -295,7 +316,7 @@ const mfaConfigSetupFinish = (
 const mfaConfigSetupFido2 = (
   sessionId: string,
   name: string,
-  // Null where the platform collects the PIN itself - see `fido2CollectsPinInApp`.
+  // null where the platform collects the PIN itself, see fido2CollectsPinInApp
   pin: string | null,
 ): Promise<MfaSetupFinishResult> =>
   invoke(TauriCommand.MfaConfigSetupFido2, { sessionId, name, pin });
@@ -370,6 +391,10 @@ export const api = {
   mfaConfigStart,
   mfaConfigSendCode,
   mfaConfigAuthorize,
+  mfaConfigAuthorizeFido2,
+  mfaConfigOidcUrl,
+  mfaConfigAuthorizeOidc,
+  mfaConfigAbortAttempt,
   mfaConfigSetupStart,
   mfaConfigSetupFinish,
   mfaConfigSetupFido2,

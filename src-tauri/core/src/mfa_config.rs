@@ -1,19 +1,27 @@
 //! Post-enrollment MFA factor configuration over HTTP. The proxy mints a short-lived session
 //! from the device's polling token, which stands in for the enrollment cookie.
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
+use chrono::Utc;
 use defguard_client_proto::defguard::client_types::{
     CodeMfaSetupFinishRequest, CodeMfaSetupFinishResponse, CodeMfaSetupStartRequest,
     CodeMfaSetupStartResponse, MfaConfigAuthorizeRequest, MfaConfigAuthorizeResponse,
-    MfaConfigSendCodeRequest, MfaConfigStartRequest, MfaConfigStartResponse, MfaMethod,
+    MfaConfigFido2ChallengeRequest, MfaConfigFido2ChallengeResponse, MfaConfigSendCodeRequest,
+    MfaConfigStartRequest, MfaConfigStartResponse, MfaMethod,
 };
 use reqwest::{Response, StatusCode, Url};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
+use tokio::{
+    select,
+    time::{sleep, Instant},
+};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     database::models::Id,
+    mfa::{OIDC_POLL_INTERVAL, OIDC_POLL_TIMEOUT},
     proxy::{post_with_headers, read_error_message},
 };
 
@@ -21,11 +29,27 @@ use crate::{
 const START: &str = "api/v1/mfa-config/start";
 const SEND_CODE: &str = "api/v1/mfa-config/send-code";
 const AUTHORIZE: &str = "api/v1/mfa-config/authorize";
+const FIDO2_CHALLENGE: &str = "api/v1/mfa-config/fido2-challenge";
 const SETUP_START: &str = "api/v1/mfa-config/setup/start";
 const SETUP_FINISH: &str = "api/v1/mfa-config/setup/finish";
 
-// `MfaConfigAuthorizeRequest` carries only a `code`, so a non-code factor cannot authorize here.
-pub const AUTHORIZING_METHODS: &[MfaMethod] = &[MfaMethod::Totp, MfaMethod::Email];
+// mirrors the methods Core accepts in mfa_config_authorize, keep in step
+pub const AUTHORIZING_METHODS: &[MfaMethod] = &[
+    MfaMethod::Totp,
+    MfaMethod::Email,
+    MfaMethod::Fido2,
+    MfaMethod::Oidc,
+];
+
+// FIDO2 sends an assertion and OIDC completes in the browser, so only these send a code
+const CODE_METHODS: &[MfaMethod] = &[MfaMethod::Totp, MfaMethod::Email];
+
+// Core reuses 401, 403 and 428 for several errors, only the message tells these apart
+const INVALID_CODE_MESSAGE: &str = "invalid code";
+const METHOD_NOT_CONFIGURED_MESSAGE: &str = "method not configured";
+const ALREADY_AUTHORIZED_MESSAGE: &str = "session already authorized";
+// a prefix, Core's login flow words it "OIDC authentication not completed yet"
+const OIDC_PENDING_MESSAGE: &str = "OIDC authentication not completed";
 
 // Mirrors the methods Core accepts in `mfa_setup_start` / `mfa_setup_finish`, keep in step.
 pub const CONFIGURABLE_METHODS: &[MfaMethod] =
@@ -36,6 +60,31 @@ pub const CONFIGURABLE_METHODS: &[MfaMethod] =
 pub enum SetupProof {
     Code(String),
     Fido2 { name: String, attestation: String },
+}
+
+pub enum AuthorizeProof {
+    Code {
+        method: MfaMethod,
+        code: String,
+    },
+    /// signature is base64url while the byte fields stay raw, matching ClientMfaFinishRequest
+    Fido2 {
+        signature: String,
+        auth_data: Vec<u8>,
+        credential_id: Vec<u8>,
+    },
+    /// Core has already seen the browser login, so there is nothing to send
+    Oidc,
+}
+
+impl AuthorizeProof {
+    fn method(&self) -> MfaMethod {
+        match self {
+            Self::Code { method, .. } => *method,
+            Self::Fido2 { .. } => MfaMethod::Fido2,
+            Self::Oidc => MfaMethod::Oidc,
+        }
+    }
 }
 
 /// One authorized session configures several factors, so it outlives a single setup.
@@ -92,6 +141,29 @@ pub enum MfaConfigError {
     #[error("MFA configuration was cancelled")]
     Cancelled,
 
+    /// e.g. a FIDO2 challenge for a user with no security key
+    #[error("{message}")]
+    MethodNotConfigured { message: String },
+
+    /// e.g. an inactive user or too many attempts, Core words these for the user
+    #[error("{message}")]
+    Forbidden { message: String },
+
+    /// never leaves the OIDC poll loop, which retries until the browser login completes
+    #[error("OpenID authentication is not completed yet")]
+    OidcPending,
+
+    /// the response that authorized it was lost, so the session cannot be resumed
+    #[error("MFA configuration session is already authorized")]
+    AlreadyAuthorized,
+
+    /// e.g. no FIDO2 challenge pending
+    #[error("{message}")]
+    FailedPrecondition { message: String },
+
+    #[error("Timed out waiting for authentication")]
+    Timeout,
+
     #[error("{message}")]
     NetworkError { message: String },
 
@@ -113,17 +185,25 @@ fn method_name(method: MfaMethod) -> &'static str {
     }
 }
 
-fn ensure_can_authorize(method: MfaMethod) -> Result<(), MfaConfigError> {
-    if AUTHORIZING_METHODS.contains(&method) {
-        Ok(())
-    } else {
-        Err(MfaConfigError::UnsupportedMethod {
+fn ensure_can_authorize(proof: &AuthorizeProof) -> Result<(), MfaConfigError> {
+    let method = proof.method();
+    if !AUTHORIZING_METHODS.contains(&method) {
+        return Err(MfaConfigError::UnsupportedMethod {
             message: format!(
-                "A {} cannot authorize MFA configuration; use a one-time code instead.",
+                "A {} cannot authorize MFA configuration.",
                 method_name(method)
             ),
-        })
+        });
     }
+    if matches!(proof, AuthorizeProof::Code { .. }) && !CODE_METHODS.contains(&method) {
+        return Err(MfaConfigError::UnsupportedMethod {
+            message: format!(
+                "A {} does not authorize with a one-time code.",
+                method_name(method)
+            ),
+        });
+    }
+    Ok(())
 }
 
 fn ensure_can_configure(method: MfaMethod) -> Result<(), MfaConfigError> {
@@ -171,8 +251,24 @@ async fn check_response(response: Response, endpoint: &str) -> Result<Response, 
 
     let message = read_error_message(response).await;
     match status {
+        // a wrong code or FIDO2 assertion, any other 401 is a session Core no longer knows
+        StatusCode::UNAUTHORIZED if message == INVALID_CODE_MESSAGE => {
+            Err(MfaConfigError::InvalidCode { message })
+        }
         StatusCode::UNAUTHORIZED => Err(MfaConfigError::SessionExpired),
         StatusCode::BAD_REQUEST => Err(MfaConfigError::InvalidCode { message }),
+        StatusCode::FORBIDDEN if message == METHOD_NOT_CONFIGURED_MESSAGE => {
+            Err(MfaConfigError::MethodNotConfigured { message })
+        }
+        StatusCode::FORBIDDEN => Err(MfaConfigError::Forbidden { message }),
+        // other 428s end a poll, so the status alone cannot mean keep polling
+        StatusCode::PRECONDITION_REQUIRED if message.starts_with(OIDC_PENDING_MESSAGE) => {
+            Err(MfaConfigError::OidcPending)
+        }
+        StatusCode::PRECONDITION_REQUIRED if message == ALREADY_AUTHORIZED_MESSAGE => {
+            Err(MfaConfigError::AlreadyAuthorized)
+        }
+        StatusCode::PRECONDITION_REQUIRED => Err(MfaConfigError::FailedPrecondition { message }),
         _ => Err(MfaConfigError::ProxyError {
             status: status.as_u16(),
             message,
@@ -222,20 +318,88 @@ pub async fn mfa_config_send_code(
     Ok(())
 }
 
+/// single-use, every authorize call that reaches verification consumes it
+pub async fn mfa_config_fido2_challenge(
+    proxy_url: Url,
+    session_token: String,
+) -> Result<MfaConfigFido2ChallengeResponse, MfaConfigError> {
+    debug!("Requesting MFA configuration FIDO2 challenge");
+    let request = MfaConfigFido2ChallengeRequest { session_token };
+    parse(post(&proxy_url, FIDO2_CHALLENGE, &request).await?).await
+}
+
 pub async fn mfa_config_authorize(
     proxy_url: Url,
     session_token: String,
-    method: MfaMethod,
-    code: String,
+    proof: AuthorizeProof,
 ) -> Result<MfaConfigAuthorizeResponse, MfaConfigError> {
-    ensure_can_authorize(method)?;
+    ensure_can_authorize(&proof)?;
     debug!("Authorizing MFA configuration session");
+    let method = proof.method() as i32;
+    let (code, signature, auth_data, credential_id) = match proof {
+        AuthorizeProof::Code { code, .. } => (code, None, None, None),
+        AuthorizeProof::Fido2 {
+            signature,
+            auth_data,
+            credential_id,
+        } => (
+            String::new(),
+            Some(signature),
+            Some(auth_data),
+            Some(credential_id),
+        ),
+        AuthorizeProof::Oidc => (String::new(), None, None, None),
+    };
     let request = MfaConfigAuthorizeRequest {
         session_token,
-        method: method as i32,
+        method,
         code,
+        signature,
+        auth_data,
+        credential_id,
     };
     parse(post(&proxy_url, AUTHORIZE, &request).await?).await
+}
+
+/// the browser login must already be open, this only polls for its result.
+/// the first poll waits an interval, Core knows of the attempt only once the browser loads it
+pub async fn mfa_config_poll_oidc(
+    proxy_url: Url,
+    session_token: String,
+    deadline_timestamp: i64,
+    cancel: CancellationToken,
+) -> Result<MfaConfigAuthorizeResponse, MfaConfigError> {
+    let session_left = u64::try_from(deadline_timestamp - Utc::now().timestamp()).unwrap_or(0);
+    let started = Instant::now();
+    let session_deadline = started + Duration::from_secs(session_left);
+    let poll_deadline = started + OIDC_POLL_TIMEOUT;
+
+    loop {
+        select! {
+            () = cancel.cancelled() => return Err(MfaConfigError::Cancelled),
+            () = sleep(OIDC_POLL_INTERVAL) => {}
+        }
+
+        let now = Instant::now();
+        if now >= session_deadline {
+            return Err(MfaConfigError::SessionExpired);
+        }
+        if now >= poll_deadline {
+            return Err(MfaConfigError::Timeout);
+        }
+
+        // not raced against the cancel, Core may authorize even if the answer is dropped
+        match mfa_config_authorize(
+            proxy_url.clone(),
+            session_token.clone(),
+            AuthorizeProof::Oidc,
+        )
+        .await
+        {
+            Err(MfaConfigError::OidcPending) => {}
+            other => return other,
+        }
+    }
 }
 
 pub async fn mfa_config_setup_start(
