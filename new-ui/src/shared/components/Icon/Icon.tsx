@@ -63,6 +63,8 @@ import { IconGateway } from './icons/IconGateway';
 import { IconGithub } from './icons/IconGithub';
 import { IconGlobe } from './icons/IconGlobe';
 import { IconGlobeBlocked } from './icons/IconGlobeBlocked';
+import { IconGoogle } from './icons/IconGoogle';
+import { IconGoogleWhite } from './icons/IconGoogleWhite';
 import { IconGroups } from './icons/IconGroups';
 import { IconHamburger } from './icons/IconHamburger';
 import { IconHelp } from './icons/IconHelp';
@@ -71,6 +73,8 @@ import { IconInfoFilled } from './icons/IconInfoFilled';
 import { IconInfoOutlined } from './icons/IconInfoOutlined';
 import { IconInternalMfa } from './icons/IconInternalMFA';
 import { IconIpSuggest } from './icons/IconIpSuggest';
+import { IconJumpCloud } from './icons/IconJumpCloud';
+import { IconJumpCloudWhite } from './icons/IconJumpCloudWhite';
 import { IconKey } from './icons/IconKey';
 import { IconLightBulb } from './icons/IconLightBulb';
 import { IconLightTheme } from './icons/IconLightTheme';
@@ -84,11 +88,15 @@ import { IconLogout } from './icons/IconLogout';
 import { IconMail } from './icons/IconMail';
 import { IconManageKeys } from './icons/IconManageKeys';
 import { IconMenu } from './icons/IconMenu';
+import { IconMicrosoft } from './icons/IconMicrosoft';
+import { IconMicrosoftWhite } from './icons/IconMicrosoftWhite';
 import { IconMinusCircle } from './icons/IconMinusCircle';
 import { IconMobile } from './icons/IconMobile';
 import { IconMobileLock } from './icons/IconMobileLock';
 import { IconNetworkSettings } from './icons/IconNetworkSettings';
 import { IconNotification } from './icons/IconNotification';
+import { IconOkta } from './icons/IconOkta';
+import { IconOktaWhite } from './icons/IconOktaWhite';
 import { IconOneTimePassword } from './icons/IconOneTimePassword';
 import { IconOnline } from './icons/IconOnline';
 import { IconOpenId } from './icons/IconOpenId';
@@ -391,6 +399,22 @@ export const Icon = <T extends IconKindValue>({
         return IconOneTimePassword;
       case 'openid':
         return IconOpenId;
+      case 'microsoft':
+        return IconMicrosoft;
+      case 'google':
+        return IconGoogle;
+      case 'okta':
+        return IconOkta;
+      case 'jump-cloud':
+        return IconJumpCloud;
+      case 'microsoft-white':
+        return IconMicrosoftWhite;
+      case 'google-white':
+        return IconGoogleWhite;
+      case 'okta-white':
+        return IconOktaWhite;
+      case 'jump-cloud-white':
+        return IconJumpCloudWhite;
       case 'pdf':
         return EmptyIcon;
       case 'pie-chart':
