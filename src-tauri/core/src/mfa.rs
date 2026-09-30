@@ -5,10 +5,16 @@
 
 use std::time::Duration;
 
-use defguard_client_proto::defguard::client_types::{
-    mfa_step_result, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
-    ClientMfaStartResponse, ClientMfaStepStartRequest, ClientMfaStepStartResponse, MfaMethod,
-    MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
+use defguard_client_proto::defguard::{
+    client_types::{
+        mfa_flow_start_response, mfa_flow_step_finish_request, mfa_step_result, mfa_step_started,
+        ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+        ClientMfaStartResponse, MfaCodeCredential, MfaFido2Assertion, MfaFlowStartRequest,
+        MfaFlowStartResponse, MfaFlowStepFinishRequest, MfaFlowStepFinishResponse,
+        MfaFlowStepStartRequest, MfaFlowStepStartResponse, MfaMethod, MfaStartRejectionReason,
+        MfaStepRejection, MfaStepResult, MfaStepStarted,
+    },
+    enterprise::posture::v2::DevicePostureData,
 };
 use futures_util::{SinkExt, StreamExt};
 use reqwest::{Response, StatusCode, Url};
@@ -27,11 +33,10 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    database::models::Id,
     mfa_contract::MfaContract,
     proxy::{construct_platform_header, http_client, read_error_message},
-    version::{
-        mfa_contract_from_headers, CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION,
-    },
+    version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
 const ATTEMPT_LIMIT_MESSAGE: &str = "Too many failed MFA attempts. Please try connecting again.";
@@ -75,10 +80,50 @@ pub enum MfaError {
     Other { message: String },
 }
 
+pub struct MfaStartRequest {
+    pub location_id: i64,
+    pub pubkey: String,
+    pub posture_data: Option<DevicePostureData>,
+    pub selected_methods: Vec<MfaMethod>,
+}
+
 #[derive(Debug)]
-pub struct MfaStartResult {
-    pub response: ClientMfaStartResponse,
-    pub multi_step_mfa_capable: bool,
+pub struct MfaStepStartResponse {
+    pub step_attempt_id: Option<String>,
+    pub challenge: Option<String>,
+    pub credential_ids: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct MfaStartResponse {
+    pub token: String,
+    pub first_step: MfaStepStartResponse,
+}
+
+pub enum MfaSubmission {
+    Code(String),
+    Fido2(MfaFido2Assertion),
+}
+
+pub struct MfaFinishRequest {
+    pub token: String,
+    pub step_attempt_id: Option<String>,
+    pub submission: Option<MfaSubmission>,
+}
+
+#[derive(Debug)]
+pub struct MfaFinishResponse {
+    pub preshared_key: String,
+    pub result: Option<MfaStepResult>,
+}
+
+#[derive(Clone)]
+pub struct MfaAuthSession {
+    pub contract: MfaContract,
+    pub step_attempt_id: Option<String>,
+    pub instance_id: Id,
+    pub location_id: Id,
+    pub proxy_url: Url,
 }
 
 #[derive(Deserialize)]
@@ -121,79 +166,176 @@ async fn check_mfa_response(response: Response) -> Result<Response, MfaError> {
     }
 }
 
-/// Start an MFA handshake for a VPN location.
-///
-/// POSTs a `ClientMfaStartRequest` (proto JSON) to
-/// `/api/v1/client-mfa/start` and returns the session token (and
-/// optionally the biometric challenge).
-pub async fn mfa_start(
-    proxy_url: Url,
-    request: ClientMfaStartRequest,
-) -> Result<ClientMfaStartResponse, MfaError> {
-    Ok(mfa_start_with_capability(proxy_url, request)
-        .await?
-        .response)
+#[derive(Clone, Copy)]
+enum MfaRoute {
+    Start,
+    StepStart,
+    Finish,
+    Remote,
 }
 
-pub async fn mfa_start_with_capability(
-    proxy_url: Url,
-    request: ClientMfaStartRequest,
-) -> Result<MfaStartResult, MfaError> {
-    let client = http_client();
-
-    let url = proxy_url
-        .join("api/v1/client-mfa/start")
-        .map_err(|e| MfaError::Other {
-            message: format!("Failed to build MFA start URL: {e}"),
-        })?;
-
-    let mut req = client.post(url).json(&request);
-
-    for (k, v) in standard_headers() {
-        req = req.header(k, v);
+fn route_path(contract: MfaContract, route: MfaRoute) -> Option<&'static str> {
+    match (contract, route) {
+        (MfaContract::Legacy, MfaRoute::Start) => Some("api/v1/client-mfa/start"),
+        (MfaContract::Legacy, MfaRoute::Finish) => Some("api/v1/client-mfa/finish"),
+        (MfaContract::Legacy, MfaRoute::Remote) => Some("api/v1/client-mfa/remote"),
+        (MfaContract::MultiStep, MfaRoute::Start) => Some("api/v1/mfa-flow/start"),
+        (MfaContract::MultiStep, MfaRoute::StepStart) => Some("api/v1/mfa-flow/step-start"),
+        (MfaContract::MultiStep, MfaRoute::Finish) => Some("api/v1/mfa-flow/step-finish"),
+        (MfaContract::MultiStep, MfaRoute::Remote) => Some("api/v1/mfa-flow/remote"),
+        (MfaContract::Legacy, MfaRoute::StepStart) => None,
     }
+}
 
-    let response = req.send().await.map_err(|e| MfaError::NetworkError {
-        message: format!("Failed to reach proxy: {e}"),
-    })?;
-
-    #[allow(deprecated)]
-    let response = match check_mfa_response(response).await {
-        Ok(response) => response,
-        Err(err) => return Err(rewrap_mobile_start_error(request.method, err)),
+fn route_url(proxy_url: &Url, contract: MfaContract, route: MfaRoute) -> Result<Url, MfaError> {
+    let name = match route {
+        MfaRoute::Start => "MFA start",
+        MfaRoute::StepStart => "MFA step start",
+        MfaRoute::Finish => "MFA finish",
+        MfaRoute::Remote => "MFA remote",
     };
-    let multi_step_mfa_capable = matches!(
-        mfa_contract_from_headers(response.headers()),
-        MfaContract::MultiStep
-    );
-    let start_response: ClientMfaStartResponse =
-        response.json().await.map_err(|e| MfaError::Other {
-            message: format!("Invalid MFA start response: {e}"),
-        })?;
+    let path = route_path(contract, route).ok_or_else(|| MfaError::Other {
+        message: "The legacy MFA contract does not support step start".into(),
+    })?;
+    proxy_url.join(path).map_err(|e| MfaError::Other {
+        message: format!("Failed to build {name} URL: {e}"),
+    })
+}
 
-    if !start_response.rejections.is_empty() {
-        let messages: Vec<String> = start_response
-            .rejections
-            .iter()
-            .map(|rejection| {
-                rejection_message(
-                    rejection,
-                    request
-                        .selected_methods
-                        .get(rejection.step as usize)
-                        .copied(),
-                )
-            })
-            .collect();
-        return Err(MfaError::MfaRejected {
-            message: messages.join(" "),
+fn started_step(step: MfaStepStarted) -> Result<MfaStepStartResponse, MfaError> {
+    if step.step_attempt_id.is_empty() {
+        return Err(MfaError::Other {
+            message: "MFA flow response did not include a step attempt ID".into(),
         });
     }
-
-    Ok(MfaStartResult {
-        response: start_response,
-        multi_step_mfa_capable,
+    let (challenge, credential_ids) = match step.challenge {
+        Some(mfa_step_started::Challenge::Signature(challenge)) => {
+            (Some(challenge.challenge), Vec::new())
+        }
+        Some(mfa_step_started::Challenge::Fido2(challenge)) => {
+            (Some(challenge.challenge), challenge.credential_ids)
+        }
+        None => (None, Vec::new()),
+    };
+    Ok(MfaStepStartResponse {
+        step_attempt_id: Some(step.step_attempt_id),
+        challenge,
+        credential_ids,
     })
+}
+
+/// Start an MFA session using the persisted contract selected by the caller.
+pub async fn mfa_start(
+    contract: MfaContract,
+    proxy_url: Url,
+    request: MfaStartRequest,
+) -> Result<MfaStartResponse, MfaError> {
+    let Some(first_method) = request.selected_methods.first().copied() else {
+        return Err(MfaError::Other {
+            message: "MFA method plan is empty".into(),
+        });
+    };
+    let selected_methods = request
+        .selected_methods
+        .iter()
+        .map(|method| *method as i32)
+        .collect::<Vec<_>>();
+    let url = route_url(&proxy_url, contract, MfaRoute::Start)?;
+    let client = http_client();
+    let mut builder = match contract {
+        MfaContract::Legacy => {
+            #[allow(deprecated)]
+            let request = ClientMfaStartRequest {
+                location_id: request.location_id,
+                pubkey: request.pubkey,
+                method: first_method as i32,
+                posture_data: request.posture_data,
+            };
+            client.post(url).json(&request)
+        }
+        MfaContract::MultiStep => {
+            let request = MfaFlowStartRequest {
+                location_id: request.location_id,
+                pubkey: request.pubkey,
+                posture_data: request.posture_data,
+                selected_methods: selected_methods.clone(),
+            };
+            client.post(url).json(&request)
+        }
+    };
+    for (key, value) in standard_headers() {
+        builder = builder.header(key, value);
+    }
+    let response = builder.send().await.map_err(|e| MfaError::NetworkError {
+        message: format!("Failed to reach proxy: {e}"),
+    })?;
+    let response = match check_mfa_response(response).await {
+        Ok(response) => response,
+        Err(err) => return Err(rewrap_mobile_start_error(first_method as i32, err)),
+    };
+
+    match contract {
+        MfaContract::Legacy => {
+            let response: ClientMfaStartResponse =
+                response.json().await.map_err(|e| MfaError::Other {
+                    message: format!("Invalid MFA start response: {e}"),
+                })?;
+            if response.token.is_empty() {
+                return Err(MfaError::Other {
+                    message: "MFA start response did not include a token".into(),
+                });
+            }
+            Ok(MfaStartResponse {
+                token: response.token,
+                first_step: MfaStepStartResponse {
+                    step_attempt_id: None,
+                    challenge: response.challenge,
+                    credential_ids: Vec::new(),
+                },
+            })
+        }
+        MfaContract::MultiStep => {
+            let response: MfaFlowStartResponse =
+                response.json().await.map_err(|e| MfaError::Other {
+                    message: format!("Invalid MFA flow start response: {e}"),
+                })?;
+            let accepted = match response.outcome {
+                Some(mfa_flow_start_response::Outcome::Accepted(accepted)) => accepted,
+                Some(mfa_flow_start_response::Outcome::Rejected(rejected)) => {
+                    let messages = rejected
+                        .rejections
+                        .iter()
+                        .map(|rejection| {
+                            rejection_message(
+                                rejection,
+                                selected_methods.get(rejection.step as usize).copied(),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    return Err(MfaError::MfaRejected {
+                        message: messages.join(" "),
+                    });
+                }
+                None => {
+                    return Err(MfaError::Other {
+                        message: "MFA flow start response did not include an outcome".into(),
+                    });
+                }
+            };
+            if accepted.token.is_empty() {
+                return Err(MfaError::Other {
+                    message: "MFA flow start response did not include a token".into(),
+                });
+            }
+            let first_step = accepted.first_step.ok_or_else(|| MfaError::Other {
+                message: "MFA flow start response did not include the first step".into(),
+            })?;
+            Ok(MfaStartResponse {
+                token: accepted.token,
+                first_step: started_step(first_step)?,
+            })
+        }
+    }
 }
 
 fn rejection_message(rejection: &MfaStepRejection, selected_method: Option<i32>) -> String {
@@ -223,34 +365,32 @@ fn rejection_message(rejection: &MfaStepRejection, selected_method: Option<i32>)
 }
 
 pub async fn mfa_step_start(
+    contract: MfaContract,
     proxy_url: Url,
-    request: ClientMfaStepStartRequest,
-) -> Result<ClientMfaStepStartResponse, MfaError> {
-    let client = http_client();
-
-    let url = proxy_url
-        .join("api/v1/client-mfa/step-start")
-        .map_err(|e| MfaError::Other {
-            message: format!("Failed to build MFA step start URL: {e}"),
-        })?;
-
-    let mut request_builder = client.post(url).json(&request);
-
-    for (header_name, header_value) in standard_headers() {
-        request_builder = request_builder.header(header_name, header_value);
+    token: String,
+    method: MfaMethod,
+) -> Result<MfaStepStartResponse, MfaError> {
+    let request = MfaFlowStepStartRequest {
+        token,
+        method: method as i32,
+    };
+    let url = route_url(&proxy_url, contract, MfaRoute::StepStart)?;
+    let mut builder = http_client().post(url).json(&request);
+    for (key, value) in standard_headers() {
+        builder = builder.header(key, value);
     }
-
-    let response = request_builder
-        .send()
-        .await
-        .map_err(|e| MfaError::NetworkError {
-            message: format!("Failed to reach proxy: {e}"),
-        })?;
-
+    let response = builder.send().await.map_err(|e| MfaError::NetworkError {
+        message: format!("Failed to reach proxy: {e}"),
+    })?;
     let response = check_mfa_response(response).await?;
-    response.json().await.map_err(|e| MfaError::Other {
-        message: format!("Invalid MFA step start response: {e}"),
-    })
+    let response: MfaFlowStepStartResponse =
+        response.json().await.map_err(|e| MfaError::Other {
+            message: format!("Invalid MFA step start response: {e}"),
+        })?;
+    let started = response.started.ok_or_else(|| MfaError::Other {
+        message: "MFA step start response did not include a step".into(),
+    })?;
+    started_step(started)
 }
 
 /// Turn the proxy's generic "selected MFA method is not available" rejection
@@ -271,36 +411,108 @@ fn rewrap_mobile_start_error(method: i32, err: MfaError) -> MfaError {
     err
 }
 
-/// Finish an MFA handshake using a one-time code (TOTP or email).
-///
-/// POSTs a `ClientMfaFinishRequest` to `/api/v1/client-mfa/finish`
-/// and returns the preshared key.
-pub async fn mfa_finish_code(
-    proxy_url: Url,
-    request: ClientMfaFinishRequest,
-) -> Result<ClientMfaFinishResponse, MfaError> {
-    let client = http_client();
+fn finish_request_body(
+    contract: MfaContract,
+    request: MfaFinishRequest,
+) -> Result<serde_json::Value, MfaError> {
+    let value = match contract {
+        MfaContract::Legacy => {
+            if request.step_attempt_id.is_some() {
+                return Err(MfaError::Other {
+                    message: "Legacy MFA does not accept a step attempt ID".into(),
+                });
+            }
+            let (code, auth_pub_key) = match request.submission {
+                Some(MfaSubmission::Code(code)) => (Some(code), None),
+                None => (None, None),
+                Some(MfaSubmission::Fido2(_)) => {
+                    return Err(MfaError::Other {
+                        message: "FIDO2 requires the multi-step MFA contract".into(),
+                    });
+                }
+            };
+            #[allow(deprecated)]
+            serde_json::to_value(ClientMfaFinishRequest {
+                token: request.token,
+                code,
+                auth_pub_key,
+            })
+        }
+        MfaContract::MultiStep => {
+            let step_attempt_id = request
+                .step_attempt_id
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| MfaError::Other {
+                    message: "MFA flow request did not include a step attempt ID".into(),
+                })?;
+            let submission = request.submission.map(|submission| match submission {
+                MfaSubmission::Code(code) => {
+                    mfa_flow_step_finish_request::Submission::Code(MfaCodeCredential { code })
+                }
+                MfaSubmission::Fido2(assertion) => {
+                    mfa_flow_step_finish_request::Submission::Fido2(assertion)
+                }
+            });
+            serde_json::to_value(MfaFlowStepFinishRequest {
+                token: request.token,
+                step_attempt_id,
+                submission,
+            })
+        }
+    };
+    value.map_err(|e| MfaError::Other {
+        message: format!("Failed to encode MFA finish request: {e}"),
+    })
+}
 
-    let url = proxy_url
-        .join("api/v1/client-mfa/finish")
-        .map_err(|e| MfaError::Other {
-            message: format!("Failed to build MFA finish URL: {e}"),
-        })?;
-
-    let mut req = client.post(url).json(&request);
-
-    for (k, v) in standard_headers() {
-        req = req.header(k, v);
+async fn decode_finish_response(
+    contract: MfaContract,
+    response: Response,
+) -> Result<MfaFinishResponse, MfaError> {
+    match contract {
+        MfaContract::Legacy => {
+            #[allow(deprecated)]
+            let response: ClientMfaFinishResponse =
+                response.json().await.map_err(|e| MfaError::Other {
+                    message: format!("Invalid MFA finish response: {e}"),
+                })?;
+            Ok(MfaFinishResponse {
+                preshared_key: response.preshared_key,
+                result: None,
+            })
+        }
+        MfaContract::MultiStep => {
+            let response: MfaFlowStepFinishResponse =
+                response.json().await.map_err(|e| MfaError::Other {
+                    message: format!("Invalid MFA flow finish response: {e}"),
+                })?;
+            let result = response.result.ok_or_else(|| MfaError::Other {
+                message: "MFA flow finish response did not include a result".into(),
+            })?;
+            Ok(MfaFinishResponse {
+                preshared_key: String::new(),
+                result: Some(result),
+            })
+        }
     }
+}
 
-    let response = req.send().await.map_err(|e| MfaError::NetworkError {
+pub async fn mfa_finish(
+    contract: MfaContract,
+    proxy_url: Url,
+    request: MfaFinishRequest,
+) -> Result<MfaFinishResponse, MfaError> {
+    let url = route_url(&proxy_url, contract, MfaRoute::Finish)?;
+    let body = finish_request_body(contract, request)?;
+    let mut builder = http_client().post(url).json(&body);
+    for (key, value) in standard_headers() {
+        builder = builder.header(key, value);
+    }
+    let response = builder.send().await.map_err(|e| MfaError::NetworkError {
         message: format!("Failed to reach proxy: {e}"),
     })?;
-
     let response = check_mfa_response(response).await?;
-    response.json().await.map_err(|e| MfaError::Other {
-        message: format!("Invalid MFA finish response: {e}"),
-    })
+    decode_finish_response(contract, response).await
 }
 
 #[cfg(not(test))]
@@ -324,28 +536,23 @@ const MOBILE_APPROVE_PING_INTERVAL: Duration = Duration::from_secs(20);
 /// Polls Edge until OIDC MFA advances, completes, times out, or is cancelled.
 /// The browser must already be open. `AwaitingExternal` and legacy 428 responses keep polling.
 pub async fn poll_openid_mfa(
+    contract: MfaContract,
     proxy_url: Url,
     token: String,
     step_attempt_id: Option<String>,
     cancel: CancellationToken,
-) -> Result<ClientMfaFinishResponse, MfaError> {
+) -> Result<MfaFinishResponse, MfaError> {
     let client = http_client();
-    let url = proxy_url
-        .join("api/v1/client-mfa/finish")
-        .map_err(|e| MfaError::Other {
-            message: format!("Failed to build MFA finish URL: {e}"),
-        })?;
-
+    let url = route_url(&proxy_url, contract, MfaRoute::Finish)?;
+    let body = finish_request_body(
+        contract,
+        MfaFinishRequest {
+            token,
+            step_attempt_id,
+            submission: None,
+        },
+    )?;
     let deadline = Instant::now() + OIDC_POLL_TIMEOUT;
-
-    let request = ClientMfaFinishRequest {
-        token,
-        code: None,
-        auth_pub_key: None,
-        step_attempt_id,
-        auth_data: None,
-        credential_id: None,
-    };
 
     loop {
         let remaining = deadline
@@ -355,70 +562,50 @@ pub async fn poll_openid_mfa(
             return Err(MfaError::Timeout);
         }
 
-        let mut req = client.post(url.clone()).json(&request);
-        for (k, v) in standard_headers() {
-            req = req.header(k, v);
+        let mut request = client.post(url.clone()).json(&body);
+        for (key, value) in standard_headers() {
+            request = request.header(key, value);
         }
 
         select! {
-            () = cancel.cancelled() => {
-                return Err(MfaError::Cancelled);
-            }
-            result = req.send() => {
+            () = cancel.cancelled() => return Err(MfaError::Cancelled),
+            result = request.send() => {
                 let response = result.map_err(|err| MfaError::NetworkError {
                     message: format!("Failed to reach Edge: {err}"),
                 })?;
-
                 let status = response.status();
                 if status == StatusCode::OK {
-                    let response = response.json::<ClientMfaFinishResponse>().await.map_err(|e| {
-                        MfaError::Other {
-                            message: format!("Invalid MFA finish response: {e}"),
+                    let response = decode_finish_response(contract, response).await?;
+                    match response.result.as_ref().and_then(|result| result.outcome.as_ref()) {
+                        None if contract == MfaContract::Legacy => return Ok(response),
+                        Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {}
+                        Some(mfa_step_result::Outcome::Advanced(_) | mfa_step_result::Outcome::Completed(_)) => {
+                            return Ok(response);
                         }
-                    })?;
-
-                    match response.result.as_ref() {
-                        None => return Ok(response),
-                        Some(result) => match result.outcome.as_ref() {
-                            Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {}
-                            Some(
-                                mfa_step_result::Outcome::Advanced(_)
-                                | mfa_step_result::Outcome::Completed(_),
-                            ) => return Ok(response),
-                            None => {
-                                return Err(MfaError::Other {
-                                    message: "The server returned an unexpected verification state"
-                                        .to_string(),
-                                });
-                            }
-                        },
+                        None => {
+                            return Err(MfaError::Other {
+                                message: "The server returned an unexpected verification state".into(),
+                            });
+                        }
                     }
                 } else if status != StatusCode::PRECONDITION_REQUIRED {
                     return Err(check_mfa_response(response).await.err().unwrap_or(
-                        MfaError::Other {
-                            message: format!("Unexpected status: {status}"),
-                        },
+                        MfaError::Other { message: format!("Unexpected status: {status}") },
                     ));
                 }
-                // 428: not complete yet - fall through to sleep.
             }
         }
 
         select! {
-            () = cancel.cancelled() => {
-                return Err(MfaError::Cancelled);
-            }
+            () = cancel.cancelled() => return Err(MfaError::Cancelled),
             () = sleep(OIDC_POLL_INTERVAL) => {}
         }
     }
 }
 
 /// Return the preshared key only when the MFA session completed.
-///
-/// Intermediate responses contain no key. For legacy responses without a step
-/// result, use the top-level key.
 #[must_use]
-pub fn completed_preshared_key(response: &ClientMfaFinishResponse) -> Option<String> {
+pub fn completed_preshared_key(response: &MfaFinishResponse) -> Option<String> {
     let key = match response
         .result
         .as_ref()
@@ -426,8 +613,6 @@ pub fn completed_preshared_key(response: &ClientMfaFinishResponse) -> Option<Str
     {
         Some(mfa_step_result::Outcome::Completed(completed)) => &completed.preshared_key,
         Some(_) => return None,
-        // Older Edge responses and mobile-approve frames have no step outcome.
-        #[allow(deprecated)]
         None => &response.preshared_key,
     };
     (!key.is_empty()).then(|| key.clone())
@@ -438,7 +623,7 @@ pub fn completed_preshared_key(response: &ClientMfaFinishResponse) -> Option<Str
 pub async fn connect_mobile_approve(
     ws_url: &str,
     cancel: CancellationToken,
-) -> Result<ClientMfaFinishResponse, MfaError> {
+) -> Result<MfaFinishResponse, MfaError> {
     let (ws_stream, _response) =
         connect_async(ws_url)
             .await
@@ -455,14 +640,14 @@ pub async fn connect_mobile_approve(
     wait_for_mfa_outcome(ws_stream, cancel).await
 }
 
-/// Derive the WebSocket URL from the proxy's base URL and MFA token.
-pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> {
-    let mut ws_url = proxy_base
-        .join("api/v1/client-mfa/remote")
-        .map_err(|e| MfaError::Other {
-            message: format!("Failed to build WebSocket URL: {e}"),
-        })?;
-
+/// Derive the contract-specific WebSocket URL from the proxy base and session identifiers.
+pub fn derive_ws_url(
+    contract: MfaContract,
+    proxy_base: &Url,
+    token: &str,
+    step_attempt_id: Option<&str>,
+) -> Result<String, MfaError> {
+    let mut ws_url = route_url(proxy_base, contract, MfaRoute::Remote)?;
     let ws_scheme = match proxy_base.scheme() {
         "https" => "wss",
         "http" => "ws",
@@ -476,7 +661,18 @@ pub fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> 
     ws_url.set_scheme(ws_scheme).map_err(|()| MfaError::Other {
         message: "Failed to set WebSocket URL scheme".into(),
     })?;
-    ws_url.query_pairs_mut().append_pair("token", token);
+    let mut query = ws_url.query_pairs_mut();
+    query.append_pair("token", token);
+    if contract == MfaContract::MultiStep {
+        let step_attempt_id =
+            step_attempt_id
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| MfaError::Other {
+                    message: "MFA flow remote request did not include a step attempt ID".into(),
+                })?;
+        query.append_pair("step_attempt_id", step_attempt_id);
+    }
+    drop(query);
 
     Ok(ws_url.to_string())
 }
@@ -504,7 +700,7 @@ fn read_error_label(err: &WsError) -> String {
 async fn wait_for_mfa_outcome(
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     cancel: CancellationToken,
-) -> Result<ClientMfaFinishResponse, MfaError> {
+) -> Result<MfaFinishResponse, MfaError> {
     let (mut write, mut read) = ws_stream.split();
     let deadline = Instant::now() + MOBILE_APPROVE_TIMEOUT;
     // Preserve Edge's close reason for the user-facing error.
@@ -556,19 +752,15 @@ async fn wait_for_mfa_outcome(
                         });
                     }
 
-                    #[allow(deprecated)]
-                    return Ok(ClientMfaFinishResponse {
+                    return Ok(MfaFinishResponse {
                         preshared_key,
-                        token: None,
                         result: None,
                     });
                 }
                 // An intermediate result has no key; the caller checks its outcome.
                 Ok(MobileMfaResponse::Result { result }) => {
-                    #[allow(deprecated)]
-                    return Ok(ClientMfaFinishResponse {
+                    return Ok(MfaFinishResponse {
                         preshared_key: String::new(),
-                        token: None,
                         result: Some(result),
                     });
                 }

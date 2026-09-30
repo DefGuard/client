@@ -29,10 +29,8 @@ use defguard_core::{
         DbPool,
     },
     mfa,
-    proto::client_types::{
-        mfa_step_result, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
-        ClientMfaStartResponse, ClientMfaStepStartRequest, ClientMfaStepStartResponse,
-    },
+    mfa_contract::MfaContract,
+    proto::client_types::mfa_step_result,
 };
 use secrecy::{ExposeSecret, SecretString};
 use tokio_util::sync::CancellationToken;
@@ -154,6 +152,16 @@ fn is_cli_drivable_method(method: LocationMfaMethod) -> bool {
             | LocationMfaMethod::Oidc
             | LocationMfaMethod::MobileApprove
     )
+}
+
+fn ensure_multistep_contract(contract: MfaContract) -> Result<(), CliError> {
+    if contract == MfaContract::MultiStep {
+        Ok(())
+    } else {
+        Err(CliError::MfaFailed(
+            "This location's MFA plan requires the multi-step MFA contract".into(),
+        ))
+    }
 }
 
 /// Format a step prefix such as `[2/4] `.
@@ -346,19 +354,14 @@ fn prompt_step_method(
     }
 }
 
-/// Start an MFA session and return its proxy URL and response.
-///
-/// `selected_methods` carries one method per verification step. An empty list makes
-/// Core use the legacy path, which rejects flows it cannot express through the legacy
-/// field and tells the user to update the client. Keep `method` populated for pre-2.2 Edge, which ignores the per-step plan.
+/// Start an MFA session using the contract persisted for the instance.
 async fn start_session(
     location: &Location<Id>,
     instance: &Instance<Id>,
-    method: MfaMethod,
-    selected_methods: Vec<i32>,
+    selected_methods: Vec<MfaMethod>,
     posture_data: Option<DevicePostureData>,
     pool: &DbPool,
-) -> Result<(Url, ClientMfaStartResponse, bool), CliError> {
+) -> Result<(Url, mfa::MfaStartResponse, MfaContract), CliError> {
     let wireguard_keys = WireguardKeys::find_by_instance_id(pool, instance.id)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?
@@ -374,19 +377,21 @@ async fn start_session(
     check_proxy_scheme(&proxy_url);
 
     debug!("Starting MFA session for location {}", location.name);
-    #[allow(deprecated)]
-    let request = ClientMfaStartRequest {
-        location_id: location.network_id,
-        pubkey: wireguard_keys.pubkey,
-        method: method as i32,
-        posture_data,
-        selected_methods,
-    };
-    let start = mfa::mfa_start_with_capability(proxy_url.clone(), request)
-        .await
-        .map_err(into_cli)?;
+    let contract = instance.mfa_contract;
+    let start = mfa::mfa_start(
+        contract,
+        proxy_url.clone(),
+        mfa::MfaStartRequest {
+            location_id: location.network_id,
+            pubkey: wireguard_keys.pubkey,
+            posture_data,
+            selected_methods,
+        },
+    )
+    .await
+    .map_err(into_cli)?;
 
-    Ok((proxy_url, start.response, start.multi_step_mfa_capable))
+    Ok((proxy_url, start, contract))
 }
 
 /// Reject methods that `authorize` cannot run.
@@ -418,15 +423,8 @@ pub(crate) async fn authorize(
 ) -> Result<SecretString, CliError> {
     check_code_method(method)?;
 
-    let (proxy_url, info, _) = start_session(
-        location,
-        instance,
-        method,
-        vec![method as i32],
-        posture_data,
-        pool,
-    )
-    .await?;
+    let (proxy_url, info, contract) =
+        start_session(location, instance, vec![method], posture_data, pool).await?;
 
     let ctx = MfaContext {
         instance: instance.name.clone(),
@@ -435,19 +433,19 @@ pub(crate) async fn authorize(
     };
     let code = obtain_code(source, &ctx)?;
 
-    let finish_req = ClientMfaFinishRequest {
-        token: info.token,
-        code: Some(code.expose_secret().to_string()),
-        auth_pub_key: None,
-        step_attempt_id: None,
-        auth_data: None,
-        credential_id: None,
-    };
-    let psk = mfa::mfa_finish_code(proxy_url, finish_req)
-        .await
-        .map_err(into_cli)?;
+    let finish = mfa::mfa_finish(
+        contract,
+        proxy_url,
+        mfa::MfaFinishRequest {
+            token: info.token,
+            step_attempt_id: info.first_step.step_attempt_id,
+            submission: Some(mfa::MfaSubmission::Code(code.expose_secret().to_string())),
+        },
+    )
+    .await
+    .map_err(into_cli)?;
 
-    finish_psk(psk)?.ok_or_else(|| {
+    finish_psk(finish, contract)?.ok_or_else(|| {
         CliError::Other("The server returned an unexpected verification state".into())
     })
 }
@@ -468,34 +466,29 @@ pub(crate) async fn authorize_multistep(
     qr_file: Option<&str>,
     json_mode: bool,
 ) -> Result<SecretString, CliError> {
-    let Some((first, _)) = plan.split_first() else {
+    if plan.is_empty() {
         return Err(CliError::Other("MFA step plan is empty".into()));
-    };
+    }
+    ensure_multistep_contract(instance.mfa_contract)?;
 
     debug!(
         "Starting multi-step MFA session for location {} ({} steps)",
         location.name,
         plan.len()
     );
-    let (proxy_url, info, capable) = start_session(
-        location,
-        instance,
-        *first,
-        plan.iter().map(|method| *method as i32).collect(),
-        posture_data,
-        pool,
-    )
-    .await?;
-    if !capable {
-        debug!("Edge or Core does not support multi-step MFA; using the legacy flow");
-    }
+    let (proxy_url, info, contract) =
+        start_session(location, instance, plan.to_vec(), posture_data, pool).await?;
 
     let token = info.token;
+    let mut first_step = Some(info.first_step);
     for (index, method) in plan.iter().enumerate() {
         debug!("Running MFA step {}/{} ({method:?})", index + 1, plan.len());
 
-        let step = if capable {
-            Some(step_start(&proxy_url, &token, *method).await?)
+        let step = if contract == MfaContract::MultiStep {
+            Some(match first_step.take() {
+                Some(step) => step,
+                None => step_start(contract, &proxy_url, &token, *method).await?,
+            })
         } else {
             None
         };
@@ -520,15 +513,17 @@ pub(crate) async fn authorize_multistep(
                 };
                 let code = obtain_code(&source, &ctx)?;
 
-                mfa::mfa_finish_code(
+                mfa::mfa_finish(
+                    contract,
                     proxy_url.clone(),
-                    ClientMfaFinishRequest {
+                    mfa::MfaFinishRequest {
                         token: token.clone(),
-                        code: Some(code.expose_secret().to_string()),
-                        auth_pub_key: None,
-                        step_attempt_id: step.map(|step| step.step_attempt_id),
-                        auth_data: None,
-                        credential_id: None,
+                        step_attempt_id: step
+                            .as_ref()
+                            .and_then(|step| step.step_attempt_id.clone()),
+                        submission: Some(mfa::MfaSubmission::Code(
+                            code.expose_secret().to_string(),
+                        )),
                     },
                 )
                 .await
@@ -536,25 +531,30 @@ pub(crate) async fn authorize_multistep(
             }
             MfaMethod::Oidc => {
                 run_oidc_step(
+                    contract,
                     &proxy_url,
                     &token,
-                    step.map(|step| step.step_attempt_id),
+                    step.and_then(|step| step.step_attempt_id),
                     Some(&step_ctx),
                     json_mode,
                 )
                 .await?
             }
             MfaMethod::MobileApprove => {
-                let challenge = match &step {
-                    Some(step) => step.challenge.clone(),
-                    None => info.challenge.clone(),
-                }
-                .ok_or_else(|| {
-                    CliError::Other("Edge did not return a challenge for mobile-approve MFA".into())
-                })?;
+                let challenge = step
+                    .as_ref()
+                    .and_then(|step| step.challenge.clone())
+                    .ok_or_else(|| {
+                        CliError::Other(
+                            "Edge did not return a challenge for mobile-approve MFA".into(),
+                        )
+                    })?;
                 run_mobile_step(
+                    contract,
                     &proxy_url,
                     &token,
+                    step.as_ref()
+                        .and_then(|step| step.step_attempt_id.as_deref()),
                     &challenge,
                     &instance.uuid,
                     qr_file,
@@ -572,7 +572,7 @@ pub(crate) async fn authorize_multistep(
             }
         };
 
-        if let Some(psk) = finish_psk(finish)? {
+        if let Some(psk) = finish_psk(finish, contract)? {
             return Ok(psk);
         }
     }
@@ -584,30 +584,33 @@ pub(crate) async fn authorize_multistep(
 
 /// Open a step on an existing session.
 async fn step_start(
+    contract: MfaContract,
     proxy_url: &Url,
     token: &str,
     method: MfaMethod,
-) -> Result<ClientMfaStepStartResponse, CliError> {
-    mfa::mfa_step_start(
-        proxy_url.clone(),
-        ClientMfaStepStartRequest {
-            token: token.to_string(),
-            method: method as i32,
-        },
-    )
-    .await
-    .map_err(into_cli)
+) -> Result<mfa::MfaStepStartResponse, CliError> {
+    mfa::mfa_step_start(contract, proxy_url.clone(), token.to_string(), method)
+        .await
+        .map_err(into_cli)
 }
 
 /// Extract a preshared key from a finish response.
 ///
 /// Return `None` when the server advanced to another step.
-fn finish_psk(finish: ClientMfaFinishResponse) -> Result<Option<SecretString>, CliError> {
-    if let Some(mfa_step_result::Outcome::AwaitingExternal(_)) = finish
+fn finish_psk(
+    finish: mfa::MfaFinishResponse,
+    contract: MfaContract,
+) -> Result<Option<SecretString>, CliError> {
+    let outcome = finish
         .result
         .as_ref()
-        .and_then(|result| result.outcome.as_ref())
-    {
+        .and_then(|result| result.outcome.as_ref());
+    if contract == MfaContract::MultiStep && outcome.is_none() {
+        return Err(CliError::Other(
+            "MFA flow response did not include an outcome".into(),
+        ));
+    }
+    if matches!(outcome, Some(mfa_step_result::Outcome::AwaitingExternal(_))) {
         return Err(CliError::Other(
             "The server returned an unexpected verification state".into(),
         ));
@@ -661,12 +664,13 @@ fn oidc_browser_url(
 
 /// Open the OIDC page and poll for the result.
 async fn run_oidc_step(
+    contract: MfaContract,
     proxy_url: &Url,
     token: &str,
     step_attempt_id: Option<String>,
     step: Option<&MfaStepContext>,
     json_mode: bool,
-) -> Result<ClientMfaFinishResponse, CliError> {
+) -> Result<mfa::MfaFinishResponse, CliError> {
     let browser_url = oidc_browser_url(proxy_url, token, step_attempt_id.as_deref())?;
 
     let badge = opt_step_badge(step);
@@ -679,6 +683,7 @@ async fn run_oidc_step(
 
     with_ctrl_c(|cancel| {
         mfa::poll_openid_mfa(
+            contract,
             proxy_url.clone(),
             token.to_string(),
             step_attempt_id,
@@ -690,15 +695,18 @@ async fn run_oidc_step(
 }
 
 /// Show a mobile-approval QR code and wait for the WebSocket result.
+#[allow(clippy::too_many_arguments)]
 async fn run_mobile_step(
+    contract: MfaContract,
     proxy_url: &Url,
     token: &str,
+    step_attempt_id: Option<&str>,
     challenge: &str,
     instance_uuid: &str,
     qr_file: Option<&str>,
     step: Option<&MfaStepContext>,
     json_mode: bool,
-) -> Result<ClientMfaFinishResponse, CliError> {
+) -> Result<mfa::MfaFinishResponse, CliError> {
     let badge = opt_step_badge(step);
     let payload = mfa_qr::build_qr_payload(token, challenge, instance_uuid);
     mfa_qr::render_qr(&payload, qr_file, &badge, json_mode)?;
@@ -706,7 +714,8 @@ async fn run_mobile_step(
         eprintln!("{badge}Waiting for mobile approval... (Ctrl-C to cancel)");
     }
 
-    let ws_url = mfa::derive_ws_url(proxy_url, token).map_err(into_cli)?;
+    let ws_url =
+        mfa::derive_ws_url(contract, proxy_url, token, step_attempt_id).map_err(into_cli)?;
 
     with_ctrl_c(|cancel| mfa::connect_mobile_approve(&ws_url, cancel))
         .await
@@ -727,18 +736,25 @@ pub(crate) async fn authorize_oidc(
     pool: &DbPool,
     json_mode: bool,
 ) -> Result<SecretString, CliError> {
-    let (proxy_url, info, _) = start_session(
+    let (proxy_url, info, contract) = start_session(
         location,
         instance,
-        MfaMethod::Oidc,
-        vec![MfaMethod::Oidc as i32],
+        vec![MfaMethod::Oidc],
         posture_data,
         pool,
     )
     .await?;
 
-    let finish = run_oidc_step(&proxy_url, &info.token, None, None, json_mode).await?;
-    finish_psk(finish)?.ok_or_else(|| {
+    let finish = run_oidc_step(
+        contract,
+        &proxy_url,
+        &info.token,
+        info.first_step.step_attempt_id,
+        None,
+        json_mode,
+    )
+    .await?;
+    finish_psk(finish, contract)?.ok_or_else(|| {
         CliError::Other("The server returned an unexpected verification state".into())
     })
 }
@@ -758,23 +774,24 @@ pub(crate) async fn authorize_mobile_approve(
     pool: &DbPool,
     json_mode: bool,
 ) -> Result<SecretString, CliError> {
-    let (proxy_url, info, _) = start_session(
+    let (proxy_url, info, contract) = start_session(
         location,
         instance,
-        MfaMethod::MobileApprove,
-        vec![MfaMethod::MobileApprove as i32],
+        vec![MfaMethod::MobileApprove],
         posture_data,
         pool,
     )
     .await?;
 
-    let challenge = info.challenge.ok_or_else(|| {
+    let challenge = info.first_step.challenge.ok_or_else(|| {
         CliError::Other("Edge did not return a challenge for mobile-approve MFA".into())
     })?;
 
     let finish = run_mobile_step(
+        contract,
         &proxy_url,
         &info.token,
+        info.first_step.step_attempt_id.as_deref(),
         &challenge,
         &instance.uuid,
         qr_file,
@@ -782,7 +799,7 @@ pub(crate) async fn authorize_mobile_approve(
         json_mode,
     )
     .await?;
-    finish_psk(finish)?.ok_or_else(|| {
+    finish_psk(finish, contract)?.ok_or_else(|| {
         CliError::Other("The server returned an unexpected verification state".into())
     })
 }
@@ -857,6 +874,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_finish_psk_uses_contract_for_completion() {
+        let legacy = mfa::MfaFinishResponse {
+            preshared_key: "legacy-key".into(),
+            result: None,
+        };
+        assert_eq!(
+            finish_psk(legacy, MfaContract::Legacy)
+                .unwrap()
+                .unwrap()
+                .expose_secret(),
+            "legacy-key"
+        );
+
+        let missing_flow_result = mfa::MfaFinishResponse {
+            preshared_key: "legacy-key".into(),
+            result: None,
+        };
+        assert!(matches!(
+            finish_psk(missing_flow_result, MfaContract::MultiStep),
+            Err(CliError::Other(message))
+                if message == "MFA flow response did not include an outcome"
+        ));
+    }
+
+    #[test]
     fn decimal_digits_matches_string_length() {
         for n in [0, 1, 9, 10, 99, 100, 999, 1000, usize::MAX] {
             assert_eq!(decimal_digits(n), n.to_string().len());
@@ -884,6 +926,12 @@ mod tests {
             mfa_method: None,
             posture_check_required: false,
         }
+    }
+
+    #[test]
+    fn test_multistep_plan_requires_multi_step_contract() {
+        assert!(ensure_multistep_contract(MfaContract::Legacy).is_err());
+        assert!(ensure_multistep_contract(MfaContract::MultiStep).is_ok());
     }
 
     #[test]

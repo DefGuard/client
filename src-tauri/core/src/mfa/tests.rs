@@ -1,7 +1,11 @@
 use defguard_client_proto::defguard::client_types::{
-    MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaStepResult,
+    mfa_flow_start_response, mfa_flow_step_finish_request, mfa_step_result, mfa_step_started,
+    ClientMfaFinishRequest, MfaAdvanced, MfaAwaitingExternal, MfaCompleted, MfaFido2Assertion,
+    MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartRejected, MfaFlowStartResponse,
+    MfaFlowStepFinishRequest, MfaFlowStepFinishResponse, MfaFlowStepStartResponse,
+    MfaSignatureChallenge, MfaStepRejection, MfaStepResult, MfaStepStarted,
 };
-use reqwest::{StatusCode, Url};
+use reqwest::Url;
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use wiremock::{
@@ -10,22 +14,58 @@ use wiremock::{
 };
 
 use super::*;
-use crate::{
-    test_helpers::{start_ws_stub, WsStubCommand},
-    version::{CORE_CONNECTED_HEADER, CORE_VERSION_HEADER, PROXY_VERSION_HEADER},
-};
+use crate::test_helpers::{start_ws_stub, WsStubCommand};
 
 fn mock_url(server: &MockServer) -> Url {
     Url::parse(&server.uri()).expect("MockServer URI should be valid")
 }
 
-fn start_request() -> ClientMfaStartRequest {
-    ClientMfaStartRequest {
+async fn mfa_start(proxy_url: Url, request: MfaStartRequest) -> Result<MfaStartResponse, MfaError> {
+    super::mfa_start(MfaContract::Legacy, proxy_url, request).await
+}
+
+async fn mfa_finish_code(
+    proxy_url: Url,
+    request: ClientMfaFinishRequest,
+) -> Result<MfaFinishResponse, MfaError> {
+    super::mfa_finish(
+        MfaContract::Legacy,
+        proxy_url,
+        MfaFinishRequest {
+            token: request.token,
+            step_attempt_id: None,
+            submission: request.code.map(MfaSubmission::Code),
+        },
+    )
+    .await
+}
+
+async fn poll_openid_mfa(
+    proxy_url: Url,
+    token: String,
+    step_attempt_id: Option<String>,
+    cancel: CancellationToken,
+) -> Result<MfaFinishResponse, MfaError> {
+    super::poll_openid_mfa(
+        MfaContract::Legacy,
+        proxy_url,
+        token,
+        step_attempt_id,
+        cancel,
+    )
+    .await
+}
+
+fn derive_ws_url(proxy_base: &Url, token: &str) -> Result<String, MfaError> {
+    super::derive_ws_url(MfaContract::Legacy, proxy_base, token, None)
+}
+
+fn start_request() -> MfaStartRequest {
+    MfaStartRequest {
         location_id: 1,
         pubkey: "pk".into(),
-        method: 0, // TOTP
         posture_data: None,
-        selected_methods: Vec::new(),
+        selected_methods: vec![MfaMethod::Totp],
     }
 }
 
@@ -36,38 +76,52 @@ fn start_response_json(token: &str) -> serde_json::Value {
     })
 }
 
-fn start_response_template(
-    core_version: Option<&str>,
-    proxy_version: Option<&str>,
-) -> ResponseTemplate {
-    let mut response = ResponseTemplate::new(StatusCode::OK.as_u16())
-        .set_body_json(start_response_json("mfa-token"))
-        .insert_header(CORE_CONNECTED_HEADER, "true");
-    if let Some(version) = core_version {
-        response = response.insert_header(CORE_VERSION_HEADER, version);
-    }
-    if let Some(version) = proxy_version {
-        response = response.insert_header(PROXY_VERSION_HEADER, version);
-    }
-    response
-}
-
 fn finish_response_json(key: &str) -> serde_json::Value {
     json!({
         "preshared_key": key,
     })
 }
 
-#[allow(deprecated)]
 fn finish_response_json_with_result(outcome: mfa_step_result::Outcome) -> serde_json::Value {
-    serde_json::to_value(ClientMfaFinishResponse {
-        preshared_key: String::new(),
-        token: None,
+    serde_json::to_value(MfaFlowStepFinishResponse {
         result: Some(MfaStepResult {
             outcome: Some(outcome),
         }),
     })
-    .expect("MFA finish response should serialize")
+    .expect("MFA flow finish response should serialize")
+}
+
+fn flow_start_response_json(token: &str, attempt_id: &str, challenge: &str) -> serde_json::Value {
+    serde_json::to_value(MfaFlowStartResponse {
+        outcome: Some(mfa_flow_start_response::Outcome::Accepted(
+            MfaFlowStartAccepted {
+                token: token.into(),
+                first_step: Some(MfaStepStarted {
+                    step_attempt_id: attempt_id.into(),
+                    challenge: Some(mfa_step_started::Challenge::Signature(
+                        MfaSignatureChallenge {
+                            challenge: challenge.into(),
+                        },
+                    )),
+                }),
+            },
+        )),
+    })
+    .expect("MFA flow start response should serialize")
+}
+
+fn flow_start_rejected_json(step: u32, reason: MfaStartRejectionReason) -> serde_json::Value {
+    serde_json::to_value(MfaFlowStartResponse {
+        outcome: Some(mfa_flow_start_response::Outcome::Rejected(
+            MfaFlowStartRejected {
+                rejections: vec![MfaStepRejection {
+                    step,
+                    reason: reason as i32,
+                }],
+            },
+        )),
+    })
+    .expect("MFA flow rejection response should serialize")
 }
 
 fn mobile_result_frame(outcome: mfa_step_result::Outcome) -> String {
@@ -94,69 +148,80 @@ async fn test_mfa_start_success() {
     let url = mock_url(&server);
     let info = mfa_start(url, start_request()).await.unwrap();
     assert_eq!(info.token, "mfa-token-1");
-    assert!(info.challenge.is_none());
+    assert!(info.first_step.challenge.is_none());
 }
 
 #[tokio::test]
-async fn test_mfa_start_with_capability_accepts_supported_versions() {
+async fn test_mfa_start_selects_multi_step_route_from_contract() {
     let server = MockServer::start().await;
-
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/start"))
-        .respond_with(start_response_template(Some("2.2.0"), Some("2.2.0")))
+        .and(path("/api/v1/mfa-flow/start"))
+        .and(body_partial_json(json!({
+            "location_id": 1,
+            "pubkey": "pk",
+            "selected_methods": [MfaMethod::Totp as i32],
+        })))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(flow_start_response_json(
+                "flow-token",
+                "attempt-1",
+                "challenge-1",
+            )),
+        )
+        .expect(1)
         .mount(&server)
         .await;
 
-    let result = mfa_start_with_capability(mock_url(&server), start_request())
+    let response = super::mfa_start(MfaContract::MultiStep, mock_url(&server), start_request())
         .await
         .unwrap();
-
-    assert_eq!(result.response.token, "mfa-token");
-    assert!(result.multi_step_mfa_capable);
+    assert_eq!(response.token, "flow-token");
+    assert_eq!(
+        response.first_step.step_attempt_id.as_deref(),
+        Some("attempt-1")
+    );
+    assert_eq!(
+        response.first_step.challenge.as_deref(),
+        Some("challenge-1")
+    );
+    server.verify().await;
 }
 
 #[tokio::test]
-async fn test_mfa_start_with_capability_accepts_prerelease_version() {
+async fn test_mfa_step_start_returns_typed_fido2_challenge() {
     let server = MockServer::start().await;
+    let body = serde_json::to_value(MfaFlowStepStartResponse {
+        started: Some(MfaStepStarted {
+            step_attempt_id: "attempt-2".into(),
+            challenge: Some(mfa_step_started::Challenge::Fido2(MfaFido2Challenge {
+                challenge: "fido-challenge".into(),
+                credential_ids: vec!["credential-1".into()],
+            })),
+        }),
+    })
+    .unwrap();
 
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/start"))
-        .respond_with(start_response_template(Some("2.2.0-alpha1"), Some("2.2.0")))
+        .and(path("/api/v1/mfa-flow/step-start"))
+        .and(body_partial_json(json!({
+            "token": "flow-token",
+            "method": MfaMethod::Fido2 as i32,
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
         .mount(&server)
         .await;
 
-    let result = mfa_start_with_capability(mock_url(&server), start_request())
-        .await
-        .unwrap();
-
-    assert!(result.multi_step_mfa_capable);
-}
-
-#[tokio::test]
-async fn test_mfa_start_with_capability_requires_supported_versions() {
-    let cases = [
-        ("missing core version", None, Some("2.2.0")),
-        ("missing proxy version", Some("2.2.0"), None),
-        ("invalid core version", Some("invalid"), Some("2.2.0")),
-        ("invalid proxy version", Some("2.2.0"), Some("invalid")),
-        ("old core version", Some("2.1.9"), Some("2.2.0")),
-        ("old proxy version", Some("2.2.0"), Some("2.1.9")),
-    ];
-
-    for (case, core_version, proxy_version) in cases {
-        let server = MockServer::start().await;
-        Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/start"))
-            .respond_with(start_response_template(core_version, proxy_version))
-            .mount(&server)
-            .await;
-
-        let result = mfa_start_with_capability(mock_url(&server), start_request())
-            .await
-            .unwrap();
-
-        assert!(!result.multi_step_mfa_capable, "{case}");
-    }
+    let response = super::mfa_step_start(
+        MfaContract::MultiStep,
+        mock_url(&server),
+        "flow-token".into(),
+        MfaMethod::Fido2,
+    )
+    .await
+    .unwrap();
+    assert_eq!(response.step_attempt_id.as_deref(), Some("attempt-2"));
+    assert_eq!(response.challenge.as_deref(), Some("fido-challenge"));
+    assert_eq!(response.credential_ids, vec!["credential-1"]);
 }
 
 #[tokio::test]
@@ -275,12 +340,9 @@ async fn test_mfa_start_mobile_no_authenticator_guidance() {
         .await;
 
     let url = mock_url(&server);
-    let request = ClientMfaStartRequest {
-        location_id: 1,
-        pubkey: "pk".into(),
-        method: MfaMethod::MobileApprove as i32,
-        posture_data: None,
-        selected_methods: Vec::new(),
+    let request = MfaStartRequest {
+        selected_methods: vec![MfaMethod::MobileApprove],
+        ..start_request()
     };
     match mfa_start(url, request).await.unwrap_err() {
         MfaError::MfaRejected { message } => {
@@ -321,60 +383,49 @@ async fn test_mfa_start_non_mobile_not_rewrapped() {
 }
 
 #[tokio::test]
-async fn test_mfa_start_keeps_legacy_method_beside_the_plan() {
-    // Pre-2.2 Edge ignores `selected_methods` and reads only the deprecated `method` field.
-    // Keep both fields so older Edge versions continue to work.
+async fn test_mfa_start_sends_frozen_legacy_request_fields() {
+    // The legacy wire request stays frozen while the flow route uses the new message.
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))
         .and(path("/api/v1/client-mfa/start"))
         .and(body_partial_json(json!({
             "method": MfaMethod::Totp as i32,
-            "selected_methods": [MfaMethod::Totp as i32],
         })))
         .respond_with(ResponseTemplate::new(200).set_body_json(start_response_json("t")))
         .mount(&server)
         .await;
 
     let url = mock_url(&server);
-    let request = ClientMfaStartRequest {
-        location_id: 1,
-        pubkey: "pk".into(),
-        method: MfaMethod::Totp as i32,
-        posture_data: None,
-        selected_methods: vec![MfaMethod::Totp as i32],
-    };
+    let request = start_request();
     mfa_start(url, request)
         .await
         .expect("request body did not match the expected wire contract");
 }
 
 #[tokio::test]
-async fn test_mfa_start_rejection_keeps_mobile_guidance() {
+async fn test_mfa_flow_rejection_keeps_mobile_guidance() {
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/start"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "token": "",
-            "challenge": null,
-            "rejections": [{
-                "step": 0,
-                "reason": MfaStartRejectionReason::MfaStartRejectionStepUnavailable as i32,
-            }],
-        })))
+        .and(path("/api/v1/mfa-flow/start"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(flow_start_rejected_json(
+                0,
+                MfaStartRejectionReason::MfaStartRejectionStepUnavailable,
+            )),
+        )
         .mount(&server)
         .await;
 
-    let url = mock_url(&server);
-    let request = ClientMfaStartRequest {
-        location_id: 1,
-        pubkey: "pk".into(),
-        method: MfaMethod::MobileApprove as i32,
-        posture_data: None,
-        selected_methods: vec![MfaMethod::MobileApprove as i32],
+    let request = MfaStartRequest {
+        selected_methods: vec![MfaMethod::MobileApprove],
+        ..start_request()
     };
-    match mfa_start(url, request).await.unwrap_err() {
+    match super::mfa_start(MfaContract::MultiStep, mock_url(&server), request)
+        .await
+        .unwrap_err()
+    {
         MfaError::MfaRejected { message } => {
             assert!(
                 message.contains("mobile app"),
@@ -386,31 +437,25 @@ async fn test_mfa_start_rejection_keeps_mobile_guidance() {
 }
 
 #[tokio::test]
-async fn test_mfa_start_rejection_non_mobile_step_stays_generic() {
+async fn test_mfa_flow_rejection_non_mobile_step_stays_generic() {
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/start"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "token": "",
-            "challenge": null,
-            "rejections": [{
-                "step": 0,
-                "reason": MfaStartRejectionReason::MfaStartRejectionStepUnavailable as i32,
-            }],
-        })))
+        .and(path("/api/v1/mfa-flow/start"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(flow_start_rejected_json(
+                0,
+                MfaStartRejectionReason::MfaStartRejectionStepUnavailable,
+            )),
+        )
         .mount(&server)
         .await;
 
-    let url = mock_url(&server);
-    let request = ClientMfaStartRequest {
-        location_id: 1,
-        pubkey: "pk".into(),
-        method: MfaMethod::Totp as i32,
-        posture_data: None,
-        selected_methods: vec![MfaMethod::Totp as i32],
-    };
-    match mfa_start(url, request).await.unwrap_err() {
+    let request = start_request();
+    match super::mfa_start(MfaContract::MultiStep, mock_url(&server), request)
+        .await
+        .unwrap_err()
+    {
         MfaError::MfaRejected { message } => {
             assert!(
                 !message.contains("mobile app"),
@@ -428,6 +473,9 @@ async fn test_mfa_finish_code_success() {
 
     Mock::given(method("POST"))
         .and(path("/api/v1/client-mfa/finish"))
+        .and(body_partial_json(
+            json!({"token": "token", "code": "123456"}),
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(&body))
         .mount(&server)
         .await;
@@ -439,9 +487,6 @@ async fn test_mfa_finish_code_success() {
             token: "token".into(),
             code: Some("123456".into()),
             auth_pub_key: None,
-            step_attempt_id: None,
-            auth_data: None,
-            credential_id: None,
         },
     )
     .await
@@ -467,9 +512,6 @@ async fn test_mfa_finish_code_rejected() {
             token: "token".into(),
             code: Some("000000".into()),
             auth_pub_key: None,
-            step_attempt_id: None,
-            auth_data: None,
-            credential_id: None,
         },
     )
     .await
@@ -478,22 +520,138 @@ async fn test_mfa_finish_code_rejected() {
 }
 
 #[tokio::test]
-async fn test_poll_openid_advanced_returns_empty_legacy_key() {
+async fn test_mfa_finish_multi_step_sends_typed_code() {
+    let server = MockServer::start().await;
+    let body = serde_json::to_value(MfaFlowStepFinishRequest {
+        token: "flow-token".into(),
+        step_attempt_id: "attempt-1".into(),
+        submission: Some(mfa_flow_step_finish_request::Submission::Code(
+            defguard_client_proto::defguard::client_types::MfaCodeCredential {
+                code: "123456".into(),
+            },
+        )),
+    })
+    .unwrap();
+    let response =
+        finish_response_json_with_result(mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "psk".into(),
+        }));
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/mfa-flow/step-finish"))
+        .and(body_partial_json(body))
+        .respond_with(ResponseTemplate::new(200).set_body_json(response))
+        .mount(&server)
+        .await;
+
+    let response = super::mfa_finish(
+        MfaContract::MultiStep,
+        mock_url(&server),
+        MfaFinishRequest {
+            token: "flow-token".into(),
+            step_attempt_id: Some("attempt-1".into()),
+            submission: Some(MfaSubmission::Code("123456".into())),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        response.result.and_then(|result| result.outcome),
+        Some(mfa_step_result::Outcome::Completed(completed)) if completed.preshared_key == "psk"
+    ));
+}
+
+#[tokio::test]
+async fn test_mfa_finish_multi_step_sends_typed_fido2_assertion() {
+    let server = MockServer::start().await;
+    let assertion = MfaFido2Assertion {
+        rp_id_hash: vec![1, 2],
+        authenticator_data: vec![3, 4],
+        signature: vec![5, 6],
+        credential_id: vec![7, 8],
+    };
+    let body = serde_json::to_value(MfaFlowStepFinishRequest {
+        token: "flow-token".into(),
+        step_attempt_id: "attempt-2".into(),
+        submission: Some(mfa_flow_step_finish_request::Submission::Fido2(
+            MfaFido2Assertion {
+                rp_id_hash: assertion.rp_id_hash.clone(),
+                authenticator_data: assertion.authenticator_data.clone(),
+                signature: assertion.signature.clone(),
+                credential_id: assertion.credential_id.clone(),
+            },
+        )),
+    })
+    .unwrap();
+    let response =
+        finish_response_json_with_result(mfa_step_result::Outcome::Completed(MfaCompleted {
+            preshared_key: "psk".into(),
+        }));
+
+    Mock::given(method("POST"))
+        .and(path("/api/v1/mfa-flow/step-finish"))
+        .and(body_partial_json(body))
+        .respond_with(ResponseTemplate::new(200).set_body_json(response))
+        .mount(&server)
+        .await;
+
+    super::mfa_finish(
+        MfaContract::MultiStep,
+        mock_url(&server),
+        MfaFinishRequest {
+            token: "flow-token".into(),
+            step_attempt_id: Some("attempt-2".into()),
+            submission: Some(MfaSubmission::Fido2(assertion)),
+        },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn test_mfa_finish_multi_step_rejects_missing_result() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/mfa-flow/step-finish"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(&server)
+        .await;
+
+    let err = super::mfa_finish(
+        MfaContract::MultiStep,
+        mock_url(&server),
+        MfaFinishRequest {
+            token: "flow-token".into(),
+            step_attempt_id: Some("attempt-1".into()),
+            submission: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        err,
+        MfaError::Other { message } if message.contains("did not include a result")
+    ));
+}
+
+#[tokio::test]
+async fn test_poll_openid_multi_step_advanced_returns_result() {
     let server = MockServer::start().await;
     let body = finish_response_json_with_result(mfa_step_result::Outcome::Advanced(MfaAdvanced {
         next_step: 1,
     }));
 
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/finish"))
+        .and(path("/api/v1/mfa-flow/step-finish"))
         .respond_with(ResponseTemplate::new(200).set_body_json(&body))
         .mount(&server)
         .await;
 
-    let response = poll_openid_mfa(
+    let response = super::poll_openid_mfa(
+        MfaContract::MultiStep,
         mock_url(&server),
         "token".into(),
-        None,
+        Some("attempt-1".into()),
         CancellationToken::new(),
     )
     .await
@@ -515,7 +673,7 @@ async fn test_poll_openid_awaiting_external_then_completed() {
         mfa_step_result::Outcome::AwaitingExternal(MfaAwaitingExternal {}),
     );
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/finish"))
+        .and(path("/api/v1/mfa-flow/step-finish"))
         .respond_with(ResponseTemplate::new(200).set_body_json(&awaiting_body))
         .up_to_n_times(1)
         .mount(&server)
@@ -526,15 +684,16 @@ async fn test_poll_openid_awaiting_external_then_completed() {
             preshared_key: "oidc-psk".into(),
         }));
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/finish"))
+        .and(path("/api/v1/mfa-flow/step-finish"))
         .respond_with(ResponseTemplate::new(200).set_body_json(&completed_body))
         .mount(&server)
         .await;
 
-    let response = poll_openid_mfa(
+    let response = super::poll_openid_mfa(
+        MfaContract::MultiStep,
         mock_url(&server),
         "token".into(),
-        None,
+        Some("attempt-1".into()),
         CancellationToken::new(),
     )
     .await
@@ -557,7 +716,7 @@ async fn test_poll_openid_sends_step_attempt_id() {
         }));
 
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/finish"))
+        .and(path("/api/v1/mfa-flow/step-finish"))
         .and(body_partial_json(json!({
             "step_attempt_id": "attempt-123",
         })))
@@ -565,7 +724,8 @@ async fn test_poll_openid_sends_step_attempt_id() {
         .mount(&server)
         .await;
 
-    let response = poll_openid_mfa(
+    let response = super::poll_openid_mfa(
+        MfaContract::MultiStep,
         mock_url(&server),
         "token".into(),
         Some("attempt-123".into()),
@@ -931,6 +1091,24 @@ fn test_derive_ws_url_preserves_path_prefix() {
 }
 
 #[test]
+fn test_derive_ws_url_multi_step_includes_attempt_id() {
+    let base = Url::parse("https://proxy.example.com/").unwrap();
+    let ws = super::derive_ws_url(MfaContract::MultiStep, &base, "tok", Some("attempt-1")).unwrap();
+    let ws = Url::parse(&ws).unwrap();
+    assert_eq!(ws.scheme(), "wss");
+    assert_eq!(ws.path(), "/api/v1/mfa-flow/remote");
+    let query = ws.query_pairs().collect::<Vec<_>>();
+    assert_eq!(query[0], ("token".into(), "tok".into()));
+    assert_eq!(query[1], ("step_attempt_id".into(), "attempt-1".into()));
+}
+
+#[test]
+fn test_derive_ws_url_multi_step_requires_attempt_id() {
+    let base = Url::parse("https://proxy.example.com/").unwrap();
+    assert!(super::derive_ws_url(MfaContract::MultiStep, &base, "tok", None).is_err());
+}
+
+#[test]
 fn test_derive_ws_url_rejects_non_http_scheme() {
     let base = Url::parse("ftp://proxy.example.com/").unwrap();
     let err = derive_ws_url(&base, "tok").unwrap_err();
@@ -938,45 +1116,40 @@ fn test_derive_ws_url_rejects_non_http_scheme() {
 }
 
 #[tokio::test]
-async fn test_mfa_start_without_credential_ids_parses() {
-    // Only an Edge that knows FIDO2 sends `credential_ids`; every older one
-    // leaves the field out and must keep working.
+async fn test_mfa_flow_start_reads_fido2_credential_ids() {
     let server = MockServer::start().await;
+    let body = serde_json::to_value(MfaFlowStartResponse {
+        outcome: Some(mfa_flow_start_response::Outcome::Accepted(
+            MfaFlowStartAccepted {
+                token: "fido2-token".into(),
+                first_step: Some(MfaStepStarted {
+                    step_attempt_id: "attempt-1".into(),
+                    challenge: Some(mfa_step_started::Challenge::Fido2(MfaFido2Challenge {
+                        challenge: "chal".into(),
+                        credential_ids: vec!["a-b_c".into(), "ZmlkbzI".into()],
+                    })),
+                }),
+            },
+        )),
+    })
+    .unwrap();
 
     Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/start"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "token": "no-fido2" })))
+        .and(path("/api/v1/mfa-flow/start"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
         .mount(&server)
         .await;
 
-    let info = mfa_start(mock_url(&server), start_request()).await.unwrap();
-    assert!(info.credential_ids.is_empty());
+    let info = super::mfa_start(MfaContract::MultiStep, mock_url(&server), start_request())
+        .await
+        .unwrap();
+    assert_eq!(info.first_step.challenge.as_deref(), Some("chal"));
+    assert_eq!(info.first_step.credential_ids, vec!["a-b_c", "ZmlkbzI"]);
 }
 
-#[tokio::test]
-async fn test_mfa_start_reads_fido2_credential_ids() {
-    let server = MockServer::start().await;
-
-    Mock::given(method("POST"))
-        .and(path("/api/v1/client-mfa/start"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "token": "fido2-token",
-            "challenge": "chal",
-            // base64url, no padding - how webauthn-rs writes a CredentialID.
-            "credential_ids": ["a-b_c", "ZmlkbzI"],
-        })))
-        .mount(&server)
-        .await;
-
-    let info = mfa_start(mock_url(&server), start_request()).await.unwrap();
-    assert_eq!(info.challenge.as_deref(), Some("chal"));
-    assert_eq!(info.credential_ids, vec!["a-b_c", "ZmlkbzI"]);
-}
-
-fn finish_response(preshared_key: &str, result: Option<MfaStepResult>) -> ClientMfaFinishResponse {
-    ClientMfaFinishResponse {
+fn finish_response(preshared_key: &str, result: Option<MfaStepResult>) -> MfaFinishResponse {
+    MfaFinishResponse {
         preshared_key: preshared_key.into(),
-        token: None,
         result,
     }
 }
