@@ -1,0 +1,31 @@
+.playground-card:has(> .playground-test-openid-providers) {
+  background-color: var(--bg-dark-blue-40);
+}
+
+.playground-test-openid-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+
+  .track {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 296px;
+
+    &.full {
+      max-width: 328px;
+    }
+
+    &.tray {
+      max-width: 248px;
+    }
+
+    .external-provider-button {
+      width: 100%;
+    }
+  }
+}
