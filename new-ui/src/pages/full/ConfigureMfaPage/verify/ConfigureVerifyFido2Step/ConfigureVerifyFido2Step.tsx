@@ -1,5 +1,4 @@
 import { Enter } from '@fluentui/keyboard-keys';
-import { useMutation } from '@tanstack/react-query';
 import { Fragment, useCallback, useState } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
@@ -10,31 +9,22 @@ import { Fido2TouchPrompt } from '../../../../../shared/components/LocationCard/
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { fido2CollectsPinInApp } from '../../../../../shared/rust-api/fido2';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import {
-  discardMfaConfiguration,
-  useConfigureMfaStore,
-} from '../../hooks/useConfigureMfaStore';
+import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { useConfigureVerifyFido2 } from './useConfigureVerifyFido2';
 import '../style.scss';
 
 interface Props {
-  onCancel: () => void;
   onSessionExpired: () => void;
 }
 
-export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) => {
+export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
   const collectsPin = fido2CollectsPinInApp();
   const [pin, setPin] = useState<string | null>(null);
   const { verify, abort, isVerifying, isAwaitingTouch, error, setError } =
     useConfigureVerifyFido2({ onSessionExpired, autoStart: !collectsPin });
 
-  const { mutate: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: discardMfaConfiguration,
-    onSettled: onCancel,
-  });
-
   const handleVerify = useCallback(() => {
-    if (isVerifying || isCancelling) return;
+    if (isVerifying) return;
     if (!collectsPin) {
       void verify(null);
       return;
@@ -44,7 +34,7 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
       return;
     }
     void verify(pin);
-  }, [collectsPin, isCancelling, isVerifying, pin, setError, verify]);
+  }, [collectsPin, isVerifying, pin, setError, verify]);
 
   const handleBack = useCallback(async () => {
     // Core holds one pending attempt per session, so abort it before another method starts
@@ -96,27 +86,17 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
       )}
       <Controls>
         <Button
-          text="Cancel"
+          text="Back"
           variant={ButtonVariant.Secondary}
-          loading={isCancelling}
           onClick={() => {
-            cancel();
+            void handleBack();
           }}
         />
         <div className="right">
           <Button
-            text="Back"
-            variant={ButtonVariant.Outlined}
-            disabled={isCancelling}
-            onClick={() => {
-              void handleBack();
-            }}
-          />
-          <Button
             text={collectsPin ? 'Verify' : 'Use security key'}
             variant={ButtonVariant.Primary}
             loading={isVerifying}
-            disabled={isCancelling}
             onClick={handleVerify}
           />
         </div>

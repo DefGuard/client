@@ -76,31 +76,29 @@ export const CompactLocationsPage = () => {
       }}
     >
       <WindowHeader variant="compact" />
+      <InstanceSwitcher />
       <ScrollContainer>
-        <div className="main-content">
-          <InstanceSwitcher />
-          <div className="locations">
-            {displayedLocations.map((location) => {
-              const isOpen =
-                location.id === openLocation || displayedLocations.length === 1;
-              return (
-                <LocationCard
-                  instance={instanceInfo}
-                  disableOpen={displayedLocations.length <= 1}
-                  location={location}
-                  key={`${location.connection_type}-${location.id}`}
-                  isOpen={isOpen}
-                  onOpen={() => {
-                    if (isOpen) {
-                      useAppStore.setState({ expandedLocation: null });
-                    } else {
-                      useAppStore.setState({ expandedLocation: location.id });
-                    }
-                  }}
-                />
-              );
-            })}
-          </div>
+        <div className="locations">
+          {displayedLocations.map((location) => {
+            const isOpen =
+              location.id === openLocation || displayedLocations.length === 1;
+            return (
+              <LocationCard
+                instance={instanceInfo}
+                disableOpen={displayedLocations.length <= 1}
+                location={location}
+                key={`${location.connection_type}-${location.id}`}
+                isOpen={isOpen}
+                onOpen={() => {
+                  if (isOpen) {
+                    useAppStore.setState({ expandedLocation: null });
+                  } else {
+                    useAppStore.setState({ expandedLocation: location.id });
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       </ScrollContainer>
       <div className="compact-footer">

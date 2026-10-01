@@ -7,6 +7,7 @@ import type { LocationInfo } from '../../../../rust-api/types';
 import {
   ConnectionAbility,
   type ConnectionAbilityValue,
+  hasMfaMethodChoice,
   mfaStepCount,
   mfaStepsToText,
   mfaToText,
@@ -40,8 +41,8 @@ export const LocationCardMfaEdit = ({
       ? mfaStepsToText(stepCount)
       : mfaToText(resolveMfaStepPlan(location)[0]);
 
-  // `Configurable` stays editable, configuring a factor unblocks it.
-  const canEdit = connectionAbility !== ConnectionAbility.Unavailable;
+  const canEdit =
+    connectionAbility === ConnectionAbility.Available && hasMfaMethodChoice(location);
 
   const canConfigure = connectionAbility === ConnectionAbility.Configurable;
 

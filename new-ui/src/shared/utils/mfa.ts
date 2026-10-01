@@ -81,6 +81,11 @@ export const pickableMfaMethods = (step: MfaStep): MfaStepMethod[] => {
   return drivable.length > 0 ? drivable : step.methods;
 };
 
+/** Whether any step offers more than one factor, so the MFA settings view has a choice to make. */
+export const hasMfaMethodChoice = (
+  location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
+): boolean => mfaStepsOf(location).some((step) => pickableMfaMethods(step).length > 1);
+
 export const resolveMfaStepPlan = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps' | 'mfa_step_plan'>,
   oneOffPlan: MfaMethodValue[] = [],

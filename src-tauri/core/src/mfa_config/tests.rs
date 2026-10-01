@@ -513,7 +513,7 @@ async fn test_fido2_cannot_authorize_with_a_code() {
 
 fn fido2_proof() -> AuthorizeProof {
     AuthorizeProof::Fido2 {
-        signature: "c2ln".into(),
+        signature: vec![6, 7],
         auth_data: vec![1, 2, 3],
         credential_id: vec![4, 5],
     }
@@ -558,8 +558,7 @@ async fn test_fido2_challenge_tolerates_missing_credential_ids() {
     assert!(response.credential_ids.is_empty());
 }
 
-/// the assertion goes out as ClientMfaFinishRequest sends it, a base64url signature and the
-/// byte fields as serde arrays, with the code left empty
+/// the assertion fields go out as serde byte arrays, with the code left empty
 #[tokio::test]
 async fn test_fido2_authorize_sends_the_assertion() {
     let server = MockServer::start().await;
@@ -569,7 +568,7 @@ async fn test_fido2_authorize_sends_the_assertion() {
             "session_token": SESSION_TOKEN,
             "method": MfaMethod::Fido2 as i32,
             "code": "",
-            "signature": "c2ln",
+            "signature": [6, 7],
             "auth_data": [1, 2, 3],
             "credential_id": [4, 5],
         })))

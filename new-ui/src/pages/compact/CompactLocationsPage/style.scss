@@ -13,10 +13,16 @@
     flex: 0 0 auto;
   }
 
-  .main-content {
-    display: flex;
-    flex-flow: column;
-    row-gap: var(--spacing-sm);
+  > .instance-switcher {
+    flex: 0 0 auto;
+    margin-bottom: var(--spacing-sm);
+
+    // Reserves the same gutter as .scroll-container.windows so the select lines up with the cards.
+    &.windows {
+      scrollbar-gutter: stable;
+      overflow-y: hidden;
+      padding-right: 6px;
+    }
   }
 
   .locations {

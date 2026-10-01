@@ -1,4 +1,3 @@
-import { useMutation } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
@@ -6,26 +5,17 @@ import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/FullPageTitle';
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import {
-  discardMfaConfiguration,
-  useConfigureMfaStore,
-} from '../../hooks/useConfigureMfaStore';
+import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { useConfigureVerifyOidc } from './useConfigureVerifyOidc';
 import '../style.scss';
 
 interface Props {
-  onCancel: () => void;
   onSessionExpired: () => void;
 }
 
-export const ConfigureVerifyOidcStep = ({ onCancel, onSessionExpired }: Props) => {
+export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
   const { start, abort, isOpening, isPolling, error } = useConfigureVerifyOidc({
     onSessionExpired,
-  });
-
-  const { mutate: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: discardMfaConfiguration,
-    onSettled: onCancel,
   });
 
   const handleBack = useCallback(async () => {
@@ -55,7 +45,6 @@ export const ConfigureVerifyOidcStep = ({ onCancel, onSessionExpired }: Props) =
           text={isPolling ? 'Open again' : 'Auth with OpenID'}
           variant={ButtonVariant.Primary}
           loading={isOpening}
-          disabled={isCancelling}
           onClick={() => {
             void start();
           }}
@@ -63,23 +52,12 @@ export const ConfigureVerifyOidcStep = ({ onCancel, onSessionExpired }: Props) =
       </div>
       <Controls>
         <Button
-          text="Cancel"
+          text="Back"
           variant={ButtonVariant.Secondary}
-          loading={isCancelling}
           onClick={() => {
-            cancel();
+            void handleBack();
           }}
         />
-        <div className="right">
-          <Button
-            text="Back"
-            variant={ButtonVariant.Outlined}
-            disabled={isCancelling}
-            onClick={() => {
-              void handleBack();
-            }}
-          />
-        </div>
       </Controls>
     </FullPage>
   );

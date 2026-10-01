@@ -15,8 +15,6 @@ export const ConfigureFinishStep = () => {
   const navigate = useNavigate();
   const { setViewSelection } = useAppData();
   const instance = useConfigureMfaStore((s) => s.instance);
-  // recovery codes are never shown again, so back keeps them reachable
-  const hasRecoveryCodes = useConfigureMfaStore((s) => s.recoveryCodes.length > 0);
 
   return (
     <div id="configure-finish-step" className="step-content">
@@ -26,15 +24,6 @@ export const ConfigureFinishStep = () => {
       </header>
       <p className="summary">{`You can now use them to access MFA protected locations.`}</p>
       <Controls>
-        {hasRecoveryCodes && (
-          <Button
-            text="Back"
-            variant={ButtonVariant.Secondary}
-            onClick={() => {
-              useConfigureMfaStore.getState().back();
-            }}
-          />
-        )}
         <div className="right">
           <Button
             text="Finish"

@@ -2580,7 +2580,7 @@ pub async fn mfa_config_authorize_fido2(
         session.proxy_url,
         session.session_token,
         AuthorizeProof::Fido2 {
-            signature: BASE64_URL_SAFE_NO_PAD.encode(&assertion.signature),
+            signature: assertion.signature,
             auth_data: assertion.authenticator_data,
             credential_id: assertion.credential_id,
         },

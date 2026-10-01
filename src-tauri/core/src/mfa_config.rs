@@ -67,9 +67,8 @@ pub enum AuthorizeProof {
         method: MfaMethod,
         code: String,
     },
-    /// signature is base64url while the byte fields stay raw, matching ClientMfaFinishRequest
     Fido2 {
-        signature: String,
+        signature: Vec<u8>,
         auth_data: Vec<u8>,
         credential_id: Vec<u8>,
     },

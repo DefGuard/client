@@ -34,32 +34,12 @@ export const ConfigureMfaVerify = ({ onCancel, onSessionExpired }: Props) => {
 
   switch (method) {
     case MfaMethod.Totp:
-      return (
-        <ConfigureVerifyTotpStep
-          onCancel={onCancel}
-          onSessionExpired={onSessionExpired}
-        />
-      );
+      return <ConfigureVerifyTotpStep onSessionExpired={onSessionExpired} />;
     case MfaMethod.Email:
-      return (
-        <ConfigureVerifyEmailStep
-          onCancel={onCancel}
-          onSessionExpired={onSessionExpired}
-        />
-      );
+      return <ConfigureVerifyEmailStep onSessionExpired={onSessionExpired} />;
     case MfaMethod.Fido2:
-      return (
-        <ConfigureVerifyFido2Step
-          onCancel={onCancel}
-          onSessionExpired={onSessionExpired}
-        />
-      );
+      return <ConfigureVerifyFido2Step onSessionExpired={onSessionExpired} />;
     case MfaMethod.Oidc:
-      return (
-        <ConfigureVerifyOidcStep
-          onCancel={onCancel}
-          onSessionExpired={onSessionExpired}
-        />
-      );
+      return <ConfigureVerifyOidcStep onSessionExpired={onSessionExpired} />;
   }
 };

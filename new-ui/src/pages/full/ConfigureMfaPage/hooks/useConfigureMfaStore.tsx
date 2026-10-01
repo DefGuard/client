@@ -134,7 +134,6 @@ interface Store extends StoreValues {
   authorize: (response: MfaConfigAuthorizeResult) => void;
   factorConfigured: (method: MfaMethodValue, recoveryCodes: string[]) => void;
   next: () => void;
-  back: () => void;
   reset: () => void;
 }
 
@@ -232,15 +231,6 @@ export const useConfigureMfaStore = create<Store>()(
             (step === current.activeStep && isMfaSetupStep(step)),
         );
         if (isPresent(next)) set({ activeStep: next });
-      },
-      back: () => {
-        const current = get();
-        const from = MFA_WIZARD_STEPS.indexOf(current.activeStep);
-        // A step with nothing left to do is not one to go back to.
-        const previous = remainingSteps(current)
-          .filter((step) => MFA_WIZARD_STEPS.indexOf(step) < from)
-          .at(-1);
-        if (isPresent(previous)) set({ activeStep: previous });
       },
       reset: () => {
         set({ ...defaults });
