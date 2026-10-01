@@ -52,6 +52,7 @@ export const useConfigureVerifyOidc = ({ onSessionExpired }: Options) => {
     setError(null);
     try {
       const url = await api.mfaConfigOidcUrl(sessionId);
+      if (!mounted.current) return;
       await api.openLink(url);
     } catch (err) {
       if (mounted.current) handleApiError(err);

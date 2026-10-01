@@ -192,10 +192,17 @@ export const useConfigureMfaStore = create<Store>()(
       },
       authorize: (response) => {
         set((current) => {
+          // A late answer can land after Back to the selection, which parked the picks there.
+          const selectedMethods = current.selectedMethods ?? current.initialSelection;
           // The fallback enables email as it verifies, so only this authorization issues codes.
-          const next = { ...current, recoveryCodes: response.recovery_codes };
+          const next = {
+            ...current,
+            selectedMethods,
+            recoveryCodes: response.recovery_codes,
+          };
           return {
             authorized: true,
+            selectedMethods,
             recoveryCodes: response.recovery_codes,
             deadline: sessionDeadline(
               next,
