@@ -1,7 +1,7 @@
 import './style.scss';
 import clsx from 'clsx';
 import type { HTMLProps, MouseEventHandler } from 'react';
-import { mfaMethodIcon, openIdProviderIcon } from '../../../../consts';
+import { mfaMethodIcon } from '../../../../consts';
 import {
   type InstanceInfo,
   MfaMethod,
@@ -11,6 +11,7 @@ import { isPresent } from '../../../../utils/isPresent';
 import { findOpenIdProvider, mfaToText } from '../../../../utils/mfa';
 import { Icon } from '../../../Icon';
 import checkboxSrc from './assets/checkbox.svg';
+import { openIdProviderIcon } from './consts';
 
 interface Props {
   factor: MfaMethodValue;
@@ -37,11 +38,8 @@ export const MfaSelector = ({
 }: Props) => {
   const isMobileOnly = factor === MfaMethod.Biometric;
   const showCheckbox = isSelectable && selected;
-  const openIdProvider = findOpenIdProvider(instance);
-  const factorIcon =
-    factor === MfaMethod.Oidc && isPresent(openIdProvider)
-      ? openIdProviderIcon[openIdProvider]
-      : mfaMethodIcon[factor];
+  const openIdProvider =
+    factor === MfaMethod.Oidc ? findOpenIdProvider(instance) : undefined;
 
   return (
     <div
@@ -62,7 +60,12 @@ export const MfaSelector = ({
       {showCheckbox && <img src={checkboxSrc} alt="" width={24} height={24} />}
       {!showCheckbox && (
         <div className="icon-col">
-          <Icon className="factor-icon" icon={factorIcon} size={20} />
+          {isPresent(openIdProvider) && (
+            <img src={openIdProviderIcon[openIdProvider]} alt="" width={20} height={20} />
+          )}
+          {!isPresent(openIdProvider) && (
+            <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
+          )}
         </div>
       )}
       <div className="middle">

@@ -19,13 +19,6 @@ export const OpenIdProvider = {
 
 export type OpenIdProviderValue = (typeof OpenIdProvider)[keyof typeof OpenIdProvider];
 
-export const openIdProviderIcon: Record<OpenIdProviderValue, IconKindValue> = {
-  [OpenIdProvider.Microsoft]: 'microsoft-white',
-  [OpenIdProvider.Google]: 'google-white',
-  [OpenIdProvider.Okta]: 'okta-white',
-  [OpenIdProvider.JumpCloud]: 'jump-cloud-white',
-};
-
 export const motionTransitionStandard = {
   type: 'tween',
   ease: 'easeOut',
