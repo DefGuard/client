@@ -37,10 +37,9 @@ export const LocationCardConnectionTiles = ({ location, instance, variant }: Pro
     if (isMultiStep) return mfaStepsToText(stepCount);
     const key = `${location.connection_type.toLowerCase()}-${location.id}`;
     const method = connectionMfaMethod[key];
-    return isPresent(method) ? mfaToText(method, instance) : null;
+    return isPresent(method) ? mfaToText(method) : null;
   }, [
     connectionMfaMethod,
-    instance,
     location.connection_type,
     location.id,
     stepCount,
