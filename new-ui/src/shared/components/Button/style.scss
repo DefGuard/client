@@ -41,7 +41,7 @@
     pointer-events: none;
   }
 
-  .icon svg {
+  .icon svg:not(.color-icon) {
     --icon-color: var(--text-color);
 
     path {
