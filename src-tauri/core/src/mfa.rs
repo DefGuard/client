@@ -9,10 +9,10 @@ use defguard_client_proto::defguard::{
     client_types::{
         mfa_flow_start_response, mfa_flow_step_finish_request, mfa_step_result, mfa_step_started,
         ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
-        ClientMfaStartResponse, MfaCodeCredential, MfaFido2Assertion, MfaFlowStartRequest,
-        MfaFlowStartResponse, MfaFlowStepFinishRequest, MfaFlowStepFinishResponse,
-        MfaFlowStepStartRequest, MfaFlowStepStartResponse, MfaMethod, MfaStartRejectionReason,
-        MfaStepRejection, MfaStepResult, MfaStepStarted,
+        ClientMfaStartResponse, MfaAdvanced, MfaCodeCredential, MfaCompleted, MfaFido2Assertion,
+        MfaFlowStartRequest, MfaFlowStartResponse, MfaFlowStepFinishRequest,
+        MfaFlowStepFinishResponse, MfaFlowStepStartRequest, MfaFlowStepStartResponse, MfaMethod,
+        MfaStartRejectionReason, MfaStepRejection, MfaStepResult, MfaStepStarted,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -128,11 +128,55 @@ pub struct MfaAuthSession {
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
-enum MobileMfaResponse {
+enum LegacyMobileMfaResponse {
     #[serde(rename = "mfa_success")]
-    Legacy { preshared_key: String },
+    Success { preshared_key: String },
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum MultiStepMobileMfaResponse {
     #[serde(rename = "mfa_result")]
-    Result { result: MfaStepResult },
+    Result { result: MultiStepMobileMfaResult },
+}
+
+#[derive(Deserialize)]
+struct MultiStepMobileMfaResult {
+    outcome: MultiStepMobileMfaOutcome,
+}
+
+#[derive(Deserialize)]
+enum MultiStepMobileMfaOutcome {
+    Advanced(MfaAdvanced),
+    Completed(MfaCompleted),
+}
+
+fn decode_multi_step_mobile_mfa_frame(text: &str) -> Result<MfaFinishResponse, MfaError> {
+    let response: MultiStepMobileMfaResponse =
+        serde_json::from_str(text).map_err(|_| MfaError::Other {
+            message: "Invalid multi-step mobile MFA response".into(),
+        })?;
+    let MultiStepMobileMfaResponse::Result { result } = response;
+    let outcome = match result.outcome {
+        MultiStepMobileMfaOutcome::Advanced(advanced) => {
+            mfa_step_result::Outcome::Advanced(advanced)
+        }
+        MultiStepMobileMfaOutcome::Completed(completed) if completed.preshared_key.is_empty() => {
+            return Err(MfaError::MfaRejected {
+                message: "mobile approval failed: Edge returned an empty preshared key".into(),
+            });
+        }
+        MultiStepMobileMfaOutcome::Completed(completed) => {
+            mfa_step_result::Outcome::Completed(completed)
+        }
+    };
+
+    Ok(MfaFinishResponse {
+        preshared_key: String::new(),
+        result: Some(MfaStepResult {
+            outcome: Some(outcome),
+        }),
+    })
 }
 
 fn standard_headers() -> Vec<(&'static str, String)> {
@@ -621,6 +665,7 @@ pub fn completed_preshared_key(response: &MfaFinishResponse) -> Option<String> {
 /// Waits for mobile approval after the QR code is shown. Returns cancellation or
 /// timeout errors when applicable.
 pub async fn connect_mobile_approve(
+    contract: MfaContract,
     ws_url: &str,
     cancel: CancellationToken,
 ) -> Result<MfaFinishResponse, MfaError> {
@@ -637,7 +682,7 @@ pub async fn connect_mobile_approve(
                 },
             })?;
 
-    wait_for_mfa_outcome(ws_stream, cancel).await
+    wait_for_mfa_outcome(contract, ws_stream, cancel).await
 }
 
 /// Derive the contract-specific WebSocket URL from the proxy base and session identifiers.
@@ -698,6 +743,7 @@ fn read_error_label(err: &WsError) -> String {
 
 /// Wait on the WebSocket for an MFA outcome frame.
 async fn wait_for_mfa_outcome(
+    contract: MfaContract,
     ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     cancel: CancellationToken,
 ) -> Result<MfaFinishResponse, MfaError> {
@@ -743,32 +789,33 @@ async fn wait_for_mfa_outcome(
         };
 
         match msg {
-            Message::Text(text) => match serde_json::from_str::<MobileMfaResponse>(&text) {
-                Ok(MobileMfaResponse::Legacy { preshared_key }) => {
-                    if preshared_key.is_empty() {
-                        return Err(MfaError::MfaRejected {
-                            message: "mobile approval failed: Edge returned an empty preshared key"
-                                .into(),
-                        });
-                    }
+            Message::Text(text) => match contract {
+                MfaContract::Legacy => {
+                    match serde_json::from_str::<LegacyMobileMfaResponse>(&text) {
+                        Ok(LegacyMobileMfaResponse::Success { preshared_key }) => {
+                            if preshared_key.is_empty() {
+                                return Err(MfaError::MfaRejected {
+                                    message: "mobile approval failed: Edge returned an empty preshared key"
+                                        .into(),
+                                });
+                            }
 
-                    return Ok(MfaFinishResponse {
-                        preshared_key,
-                        result: None,
-                    });
+                            return Ok(MfaFinishResponse {
+                                preshared_key,
+                                result: None,
+                            });
+                        }
+                        // Preserve legacy handling of frames that are not mfa_success.
+                        Err(err) => debug!("Ignoring unrecognized mobile MFA frame: {err}"),
+                    }
                 }
-                // An intermediate result has no key; the caller checks its outcome.
-                Ok(MobileMfaResponse::Result { result }) => {
-                    return Ok(MfaFinishResponse {
-                        preshared_key: String::new(),
-                        result: Some(result),
-                    });
-                }
-                // Ignore unknown frames and keep waiting; they may contain a preshared key.
-                Err(err) => {
-                    debug!("Ignoring unrecognized mobile MFA frame: {err}");
+                MfaContract::MultiStep => {
+                    return decode_multi_step_mobile_mfa_frame(&text);
                 }
             },
+            Message::Close(_) if contract == MfaContract::MultiStep => {
+                return Err(mobile_approve_closed(None));
+            }
             Message::Close(frame) => {
                 close_detail = Some(match frame {
                     Some(frame) if frame.reason.is_empty() => {
@@ -776,6 +823,11 @@ async fn wait_for_mfa_outcome(
                     }
                     Some(frame) => format!("code {}: {}", u16::from(frame.code), frame.reason),
                     None => "no close reason".to_string(),
+                });
+            }
+            Message::Binary(_) if contract == MfaContract::MultiStep => {
+                return Err(MfaError::Other {
+                    message: "Multi-step mobile MFA returned an unexpected frame".into(),
                 });
             }
             _ => {}

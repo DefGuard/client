@@ -856,7 +856,9 @@ async fn test_mobile_approve_advanced_result() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle = tokio::spawn(async move {
+        connect_mobile_approve(MfaContract::MultiStep, &ws_url, cancel).await
+    });
 
     tx.send(WsStubCommand::SendMessage(mobile_result_frame(
         mfa_step_result::Outcome::Advanced(MfaAdvanced { next_step: 1 }),
@@ -881,7 +883,9 @@ async fn test_mobile_approve_completed_result_uses_nested_key() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle = tokio::spawn(async move {
+        connect_mobile_approve(MfaContract::MultiStep, &ws_url, cancel).await
+    });
 
     tx.send(WsStubCommand::SendMessage(mobile_result_frame(
         mfa_step_result::Outcome::Completed(MfaCompleted {
@@ -908,7 +912,10 @@ async fn test_mobile_approve_empty_legacy_key_is_rejected() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle =
+        tokio::spawn(
+            async move { connect_mobile_approve(MfaContract::Legacy, &ws_url, cancel).await },
+        );
 
     tx.send(WsStubCommand::SendMessage(
         r#"{"type":"mfa_success","preshared_key":""}"#.into(),
@@ -930,7 +937,10 @@ async fn test_mobile_approve_success() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle =
+        tokio::spawn(
+            async move { connect_mobile_approve(MfaContract::Legacy, &ws_url, cancel).await },
+        );
 
     tx.send(WsStubCommand::SendMessage(
         r#"{"type":"mfa_success","preshared_key":"mobile-psk"}"#.into(),
@@ -950,7 +960,10 @@ async fn test_mobile_approve_close_without_success() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle =
+        tokio::spawn(
+            async move { connect_mobile_approve(MfaContract::Legacy, &ws_url, cancel).await },
+        );
 
     tx.send(WsStubCommand::Close).unwrap();
 
@@ -964,6 +977,21 @@ fn mfa_result_frame(result: &MfaStepResult) -> String {
         .expect("frame serializes")
 }
 
+async fn multi_step_mobile_approve_error(command: WsStubCommand) -> MfaError {
+    let stub = start_ws_stub().await;
+    let ws_url = format!("ws://{}/test", stub.addr);
+    let handle = tokio::spawn(async move {
+        connect_mobile_approve(MfaContract::MultiStep, &ws_url, CancellationToken::new()).await
+    });
+
+    stub.tx.send(command).unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(1), handle)
+        .await
+        .expect("invalid remote result should fail promptly")
+        .unwrap()
+        .unwrap_err()
+}
+
 #[tokio::test]
 async fn test_mobile_approve_advanced_result_is_a_passed_step() {
     // An intermediate step returns no preshared key.
@@ -973,7 +1001,9 @@ async fn test_mobile_approve_advanced_result_is_a_passed_step() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle = tokio::spawn(async move {
+        connect_mobile_approve(MfaContract::MultiStep, &ws_url, cancel).await
+    });
 
     tx.send(WsStubCommand::SendMessage(mfa_result_frame(
         &MfaStepResult {
@@ -997,7 +1027,9 @@ async fn test_mobile_approve_completed_result_carries_the_key() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle = tokio::spawn(async move {
+        connect_mobile_approve(MfaContract::MultiStep, &ws_url, cancel).await
+    });
 
     tx.send(WsStubCommand::SendMessage(mfa_result_frame(
         &MfaStepResult {
@@ -1017,6 +1049,93 @@ async fn test_mobile_approve_completed_result_carries_the_key() {
 }
 
 #[tokio::test]
+async fn test_mobile_approve_multi_step_close_without_result_fails_promptly() {
+    assert!(matches!(
+        multi_step_mobile_approve_error(WsStubCommand::Close).await,
+        MfaError::MfaRejected { .. }
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_multi_step_rejects_legacy_frame() {
+    assert!(matches!(
+        multi_step_mobile_approve_error(WsStubCommand::SendMessage(
+            r#"{"type":"mfa_success","preshared_key":"legacy-key"}"#.into()
+        ))
+        .await,
+        MfaError::Other { .. }
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_multi_step_rejects_missing_outcome() {
+    assert!(matches!(
+        multi_step_mobile_approve_error(WsStubCommand::SendMessage(
+            r#"{"type":"mfa_result","result":{}}"#.into()
+        ))
+        .await,
+        MfaError::Other { .. }
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_legacy_ignores_multi_step_frame() {
+    let stub = start_ws_stub().await;
+    let ws_url = format!("ws://{}/test", stub.addr);
+    let handle = tokio::spawn(async move {
+        connect_mobile_approve(MfaContract::Legacy, &ws_url, CancellationToken::new()).await
+    });
+
+    stub.tx
+        .send(WsStubCommand::SendMessage(mfa_result_frame(
+            &MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+                    next_step: 1,
+                })),
+            },
+        )))
+        .unwrap();
+    stub.tx.send(WsStubCommand::Close).unwrap();
+
+    let err = tokio::time::timeout(std::time::Duration::from_secs(1), handle)
+        .await
+        .expect("legacy decoder should ignore the other contract's frame")
+        .unwrap()
+        .unwrap_err();
+    assert!(matches!(err, MfaError::MfaRejected { .. }));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_multi_step_rejects_awaiting_external() {
+    assert!(matches!(
+        multi_step_mobile_approve_error(WsStubCommand::SendMessage(mfa_result_frame(
+            &MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::AwaitingExternal(
+                    MfaAwaitingExternal {},
+                )),
+            },
+        )))
+        .await,
+        MfaError::Other { .. }
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_multi_step_rejects_empty_completed_key() {
+    assert!(matches!(
+        multi_step_mobile_approve_error(WsStubCommand::SendMessage(mfa_result_frame(
+            &MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Completed(MfaCompleted {
+                    preshared_key: String::new(),
+                })),
+            },
+        )))
+        .await,
+        MfaError::MfaRejected { message } if message.contains("empty preshared key")
+    ));
+}
+
+#[tokio::test]
 async fn test_mobile_approve_close_frame_reaches_the_error() {
     let stub = start_ws_stub().await;
     let addr = stub.addr;
@@ -1024,7 +1143,10 @@ async fn test_mobile_approve_close_frame_reaches_the_error() {
     let ws_url = format!("ws://{addr}/test");
 
     let cancel = CancellationToken::new();
-    let handle = tokio::spawn(async move { connect_mobile_approve(&ws_url, cancel).await });
+    let handle =
+        tokio::spawn(
+            async move { connect_mobile_approve(MfaContract::Legacy, &ws_url, cancel).await },
+        );
 
     tx.send(WsStubCommand::CloseWith(4001, "unknown mfa token".into()))
         .unwrap();
@@ -1045,7 +1167,9 @@ async fn test_mobile_approve_cancelled() {
 
     let cancel = CancellationToken::new();
     cancel.cancel();
-    let err = connect_mobile_approve(&ws_url, cancel).await.unwrap_err();
+    let err = connect_mobile_approve(MfaContract::Legacy, &ws_url, cancel)
+        .await
+        .unwrap_err();
     assert!(matches!(err, MfaError::Cancelled));
 }
 
@@ -1059,7 +1183,9 @@ async fn test_mobile_approve_connect_error_does_not_leak_token() {
     let ws_url = derive_ws_url(&base, token).unwrap();
 
     let cancel = CancellationToken::new();
-    let err = connect_mobile_approve(&ws_url, cancel).await.unwrap_err();
+    let err = connect_mobile_approve(MfaContract::Legacy, &ws_url, cancel)
+        .await
+        .unwrap_err();
 
     assert!(matches!(err, MfaError::NetworkError { .. }));
     assert!(

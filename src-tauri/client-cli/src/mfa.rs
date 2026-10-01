@@ -717,7 +717,7 @@ async fn run_mobile_step(
     let ws_url =
         mfa::derive_ws_url(contract, proxy_url, token, step_attempt_id).map_err(into_cli)?;
 
-    with_ctrl_c(|cancel| mfa::connect_mobile_approve(&ws_url, cancel))
+    with_ctrl_c(|cancel| mfa::connect_mobile_approve(contract, &ws_url, cancel))
         .await
         .map_err(into_cli)
 }

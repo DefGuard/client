@@ -2109,7 +2109,7 @@ pub async fn mfa_connect_mobile_approve(
         EventKey::MfaMobileError,
         Some(token),
         move |cancel| async move {
-            mfa::connect_mobile_approve(&ws_url, cancel)
+            mfa::connect_mobile_approve(contract, &ws_url, cancel)
                 .await
                 .and_then(|response| classify_mfa_response(response, contract))
         },
