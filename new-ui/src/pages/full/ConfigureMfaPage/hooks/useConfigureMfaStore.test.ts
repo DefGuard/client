@@ -19,26 +19,45 @@ describe('applyAuthorization', () => {
     });
   });
 
-  it('sets up the picks when the answer lands after Back to the selection', () => {
+  it('waits on the selection when the answer lands after Back', () => {
     useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
     useConfigureMfaStore.getState().backFromVerification();
     applyAuthorization(SESSION_ID, authorizeResult);
 
     const state = useConfigureMfaStore.getState();
     expect(state.authorized).toBe(true);
-    expect(state.selectedMethods).toEqual([MfaMethod.Fido2]);
+    expect(state.selectedMethods).toBeNull();
+    expect(state.activeStep).toBe(ConfigureMfaStep.Configuration);
+    expect(state.deadline).not.toBeNull();
+  });
+
+  it('sets up the picks confirmed after a late answer', () => {
+    useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
+    useConfigureMfaStore.getState().backFromVerification();
+    applyAuthorization(SESSION_ID, authorizeResult);
+    useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
+
+    const state = useConfigureMfaStore.getState();
     expect(state.activeStep).toBe(ConfigureMfaStep.Fido2);
     expect(state.deadline).not.toBeNull();
   });
 
-  it('finishes when the parked selection is empty', () => {
-    useConfigureMfaStore.getState().selectMethods([]);
+  it('finishes when the pick confirmed after a late answer is empty', () => {
+    useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
     useConfigureMfaStore.getState().backFromVerification();
     applyAuthorization(SESSION_ID, authorizeResult);
+    useConfigureMfaStore.getState().selectMethods([]);
 
     const state = useConfigureMfaStore.getState();
     expect(state.activeStep).toBe(ConfigureMfaStep.Finish);
     expect(state.deadline).toBeNull();
+  });
+
+  it('keeps the deadline of an unauthorized session with an empty pick', () => {
+    useConfigureMfaStore.setState({ deadline: '2030-01-01T00:00:00.000Z' });
+    useConfigureMfaStore.getState().selectMethods([]);
+
+    expect(useConfigureMfaStore.getState().deadline).toBe('2030-01-01T00:00:00.000Z');
   });
 
   it('drops an answer for another session', () => {

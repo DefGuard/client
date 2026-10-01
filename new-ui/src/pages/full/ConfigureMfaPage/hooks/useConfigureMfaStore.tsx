@@ -167,10 +167,17 @@ export const useConfigureMfaStore = create<Store>()(
         });
       },
       selectMethods: (methods) => {
-        set((current) => ({
-          selectedMethods: methods,
-          activeStep: firstStep({ ...current, selectedMethods: methods }),
-        }));
+        set((current) => {
+          const next = { ...current, selectedMethods: methods };
+          return {
+            selectedMethods: methods,
+            activeStep: firstStep(next),
+            // Picked after a late authorization, so the deadline was kept for this pick.
+            ...(current.authorized && {
+              deadline: sessionDeadline(next, current.deadline),
+            }),
+          };
+        });
       },
       selectVerificationMethod: (method) => {
         set({ verificationMethod: method });
@@ -192,22 +199,17 @@ export const useConfigureMfaStore = create<Store>()(
       },
       authorize: (response) => {
         set((current) => {
-          // A late answer can land after Back to the selection, which parked the picks there.
-          const selectedMethods = current.selectedMethods ?? current.initialSelection;
+          const deadline = dayjs.unix(response.deadline_timestamp).toISOString();
+          // A late answer can land after Back to the selection, the steps wait for its Continue.
+          if (!isPresent(current.selectedMethods)) {
+            return { authorized: true, recoveryCodes: response.recovery_codes, deadline };
+          }
           // The fallback enables email as it verifies, so only this authorization issues codes.
-          const next = {
-            ...current,
-            selectedMethods,
-            recoveryCodes: response.recovery_codes,
-          };
+          const next = { ...current, recoveryCodes: response.recovery_codes };
           return {
             authorized: true,
-            selectedMethods,
             recoveryCodes: response.recovery_codes,
-            deadline: sessionDeadline(
-              next,
-              dayjs.unix(response.deadline_timestamp).toISOString(),
-            ),
+            deadline: sessionDeadline(next, deadline),
             activeStep: firstStep(next),
           };
         });
