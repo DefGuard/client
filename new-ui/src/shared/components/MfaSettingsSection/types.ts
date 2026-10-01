@@ -6,7 +6,10 @@ export type MfaSettingsLocation = Pick<
   'connection_type' | 'mfa_steps' | 'mfa_step_plan'
 >;
 
-export type MfaSettingsInstance = Pick<InstanceInfo, 'mfa_configured_methods'>;
+export type MfaSettingsInstance = Pick<
+  InstanceInfo,
+  'mfa_configured_methods' | 'openid_display_name'
+>;
 
 /** What clicking a factor row does. */
 export const MfaFactorAction = {
