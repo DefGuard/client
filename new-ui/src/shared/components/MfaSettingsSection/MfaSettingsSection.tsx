@@ -35,6 +35,7 @@ export const MfaSettingsSection = ({
               <MfaSelector
                 key={method}
                 factor={method}
+                instance={instance}
                 configured={configured}
                 isDefault={isDefault}
                 active={action === MfaFactorAction.Pick && plan[stepIndex] === method}

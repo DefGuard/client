@@ -7,6 +7,7 @@ import { PlaygroundTestMenu } from './components/PlaygroundTestMenu/PlaygroundTe
 import { PlaygroundTestMfaSelector } from './components/PlaygroundTestMfaSelector/PlaygroundTestMfaSelector';
 import { PlaygroundTestMfaSettingsSection } from './components/PlaygroundTestMfaSettingsSection/PlaygroundTestMfaSettingsSection';
 import { PlaygroundTestMfaVerificatorFactorSelector } from './components/PlaygroundTestMfaVerificatorFactorSelector/PlaygroundTestMfaVerificatorFactorSelector';
+import { PlaygroundTestOpenIdProviders } from './components/PlaygroundTestOpenIdProviders/PlaygroundTestOpenIdProviders';
 import { PlaygroundTestSelect } from './components/PlaygroundTestSelect';
 
 export const PlaygroundIndex = () => {
@@ -18,6 +19,7 @@ export const PlaygroundIndex = () => {
       <div className="main-track">
         <PlaygroundTestConnectButton />
         <PlaygroundTestMfaSelector />
+        <PlaygroundTestOpenIdProviders />
         <PlaygroundTestMfaVerificatorFactorSelector />
         <PlaygroundTestInstanceSelector />
         <PlaygroundTestMfaSettingsSection />

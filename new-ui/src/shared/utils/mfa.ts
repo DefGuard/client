@@ -1,3 +1,4 @@
+import { OpenIdProvider } from '../consts';
 import {
   ConnectionType,
   type InstanceInfo,
@@ -18,7 +19,22 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Fido2]: 'Security key',
 };
 
-export const mfaToText = (factor: MfaMethodValue): string => mfaMethodLabels[factor];
+type OpenIdInstance = Pick<InstanceInfo, 'openid_display_name'>;
+
+export const openIdProviderName = (instance?: OpenIdInstance): string =>
+  instance?.openid_display_name || mfaMethodLabels[MfaMethod.Oidc];
+
+export const mfaToText = (factor: MfaMethodValue, instance?: OpenIdInstance): string => {
+  if (factor === MfaMethod.Oidc) {
+    return openIdProviderName(instance);
+  }
+  return mfaMethodLabels[factor];
+};
+
+export const findOpenIdProvider = (instance?: OpenIdInstance) =>
+  Object.values(OpenIdProvider).find((provider) =>
+    instance?.openid_display_name?.toLowerCase().includes(provider),
+  );
 
 export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
   [MfaMethod.Email]: 'Email',

@@ -189,7 +189,7 @@ export const LocationCardProvider = ({
   const stepMethod = stepPlan[stepIndex];
   const showStepLabel = isMultiStep && isPresent(stepMethod);
   const stepLabel = showStepLabel
-    ? `Step ${stepIndex + 1}/${mfaSteps.length}: ${mfaToText(stepMethod)}`
+    ? `Step ${stepIndex + 1}/${mfaSteps.length}: ${mfaToText(stepMethod, instance)}`
     : null;
 
   return (
