@@ -10,6 +10,15 @@ export const mfaMethodIcon: Record<MfaMethodValue, IconKindValue> = {
   [MfaMethod.Fido2]: 'software-key',
 };
 
+export const OpenIdProvider = {
+  Microsoft: 'microsoft',
+  Google: 'google',
+  Okta: 'okta',
+  JumpCloud: 'jumpcloud',
+} as const;
+
+export type OpenIdProviderValue = (typeof OpenIdProvider)[keyof typeof OpenIdProvider];
+
 export const motionTransitionStandard = {
   type: 'tween',
   ease: 'easeOut',

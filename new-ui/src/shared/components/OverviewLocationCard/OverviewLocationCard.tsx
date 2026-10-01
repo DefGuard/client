@@ -193,6 +193,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
               <LocationCardMfaEdit
                 variant="full"
                 location={location}
+                instance={instance}
                 connectionAbility={connectionAbility}
                 onEdit={() => {
                   if (isPresent(location)) {

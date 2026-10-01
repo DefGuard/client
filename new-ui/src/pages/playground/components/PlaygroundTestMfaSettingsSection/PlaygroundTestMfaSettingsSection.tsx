@@ -53,6 +53,7 @@ const singleStepLocation: MfaSettingsLocation = {
 
 const instance: MfaSettingsInstance = {
   mfa_configured_methods: [MfaMethod.Totp, MfaMethod.Oidc, MfaMethod.Fido2],
+  openid_display_name: null,
 };
 
 const Demo = ({

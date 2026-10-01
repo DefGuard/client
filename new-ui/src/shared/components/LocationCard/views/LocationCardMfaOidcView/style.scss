@@ -3,3 +3,16 @@
     color: var(--fg-critical);
   }
 }
+
+.location-card-mfa-oidc {
+  .controls {
+    > .right {
+      flex: 1;
+
+      .btn,
+      .external-provider-button {
+        width: 100%;
+      }
+    }
+  }
+}

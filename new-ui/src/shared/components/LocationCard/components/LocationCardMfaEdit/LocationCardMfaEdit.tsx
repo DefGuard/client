@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { TooltipContent } from '../../../../providers/tooltip/TooltipContent';
 import { TooltipProvider } from '../../../../providers/tooltip/TooltipContext';
 import { TooltipTrigger } from '../../../../providers/tooltip/TooltipTrigger';
-import type { LocationInfo } from '../../../../rust-api/types';
+import type { InstanceInfo, LocationInfo } from '../../../../rust-api/types';
 import {
   ConnectionAbility,
   type ConnectionAbilityValue,
@@ -19,6 +19,7 @@ import { IconButtonVariant } from '../../../IconButton/types';
 interface Props {
   variant: 'compact' | 'full';
   location: LocationInfo;
+  instance?: InstanceInfo;
   /** Supplied by the caller - the tray card reads it off the LocationCard context,
    *  the desktop card computes it with `useConnectionAbility`. */
   connectionAbility: ConnectionAbilityValue;
@@ -30,6 +31,7 @@ const CONFIGURE_REQUIRED_TOOLTIP =
 
 export const LocationCardMfaEdit = ({
   location,
+  instance,
   onEdit,
   variant,
   connectionAbility,
@@ -38,7 +40,7 @@ export const LocationCardMfaEdit = ({
   const label =
     stepCount > 1
       ? mfaStepsToText(stepCount)
-      : mfaToText(resolveMfaStepPlan(location)[0]);
+      : mfaToText(resolveMfaStepPlan(location)[0], instance);
 
   // `Configurable` stays editable, configuring a factor unblocks it.
   const canEdit = connectionAbility !== ConnectionAbility.Unavailable;

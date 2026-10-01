@@ -5,11 +5,17 @@ import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkbox';
+import { ExternalProviderButton } from '../../../../../../../shared/components/ExternalProviderButton/ExternalProviderButton';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
+import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../../../shared/rust-api/api';
 import { getAppConfigQueryOptions } from '../../../../../../../shared/rust-api/query';
 import { ThemeSpacing } from '../../../../../../../shared/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
+import {
+  findOpenIdProvider,
+  openIdProviderName,
+} from '../../../../../../../shared/utils/mfa';
 import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
@@ -22,6 +28,9 @@ export const ConnectModalMfaOidc = () => {
   const [perviousView, location, initAutoStart] = useConnectModal(
     useShallow((s) => [s.perviousView, s.location, s.autoStartOpenId]),
   );
+  const { instances } = useAppData();
+  const instance = instances.find((entry) => entry.id === location?.instance_id);
+  const providerName = openIdProviderName(instance);
 
   const { start, isStarting, startError, isPolling, pollError } = useConnectModalMfaOidc({
     autoStart: initAutoStart,
@@ -60,8 +69,7 @@ export const ConnectModalMfaOidc = () => {
     <div id="mfa-oidc-view">
       {screen === 'idle' && (
         <p className="view-description">
-          To connect to the VPN, authenticate via your OpenID provider. A browser window
-          will open for you to sign in.
+          {`To connect to the VPN, sign in with ${providerName} by clicking button below. A browser window will open and redirect you to ${providerName} for authentication.`}
         </p>
       )}
       {screen === 'polling' && (
@@ -72,9 +80,9 @@ export const ConnectModalMfaOidc = () => {
       {screen === 'error' && <p className="view-description">{errorMessage}</p>}
       <div className="actions">
         {screen !== 'error' && (
-          <Button
-            text="Auth with OpenID"
-            variant={ButtonVariant.Primary}
+          <ExternalProviderButton
+            text={`Authenticate with ${providerName}`}
+            provider={findOpenIdProvider(instance) ?? 'custom'}
             loading={screen === 'polling' || isStarting}
             onClick={handleStart}
           />

@@ -30,6 +30,7 @@ const threeSteps = [
 
 const instance = {
   mfa_configured_methods: [MfaMethod.Totp, MfaMethod.Oidc, MfaMethod.Fido2],
+  openid_display_name: null,
 };
 
 describe('mfaSettingsStepsOf', () => {
@@ -101,7 +102,7 @@ describe('mfaSettingsStepsOf', () => {
   it('never offers configuration on an instance that does not report its factors', () => {
     const steps = mfaSettingsStepsOf({
       location: locationOf(threeSteps),
-      instance: { mfa_configured_methods: null },
+      instance: { mfa_configured_methods: null, openid_display_name: null },
       configurable: true,
     });
     expect(steps[0].factors[1].action).toBe(MfaFactorAction.None);
