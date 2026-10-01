@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../../../rust-api/query';
 import { ThemeSpacing } from '../../../../types';
-import { openIdProviderColorIconOf, openIdProviderName } from '../../../../utils/mfa';
+import { findOpenIdProvider, openIdProviderName } from '../../../../utils/mfa';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
 import { Controls } from '../../../Controls/Controls';
 import { Divider } from '../../../Divider/Divider';
+import { ExternalProviderButton } from '../../../ExternalProviderButton/ExternalProviderButton';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
@@ -92,10 +93,9 @@ export const LocationCardMfaOidcView = () => {
         />
         <div className="right">
           {screen !== 'error' && (
-            <Button
+            <ExternalProviderButton
               text={`Authenticate with ${providerName}`}
-              iconLeft={openIdProviderColorIconOf(instance)}
-              variant={ButtonVariant.Primary}
+              provider={findOpenIdProvider(instance) ?? 'custom'}
               loading={screen === 'polling' || isStarting}
               onClick={handleStart}
             />

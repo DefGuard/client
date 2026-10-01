@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkbox';
+import { ExternalProviderButton } from '../../../../../../../shared/components/ExternalProviderButton/ExternalProviderButton';
 import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
 import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../../../shared/rust-api/api';
@@ -12,7 +13,7 @@ import { getAppConfigQueryOptions } from '../../../../../../../shared/rust-api/q
 import { ThemeSpacing } from '../../../../../../../shared/types';
 import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import {
-  openIdProviderColorIconOf,
+  findOpenIdProvider,
   openIdProviderName,
 } from '../../../../../../../shared/utils/mfa';
 import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPostureCheckLoading/ConnectModalPostureCheckLoading';
@@ -79,10 +80,9 @@ export const ConnectModalMfaOidc = () => {
       {screen === 'error' && <p className="view-description">{errorMessage}</p>}
       <div className="actions">
         {screen !== 'error' && (
-          <Button
+          <ExternalProviderButton
             text={`Authenticate with ${providerName}`}
-            iconLeft={openIdProviderColorIconOf(instance)}
-            variant={ButtonVariant.Primary}
+            provider={findOpenIdProvider(instance) ?? 'custom'}
             loading={screen === 'polling' || isStarting}
             onClick={handleStart}
           />

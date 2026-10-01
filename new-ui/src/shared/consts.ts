@@ -26,13 +26,6 @@ export const openIdProviderIcon: Record<OpenIdProviderValue, IconKindValue> = {
   [OpenIdProvider.JumpCloud]: 'jump-cloud-white',
 };
 
-export const openIdProviderColorIcon: Record<OpenIdProviderValue, IconKindValue> = {
-  [OpenIdProvider.Microsoft]: 'microsoft',
-  [OpenIdProvider.Google]: 'google',
-  [OpenIdProvider.Okta]: 'okta',
-  [OpenIdProvider.JumpCloud]: 'jump-cloud',
-};
-
 export const motionTransitionStandard = {
   type: 'tween',
   ease: 'easeOut',

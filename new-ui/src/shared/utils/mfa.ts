@@ -1,4 +1,4 @@
-import { OpenIdProvider, openIdProviderColorIcon } from '../consts';
+import { OpenIdProvider } from '../consts';
 import {
   ConnectionType,
   type InstanceInfo,
@@ -35,11 +35,6 @@ export const findOpenIdProvider = (instance?: OpenIdInstance) =>
   Object.values(OpenIdProvider).find((provider) =>
     instance?.openid_display_name?.toLowerCase().includes(provider),
   );
-
-export const openIdProviderColorIconOf = (instance?: OpenIdInstance) => {
-  const provider = findOpenIdProvider(instance);
-  return isPresent(provider) ? openIdProviderColorIcon[provider] : undefined;
-};
 
 export const mfaMethodApiValues: Record<MfaMethodValue, string> = {
   [MfaMethod.Email]: 'Email',

@@ -22,7 +22,7 @@
   }
 }
 
-.icon svg:not(.color-icon) {
+.icon svg {
   path {
     fill: var(--icon-color, var(--fg-white-100));
   }
@@ -32,11 +32,11 @@
   }
 }
 
-.icon[style*='--icon-color'] svg:not(.color-icon) path {
+.icon[style*='--icon-color'] svg path {
   fill: var(--icon-color, var(--fg-white-100));
 }
 
-.icon[style*='--icon-color'] svg:not(.color-icon) circle {
+.icon[style*='--icon-color'] svg circle {
   stroke: var(--icon-color, var(--fg-white-100));
 }
 
