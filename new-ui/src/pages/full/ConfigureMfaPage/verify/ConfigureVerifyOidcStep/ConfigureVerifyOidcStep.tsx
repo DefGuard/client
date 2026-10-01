@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
@@ -18,11 +17,11 @@ export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
     onSessionExpired,
   });
 
-  const handleBack = useCallback(async () => {
+  const handleBack = async () => {
     // Core holds one pending attempt per session, so abort it before another method starts
     await abort();
     useConfigureMfaStore.getState().backFromVerification();
-  }, [abort]);
+  };
 
   return (
     <FullPage
@@ -33,11 +32,11 @@ export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
     >
       <FullPageTitle title="Verify with OpenID" />
       <p className="description">
-        {isPolling ? (
-          <span>{`Complete the sign-in in your browser. This page will update automatically.`}</span>
-        ) : (
-          <span>{`Authenticate via your OpenID provider. A browser window will open for you to sign in.`}</span>
-        )}
+        <span>
+          {isPolling
+            ? 'Complete the sign-in in your browser. This page will update automatically.'
+            : 'Authenticate via your OpenID provider. A browser window will open for you to sign in.'}
+        </span>
       </p>
       {isPresent(error) && <p className="error">{error}</p>}
       <div className="oidc-action">

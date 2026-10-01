@@ -1,5 +1,5 @@
-//! The v8 option structs, which the `windows` bindings stop short of. Each one is the bound v7
-//! struct followed by the fields webauthn.h appends at v8, in its order.
+//! v8 option structs, which the windows bindings stop short of. each is the bound v7 struct
+//! followed by the fields webauthn.h appends at v8, in its order
 
 use std::ffi::c_void;
 
@@ -13,12 +13,12 @@ use windows::{
     },
 };
 
-/// The first API with `PublicKeyCredentialHints`.
+/// first api with credential hints
 const API_VERSION_8: u32 = 8;
 const MAKE_CREDENTIAL_OPTIONS_VERSION_8: u32 = 8;
 const GET_ASSERTION_OPTIONS_VERSION_8: u32 = 8;
 
-/// The DLL reads only up to `dwVersion`, so the v8 struct is safe to hand any platform.
+/// the dll reads only up to dwVersion, so the v8 struct is safe to hand any platform
 pub(super) fn make_credential_options_version(api_version: u32) -> u32 {
     if api_version >= API_VERSION_8 {
         MAKE_CREDENTIAL_OPTIONS_VERSION_8
@@ -51,8 +51,8 @@ pub(super) struct GetAssertionOptions {
     pub(super) credential_hints: *const PCWSTR,
 }
 
-/// Steers the platform dialog to its security key flow. Advisory only, the transport check on
-/// the way out is what actually refuses a phone.
+/// steers the platform dialog to its security key flow. advisory only, the transport check
+/// on the way out is what actually refuses a phone
 pub(super) struct CredentialHints([PCWSTR; 1]);
 
 impl CredentialHints {
@@ -60,7 +60,7 @@ impl CredentialHints {
         Self([windows::core::w!("security-key")])
     }
 
-    /// Nothing is sent on a platform that predates hints.
+    /// nothing is sent on a platform that predates hints
     pub(super) fn for_api(&self, api_version: u32) -> (u32, *const PCWSTR) {
         if api_version >= API_VERSION_8 {
             (self.0.len() as u32, self.0.as_ptr())
@@ -76,8 +76,8 @@ mod tests {
 
     use super::*;
 
-    /// Offsets worked out by hand from webauthn.h for x64. A bindings bump that grows the v7
-    /// structs would shift every appended field, and this is where it shows.
+    /// offsets worked out by hand from webauthn.h for x64. a bindings bump that grows the v7
+    /// structs would shift every appended field, and this is where it shows
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_v8_fields_sit_where_webauthn_h_puts_them() {
@@ -105,7 +105,7 @@ mod tests {
         assert_eq!(hints.for_api(API_VERSION_8 - 1), (0, std::ptr::null()));
         let (len, pointer) = hints.for_api(API_VERSION_8);
         assert_eq!(len, 1);
-        // SAFETY: one entry, and `hints` outlives the read.
+        // SAFETY: one entry, and hints outlives the read
         assert_eq!(unsafe { (*pointer).to_string() }.unwrap(), "security-key");
     }
 }

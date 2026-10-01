@@ -406,7 +406,7 @@ pub(crate) async fn register(
                 bRequireResidentKey: BOOL::from(request.resident_key == ResidentKey::Required),
                 bPreferResidentKey: BOOL::from(request.resident_key == ResidentKey::Preferred),
                 dwUserVerificationRequirement: user_verification(request.user_verification),
-                // The statement is discarded anyway, see `protocol::attestation_object`.
+                // the statement is discarded anyway, see protocol::attestation_object
                 dwAttestationConveyancePreference: WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
                 pCancellationId: &raw mut cancellation_id,
                 pExcludeCredentialList: exclude.as_mut_ptr(),
@@ -443,7 +443,7 @@ pub(crate) async fn register(
                 &raw const user,
                 algorithms.as_ptr(),
                 &raw const client_data_raw,
-                // cast from the whole struct, the dll reads the v8 tail past `base`
+                // cast from the whole struct, the dll reads the v8 tail past base
                 (&raw const options).cast(),
                 &raw mut raw,
             )

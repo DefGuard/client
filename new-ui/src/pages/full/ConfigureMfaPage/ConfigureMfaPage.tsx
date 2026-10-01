@@ -19,7 +19,7 @@ export const ConfigureMfaPage = () => {
 
 const ConfigureMfaContent = () => {
   const navigate = useNavigate();
-  // A late authorization on the selection screen waits for the picks to be confirmed.
+  // a late authorization on the selection screen waits for the picks
   const inWizard = useConfigureMfaStore(
     (s) => s.authorized && isPresent(s.selectedMethods),
   );
@@ -29,9 +29,14 @@ const ConfigureMfaContent = () => {
     navigate({ to: '/full/add' });
   }, [navigate]);
 
-  return inWizard ? (
-    <ConfigureMfaWizard onCancel={leave} onSessionExpired={handleSessionExpired} />
-  ) : (
-    <ConfigureMfaVerify onCancel={leave} onSessionExpired={handleSessionExpired} />
+  return (
+    <>
+      {inWizard && (
+        <ConfigureMfaWizard onCancel={leave} onSessionExpired={handleSessionExpired} />
+      )}
+      {!inWizard && (
+        <ConfigureMfaVerify onCancel={leave} onSessionExpired={handleSessionExpired} />
+      )}
+    </>
   );
 };

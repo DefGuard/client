@@ -2739,7 +2739,7 @@ pub async fn mfa_config_setup_fido2(
 
     // the key blinks from here on and gives up without a touch
     let _ = handle.emit(EventKey::MfaConfigFido2Touch.into(), ());
-    // The prompt must not open behind the window that asked for it.
+    // the prompt must not open behind the window that asked for it
     let _level = WindowLevelGuard::lower(&window);
     let attestation = defguard_client_fido2::register_security_key(
         &challenge,
@@ -2750,15 +2750,15 @@ pub async fn mfa_config_setup_fido2(
     )
     .await
     .map_err(|err| match err {
-        // Core minted the challenge, so a bad one is not the user's problem.
+        // Core minted the challenge, so a bad one is not the user's problem
         Fido2Error::MalformedChallenge(detail) => mfa_config_other(format!(
             "Defguard sent a malformed security key challenge: {detail}"
         )),
         err => err_to_json(mfa_config_fido2_error(&err, "complete the registration")),
     })?;
 
-    // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
-    // over, and this is the last point one can be caught before the factor is submitted.
+    // a platform that cannot abort a waiting key reports the cancel only once the ceremony is
+    // over, the last point one can be caught before the factor is submitted
     if ceremony.is_cancelled() {
         debug!("Security key registration was cancelled, discarding the attestation");
         return Err(err_to_json(MfaConfigError::Cancelled));

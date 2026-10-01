@@ -19,7 +19,7 @@ vi.mock('../../../../../shared/rust-api/api', () => ({
   },
 }));
 
-const SESSION_ID = 'session-1';
+const sessionId = 'session-1';
 const authorizeResult = { deadline_timestamp: 1_900_000_000, recovery_codes: [] };
 
 const deferred = <T>() => {
@@ -41,7 +41,7 @@ describe('useConfigureVerifyFido2', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useConfigureMfaStore.getState().reset();
-    useConfigureMfaStore.setState({ sessionId: SESSION_ID });
+    useConfigureMfaStore.setState({ sessionId });
     mocks.listen.mockResolvedValue(vi.fn());
     mocks.mfaConfigAbortAttempt.mockResolvedValue(undefined);
     mocks.mfaConfigAuthorizeFido2.mockResolvedValue(authorizeResult);

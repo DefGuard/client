@@ -21,8 +21,8 @@ vi.mock('../../../../../shared/rust-api/api', () => ({
   },
 }));
 
-const SESSION_ID = 'session-1';
-const OIDC_URL = 'https://idp.test/auth';
+const sessionId = 'session-1';
+const oidcUrl = 'https://idp.test/auth';
 const authorizeResult = { deadline_timestamp: 1_900_000_000, recovery_codes: [] };
 
 const deferred = <T>() => {
@@ -40,10 +40,10 @@ describe('useConfigureVerifyOidc', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useConfigureMfaStore.getState().reset();
-    useConfigureMfaStore.setState({ sessionId: SESSION_ID });
+    useConfigureMfaStore.setState({ sessionId });
     mocks.mfaConfigAbortAttempt.mockResolvedValue(undefined);
     mocks.mfaConfigAuthorizeOidc.mockResolvedValue(authorizeResult);
-    mocks.mfaConfigOidcUrl.mockResolvedValue(OIDC_URL);
+    mocks.mfaConfigOidcUrl.mockResolvedValue(oidcUrl);
     mocks.openLink.mockResolvedValue(undefined);
   });
 
@@ -54,8 +54,8 @@ describe('useConfigureVerifyOidc', () => {
       await result.current.start();
     });
 
-    expect(mocks.openLink).toHaveBeenCalledWith(OIDC_URL);
-    expect(mocks.mfaConfigAuthorizeOidc).toHaveBeenCalledWith(SESSION_ID);
+    expect(mocks.openLink).toHaveBeenCalledWith(oidcUrl);
+    expect(mocks.mfaConfigAuthorizeOidc).toHaveBeenCalledWith(sessionId);
   });
 
   it('does not open the browser when unmounted while the URL is pending', async () => {
@@ -68,7 +68,7 @@ describe('useConfigureVerifyOidc', () => {
       starting = result.current.start();
     });
     unmount();
-    fetching.resolve(OIDC_URL);
+    fetching.resolve(oidcUrl);
     await starting;
 
     expect(mocks.openLink).not.toHaveBeenCalled();

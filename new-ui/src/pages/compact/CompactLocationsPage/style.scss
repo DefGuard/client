@@ -3,25 +3,26 @@
   flex-flow: column;
   height: 100dvh;
 
-  > .compact-footer {
+  & > .compact-footer {
     display: flex;
     flex-flow: column;
   }
 
-  > .window-header,
-  > .compact-footer {
+  & > .window-header,
+  & > .compact-footer {
     flex: 0 0 auto;
   }
 
-  > .instance-switcher {
+  & > .instance-switcher {
     flex: 0 0 auto;
     margin-bottom: var(--spacing-sm);
+    box-sizing: border-box;
 
-    // Reserves the same gutter as .scroll-container.windows so the select lines up with the cards.
+    // lines the select up with the cards inside .scroll-container.windows
     &.windows {
       scrollbar-gutter: stable;
       overflow-y: hidden;
-      padding-right: 6px;
+      padding-right: var(--scroll-container-gutter);
     }
   }
 

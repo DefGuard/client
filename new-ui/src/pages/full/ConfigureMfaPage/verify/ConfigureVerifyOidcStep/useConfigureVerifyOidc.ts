@@ -17,8 +17,8 @@ export const useConfigureVerifyOidc = ({ onSessionExpired }: Options) => {
   const [isOpening, setIsOpening] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const polling = useRef(false);
-  const mounted = useRef(true);
+  const pollingRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const handleApiError = useMfaConfigErrorHandler({
     context: 'OpenID MFA configuration verification failed',
@@ -30,16 +30,16 @@ export const useConfigureVerifyOidc = ({ onSessionExpired }: Options) => {
 
   const poll = useCallback(
     async (sessionId: string) => {
-      polling.current = true;
+      pollingRef.current = true;
       setIsPolling(true);
       try {
         const result = await api.mfaConfigAuthorizeOidc(sessionId);
         applyAuthorization(sessionId, result);
       } catch (err) {
-        if (mounted.current) handleApiError(err);
+        if (mountedRef.current) handleApiError(err);
       } finally {
-        polling.current = false;
-        if (mounted.current) setIsPolling(false);
+        pollingRef.current = false;
+        if (mountedRef.current) setIsPolling(false);
       }
     },
     [handleApiError],
@@ -52,20 +52,20 @@ export const useConfigureVerifyOidc = ({ onSessionExpired }: Options) => {
     setError(null);
     try {
       const url = await api.mfaConfigOidcUrl(sessionId);
-      if (!mounted.current) return;
+      if (!mountedRef.current) return;
       await api.openLink(url);
     } catch (err) {
-      if (mounted.current) handleApiError(err);
+      if (mountedRef.current) handleApiError(err);
       return;
     } finally {
-      if (mounted.current) setIsOpening(false);
+      if (mountedRef.current) setIsOpening(false);
     }
-    if (mounted.current && !polling.current) void poll(sessionId);
+    if (mountedRef.current && !pollingRef.current) void poll(sessionId);
   }, [handleApiError, poll]);
 
   const abort = useCallback(async () => {
     const { sessionId } = useConfigureMfaStore.getState();
-    if (!polling.current || !isPresent(sessionId)) return;
+    if (!pollingRef.current || !isPresent(sessionId)) return;
     try {
       await api.mfaConfigAbortAttempt(sessionId);
     } catch (err) {
@@ -75,9 +75,9 @@ export const useConfigureVerifyOidc = ({ onSessionExpired }: Options) => {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: aborts on unmount only
   useEffect(() => {
-    mounted.current = true;
+    mountedRef.current = true;
     return () => {
-      mounted.current = false;
+      mountedRef.current = false;
       void abort();
     };
   }, []);

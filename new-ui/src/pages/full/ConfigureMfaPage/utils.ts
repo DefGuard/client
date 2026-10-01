@@ -6,10 +6,10 @@ import {
 import {
   ConfigureMfaStep,
   type ConfigureMfaStepValue,
-  MFA_VERIFICATION_METHODS,
   MFA_WIZARD_STEPS,
   type MfaFactor,
   type MfaVerificationMethod,
+  mfaVerificationMethods,
 } from './types';
 
 /** Keyed on the shared list, so a new factor fails to compile until mapped here. */
@@ -48,15 +48,15 @@ export const isMfaFactorOfferable = (
   return factor.repeatable || !configuredMethods.includes(method);
 };
 
-const CODE_MFA_METHODS: MfaMethodValue[] = [MfaMethod.Totp, MfaMethod.Email];
+const codeMfaMethods: MfaMethodValue[] = [MfaMethod.Totp, MfaMethod.Email];
 
 /** every Core reports code factors in a session but older ones leave out FIDO2,
  *  so the instance snapshot stays the source for the rest */
 export const isCodeMfaMethod = (method: MfaMethodValue): boolean =>
-  CODE_MFA_METHODS.includes(method);
+  codeMfaMethods.includes(method);
 
 /** ordered by preference, not by the input */
 export const verificationMethodsOf = (
   availableMethods: MfaMethodValue[],
 ): MfaVerificationMethod[] =>
-  MFA_VERIFICATION_METHODS.filter((method) => availableMethods.includes(method));
+  mfaVerificationMethods.filter((method) => availableMethods.includes(method));

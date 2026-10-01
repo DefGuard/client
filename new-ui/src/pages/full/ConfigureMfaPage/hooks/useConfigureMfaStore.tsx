@@ -172,7 +172,7 @@ export const useConfigureMfaStore = create<Store>()(
           return {
             selectedMethods: methods,
             activeStep: firstStep(next),
-            // Picked after a late authorization, so the deadline was kept for this pick.
+            // picked after a late authorization, so the deadline was kept for it
             ...(current.authorized && {
               deadline: sessionDeadline(next, current.deadline),
             }),
@@ -200,7 +200,7 @@ export const useConfigureMfaStore = create<Store>()(
       authorize: (response) => {
         set((current) => {
           const deadline = dayjs.unix(response.deadline_timestamp).toISOString();
-          // A late answer can land after Back to the selection, the steps wait for its Continue.
+          // a late answer can land after Back, the steps wait for its Continue
           if (!isPresent(current.selectedMethods)) {
             return { authorized: true, recoveryCodes: response.recovery_codes, deadline };
           }
@@ -278,7 +278,6 @@ export const startMfaConfiguration = async (
   useConfigureMfaStore.setState({ initialSelection });
 };
 
-/** A copy the proxy still holds expires on its own, so a failed cancel is not worth raising. */
 /** applied even after the asking step unmounts, Core has authorized the session either way.
  *  a cancel resets sessionId, so a late answer for a discarded session is dropped */
 export const applyAuthorization = (
@@ -290,6 +289,7 @@ export const applyAuthorization = (
   store.authorize(result);
 };
 
+/** A copy the proxy still holds expires on its own, so a failed cancel is not worth raising. */
 export const discardMfaConfiguration = async (): Promise<void> => {
   const { sessionId } = useConfigureMfaStore.getState();
   useConfigureMfaStore.getState().reset();

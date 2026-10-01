@@ -8,6 +8,6 @@
   &.windows {
     scrollbar-gutter: stable;
     overflow-y: scroll;
-    padding-right: 6px;
+    padding-right: var(--scroll-container-gutter);
   }
 }

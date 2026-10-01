@@ -22,8 +22,8 @@ export const useConfigureVerifyFido2 = ({ onSessionExpired, autoStart }: Options
   const [isVerifying, setIsVerifying] = useState(false);
   const [isAwaitingTouch, setIsAwaitingTouch] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const running = useRef(false);
-  const mounted = useRef(true);
+  const runningRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const handleApiError = useMfaConfigErrorHandler({
     context: 'Security key MFA configuration verification failed',
@@ -36,8 +36,8 @@ export const useConfigureVerifyFido2 = ({ onSessionExpired, autoStart }: Options
   const verify = useCallback(
     async (pin: string | null) => {
       const { sessionId } = useConfigureMfaStore.getState();
-      if (running.current || !isPresent(sessionId)) return;
-      running.current = true;
+      if (runningRef.current || !isPresent(sessionId)) return;
+      runningRef.current = true;
       setIsVerifying(true);
       setError(null);
       let unlisten: UnlistenFn | undefined;
@@ -45,14 +45,14 @@ export const useConfigureVerifyFido2 = ({ onSessionExpired, autoStart }: Options
         // listen before invoking, the touch event fires while the call is still running
         unlisten = await listen(TauriEvent.MfaConfigFido2Touch, () => {
           // a platform that runs the ceremony shows its own prompt, ours would sit behind it
-          if (mounted.current) setIsAwaitingTouch(fido2ShowsTouchPrompt());
+          if (mountedRef.current) setIsAwaitingTouch(fido2ShowsTouchPrompt());
         });
         // an abort sent while listen was pending found no ceremony to stop
-        if (!mounted.current) return;
+        if (!mountedRef.current) return;
         const result = await api.mfaConfigAuthorizeFido2(sessionId, pin);
         applyAuthorization(sessionId, result);
       } catch (err) {
-        if (!mounted.current) return;
+        if (!mountedRef.current) return;
         // Core says "invalid code", which means nothing next to a security key
         if (isMfaConfigInvalidCode(err)) {
           void logError(`Security key MFA configuration verification rejected: ${err}`);
@@ -62,8 +62,8 @@ export const useConfigureVerifyFido2 = ({ onSessionExpired, autoStart }: Options
         handleApiError(err);
       } finally {
         unlisten?.();
-        running.current = false;
-        if (mounted.current) {
+        runningRef.current = false;
+        if (mountedRef.current) {
           setIsAwaitingTouch(false);
           setIsVerifying(false);
         }
@@ -74,7 +74,7 @@ export const useConfigureVerifyFido2 = ({ onSessionExpired, autoStart }: Options
 
   const abort = useCallback(async () => {
     const { sessionId } = useConfigureMfaStore.getState();
-    if (!running.current || !isPresent(sessionId)) return;
+    if (!runningRef.current || !isPresent(sessionId)) return;
     try {
       await api.mfaConfigAbortAttempt(sessionId);
     } catch (err) {
@@ -84,9 +84,9 @@ export const useConfigureVerifyFido2 = ({ onSessionExpired, autoStart }: Options
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: aborts on unmount only
   useEffect(() => {
-    mounted.current = true;
+    mountedRef.current = true;
     return () => {
-      mounted.current = false;
+      mountedRef.current = false;
       void abort();
     };
   }, []);
@@ -98,7 +98,9 @@ export const useConfigureVerifyFido2 = ({ onSessionExpired, autoStart }: Options
     const timer = window.setTimeout(() => {
       void verify(null);
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [autoStart]);
 
   return { verify, abort, isVerifying, isAwaitingTouch, error, setError };

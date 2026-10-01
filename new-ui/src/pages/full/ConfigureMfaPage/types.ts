@@ -27,11 +27,11 @@ export type MfaFactor = {
 };
 
 /** most preferred first */
-export const MFA_VERIFICATION_METHODS = [
+export const mfaVerificationMethods = [
   MfaMethod.Totp,
   MfaMethod.Email,
   MfaMethod.Fido2,
   MfaMethod.Oidc,
 ] as const;
 
-export type MfaVerificationMethod = (typeof MFA_VERIFICATION_METHODS)[number];
+export type MfaVerificationMethod = (typeof mfaVerificationMethods)[number];

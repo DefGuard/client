@@ -6,14 +6,14 @@ import { applyAuthorization, useConfigureMfaStore } from './useConfigureMfaStore
 vi.mock('@tauri-apps/plugin-log', () => ({ error: vi.fn() }));
 vi.mock('../../../../shared/rust-api/api', () => ({ api: {} }));
 
-const SESSION_ID = 'session-1';
+const sessionId = 'session-1';
 const authorizeResult = { deadline_timestamp: 1_900_000_000, recovery_codes: [] };
 
 describe('applyAuthorization', () => {
   beforeEach(() => {
     useConfigureMfaStore.getState().reset();
     useConfigureMfaStore.setState({
-      sessionId: SESSION_ID,
+      sessionId,
       configuredMethods: [MfaMethod.Email],
       verificationMethods: [MfaMethod.Email],
     });
@@ -22,7 +22,7 @@ describe('applyAuthorization', () => {
   it('waits on the selection when the answer lands after Back', () => {
     useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
     useConfigureMfaStore.getState().backFromVerification();
-    applyAuthorization(SESSION_ID, authorizeResult);
+    applyAuthorization(sessionId, authorizeResult);
 
     const state = useConfigureMfaStore.getState();
     expect(state.authorized).toBe(true);
@@ -34,7 +34,7 @@ describe('applyAuthorization', () => {
   it('sets up the picks confirmed after a late answer', () => {
     useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
     useConfigureMfaStore.getState().backFromVerification();
-    applyAuthorization(SESSION_ID, authorizeResult);
+    applyAuthorization(sessionId, authorizeResult);
     useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
 
     const state = useConfigureMfaStore.getState();
@@ -45,7 +45,7 @@ describe('applyAuthorization', () => {
   it('finishes when the pick confirmed after a late answer is empty', () => {
     useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
     useConfigureMfaStore.getState().backFromVerification();
-    applyAuthorization(SESSION_ID, authorizeResult);
+    applyAuthorization(sessionId, authorizeResult);
     useConfigureMfaStore.getState().selectMethods([]);
 
     const state = useConfigureMfaStore.getState();

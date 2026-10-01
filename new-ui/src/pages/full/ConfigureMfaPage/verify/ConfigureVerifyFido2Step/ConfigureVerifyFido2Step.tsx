@@ -1,5 +1,5 @@
 import { Enter } from '@fluentui/keyboard-keys';
-import { Fragment, useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
@@ -23,7 +23,7 @@ export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
   const { verify, abort, isVerifying, isAwaitingTouch, error, setError } =
     useConfigureVerifyFido2({ onSessionExpired, autoStart: !collectsPin });
 
-  const handleVerify = useCallback(() => {
+  const handleVerify = () => {
     if (isVerifying) return;
     if (!collectsPin) {
       void verify(null);
@@ -34,13 +34,13 @@ export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
       return;
     }
     void verify(pin);
-  }, [collectsPin, isVerifying, pin, setError, verify]);
+  };
 
-  const handleBack = useCallback(async () => {
+  const handleBack = async () => {
     // Core holds one pending attempt per session, so abort it before another method starts
     await abort();
     useConfigureMfaStore.getState().backFromVerification();
-  }, [abort]);
+  };
 
   return (
     <FullPage
@@ -50,10 +50,9 @@ export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
       withControls
     >
       <FullPageTitle title="Verify with your security key" />
-      {isAwaitingTouch ? (
-        <Fido2TouchPrompt />
-      ) : (
-        <Fragment>
+      {isAwaitingTouch && <Fido2TouchPrompt />}
+      {!isAwaitingTouch && (
+        <>
           <p className="description">
             <span>
               {collectsPin
@@ -61,7 +60,7 @@ export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
                 : 'Insert your security key and continue in the prompt your system shows.'}
             </span>
           </p>
-          {collectsPin ? (
+          {collectsPin && (
             <div
               className="pin-track"
               onKeyDown={(e) => {
@@ -79,10 +78,9 @@ export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
                 error={error}
               />
             </div>
-          ) : (
-            isPresent(error) && <p className="error">{error}</p>
           )}
-        </Fragment>
+          {!collectsPin && isPresent(error) && <p className="error">{error}</p>}
+        </>
       )}
       <Controls>
         <Button
