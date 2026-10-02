@@ -13,6 +13,7 @@ import {
   type MfaMethodValue,
 } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
+import { setupMethodsOf } from '../../../../shared/utils/mfa';
 import { dismissEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
 import {
   ConfigureMfaStep,
@@ -62,7 +63,11 @@ type StoreValues = {
 
 type FlowState = Pick<
   StoreValues,
-  'configuredMethods' | 'completedMethods' | 'selectedMethods' | 'recoveryCodes'
+  | 'instance'
+  | 'configuredMethods'
+  | 'completedMethods'
+  | 'selectedMethods'
+  | 'recoveryCodes'
 >;
 
 /** Picked factors still to set up, in wizard order. */
@@ -71,7 +76,11 @@ const pendingMethods = (state: FlowState): MfaMethodValue[] =>
     (method) =>
       !state.completedMethods.includes(method) &&
       // Guards against a pick the selection screen should already have refused.
-      isMfaFactorOfferable(method, state.configuredMethods),
+      isMfaFactorOfferable(
+        method,
+        state.configuredMethods,
+        setupMethodsOf(state.instance),
+      ),
   ) ?? [];
 
 /** Setup steps with a factor still pending, plus the closing steps that have something to show. */
@@ -146,10 +155,14 @@ export const useConfigureMfaStore = create<Store>()(
         const sessionMethods = response.email_fallback
           ? [MfaMethod.Email]
           : response.available_methods;
+        // a factor the instance cannot authorize with is still configured
+        const sessionConfiguredMethods = response.email_fallback
+          ? [MfaMethod.Email]
+          : response.configured_methods;
         // the session and the snapshot may both list FIDO2
         const configuredMethods = [
           ...new Set([
-            ...sessionMethods,
+            ...sessionConfiguredMethods,
             ...(instance.mfa_configured_methods ?? []).filter(
               (method) => !isCodeMfaMethod(method),
             ),
@@ -249,7 +262,7 @@ export const useConfigureMfaStore = create<Store>()(
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
       // Bumped on every shape change: a stored session is never resumable across one.
-      version: 12,
+      version: 13,
     },
   ),
 );
@@ -276,8 +289,9 @@ export const startMfaConfiguration = async (
   dismissEdgeComsError();
   useConfigureMfaStore.getState().start(instance, response, { source, location });
   // Only pre-ticks, the user still confirms in the selection step.
+  const { configuredMethods } = useConfigureMfaStore.getState();
   const initialSelection = preselectedMethods.filter((method) =>
-    isMfaFactorOfferable(method, useConfigureMfaStore.getState().configuredMethods),
+    isMfaFactorOfferable(method, configuredMethods, setupMethodsOf(instance)),
   );
   useConfigureMfaStore.setState({ initialSelection });
 };

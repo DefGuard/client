@@ -20,19 +20,20 @@ const WIZARD_FACTORS: Record<ClientConfigurableMethod, Omit<MfaFactor, 'method'>
 };
 
 /** In selection and wizard order. */
-export const MFA_CONFIGURABLE_FACTORS: MfaFactor[] = CLIENT_CONFIGURABLE_METHODS.map(
-  (method) => ({ method, ...WIZARD_FACTORS[method] }),
-);
+const configurableFactors: MfaFactor[] = CLIENT_CONFIGURABLE_METHODS.map((method) => ({
+  method,
+  ...WIZARD_FACTORS[method],
+}));
 
 export const mfaFactor = (method: MfaMethodValue): MfaFactor | undefined =>
-  MFA_CONFIGURABLE_FACTORS.find((factor) => factor.method === method);
+  configurableFactors.find((factor) => factor.method === method);
 
 export const mfaFactorStep = (
   method: MfaMethodValue,
 ): ConfigureMfaStepValue | undefined => mfaFactor(method)?.step;
 
 export const isMfaSetupStep = (step: ConfigureMfaStepValue): boolean =>
-  MFA_CONFIGURABLE_FACTORS.some((factor) => factor.step === step);
+  configurableFactors.some((factor) => factor.step === step);
 
 export const mfaStepsOf = (methods: MfaMethodValue[]): ConfigureMfaStepValue[] =>
   MFA_WIZARD_STEPS.filter((step) =>
@@ -42,9 +43,10 @@ export const mfaStepsOf = (methods: MfaMethodValue[]): ConfigureMfaStepValue[] =
 export const isMfaFactorOfferable = (
   method: MfaMethodValue,
   configuredMethods: MfaMethodValue[],
+  setupMethods: MfaMethodValue[],
 ): boolean => {
   const factor = mfaFactor(method);
-  if (!factor) return false;
+  if (!factor || !setupMethods.includes(method)) return false;
   return factor.repeatable || !configuredMethods.includes(method);
 };
 
