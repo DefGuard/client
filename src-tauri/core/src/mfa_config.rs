@@ -34,7 +34,7 @@ const SETUP_START: &str = "api/v1/mfa-config/setup/start";
 const SETUP_FINISH: &str = "api/v1/mfa-config/setup/finish";
 const END: &str = "api/v1/mfa-config/end";
 
-// what this client can authorize with, narrowed per instance by `MfaCapabilities`
+// what this client can authorize with, narrowed per instance by MfaCapabilities
 pub const AUTHORIZING_METHODS: &[MfaMethod] = &[
     MfaMethod::Totp,
     MfaMethod::Email,
@@ -52,7 +52,7 @@ const ALREADY_AUTHORIZED_MESSAGE: &str = "session already authorized";
 // a prefix, Core's login flow words it "OIDC authentication not completed yet"
 const OIDC_PENDING_MESSAGE: &str = "OIDC authentication not completed";
 
-// what this client can set up, narrowed per instance by `MfaCapabilities`
+// what this client can set up, narrowed per instance by MfaCapabilities
 pub const CONFIGURABLE_METHODS: &[MfaMethod] =
     &[MfaMethod::Totp, MfaMethod::Email, MfaMethod::Fido2];
 
@@ -187,11 +187,11 @@ fn method_name(method: MfaMethod) -> &'static str {
     }
 }
 
-fn ensure_can_authorize(
-    proof: &AuthorizeProof,
+/// Lets a caller refuse before a key prompt or browser login the request would waste.
+pub fn ensure_can_authorize_method(
+    method: MfaMethod,
     capabilities: &MfaCapabilities,
 ) -> Result<(), MfaConfigError> {
-    let method = proof.method();
     if !AUTHORIZING_METHODS.contains(&method) {
         return Err(MfaConfigError::UnsupportedMethod {
             message: format!(
@@ -208,6 +208,15 @@ fn ensure_can_authorize(
             ),
         });
     }
+    Ok(())
+}
+
+fn ensure_can_authorize(
+    proof: &AuthorizeProof,
+    capabilities: &MfaCapabilities,
+) -> Result<(), MfaConfigError> {
+    let method = proof.method();
+    ensure_can_authorize_method(method, capabilities)?;
     if matches!(proof, AuthorizeProof::Code { .. }) && !CODE_METHODS.contains(&method) {
         return Err(MfaConfigError::UnsupportedMethod {
             message: format!(

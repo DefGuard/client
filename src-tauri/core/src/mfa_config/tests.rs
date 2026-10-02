@@ -1058,6 +1058,24 @@ fn test_authorizing_methods_keeps_only_what_the_instance_accepts() {
     );
 }
 
+#[test]
+fn test_ensure_can_authorize_method_needs_the_client_and_the_instance() {
+    let capabilities = MfaCapabilities {
+        setup_methods: Vec::new(),
+        authorize_methods: vec![LocationMfaMethod::Fido2, LocationMfaMethod::MobileApprove],
+    };
+
+    assert!(ensure_can_authorize_method(MfaMethod::Fido2, &capabilities).is_ok());
+    assert!(matches!(
+        ensure_can_authorize_method(MfaMethod::Oidc, &capabilities),
+        Err(MfaConfigError::UnsupportedMethod { .. })
+    ));
+    assert!(matches!(
+        ensure_can_authorize_method(MfaMethod::MobileApprove, &capabilities),
+        Err(MfaConfigError::UnsupportedMethod { .. })
+    ));
+}
+
 /// A proxy URL may carry a base path, which a leading slash on the endpoint would discard.
 #[tokio::test]
 async fn test_proxy_base_path_is_preserved() {

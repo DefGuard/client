@@ -155,10 +155,7 @@ export const isClientConfigurableMethod = (
 
 type MfaCapabilitiesInstance = Pick<InstanceInfo, 'mfa_capabilities'>;
 
-/**
- * Factors both this client and the instance's Core can set up, in the client's order. Empty
- * when the Core cannot configure MFA from the client at all.
- */
+/** in client order, which the picker and wizard rely on */
 export const setupMethodsOf = (
   instance?: MfaCapabilitiesInstance | null,
 ): ClientConfigurableMethod[] => {
@@ -170,7 +167,7 @@ export const setupMethodsOf = (
 
 export const canSetUpMfaMethod = (
   method: MfaMethodValue,
-  instance?: MfaCapabilitiesInstance,
+  instance?: MfaCapabilitiesInstance | null,
 ): method is ClientConfigurableMethod =>
   setupMethodsOf(instance).some((candidate) => candidate === method);
 

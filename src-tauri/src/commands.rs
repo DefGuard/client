@@ -2536,6 +2536,8 @@ pub async fn mfa_config_authorize_fido2(
     let uid = parse_mfa_config_session_id(&session_id)?;
     let ceremony = CeremonyGuard::register(&state, uid).map_err(err_to_json)?;
     let session = get_mfa_config_session(&state, &session_id)?;
+    mfa_config::ensure_can_authorize_method(MfaMethod::Fido2, &session.capabilities)
+        .map_err(err_to_json)?;
     let instance = Instance::find_by_id(&*DB_POOL, session.instance_id)
         .await
         .map_err(|err| mfa_config_other(err.to_string()))?
@@ -2609,6 +2611,8 @@ pub async fn mfa_config_oidc_url(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let session = get_mfa_config_session(&state, &session_id)?;
+    mfa_config::ensure_can_authorize_method(MfaMethod::Oidc, &session.capabilities)
+        .map_err(err_to_json)?;
     let mut url = session
         .proxy_url
         .join("openid/mfa")

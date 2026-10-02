@@ -19,9 +19,9 @@ pub struct Instance<I = NoId> {
     pub enterprise_enabled: bool,
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
-    /// `None` when the proxy never sent `MfaUserState`.
+    /// None when the proxy never sent MfaUserState.
     pub mfa_configured_methods: Option<Json<Vec<LocationMfaMethod>>>,
-    /// `None` when this Core cannot configure MFA from the client.
+    /// None when this Core cannot configure MFA from the client.
     pub mfa_capabilities: Option<Json<MfaCapabilities>>,
 }
 
@@ -65,7 +65,7 @@ pub fn mfa_configured_methods(
         .map(|state| sorted_methods(state.configured_methods()))
 }
 
-/// Same contract as [`mfa_configured_methods`]. Methods this client does not know are dropped.
+/// Same contract as [mfa_configured_methods]. Methods this client does not know are dropped.
 #[must_use]
 pub fn mfa_capabilities(
     instance_info: &proto::client_types::InstanceInfo,
@@ -345,7 +345,7 @@ pub struct InstanceInfo<I = NoId> {
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
     pub mfa_configured_methods: Option<Vec<LocationMfaMethod>>,
-    /// `None` when this Core cannot configure MFA from the client.
+    /// None when this Core cannot configure MFA from the client.
     pub mfa_capabilities: Option<MfaCapabilities>,
 }
 

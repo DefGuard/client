@@ -15,6 +15,7 @@ import {
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import {
+  CLIENT_CONFIGURABLE_METHODS,
   isClientConfigurableMethod,
   isDesktopDrivableMethod,
   mfaStepsOf as locationMfaSteps,
@@ -75,7 +76,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
   );
 
   const groups = useMemo(() => {
-    let result: MfaMethodValue[][] = [setupMethods];
+    let result: MfaMethodValue[][] = [[...CLIENT_CONFIGURABLE_METHODS]];
     if (isLocationAware) {
       result = locationSteps.map((step) => step.methods.map((entry) => entry.method));
     }
