@@ -26,7 +26,12 @@ export type MfaFactor = {
   repeatable: boolean;
 };
 
-/** Factors that can authorize a session, most preferred first. Core only accepts code factors. */
-export const MFA_VERIFICATION_METHODS = [MfaMethod.Totp, MfaMethod.Email] as const;
+/** most preferred first */
+export const mfaVerificationMethods = [
+  MfaMethod.Totp,
+  MfaMethod.Email,
+  MfaMethod.Fido2,
+  MfaMethod.Oidc,
+] as const;
 
-export type MfaVerificationMethod = (typeof MFA_VERIFICATION_METHODS)[number];
+export type MfaVerificationMethod = (typeof mfaVerificationMethods)[number];

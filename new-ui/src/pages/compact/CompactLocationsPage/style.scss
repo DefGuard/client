@@ -3,20 +3,27 @@
   flex-flow: column;
   height: 100dvh;
 
-  > .compact-footer {
+  & > .compact-footer {
     display: flex;
     flex-flow: column;
   }
 
-  > .window-header,
-  > .compact-footer {
+  & > .window-header,
+  & > .compact-footer {
     flex: 0 0 auto;
   }
 
-  .main-content {
-    display: flex;
-    flex-flow: column;
-    row-gap: var(--spacing-sm);
+  & > .instance-switcher {
+    flex: 0 0 auto;
+    margin-bottom: var(--spacing-sm);
+    box-sizing: border-box;
+
+    // lines the select up with the cards inside .scroll-container.windows
+    &.windows {
+      scrollbar-gutter: stable;
+      overflow-y: hidden;
+      padding-right: var(--scroll-container-gutter);
+    }
   }
 
   .locations {

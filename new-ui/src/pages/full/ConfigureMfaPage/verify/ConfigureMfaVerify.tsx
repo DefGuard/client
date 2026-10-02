@@ -1,12 +1,12 @@
-import { useMemo } from 'react';
 import { MfaMethod } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
 import { useConfigureMfaStore } from '../hooks/useConfigureMfaStore';
 import type { MfaVerificationMethod } from '../types';
-import { verificationMethodsOf } from '../utils';
 import { ConfigureSelectMethodsStep } from './ConfigureSelectMethodsStep/ConfigureSelectMethodsStep';
 import { ConfigureSelectVerificationStep } from './ConfigureSelectVerificationStep/ConfigureSelectVerificationStep';
 import { ConfigureVerifyEmailStep } from './ConfigureVerifyEmailStep/ConfigureVerifyEmailStep';
+import { ConfigureVerifyFido2Step } from './ConfigureVerifyFido2Step/ConfigureVerifyFido2Step';
+import { ConfigureVerifyOidcStep } from './ConfigureVerifyOidcStep/ConfigureVerifyOidcStep';
 import { ConfigureVerifyTotpStep } from './ConfigureVerifyTotpStep/ConfigureVerifyTotpStep';
 
 type Props = {
@@ -16,14 +16,9 @@ type Props = {
 
 /** Picks what the wizard sets up, then verifies the session with an existing factor. */
 export const ConfigureMfaVerify = ({ onCancel, onSessionExpired }: Props) => {
-  const configuredMethods = useConfigureMfaStore((s) => s.configuredMethods);
+  const candidates = useConfigureMfaStore((s) => s.verificationMethods);
   const methodsSelected = useConfigureMfaStore((s) => isPresent(s.selectedMethods));
   const verificationMethod = useConfigureMfaStore((s) => s.verificationMethod);
-
-  const candidates = useMemo(
-    () => verificationMethodsOf(configuredMethods),
-    [configuredMethods],
-  );
 
   if (!methodsSelected) {
     return <ConfigureSelectMethodsStep onCancel={onCancel} />;
@@ -33,23 +28,18 @@ export const ConfigureMfaVerify = ({ onCancel, onSessionExpired }: Props) => {
     return <ConfigureSelectVerificationStep />;
   }
 
+  // for the type only, a session always offers a method or falls back to email
   const method: MfaVerificationMethod =
     verificationMethod ?? candidates[0] ?? MfaMethod.Email;
 
   switch (method) {
     case MfaMethod.Totp:
-      return (
-        <ConfigureVerifyTotpStep
-          onCancel={onCancel}
-          onSessionExpired={onSessionExpired}
-        />
-      );
+      return <ConfigureVerifyTotpStep onSessionExpired={onSessionExpired} />;
     case MfaMethod.Email:
-      return (
-        <ConfigureVerifyEmailStep
-          onCancel={onCancel}
-          onSessionExpired={onSessionExpired}
-        />
-      );
+      return <ConfigureVerifyEmailStep onSessionExpired={onSessionExpired} />;
+    case MfaMethod.Fido2:
+      return <ConfigureVerifyFido2Step onSessionExpired={onSessionExpired} />;
+    case MfaMethod.Oidc:
+      return <ConfigureVerifyOidcStep onSessionExpired={onSessionExpired} />;
   }
 };

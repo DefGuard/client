@@ -7,6 +7,7 @@
 
 mod api;
 mod convert;
+mod options;
 
 use std::{
     sync::{Arc, Mutex},
@@ -27,9 +28,7 @@ use windows::{
             WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_NONE, WEBAUTHN_AUTHENTICATOR_ATTACHMENT_ANY,
             WEBAUTHN_AUTHENTICATOR_ATTACHMENT_CROSS_PLATFORM,
             WEBAUTHN_AUTHENTICATOR_GET_ASSERTION_OPTIONS,
-            WEBAUTHN_AUTHENTICATOR_GET_ASSERTION_OPTIONS_VERSION_4,
-            WEBAUTHN_AUTHENTICATOR_MAKE_CREDENTIAL_OPTIONS,
-            WEBAUTHN_AUTHENTICATOR_MAKE_CREDENTIAL_OPTIONS_VERSION_4, WEBAUTHN_CLIENT_DATA,
+            WEBAUTHN_AUTHENTICATOR_MAKE_CREDENTIAL_OPTIONS, WEBAUTHN_CLIENT_DATA,
             WEBAUTHN_CLIENT_DATA_CURRENT_VERSION, WEBAUTHN_CREDENTIAL_ATTESTATION,
             WEBAUTHN_CREDENTIAL_ATTESTATION_VERSION_3, WEBAUTHN_CTAP_TRANSPORT_BLE,
             WEBAUTHN_CTAP_TRANSPORT_FLAGS_MASK, WEBAUTHN_CTAP_TRANSPORT_NFC,
@@ -46,6 +45,10 @@ use windows::{
 use self::{
     api::{api, error_name, Api},
     convert::{copy_out, Buffer, CoseParameters, CredentialList, WideString},
+    options::{
+        get_assertion_options_version, make_credential_options_version, CredentialHints,
+        GetAssertionOptions, MakeCredentialOptions,
+    },
 };
 use crate::{
     protocol::{
@@ -391,32 +394,43 @@ pub(crate) async fn register(
             pbClientDataJSON: client_data.as_mut_ptr(),
             pwszHashAlgId: WEBAUTHN_HASH_ALGORITHM_SHA_256,
         };
+        let hints = CredentialHints::security_key();
+        let (credential_hints_len, credential_hints) = hints.for_api(api.version);
         let mut cancellation_id = cancellation_id;
-        let options = WEBAUTHN_AUTHENTICATOR_MAKE_CREDENTIAL_OPTIONS {
-            dwVersion: WEBAUTHN_AUTHENTICATOR_MAKE_CREDENTIAL_OPTIONS_VERSION_4,
-            dwTimeoutMilliseconds: u32::try_from(request.timeout.as_millis()).unwrap_or(u32::MAX),
-            dwAuthenticatorAttachment: attachment(request.attachment),
-            bRequireResidentKey: BOOL::from(request.resident_key == ResidentKey::Required),
-            bPreferResidentKey: BOOL::from(request.resident_key == ResidentKey::Preferred),
-            dwUserVerificationRequirement: user_verification(request.user_verification),
-            // The statement is discarded anyway, see `protocol::attestation_object`.
-            dwAttestationConveyancePreference: WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
-            pCancellationId: &raw mut cancellation_id,
-            pExcludeCredentialList: exclude.as_mut_ptr(),
-            ..Default::default()
+        let options = MakeCredentialOptions {
+            base: WEBAUTHN_AUTHENTICATOR_MAKE_CREDENTIAL_OPTIONS {
+                dwVersion: make_credential_options_version(api.version),
+                dwTimeoutMilliseconds: u32::try_from(request.timeout.as_millis())
+                    .unwrap_or(u32::MAX),
+                dwAuthenticatorAttachment: attachment(request.attachment),
+                bRequireResidentKey: BOOL::from(request.resident_key == ResidentKey::Required),
+                bPreferResidentKey: BOOL::from(request.resident_key == ResidentKey::Preferred),
+                dwUserVerificationRequirement: user_verification(request.user_verification),
+                // the statement is discarded anyway, see protocol::attestation_object
+                dwAttestationConveyancePreference: WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
+                pCancellationId: &raw mut cancellation_id,
+                pExcludeCredentialList: exclude.as_mut_ptr(),
+                ..Default::default()
+            },
+            prf_global_eval: std::ptr::null_mut(),
+            credential_hints_len,
+            credential_hints,
+            third_party_payment: BOOL::from(false),
         };
 
         begin(progress, cancellation_id)?;
         // What a failed assertion gets checked against, and neither field names the user.
         tracing::debug!(
             "Windows WebAuthn make credential: rp_id={}, algorithms={}, exclude={}, \
-             resident_key={:?}, user_verification={:?}, api={}",
+             resident_key={:?}, user_verification={:?}, api={}, options_version={}, hints={}",
             request.rp_id,
             request.algorithms.len(),
             request.exclude_credentials.len(),
             request.resident_key,
             request.user_verification,
             api.version,
+            options.base.dwVersion,
+            credential_hints_len,
         );
         let started = Instant::now();
         let mut raw = std::ptr::null_mut();
@@ -429,7 +443,8 @@ pub(crate) async fn register(
                 &raw const user,
                 algorithms.as_ptr(),
                 &raw const client_data_raw,
-                &raw const options,
+                // cast from the whole struct, the dll reads the v8 tail past base
+                (&raw const options).cast(),
                 &raw mut raw,
             )
         };
@@ -508,26 +523,35 @@ pub(crate) async fn assert(
             pbClientDataJSON: client_data.as_mut_ptr(),
             pwszHashAlgId: WEBAUTHN_HASH_ALGORITHM_SHA_256,
         };
+        let hints = CredentialHints::security_key();
+        let (credential_hints_len, credential_hints) = hints.for_api(api.version);
         let mut cancellation_id = cancellation_id;
-        let options = WEBAUTHN_AUTHENTICATOR_GET_ASSERTION_OPTIONS {
-            dwVersion: WEBAUTHN_AUTHENTICATOR_GET_ASSERTION_OPTIONS_VERSION_4,
-            dwTimeoutMilliseconds: u32::try_from(request.timeout.as_millis()).unwrap_or(u32::MAX),
-            dwAuthenticatorAttachment: attachment(request.attachment),
-            dwUserVerificationRequirement: user_verification(request.user_verification),
-            pCancellationId: &raw mut cancellation_id,
-            pAllowCredentialList: allow.as_mut_ptr(),
-            ..Default::default()
+        let options = GetAssertionOptions {
+            base: WEBAUTHN_AUTHENTICATOR_GET_ASSERTION_OPTIONS {
+                dwVersion: get_assertion_options_version(api.version),
+                dwTimeoutMilliseconds: u32::try_from(request.timeout.as_millis())
+                    .unwrap_or(u32::MAX),
+                dwAuthenticatorAttachment: attachment(request.attachment),
+                dwUserVerificationRequirement: user_verification(request.user_verification),
+                pCancellationId: &raw mut cancellation_id,
+                pAllowCredentialList: allow.as_mut_ptr(),
+                ..Default::default()
+            },
+            credential_hints_len,
+            credential_hints,
         };
 
         begin(progress, cancellation_id)?;
         // An empty allow list and a wrong rp id both surface as the same opaque refusal.
         tracing::debug!(
             "Windows WebAuthn get assertion: rp_id={}, allow_credentials={}, \
-             user_verification={:?}, api={}",
+             user_verification={:?}, api={}, options_version={}, hints={}",
             request.rp_id,
             request.allow_credentials.len(),
             request.user_verification,
             api.version,
+            options.base.dwVersion,
+            credential_hints_len,
         );
         let started = Instant::now();
         let mut raw = std::ptr::null_mut();
@@ -538,7 +562,7 @@ pub(crate) async fn assert(
                 hwnd,
                 rp_id.as_pcwstr(),
                 &raw const client_data_raw,
-                &raw const options,
+                (&raw const options).cast(),
                 &raw mut raw,
             )
         };

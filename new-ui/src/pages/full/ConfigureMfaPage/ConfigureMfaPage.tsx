@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useCallback } from 'react';
+import { isPresent } from '../../../shared/utils/isPresent';
 import {
   ConfigureMfaTimeoutProvider,
   useConfigureMfaSessionExpired,
@@ -18,16 +19,24 @@ export const ConfigureMfaPage = () => {
 
 const ConfigureMfaContent = () => {
   const navigate = useNavigate();
-  const authorized = useConfigureMfaStore((s) => s.authorized);
+  // a late authorization on the selection screen waits for the picks
+  const inWizard = useConfigureMfaStore(
+    (s) => s.authorized && isPresent(s.selectedMethods),
+  );
   const handleSessionExpired = useConfigureMfaSessionExpired();
 
   const leave = useCallback(() => {
     navigate({ to: '/full/add' });
   }, [navigate]);
 
-  return authorized ? (
-    <ConfigureMfaWizard onCancel={leave} onSessionExpired={handleSessionExpired} />
-  ) : (
-    <ConfigureMfaVerify onCancel={leave} onSessionExpired={handleSessionExpired} />
+  return (
+    <>
+      {inWizard && (
+        <ConfigureMfaWizard onCancel={leave} onSessionExpired={handleSessionExpired} />
+      )}
+      {!inWizard && (
+        <ConfigureMfaVerify onCancel={leave} onSessionExpired={handleSessionExpired} />
+      )}
+    </>
   );
 };

@@ -23,13 +23,19 @@ const factorText = (method: MfaMethodValue): FactorText => {
         description: `We'll send a temporary security code to your email. Enter the code to confirm it's you and continue.`,
       };
     case MfaMethod.Oidc:
-      return { title: '', description: '' };
+      return {
+        title: 'OpenID sign-in',
+        description: `Sign in with your identity provider in the browser to confirm it's you.`,
+      };
     case MfaMethod.Biometric:
       return { title: '', description: '' };
     case MfaMethod.MobileApprove:
       return { title: '', description: '' };
     case MfaMethod.Fido2:
-      return { title: '', description: '' };
+      return {
+        title: 'Security key',
+        description: `Use a security key registered to your account, such as a YubiKey, to confirm it's you.`,
+      };
   }
 };
 

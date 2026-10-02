@@ -4,7 +4,12 @@ import { MfaMethod, type MfaMethodValue } from '../../../../shared/rust-api/type
 import { ConfigureMfaVerificatorFactorSelector } from '../../../full/ConfigureMfaPage/components/ConfigureMfaVerificatorFactorSelector/ConfigureMfaVerificatorFactorSelector';
 import { PlaygroundCard } from '../PlaygroundCard/PlaygroundCard';
 
-const factors: MfaMethodValue[] = [MfaMethod.Totp, MfaMethod.Email];
+const factors: MfaMethodValue[] = [
+  MfaMethod.Totp,
+  MfaMethod.Email,
+  MfaMethod.Fido2,
+  MfaMethod.Oidc,
+];
 
 export const PlaygroundTestMfaVerificatorFactorSelector = () => {
   const [selected, setSelected] = useState<MfaMethodValue>();

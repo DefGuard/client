@@ -9,23 +9,19 @@ import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import {
-  discardMfaConfiguration,
-  useConfigureMfaStore,
-} from '../../hooks/useConfigureMfaStore';
+import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
 import '../style.scss';
 
 const CODE_LENGTH = 6;
 
 interface Props {
-  onCancel: () => void;
   /** The session outlived its deadline, so the whole flow has to start over. */
   onSessionExpired: () => void;
 }
 
 /** The code comes from an app the user already has, so there is nothing to request first. */
-export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) => {
+export const ConfigureVerifyTotpStep = ({ onSessionExpired }: Props) => {
   const sessionId = useConfigureMfaStore((s) => s.sessionId);
 
   const [code, setCode] = useState<string | null>(null);
@@ -49,16 +45,9 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
     onError: (err) => handleApiError(err),
   });
 
-  const { mutate: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: discardMfaConfiguration,
-    onSettled: onCancel,
-  });
-
-  const isBusy = isSubmitting || isCancelling;
-
   const handleSubmit = useCallback(
     (pastedCode?: string) => {
-      if (isBusy) return;
+      if (isSubmitting) return;
       const toSubmit = (pastedCode ?? code)?.trim();
       if (toSubmit?.length !== CODE_LENGTH) {
         setError('Enter a valid code');
@@ -66,7 +55,7 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
       }
       submitCode(toSubmit);
     },
-    [code, isBusy, submitCode],
+    [code, isSubmitting, submitCode],
   );
 
   // Only real input clears the error, CodeInput's own reset passes ''.
@@ -94,16 +83,16 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
           onChange={handleCodeChange}
           error={error}
           onSubmit={handleSubmit}
-          loading={isBusy}
+          loading={isSubmitting}
         />
       </div>
       <Controls>
         <Button
-          text="Cancel"
+          text="Back"
           variant={ButtonVariant.Secondary}
-          loading={isCancelling}
+          disabled={isSubmitting}
           onClick={() => {
-            cancel();
+            useConfigureMfaStore.getState().backFromVerification();
           }}
         />
         <div className="right">
@@ -111,7 +100,6 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
             text="Verify"
             variant={ButtonVariant.Primary}
             loading={isSubmitting}
-            disabled={isCancelling}
             onClick={() => {
               handleSubmit();
             }}
