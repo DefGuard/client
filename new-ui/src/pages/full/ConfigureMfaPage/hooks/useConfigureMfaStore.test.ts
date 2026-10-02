@@ -1,7 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MfaMethod } from '../../../../shared/rust-api/types';
+import { api } from '../../../../shared/rust-api/api';
+import {
+  ClientTrafficPolicy,
+  type InstanceInfo,
+  MfaMethod,
+} from '../../../../shared/rust-api/types';
 import { ConfigureMfaStep } from '../types';
-import { applyAuthorization, useConfigureMfaStore } from './useConfigureMfaStore';
+import {
+  applyAuthorization,
+  discardMfaConfiguration,
+  startMfaConfiguration,
+  useConfigureMfaStore,
+} from './useConfigureMfaStore';
 
 vi.mock('@tauri-apps/plugin-log', () => ({ error: vi.fn() }));
 vi.mock('../../../../shared/rust-api/api', () => ({ api: {} }));
@@ -65,5 +75,47 @@ describe('applyAuthorization', () => {
     applyAuthorization('session-2', authorizeResult);
 
     expect(useConfigureMfaStore.getState().authorized).toBe(false);
+  });
+});
+
+describe('startMfaConfiguration', () => {
+  const instance: InstanceInfo = {
+    id: 1,
+    name: 'instance',
+    uuid: 'instance-uuid',
+    url: 'https://core.example',
+    proxy_url: 'https://proxy.example',
+    active: false,
+    pubkey: 'pubkey',
+    client_traffic_policy: ClientTrafficPolicy.None,
+    enterprise_enabled: false,
+    disable_tunnels: false,
+    openid_display_name: null,
+    mfa_configured_methods: [],
+  };
+
+  it('waits for the previous session to end before starting a new one', async () => {
+    let endPrevious = () => {};
+    const ended = new Promise<void>((resolve) => {
+      endPrevious = resolve;
+    });
+    const mfaConfigStart = vi.fn().mockResolvedValue({
+      session_id: 'session-2',
+      available_methods: [MfaMethod.Totp],
+      email_fallback: false,
+      deadline_timestamp: 1_900_000_000,
+    });
+    Object.assign(api, { mfaConfigCancel: vi.fn(() => ended), mfaConfigStart });
+    useConfigureMfaStore.setState({ sessionId });
+
+    void discardMfaConfiguration();
+    const started = startMfaConfiguration(instance);
+    await Promise.resolve();
+    expect(mfaConfigStart).not.toHaveBeenCalled();
+
+    endPrevious();
+    await started;
+    expect(mfaConfigStart).toHaveBeenCalledOnce();
+    expect(useConfigureMfaStore.getState().sessionId).toBe('session-2');
   });
 });

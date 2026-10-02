@@ -2802,13 +2802,14 @@ fn abort_mfa_config_attempt(state: &AppState, uid: Uuid) {
     }
 }
 
-fn cancel_mfa_config_session(state: &AppState, uid: Uuid) {
-    state
+fn cancel_mfa_config_session(state: &AppState, uid: Uuid) -> Option<MfaConfigSession> {
+    let session = state
         .mfa_config_sessions
         .lock()
         .expect("mfa_config_sessions mutex poisoned")
         .remove(&uid);
     abort_mfa_config_attempt(state, uid);
+    session
 }
 
 /// unlike mfa_config_cancel, the session survives for another method
@@ -2823,6 +2824,8 @@ pub async fn mfa_config_abort_attempt(
     Ok(())
 }
 
+/// Awaited rather than spawned: Core ends every MFA configuration session of the user, so an
+/// end landing after the next `mfa_config_start` would kill that session too.
 #[tauri::command(async)]
 pub async fn mfa_config_cancel(
     session_id: String,
@@ -2830,7 +2833,16 @@ pub async fn mfa_config_cancel(
 ) -> Result<(), String> {
     debug!("Cancelling MFA configuration session");
     let uid = parse_mfa_config_session_id(&session_id)?;
-    cancel_mfa_config_session(&state, uid);
+    let Some(session) = cancel_mfa_config_session(&state, uid) else {
+        return Ok(());
+    };
+    if session.is_expired(Utc::now().timestamp()) {
+        return Ok(());
+    }
+    // Best effort, an older proxy lacks the route and the session dies at its deadline anyway.
+    if let Err(err) = mfa_config::mfa_config_end(session.proxy_url, session.session_token).await {
+        warn!("Failed to end MFA configuration session: {err}");
+    }
     Ok(())
 }
 

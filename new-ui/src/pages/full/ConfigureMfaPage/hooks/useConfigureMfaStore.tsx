@@ -260,6 +260,8 @@ export const selectPendingMethod =
   (state: Store): MfaMethodValue | undefined =>
     pendingMethods(state).find((method) => mfaFactorStep(method) === step);
 
+let pendingEnd: Promise<void> = Promise.resolve();
+
 type StartOptions = Partial<ConfigureMfaOrigin> & {
   preselectedMethods?: MfaMethodValue[];
 };
@@ -268,6 +270,8 @@ export const startMfaConfiguration = async (
   instance: InstanceInfo,
   { preselectedMethods = [], source = null, location = null }: StartOptions = {},
 ): Promise<void> => {
+  // Core ends every session of the user, so an end still in flight would take this one with it.
+  await pendingEnd;
   const response = await api.mfaConfigStart(instance.id);
   dismissEdgeComsError();
   useConfigureMfaStore.getState().start(instance, response, { source, location });
@@ -289,14 +293,20 @@ export const applyAuthorization = (
   store.authorize(result);
 };
 
-/** A copy the proxy still holds expires on its own, so a failed cancel is not worth raising. */
-export const discardMfaConfiguration = async (): Promise<void> => {
-  const { sessionId } = useConfigureMfaStore.getState();
-  useConfigureMfaStore.getState().reset();
-  if (!isPresent(sessionId)) return;
+const endSession = async (sessionId: string): Promise<void> => {
   try {
     await api.mfaConfigCancel(sessionId);
   } catch (err) {
     void logError(`Failed to cancel MFA configuration session: ${err}`);
   }
+};
+
+/** Also ends the session on Core. One the proxy still holds expires on its own, so a failure is
+ *  not worth raising. */
+export const discardMfaConfiguration = async (): Promise<void> => {
+  const { sessionId } = useConfigureMfaStore.getState();
+  useConfigureMfaStore.getState().reset();
+  if (!isPresent(sessionId)) return;
+  pendingEnd = endSession(sessionId);
+  await pendingEnd;
 };
