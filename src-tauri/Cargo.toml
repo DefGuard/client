@@ -119,7 +119,7 @@ version.workspace = true
 name = "defguard-client"
 
 [build-dependencies]
-tauri-build = "2"
+tauri-build = { version = "2", features = [] }
 vergen-git2.workspace = true
 
 [workspace.lints.clippy]
@@ -159,7 +159,7 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-http = { version = "2", features = ["unsafe-headers", "native-tls"] }
+tauri-plugin-http = { version = "=2.6.1", features = ["unsafe-headers", "native-tls"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
@@ -207,6 +207,7 @@ custom-protocol = ["tauri/custom-protocol"]
 macos_installer = ["dep:dispatch2", "dep:objc2-system-extensions"]
 
 [dev-dependencies]
+tempfile.workspace = true
 tokio = { workspace = true, features = ["full"] }
 wiremock.workspace = true
 

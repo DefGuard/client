@@ -10,7 +10,7 @@ use windows::{
         WEBAUTHN_COSE_CREDENTIAL_PARAMETER, WEBAUTHN_COSE_CREDENTIAL_PARAMETERS,
         WEBAUTHN_COSE_CREDENTIAL_PARAMETER_CURRENT_VERSION, WEBAUTHN_CREDENTIAL_EX,
         WEBAUTHN_CREDENTIAL_EX_CURRENT_VERSION, WEBAUTHN_CREDENTIAL_LIST,
-        WEBAUTHN_CREDENTIAL_TYPE_PUBLIC_KEY, WEBAUTHN_CTAP_TRANSPORT_FLAGS_MASK,
+        WEBAUTHN_CREDENTIAL_TYPE_PUBLIC_KEY,
     },
 };
 
@@ -67,7 +67,10 @@ pub(super) struct CredentialList {
 }
 
 impl CredentialList {
-    pub(super) fn new(ids: &[Vec<u8>]) -> Self {
+    /// `transports` is the `WEBAUTHN_CTAP_TRANSPORT_*` mask every entry is tagged with. On an
+    /// allow list it is what the platform will try, so narrowing it there narrows the dialog;
+    /// on an exclude list it is what an entry is matched against, so that one stays wide.
+    pub(super) fn new(ids: &[Vec<u8>], transports: u32) -> Self {
         // Cloned so the entries point at buffers this struct owns.
         let mut _ids: Vec<Vec<u8>> = ids.to_vec();
 
@@ -78,8 +81,7 @@ impl CredentialList {
                 cbId: u32::try_from(id.len()).unwrap_or(u32::MAX),
                 pbId: id.as_mut_ptr(),
                 pwszCredentialType: WEBAUTHN_CREDENTIAL_TYPE_PUBLIC_KEY,
-                // The key answers on whichever transport it is actually reachable over.
-                dwTransports: WEBAUTHN_CTAP_TRANSPORT_FLAGS_MASK,
+                dwTransports: transports,
             })
             .collect();
 
@@ -172,6 +174,8 @@ pub(super) unsafe fn copy_out(pointer: *const u8, length: u32) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use windows::Win32::Networking::WindowsWebServices::WEBAUTHN_CTAP_TRANSPORT_FLAGS_MASK;
+
     use super::*;
 
     #[test]
@@ -194,7 +198,7 @@ mod tests {
     #[test]
     fn test_credential_list_is_an_array_of_pointers() {
         let ids = vec![b"one".to_vec(), b"two".to_vec(), b"three".to_vec()];
-        let mut list = CredentialList::new(&ids);
+        let mut list = CredentialList::new(&ids, WEBAUTHN_CTAP_TRANSPORT_FLAGS_MASK);
 
         let raw = list.as_mut_ptr();
         assert!(!raw.is_null());
@@ -212,7 +216,7 @@ mod tests {
     /// A zero-length list must be null, or the API faults on the `Vec`'s dangling pointer.
     #[test]
     fn test_empty_credential_list_is_a_null_pointer() {
-        let mut list = CredentialList::new(&[]);
+        let mut list = CredentialList::new(&[], WEBAUTHN_CTAP_TRANSPORT_FLAGS_MASK);
 
         assert!(list.as_mut_ptr().is_null());
     }

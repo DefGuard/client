@@ -32,13 +32,16 @@ export const ConnectModal = () => {
     useShallow((s) => [s.view, s.visible, s.location, s.stepIndex, s.stepPlan]),
   );
 
+  const { instances } = useAppData();
+  const instance = instances.find((entry) => entry.id === location?.instance_id);
+
   const stepCount = isPresent(location) ? mfaStepCount(location) : 0;
   const stepMethod = stepPlan[stepIndex];
   const isOnMfaStepView =
     isPresent(stepMethod) && view === mfaMethodToConnectModalView(stepMethod);
   const stepLabel =
     stepCount > 1 && isOnMfaStepView
-      ? `Step ${stepIndex + 1}/${stepCount}: ${mfaToText(stepMethod)}`
+      ? `Step ${stepIndex + 1}/${stepCount}: ${mfaToText(stepMethod, instance)}`
       : null;
 
   const isOpen = isPresent(view) && isPresent(location) && visible;

@@ -403,11 +403,11 @@ impl CommandOutput for LocationShowResult {
             "mfa_method": self.mfa_method,
             "mfa_steps": self.mfa_steps
                 .iter()
-                .map(|methods| methods.iter().map(|method| method.as_str()).collect::<Vec<_>>())
+                .map(|methods| methods.iter().map(LocationMfaMethod::as_str).collect::<Vec<_>>())
                 .collect::<Vec<_>>(),
             "mfa_step_plan": self.mfa_step_plan
                 .iter()
-                .map(|method| method.as_str())
+                .map(LocationMfaMethod::as_str)
                 .collect::<Vec<_>>(),
             "route_all_traffic": self.route_all_traffic,
             "keepalive_interval": self.keepalive_interval,

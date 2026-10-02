@@ -61,6 +61,11 @@ impl AppState {
         }
     }
 
+    #[must_use]
+    pub fn with_session_state(mut self, session_state: SessionState) -> Self {
+        self.session_state = Mutex::new(session_state);
+        self
+    }
     pub(crate) async fn add_connection<S: Into<String>>(
         &self,
         location_id: Id,

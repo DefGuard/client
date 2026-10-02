@@ -1,4 +1,3 @@
-import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
@@ -77,12 +76,7 @@ export const ConnectModalMfaEmail = () => {
   }
 
   return (
-    <div
-      id="mfa-email-view"
-      onKeyDown={(e) => {
-        if (e.key === Enter) handleVerify();
-      }}
-    >
+    <div id="mfa-email-view">
       <p className="view-description">
         Enter the 6-digit code sent to your email address.
       </p>
@@ -91,9 +85,8 @@ export const ConnectModalMfaEmail = () => {
         value={emailCode}
         onChange={handleCodeChange}
         error={startError ?? error}
-        onSuccessPaste={(value) => {
-          handleVerify(value);
-        }}
+        onSubmit={handleVerify}
+        loading={isStarting || isVerifying}
       />
       <Controls>
         {canPickOtherMethod && (

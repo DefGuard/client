@@ -9,17 +9,17 @@ import {
   mfaMethodToConnectModalView,
 } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
+import { useConfigureFactorsScreen } from '../../hooks/useConfigureFactorsScreen';
+import { useConnectionAbility } from '../../hooks/useConnectionAbility';
 import { api } from '../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../rust-api/query';
 import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
 import { ThemeSpacing } from '../../types';
+import { connectConfigureFactorsSource } from '../../utils/configureFactorsSource';
 import { isPresent } from '../../utils/isPresent';
-import {
-  hasUnpassableMfaStep,
-  resolveMfaStepPlan,
-  shouldStartMfa,
-} from '../../utils/mfa';
+import { ConnectionAbility, resolveMfaStepPlan, shouldStartMfa } from '../../utils/mfa';
 import { Divider } from '../Divider/Divider';
+import { IconKind } from '../Icon';
 import { parseConnectError } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
 import { LocationCardConnectionInfo } from '../LocationCard/components/LocationCardConnectionInfo/LocationCardConnectionInfo';
@@ -86,12 +86,28 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
     },
   });
 
-  const isBusy = isConnecting || isDisconnecting;
+  const { mutate: configureMfa, isPending: isOpeningConfiguration } =
+    useConfigureFactorsScreen();
+
+  const isBusy = isConnecting || isDisconnecting || isOpeningConfiguration;
+
+  const connectionAbility = useConnectionAbility(location, instance);
 
   const handleConnectClick = () => {
     if (!appConfig) return;
     if (location.active) {
       disconnect({ connectionType: location.connection_type, locationId: location.id });
+      return;
+    }
+
+    if (connectionAbility === ConnectionAbility.Configurable) {
+      // Goes through the backend like the tray card does, so both open the same screen.
+      configureMfa({
+        instanceId: location.instance_id,
+        methods: [],
+        source: connectConfigureFactorsSource(),
+        locationId: location.id,
+      });
       return;
     }
 
@@ -108,6 +124,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
 
     connect({ connectionType: location.connection_type, locationId: location.id });
   };
+
+  const canConfigureMfa = connectionAbility === ConnectionAbility.Configurable;
 
   const traficLabel = useMemo(() => {
     if (location.route_all_traffic) {
@@ -135,9 +153,14 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
         />
         <div className="right">
           <ConnectButton
+            icon={canConfigureMfa ? IconKind.ManageKeys : null}
+            text={canConfigureMfa ? 'Configure MFA' : null}
             active={location.active}
             onClick={handleConnectClick}
-            disabled={isBusy || hasUnpassableMfaStep(location)}
+            disabled={
+              isBusy ||
+              (!location.active && connectionAbility === ConnectionAbility.Unavailable)
+            }
           />
         </div>
       </div>
@@ -170,6 +193,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
               <LocationCardMfaEdit
                 variant="full"
                 location={location}
+                instance={instance}
+                connectionAbility={connectionAbility}
                 onEdit={() => {
                   if (isPresent(location)) {
                     useConnectModal.getState().open({

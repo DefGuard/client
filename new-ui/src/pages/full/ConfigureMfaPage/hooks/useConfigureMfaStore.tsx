@@ -4,22 +4,29 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { api } from '../../../../shared/rust-api/api';
 import {
+  type ConfigureFactorsSourceValue,
   type InstanceInfo,
+  type LocationInfo,
   type MfaConfigAuthorizeResult,
   type MfaConfigStartResult,
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
+import { dismissEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
 import {
   ConfigureMfaStep,
   type ConfigureMfaStepValue,
+  MFA_WIZARD_STEPS,
+  type MfaVerificationMethod,
+} from '../types';
+import {
   isCodeMfaMethod,
   isMfaFactorOfferable,
   isMfaSetupStep,
-  MFA_WIZARD_STEPS,
   mfaFactorStep,
-} from '../types';
+  verificationMethodsOf,
+} from '../utils';
 
 type StoreValues = {
   activeStep: ConfigureMfaStepValue;
@@ -33,6 +40,12 @@ type StoreValues = {
   /** Null until the selection step is done. Empty is valid, the email fallback configures
    *  a factor on its own. */
   selectedMethods: MfaMethodValue[] | null;
+  /** Pre-ticked in the selection step, from the entry point or an earlier pass. */
+  initialSelection: MfaMethodValue[];
+  /** most preferred first, from the session since an older Core rejects some factors */
+  verificationMethods: MfaVerificationMethod[];
+  /** null until picked, asked only when the session offers more than one method */
+  verificationMethod: MfaVerificationMethod | null;
   /** No factor was configured, so an emailed code was the only way in. */
   emailFallback: boolean;
   /** ISO timestamp the session dies at, null once nothing in the flow needs it. */
@@ -40,6 +53,11 @@ type StoreValues = {
   authorized: boolean;
   /** Issued for the account's first factor only, so an empty list is an ordinary success. */
   recoveryCodes: string[];
+  /** Which entry point opened this flow. Recorded for later, nothing branches on it yet. */
+  source: ConfigureFactorsSourceValue | null;
+  /** The location that sent the user here, so the screens can speak to what that location
+   *  needs. Null when the flow was not started from a location. */
+  location: LocationInfo | null;
 };
 
 type FlowState = Pick<
@@ -87,20 +105,35 @@ const defaults: StoreValues = {
   configuredMethods: [],
   completedMethods: [],
   selectedMethods: null,
+  initialSelection: [],
+  verificationMethods: [],
+  verificationMethod: null,
   emailFallback: false,
   deadline: null,
   authorized: false,
   recoveryCodes: [],
+  source: null,
+  location: null,
 };
 
+/** What the entry point knew about the flow it is opening. */
+type ConfigureMfaOrigin = Pick<StoreValues, 'source' | 'location'>;
+
 interface Store extends StoreValues {
-  start: (instance: InstanceInfo, response: MfaConfigStartResult) => void;
+  start: (
+    instance: InstanceInfo,
+    response: MfaConfigStartResult,
+    origin: ConfigureMfaOrigin,
+  ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
+  selectVerificationMethod: (method: MfaVerificationMethod) => void;
+  /** Keeps the current picks ticked and the session alive. */
+  backToSelection: () => void;
+  backFromVerification: () => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
   factorConfigured: (method: MfaMethodValue, recoveryCodes: string[]) => void;
   next: () => void;
-  back: () => void;
   reset: () => void;
 }
 
@@ -108,43 +141,75 @@ export const useConfigureMfaStore = create<Store>()(
   persist(
     (set, get) => ({
       ...defaults,
-      start: (instance, response) => {
+      start: (instance, response, origin) => {
         // The fallback mails a code to the address on file, registering email along the way.
-        const codeFactors = response.email_fallback
+        const sessionMethods = response.email_fallback
           ? [MfaMethod.Email]
           : response.available_methods;
+        // the session and the snapshot may both list FIDO2
         const configuredMethods = [
-          ...codeFactors,
-          ...(instance.mfa_configured_methods ?? []).filter(
-            (method) => !isCodeMfaMethod(method),
-          ),
+          ...new Set([
+            ...sessionMethods,
+            ...(instance.mfa_configured_methods ?? []).filter(
+              (method) => !isCodeMfaMethod(method),
+            ),
+          ]),
         ];
         set({
           ...defaults,
           instance,
           sessionId: response.session_id,
           configuredMethods,
+          verificationMethods: verificationMethodsOf(sessionMethods),
           emailFallback: response.email_fallback,
           deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
+          ...origin,
         });
       },
       selectMethods: (methods) => {
+        set((current) => {
+          const next = { ...current, selectedMethods: methods };
+          return {
+            selectedMethods: methods,
+            activeStep: firstStep(next),
+            // picked after a late authorization, so the deadline was kept for it
+            ...(current.authorized && {
+              deadline: sessionDeadline(next, current.deadline),
+            }),
+          };
+        });
+      },
+      selectVerificationMethod: (method) => {
+        set({ verificationMethod: method });
+      },
+      backToSelection: () => {
         set((current) => ({
-          selectedMethods: methods,
-          activeStep: firstStep({ ...current, selectedMethods: methods }),
+          initialSelection: current.selectedMethods ?? current.initialSelection,
+          selectedMethods: null,
+          verificationMethod: null,
+          activeStep: defaults.activeStep,
         }));
+      },
+      backFromVerification: () => {
+        if (isPresent(get().verificationMethod)) {
+          set({ verificationMethod: null });
+          return;
+        }
+        get().backToSelection();
       },
       authorize: (response) => {
         set((current) => {
+          const deadline = dayjs.unix(response.deadline_timestamp).toISOString();
+          // a late answer can land after Back, the steps wait for its Continue
+          if (!isPresent(current.selectedMethods)) {
+            return { authorized: true, recoveryCodes: response.recovery_codes, deadline };
+          }
           // The fallback enables email as it verifies, so only this authorization issues codes.
           const next = { ...current, recoveryCodes: response.recovery_codes };
           return {
             authorized: true,
             recoveryCodes: response.recovery_codes,
-            deadline: sessionDeadline(
-              next,
-              dayjs.unix(response.deadline_timestamp).toISOString(),
-            ),
+            deadline: sessionDeadline(next, deadline),
             activeStep: firstStep(next),
           };
         });
@@ -176,15 +241,6 @@ export const useConfigureMfaStore = create<Store>()(
         );
         if (isPresent(next)) set({ activeStep: next });
       },
-      back: () => {
-        const current = get();
-        const from = MFA_WIZARD_STEPS.indexOf(current.activeStep);
-        // A step with nothing left to do is not one to go back to.
-        const previous = remainingSteps(current)
-          .filter((step) => MFA_WIZARD_STEPS.indexOf(step) < from)
-          .at(-1);
-        if (isPresent(previous)) set({ activeStep: previous });
-      },
       reset: () => {
         set({ ...defaults });
       },
@@ -192,9 +248,8 @@ export const useConfigureMfaStore = create<Store>()(
     {
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
-      // Bumped when setup progress moved to its own list, so older sessions start over rather
-      // than resume believing a configured factor is still pending.
-      version: 7,
+      // Bumped on every shape change: a stored session is never resumable across one.
+      version: 12,
     },
   ),
 );
@@ -205,19 +260,53 @@ export const selectPendingMethod =
   (state: Store): MfaMethodValue | undefined =>
     pendingMethods(state).find((method) => mfaFactorStep(method) === step);
 
-export const startMfaConfiguration = async (instance: InstanceInfo): Promise<void> => {
-  const response = await api.mfaConfigStart(instance.id);
-  useConfigureMfaStore.getState().start(instance, response);
+let pendingEnd: Promise<void> = Promise.resolve();
+
+type StartOptions = Partial<ConfigureMfaOrigin> & {
+  preselectedMethods?: MfaMethodValue[];
 };
 
-/** A copy the proxy still holds expires on its own, so a failed cancel is not worth raising. */
-export const discardMfaConfiguration = async (): Promise<void> => {
-  const { sessionId } = useConfigureMfaStore.getState();
-  useConfigureMfaStore.getState().reset();
-  if (!isPresent(sessionId)) return;
+export const startMfaConfiguration = async (
+  instance: InstanceInfo,
+  { preselectedMethods = [], source = null, location = null }: StartOptions = {},
+): Promise<void> => {
+  // Core ends every session of the user, so an end still in flight would take this one with it.
+  await pendingEnd;
+  const response = await api.mfaConfigStart(instance.id);
+  dismissEdgeComsError();
+  useConfigureMfaStore.getState().start(instance, response, { source, location });
+  // Only pre-ticks, the user still confirms in the selection step.
+  const initialSelection = preselectedMethods.filter((method) =>
+    isMfaFactorOfferable(method, useConfigureMfaStore.getState().configuredMethods),
+  );
+  useConfigureMfaStore.setState({ initialSelection });
+};
+
+/** applied even after the asking step unmounts, Core has authorized the session either way.
+ *  a cancel resets sessionId, so a late answer for a discarded session is dropped */
+export const applyAuthorization = (
+  sessionId: string,
+  result: MfaConfigAuthorizeResult,
+): void => {
+  const store = useConfigureMfaStore.getState();
+  if (store.sessionId !== sessionId) return;
+  store.authorize(result);
+};
+
+const endSession = async (sessionId: string): Promise<void> => {
   try {
     await api.mfaConfigCancel(sessionId);
   } catch (err) {
     void logError(`Failed to cancel MFA configuration session: ${err}`);
   }
+};
+
+/** Also ends the session on Core. One the proxy still holds expires on its own, so a failure is
+ *  not worth raising. */
+export const discardMfaConfiguration = async (): Promise<void> => {
+  const { sessionId } = useConfigureMfaStore.getState();
+  useConfigureMfaStore.getState().reset();
+  if (!isPresent(sessionId)) return;
+  pendingEnd = endSession(sessionId);
+  await pendingEnd;
 };

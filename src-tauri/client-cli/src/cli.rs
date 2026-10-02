@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
 
+use crate::mfa::method_parser;
+
 /// Command-line client for the Defguard VPN.
 ///
 /// Shares the same database as the desktop client.
@@ -61,13 +63,13 @@ pub enum Commands {
         code_command: Option<String>,
 
         /// Override the persisted MFA method for a single-step location.
-        #[arg(long)]
+        #[arg(long, ignore_case = true, value_parser = method_parser(true))]
         mfa_method: Option<String>,
 
         /// MFA method for one step of a multi-step location. Repeat this flag
         /// in step order, for example, --mfa-step totp --mfa-step email.
         /// Omitted steps are chosen interactively on a TTY.
-        #[arg(long = "mfa-step")]
+        #[arg(long = "mfa-step", ignore_case = true, value_parser = method_parser(true))]
         mfa_steps: Vec<String>,
 
         /// Save the mobile-approve MFA QR code as a PNG image to this path.
@@ -141,16 +143,16 @@ pub enum LocationCommand {
         #[arg(long)]
         instance: Option<String>,
 
-        /// Override the MFA method (totp, email, oidc, biometric, mobile, fido2).
-        /// The CLI cannot connect with biometric or fido2, but it saves them
-        /// because the desktop client reads the same preference.
-        #[arg(long)]
+        /// Override the MFA method. The CLI cannot connect with biometric or
+        /// fido2, but it saves them because the desktop client reads the same
+        /// preference.
+        #[arg(long, ignore_case = true, value_parser = method_parser(false))]
         mfa_method: Option<String>,
 
         /// Persist one MFA method per verification step, in order. Repeat this
         /// flag for every step. Multi-step locations only. Conflicts with
         /// --mfa-method.
-        #[arg(long = "mfa-step")]
+        #[arg(long = "mfa-step", ignore_case = true, value_parser = method_parser(false))]
         mfa_steps: Vec<String>,
 
         /// Always route all traffic through this location.
@@ -179,4 +181,23 @@ pub enum TunnelCommand {
 
     /// Show details for a tunnel.
     Show { name: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::error::ErrorKind;
+
+    use super::*;
+
+    fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
+        Cli::try_parse_from(["defguard-client"].iter().chain(args))
+    }
+
+    #[test]
+    fn test_mfa_flags_list_methods() {
+        assert!(parse(&["connect", "--mfa-method", "fido2"]).is_ok());
+        assert!(parse(&["connect", "--mfa-step", "MOBILE_APPROVE"]).is_ok());
+        let err = parse(&["connect", "--mfa-method", "sms"]).err().unwrap();
+        assert_eq!(err.kind(), ErrorKind::InvalidValue);
+    }
 }

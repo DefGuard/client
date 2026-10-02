@@ -58,6 +58,7 @@ export const useMfaConnect = (
   const [startError, setStartError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const verifyingRef = useRef(false);
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
 
@@ -108,8 +109,9 @@ export const useMfaConnect = (
 
   const verifyCode = useCallback(
     async (code: string) => {
-      if (isStarting || !token || !instance) return;
+      if (isStarting || !token || !instance || verifyingRef.current) return;
 
+      verifyingRef.current = true;
       setIsVerifying(true);
       setVerifyError(null);
 
@@ -145,6 +147,7 @@ export const useMfaConnect = (
           setVerifyError('Verification failed');
         }
       } finally {
+        verifyingRef.current = false;
         setIsVerifying(false);
       }
     },

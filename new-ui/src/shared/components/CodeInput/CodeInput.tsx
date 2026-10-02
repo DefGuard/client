@@ -1,5 +1,6 @@
 import './style.scss';
 import { ArrowLeft, ArrowRight, Backspace, Delete, Enter } from '@fluentui/keyboard-keys';
+import clsx from 'clsx';
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -16,8 +17,10 @@ interface Props {
   value: string | null;
   error?: string | null;
   onChange: (value: string) => void;
-  onSuccessPaste?: (value: string) => void;
-  onSubmit?: () => void;
+  /** Fired on Enter, on a full paste, and on the first time the code is fully typed. */
+  onSubmit?: (value: string) => void;
+  /** Blocks submitting while the previous submit is still being handled. */
+  loading?: boolean;
 }
 
 const toDigits = (value: string | null, length: number): string[] => {
@@ -33,8 +36,8 @@ export const CodeInput = ({
   onChange,
   value,
   error,
-  onSuccessPaste,
   onSubmit,
+  loading = false,
   length = 6,
 }: Props) => {
   const [digits, setDigits] = useState<string[]>(() => toDigits(value, length));
@@ -42,15 +45,23 @@ export const CodeInput = ({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const prevLengthRef = useRef(length);
   const hadErrorRef = useRef(false);
+  const hasSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => inputRefs.current[0]?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const lengthChanged = prevLengthRef.current !== length;
     prevLengthRef.current = length;
 
     if (lengthChanged) {
+      hasSubmittedRef.current = false;
       setDigits(Array.from({ length }, () => ''));
       requestAnimationFrame(() => inputRefs.current[0]?.focus());
     } else {
+      if (!value) hasSubmittedRef.current = false;
       setDigits((current) => {
         if (current.join('') === (value ?? '')) return current;
         return toDigits(value, length);
@@ -65,6 +76,7 @@ export const CodeInput = ({
     hadErrorRef.current = hasError;
 
     if (shouldClear) {
+      hasSubmittedRef.current = false;
       setDigits(Array.from({ length }, () => ''));
       onChange('');
       requestAnimationFrame(() => inputRefs.current[0]?.focus());
@@ -74,6 +86,12 @@ export const CodeInput = ({
   const focus = (index: number) => {
     const clamped = Math.max(0, Math.min(index, length - 1));
     inputRefs.current[clamped]?.focus();
+  };
+
+  const submit = (code: string) => {
+    if (loading) return;
+    hasSubmittedRef.current = true;
+    onSubmit?.(code);
   };
 
   const updateDigit = (index: number, digit: string) => {
@@ -90,7 +108,7 @@ export const CodeInput = ({
 
     if (e.key === Enter) {
       e.preventDefault();
-      onSubmit?.();
+      submit(digits.join(''));
     } else if (e.key === Backspace) {
       e.preventDefault();
       updateDigit(index, '');
@@ -110,6 +128,11 @@ export const CodeInput = ({
       if (index < length - 1) {
         focus(index + 1);
       }
+      const next = [...digits];
+      next[index] = e.key;
+      if (!hasSubmittedRef.current && next.every((d) => d !== '')) {
+        submit(next.join(''));
+      }
     } else if (e.key.length === 1) {
       e.preventDefault();
     }
@@ -122,7 +145,7 @@ export const CodeInput = ({
       const newDigits = cleaned.split('');
       setDigits(newDigits);
       onChange(cleaned);
-      onSuccessPaste?.(cleaned);
+      submit(cleaned);
       focus(length - 1);
     }
   };
@@ -147,6 +170,7 @@ export const CodeInput = ({
               ref={(el) => {
                 inputRefs.current[i] = el;
               }}
+              className={clsx({ empty: digit === '' })}
               type="text"
               inputMode="numeric"
               value={digit}

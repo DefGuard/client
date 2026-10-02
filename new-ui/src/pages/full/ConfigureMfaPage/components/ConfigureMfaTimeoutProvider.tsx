@@ -1,24 +1,44 @@
-import { useNavigate } from '@tanstack/react-router';
-import { type PropsWithChildren, useEffect } from 'react';
-import { Snackbar } from '../../../../shared/providers/snackbar/snackbar';
 import {
-  discardMfaConfiguration,
-  useConfigureMfaStore,
-} from '../hooks/useConfigureMfaStore';
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
+import { useConfigureMfaStore } from '../hooks/useConfigureMfaStore';
+import { ConfigureMfaStep } from '../types';
+import { SessionTimeoutPage } from './SessionTimeoutPage/SessionTimeoutPage';
+
+const ConfigureMfaTimeoutContext = createContext<(() => void) | null>(null);
+
+/** Marks the session expired, for when the proxy reports it before the local timer fires. */
+export const useConfigureMfaSessionExpired = (): (() => void) => {
+  const expire = useContext(ConfigureMfaTimeoutContext);
+  if (!expire) {
+    throw new Error(
+      'useConfigureMfaSessionExpired must be used within ConfigureMfaTimeoutProvider',
+    );
+  }
+  return expire;
+};
 
 /** Recover at the deadline rather than let the user type a code that cannot land. */
 export const ConfigureMfaTimeoutProvider = ({ children }: PropsWithChildren) => {
-  const navigate = useNavigate();
+  const [expired, setExpired] = useState(false);
   const deadline = useConfigureMfaStore((s) => s.deadline);
+  // Picking only the email fallback opens on Finish before verification, hence the auth check.
+  const settled = useConfigureMfaStore(
+    (s) =>
+      s.authorized &&
+      (s.activeStep === ConfigureMfaStep.RecoveryCodes ||
+        s.activeStep === ConfigureMfaStep.Finish),
+  );
+
+  const expire = useCallback(() => setExpired(true), []);
 
   useEffect(() => {
-    if (!deadline) return;
-
-    const expire = () => {
-      void discardMfaConfiguration();
-      Snackbar.error('MFA configuration session expired, start again.');
-      void navigate({ to: '/full/add', replace: true });
-    };
+    if (!deadline || settled) return;
 
     const ms = new Date(deadline).getTime() - Date.now();
     if (ms <= 0) {
@@ -28,7 +48,11 @@ export const ConfigureMfaTimeoutProvider = ({ children }: PropsWithChildren) => 
 
     const timer = setTimeout(expire, ms);
     return () => clearTimeout(timer);
-  }, [deadline, navigate]);
+  }, [deadline, settled, expire]);
 
-  return children;
+  return (
+    <ConfigureMfaTimeoutContext.Provider value={expire}>
+      {expired ? <SessionTimeoutPage /> : children}
+    </ConfigureMfaTimeoutContext.Provider>
+  );
 };

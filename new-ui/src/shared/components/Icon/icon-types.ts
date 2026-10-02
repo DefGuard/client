@@ -27,6 +27,8 @@ export const IconKind = {
   Settings: 'settings',
   Close: 'close',
   Plus: 'plus',
+  SoftwareKey: 'software-key',
+  Qr: 'qr',
   Support: 'support',
   Menu: 'menu',
   Sync: 'sync',

@@ -48,7 +48,7 @@ const SupportSection = ({
 
 export const SupportPage = () => {
   return (
-    <FullPage id="support-page-view">
+    <FullPage id="support-page-view" hideScrollContainer>
       <FullPageTitle title="Support" spacing={ThemeSpacing.Xl} />
       <div className="sections">
         <SupportSection

@@ -1,0 +1,44 @@
+.instance-selector {
+  --border-color: var(--border-disabled);
+  --bg: transparent;
+
+  user-select: none;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background-color: var(--bg);
+  box-sizing: border-box;
+  padding: var(--spacing-md) var(--spacing-lg);
+  transition:
+    border-color 160ms ease-out,
+    background-color 160ms ease-out;
+  cursor: pointer;
+  min-height: 40px;
+
+  &:hover {
+    --bg: var(--bg-white-5);
+  }
+
+  &.selected {
+    --border-color: var(--border-emphasis);
+  }
+
+  > .track {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) 24px;
+    column-gap: var(--spacing-lg);
+    align-items: center;
+    justify-content: start;
+
+    > .side-col {
+      display: flex;
+      flex-flow: row;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  .name {
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-100);
+  }
+}

@@ -5,5 +5,12 @@ export const readClipboard = (): string => {
 		encoding: "utf8",
 		timeout: 5_000,
 	});
+	if (
+		result.error &&
+		"code" in result.error &&
+		result.error.code === "ENOENT"
+	) {
+		throw new Error("xclip is missing; install it to read the clipboard.");
+	}
 	return result.status === 0 ? result.stdout : "";
 };

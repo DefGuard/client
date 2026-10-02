@@ -35,6 +35,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".defguard.client_types.MfaConfigStartResponse.available_methods",
             "#[serde(default)]",
         )
+        .field_attribute(
+            ".defguard.client_types.MfaConfigFido2ChallengeResponse.credential_ids",
+            "#[serde(default)]",
+        )
         // [2.2] FIDO2 setup fields and the email fallback's recovery codes, absent on older edges.
         .field_attribute(
             ".defguard.client_types.MfaConfigAuthorizeResponse.recovery_codes",

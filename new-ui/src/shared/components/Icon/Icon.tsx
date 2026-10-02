@@ -82,6 +82,7 @@ import { IconLockOpen } from './icons/IconLock';
 import { IconLockClosed } from './icons/IconLockClosed';
 import { IconLogout } from './icons/IconLogout';
 import { IconMail } from './icons/IconMail';
+import { IconManageKeys } from './icons/IconManageKeys';
 import { IconMenu } from './icons/IconMenu';
 import { IconMinusCircle } from './icons/IconMinusCircle';
 import { IconMobile } from './icons/IconMobile';
@@ -100,6 +101,7 @@ import { IconPlus } from './icons/IconPlus';
 import { IconPlusCircle } from './icons/IconPlusCircle';
 import { IconProfile } from './icons/IconProfile';
 import { IconProtection } from './icons/IconProtection';
+import { IconQr } from './icons/IconQr';
 import { IconQuestion } from './icons/IconQuestion';
 import { IconRefresh } from './icons/IconRefresh';
 import { IconReport } from './icons/IconReport';
@@ -110,6 +112,7 @@ import { IconServers } from './icons/IconServers';
 import { IconServiceUnavailable } from './icons/IconServiceUnavailable';
 import { IconSettings } from './icons/IconSettings';
 import { IconShow } from './icons/IconShow';
+import { IconSoftwareKey } from './icons/IconSoftwareKey';
 import { IconSortable } from './icons/IconSortable';
 import { IconStatusAttention } from './icons/IconStatusAttention';
 import { IconStatusAvailable } from './icons/IconStatusAvailable';
@@ -178,6 +181,8 @@ export const Icon = <T extends IconKindValue>({
 }: Props<T>) => {
   const IconToRender = useMemo(() => {
     switch (iconKind) {
+      case 'qr':
+        return IconQr;
       case 'mobile-lock':
         return IconMobileLock;
       case 'sync':
@@ -371,7 +376,7 @@ export const Icon = <T extends IconKindValue>({
       case 'mail':
         return IconMail;
       case 'manage-keys':
-        return EmptyIcon;
+        return IconManageKeys;
       case 'menu':
         return IconMenu;
       case 'minus-circle':
@@ -394,10 +399,10 @@ export const Icon = <T extends IconKindValue>({
         return IconPlusCircle;
       case 'profile':
         return IconProfile;
+      case 'software-key':
+        return IconSoftwareKey;
       case 'protection':
         return IconProtection;
-      case 'qr':
-        return EmptyIcon;
       case 'search':
         return IconSearch;
       case 'servers':

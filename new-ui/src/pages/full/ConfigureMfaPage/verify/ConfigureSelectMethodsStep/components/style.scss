@@ -1,0 +1,37 @@
+.method-row {
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--spacing-md);
+  align-items: center;
+  width: 100%;
+
+  > .right {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-end;
+    user-select: none;
+
+    .configured-badge {
+      user-select: none;
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      padding: 0 var(--spacing-sm);
+      flex-grow: 0;
+      flex-shrink: 1;
+      border-radius: 8px;
+      background-color: var(--bg-white-5);
+      min-height: 24px;
+
+      p,
+      span {
+        font: var(--t-body-xs-400);
+        color: var(--fg-white-50);
+      }
+    }
+  }
+}

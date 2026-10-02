@@ -35,7 +35,7 @@ use crate::{
     events::handle_deep_link,
     periodic::run_periodic_tasks,
     provisioning::handle_client_initialization,
-    session_state,
+    session_state::{self, PersistedSessionState},
     tray::{configure_tray_icon, setup_tray},
     utils::{load_log_targets, DEFAULT_SERVICE_LOG_DIR},
     window_manager::*,
@@ -198,6 +198,7 @@ pub fn run_app() {
             open_full_view_window,
             swap_to_tray,
             swap_to_full_view,
+            initiate_configure_factor_screen,
             close_tray_window,
             close_welcome_window,
             all_active_connections,
@@ -218,6 +219,10 @@ pub fn run_app() {
             mfa_config_start,
             mfa_config_send_code,
             mfa_config_authorize,
+            mfa_config_authorize_fido2,
+            mfa_config_oidc_url,
+            mfa_config_authorize_oidc,
+            mfa_config_abort_attempt,
             mfa_config_setup_start,
             mfa_config_setup_finish,
             mfa_config_setup_fido2,
@@ -414,7 +419,13 @@ pub fn run_app() {
             let provisioning_config =
                 async_runtime::block_on(handle_client_initialization(app_handle));
 
-            let state = AppState::new(config, provisioning_config);
+            let mut persisted_session = PersistedSessionState::load(&config_dir);
+            if async_runtime::block_on(persisted_session.resolve(&DB_POOL)) {
+                persisted_session.save(&config_dir);
+            }
+
+            let state = AppState::new(config, provisioning_config)
+                .with_session_state(persisted_session.into());
             app.manage(state);
 
             // Pre-build windows hidden so they can be shown/hidden without recreation.
@@ -497,11 +508,13 @@ pub fn run_app() {
             debug!("Setting up Ctrl-C handler.");
             let app_handle_clone = app_handle.clone();
             async_runtime::spawn(async move {
-                tokio::signal::ctrl_c()
-                    .await
-                    .expect("Signal handler failure");
-                debug!("Ctrl-C handler: quitting the app");
-                app_handle_clone.exit(0);
+                loop {
+                    tokio::signal::ctrl_c()
+                        .await
+                        .expect("Signal handler failure");
+                    debug!("Ctrl-C handler: quitting the app");
+                    app_handle_clone.exit(0);
+                }
             });
             debug!("Ctrl-C handler has been set up successfully");
         }

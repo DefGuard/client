@@ -1,78 +1,87 @@
 import './style.scss';
 import clsx from 'clsx';
-import { type HTMLProps, type MouseEventHandler, useMemo } from 'react';
-import { MfaMethod, type MfaMethodValue } from '../../../../rust-api/types';
-import { mfaToText } from '../../../../utils/mfa';
-import { Icon, IconKind, type IconKindValue } from '../../../Icon';
+import type { HTMLProps, MouseEventHandler } from 'react';
+import { mfaMethodIcon } from '../../../../consts';
+import {
+  type InstanceInfo,
+  MfaMethod,
+  type MfaMethodValue,
+} from '../../../../rust-api/types';
+import { isPresent } from '../../../../utils/isPresent';
+import { findOpenIdProvider, mfaToText } from '../../../../utils/mfa';
+import { Icon } from '../../../Icon';
+import checkboxSrc from './assets/checkbox.svg';
+import { openIdProviderIcon } from './consts';
 
 interface Props {
   factor: MfaMethodValue;
+  instance?: Pick<InstanceInfo, 'openid_display_name'>;
   selected?: boolean;
+  active?: boolean;
   isDefault?: boolean;
   configured?: boolean;
+  isSelectable: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
   containerProps?: Omit<HTMLProps<HTMLDivElement>, 'onClick'>;
 }
 
 export const MfaSelector = ({
   factor,
+  instance,
   onClick,
   containerProps,
   selected = false,
+  active = false,
   isDefault = false,
   configured = true,
+  isSelectable,
 }: Props) => {
-  const iconKind = useMemo((): IconKindValue => {
-    switch (factor) {
-      case 'email':
-        return 'mail';
-      case 'mobileapprove':
-        return 'mobile';
-      case 'oidc':
-        return 'token';
-      case 'totp':
-        return 'lock-closed';
-      case 'biometric':
-        return 'biometric';
-      case 'fido2':
-        return 'yubi-keys';
-    }
-  }, [factor]);
-
   const isMobileOnly = factor === MfaMethod.Biometric;
-  const selectable = configured && !isMobileOnly;
+  const showCheckbox = isSelectable && selected;
+  const openIdProvider =
+    factor === MfaMethod.Oidc ? findOpenIdProvider(instance) : undefined;
 
   return (
     <div
       {...containerProps}
+      aria-disabled={!isSelectable}
+      data-factor={factor}
       className={clsx(containerProps?.className, 'mfa-selector', {
         selected,
-        disabled: !selectable,
+        active,
+        disabled: !isSelectable,
       })}
-      aria-disabled={!selectable}
       onClick={(event) => {
-        if (selectable) {
+        if (isSelectable) {
           onClick?.(event);
         }
       }}
-      data-factor={factor}
     >
-      <Icon className="factor-icon" icon={iconKind} size={20} />
+      {showCheckbox && <img src={checkboxSrc} alt="" width={24} height={24} />}
+      {!showCheckbox && (
+        <div className="icon-col">
+          {isPresent(openIdProvider) && (
+            <img src={openIdProviderIcon[openIdProvider]} alt="" width={20} height={20} />
+          )}
+          {!isPresent(openIdProvider) && (
+            <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
+          )}
+        </div>
+      )}
       <div className="middle">
-        <p className="name">{mfaToText(factor)}</p>
+        <p className="name">{mfaToText(factor, instance)}</p>
       </div>
       <div className="right">
-        {!selectable && (
+        {(isMobileOnly || !configured) && (
           <p className="disabled-label">
             {isMobileOnly ? 'Mobile client only' : 'Not configured'}
           </p>
         )}
-        {selectable && isDefault && (
+        {isSelectable && configured && isDefault && (
           <div className="default-badge">
             <p>Default</p>
           </div>
         )}
-        {selectable && !isDefault && selected && <Icon icon={IconKind.Check} size={16} />}
       </div>
     </div>
   );

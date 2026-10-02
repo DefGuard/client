@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../../../rust-api/query';
 import { ThemeSpacing } from '../../../../types';
+import { findOpenIdProvider, openIdProviderName } from '../../../../utils/mfa';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
 import { Controls } from '../../../Controls/Controls';
 import { Divider } from '../../../Divider/Divider';
+import { ExternalProviderButton } from '../../../ExternalProviderButton/ExternalProviderButton';
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
@@ -22,8 +24,9 @@ type Screen = 'idle' | 'polling' | 'error';
 
 export const LocationCardMfaOidcView = () => {
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
-  const { setView, setPostureError, autoConnectOpenid, stepLabel } =
+  const { setView, setPostureError, autoConnectOpenid, stepLabel, instance } =
     useLocationCardContext();
+  const providerName = openIdProviderName(instance);
   const { start, isStarting, startError, isPolling, pollError } =
     useMfaOidcConnect(autoConnectOpenid);
   const [screen, setScreen] = useState<Screen>('idle');
@@ -54,8 +57,7 @@ export const LocationCardMfaOidcView = () => {
       <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
         {screen === 'idle' && (
           <p>
-            To connect to the VPN, authenticate via your OpenID provider. A browser window
-            will open for you to sign in.
+            {`To connect to the VPN, sign in with ${providerName} by clicking button below. A browser window will open and redirect you to ${providerName} for authentication.`}
           </p>
         )}
         {screen === 'polling' && (
@@ -70,7 +72,7 @@ export const LocationCardMfaOidcView = () => {
           <SizedBox height={ThemeSpacing.Lg} />
           <Checkbox
             active={appConfig?.auto_start_openid_mfa}
-            text={`Don't show this screen next time`}
+            text={`Don't show this message again`}
             onClick={() => {
               void api.setAppConfig(
                 {
@@ -91,9 +93,9 @@ export const LocationCardMfaOidcView = () => {
         />
         <div className="right">
           {screen !== 'error' && (
-            <Button
-              text="Auth with OpenID"
-              variant={ButtonVariant.Primary}
+            <ExternalProviderButton
+              text={`Authenticate with ${providerName}`}
+              provider={findOpenIdProvider(instance) ?? 'custom'}
               loading={screen === 'polling' || isStarting}
               onClick={handleStart}
             />

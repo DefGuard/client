@@ -3,9 +3,15 @@ on:
   workflow_call:
     inputs:
       upload_url:
-        description: 'Upload URL for release'
-        required: true
+        description: 'Upload URL for release; if empty, the DMG is uploaded as a workflow artifact instead'
+        required: false
         type: string
+        default: ''
+  workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
 
 env:
   SCCACHE_GHA_ENABLED: "true"
@@ -14,6 +20,8 @@ env:
 
 jobs:
   build-macos-dmg:
+    # For pull requests, only build from the apple_signing branch.
+    if: github.event_name != 'pull_request' || github.head_ref == 'apple_signing'
     runs-on:
       - self-hosted
       - macOS
@@ -82,8 +90,14 @@ jobs:
           pnpm build
 
       - name: Unlock keychain
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.BUILD_KEYCHAIN_PASSWORD }}
         run: |
-          security unlock-keychain -p "${{ secrets.BUILD_KEYCHAIN_PASSWORD }}" build.keychain
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" build.keychain
+          # Don't auto-lock during the long build.
+          security set-keychain-settings build.keychain
+          # Let codesign/Xcode use the private keys without the "allow access" GUI prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" build.keychain > /dev/null
 
       - name: Build app
         uses: tauri-apps/tauri-action@v1
@@ -99,6 +113,7 @@ jobs:
           args: --ignore-version-mismatches --config src-tauri/tauri.dmg.conf.json --target universal-apple-darwin
 
       - name: Upload DMG
+        if: inputs.upload_url != ''
         uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -107,3 +122,13 @@ jobs:
           asset_path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/Defguard_${{ env.VERSION }}_universal.dmg
           asset_content_type: application/x-apple-diskimage
           overwrite: true
+
+      - name: Upload DMG artifact
+        if: inputs.upload_url == ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: defguard-client-macos-dmg-${{ github.run_number }}
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

@@ -88,7 +88,7 @@ export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
         setIsAwaitingTouch(false);
       }
     },
-    onError: handleApiError,
+    onError: (err) => handleApiError(err),
     onSuccess: (result) => {
       const store = useConfigureMfaStore.getState();
       store.factorConfigured(MfaMethod.Fido2, result.recovery_codes);

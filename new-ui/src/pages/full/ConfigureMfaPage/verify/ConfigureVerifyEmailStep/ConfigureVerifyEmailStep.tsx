@@ -9,23 +9,19 @@ import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import {
-  discardMfaConfiguration,
-  useConfigureMfaStore,
-} from '../../hooks/useConfigureMfaStore';
+import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
 import '../style.scss';
 
 const CODE_LENGTH = 6;
 
 interface Props {
-  onCancel: () => void;
   /** The session outlived its deadline, so the whole flow has to start over. */
   onSessionExpired: () => void;
 }
 
 /** The fallback when no factor exists, or email picked from the configured code factors. */
-export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) => {
+export const ConfigureVerifyEmailStep = ({ onSessionExpired }: Props) => {
   const sessionId = useConfigureMfaStore((s) => s.sessionId);
 
   const [code, setCode] = useState<string | null>(null);
@@ -50,7 +46,10 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
     },
     onError: (err) => {
       requestedFor.current = null;
-      handleApiError(err);
+      handleApiError(err, () => {
+        requestedFor.current = sessionId;
+        requestCode();
+      });
     },
   });
 
@@ -69,15 +68,10 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
       const result = await api.mfaConfigAuthorize(sessionId, MfaMethod.Email, value);
       useConfigureMfaStore.getState().authorize(result);
     },
-    onError: handleApiError,
+    onError: (err) => handleApiError(err),
   });
 
-  const { mutate: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: discardMfaConfiguration,
-    onSettled: onCancel,
-  });
-
-  const isBusy = isRequestingCode || isSubmitting || isCancelling;
+  const isBusy = isRequestingCode || isSubmitting;
 
   const handleSubmit = useCallback(
     (pastedCode?: string) => {
@@ -124,21 +118,17 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
           value={code}
           onChange={handleCodeChange}
           error={error}
-          onSubmit={() => {
-            handleSubmit();
-          }}
-          onSuccessPaste={(value) => {
-            handleSubmit(value);
-          }}
+          onSubmit={handleSubmit}
+          loading={isBusy}
         />
       </div>
       <Controls>
         <Button
-          text="Cancel"
+          text="Back"
           variant={ButtonVariant.Secondary}
-          loading={isCancelling}
+          disabled={isSubmitting}
           onClick={() => {
-            cancel();
+            useConfigureMfaStore.getState().backFromVerification();
           }}
         />
         <div className="right">
@@ -146,14 +136,14 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
             text="Resend code"
             variant={ButtonVariant.Secondary}
             loading={isRequestingCode}
-            disabled={isSubmitting || isCancelling}
+            disabled={isSubmitting}
             onClick={handleResend}
           />
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
             loading={isSubmitting}
-            disabled={isRequestingCode || isCancelling}
+            disabled={isRequestingCode}
             onClick={() => {
               handleSubmit();
             }}

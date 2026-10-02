@@ -25,6 +25,10 @@
       line-height: 20px;
       caret-color: transparent;
       cursor: text;
+
+      &.empty {
+        caret-color: var(--fg-white-100);
+      }
     }
   }
 }

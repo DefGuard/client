@@ -139,6 +139,10 @@ pub enum DisconnectResult {
 impl CommandOutput for DisconnectResult {
     fn human(&self) -> String {
         match self {
+            // macOS manages the interface, so `active_state` reports no name there.
+            DisconnectResult::Single { name, interface } if interface.is_empty() => {
+                format!("Disconnected from {name}")
+            }
             DisconnectResult::Single { name, interface } => {
                 format!("Disconnected from {name} ({interface})")
             }
@@ -199,6 +203,12 @@ mod tests {
             interface: "wg0".to_string(),
         };
         assert_eq!(result.human(), "Disconnected from office (wg0)");
+
+        let result = DisconnectResult::Single {
+            name: "office".to_string(),
+            interface: String::new(),
+        };
+        assert_eq!(result.human(), "Disconnected from office");
     }
 
     #[test]

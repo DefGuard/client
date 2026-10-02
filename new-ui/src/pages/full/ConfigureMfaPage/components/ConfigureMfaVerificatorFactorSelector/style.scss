@@ -1,0 +1,55 @@
+.mfa-verification-factor-selector {
+  --border-color: var(--border-disabled);
+
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-sizing: border-box;
+  padding: var(--spacing-lg) var(--spacing-md);
+  transition: border-color 160ms ease-out;
+  cursor: pointer;
+  user-select: none;
+
+  &.selected {
+    --border-color: var(--fg-white-100);
+  }
+
+  &.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  > .inner-grid {
+    display: grid;
+    grid-template-rows: 1fr;
+    grid-template-columns: 20px var(--spacing-lg) minmax(0, 1fr) var(--spacing-4xl) 24px;
+
+    > .icon-col {
+      grid-row: 1;
+      grid-column: 1;
+    }
+
+    > .content-col {
+      grid-row: 1;
+      grid-column: 3;
+
+      > .title {
+        font: var(--t-body-sm-500);
+        color: var(--fg-white-100);
+        padding-bottom: var(--spacing-xs);
+      }
+
+      > .description {
+        font: var(--t-body-xs-400);
+        color: var(--fg-white-70);
+      }
+    }
+
+    > .indicator-col {
+      grid-row: 1;
+      grid-column: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+}

@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { platform } from '@tauri-apps/plugin-os';
+import clsx from 'clsx';
 import { useMemo } from 'react';
 import { Select } from '../../../../shared/components/Select/Select';
 import type {
@@ -13,6 +15,8 @@ import {
 } from '../../../../shared/rust-api/query';
 import type { OverviewViewSelection } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
+
+const isWindows = platform() === 'windows';
 
 export const InstanceSwitcher = () => {
   const { viewSelection: selectedInstance, setViewSelection } = useAppData();
@@ -76,12 +80,18 @@ export const InstanceSwitcher = () => {
   if (totalOptions <= 1) return null;
 
   return (
-    <Select
-      groups={groups}
-      value={selectedOption as never}
-      onChange={(option) => {
-        setViewSelection(option.value);
-      }}
-    />
+    <div
+      className={clsx('instance-switcher', {
+        windows: isWindows,
+      })}
+    >
+      <Select
+        groups={groups}
+        value={selectedOption as never}
+        onChange={(option) => {
+          setViewSelection(option.value);
+        }}
+      />
+    </div>
   );
 };

@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import type { PropsWithChildren } from 'react';
 import './style.scss';
+import { ScrollContainer } from '../../components/ScrollContainer/ScrollContainer';
 
 interface Props extends PropsWithChildren {
   id?: string;
@@ -21,10 +22,11 @@ export const FullPage = ({
     <div
       className={clsx('full-page page-content', className, {
         'with-controls': withControls,
+        'scroll-hidden': hideScrollContainer,
       })}
       id={id}
     >
-      {!hideScrollContainer && <div className="scroll-container">{children}</div>}
+      {!hideScrollContainer && <ScrollContainer>{children}</ScrollContainer>}
       {hideScrollContainer && children}
     </div>
   );

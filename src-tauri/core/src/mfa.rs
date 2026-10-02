@@ -560,14 +560,14 @@ pub async fn mfa_finish(
 }
 
 #[cfg(not(test))]
-const OIDC_POLL_INTERVAL: Duration = Duration::from_secs(5);
+pub(crate) const OIDC_POLL_INTERVAL: Duration = Duration::from_secs(5);
 #[cfg(test)]
-const OIDC_POLL_INTERVAL: Duration = Duration::from_millis(5);
+pub(crate) const OIDC_POLL_INTERVAL: Duration = Duration::from_millis(5);
 
 #[cfg(not(test))]
-const OIDC_POLL_TIMEOUT: Duration = Duration::from_mins(5);
+pub(crate) const OIDC_POLL_TIMEOUT: Duration = Duration::from_mins(5);
 #[cfg(test)]
-const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
+pub(crate) const OIDC_POLL_TIMEOUT: Duration = Duration::from_millis(200);
 
 #[cfg(not(test))]
 const MOBILE_APPROVE_TIMEOUT: Duration = Duration::from_mins(2);

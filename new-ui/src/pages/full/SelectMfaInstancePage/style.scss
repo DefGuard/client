@@ -1,45 +1,15 @@
 #select-mfa-instance-page {
-  .instances {
-    @include surface-row-stack;
+  > .label {
+    font: var(--t-body-xs-500);
+    color: var(--fg-white-60);
+    padding-bottom: var(--spacing-md);
   }
 
-  .instance-row {
+  .instances {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-md);
     width: 100%;
-
-    .instance {
-      --color: var(--fg-white-100);
-
-      @include surface-row;
-
-      border: 0;
-      color: var(--color);
-      cursor: pointer;
-
-      @include animate(color, background);
-
-      span {
-        font: var(--t-body-sm-400);
-        color: inherit;
-        min-width: 0;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-      }
-
-      &:hover:not(:disabled) {
-        background: var(--bg-white-10);
-      }
-
-      &:disabled {
-        --color: var(--fg-white-70);
-
-        cursor: default;
-      }
-
-      // Qualified so the row whose session is opening keeps its emphasis whatever the rule order.
-      &:disabled.pending {
-        --color: var(--fg-white-100);
-      }
-    }
+    padding-bottom: var(--spacing-xl);
   }
 }

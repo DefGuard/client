@@ -1,22 +1,25 @@
 #configure-select-methods-step {
-  .methods {
-    @include surface-row-stack;
+  .steps {
+    display: flex;
+    flex-flow: column;
+    width: 100%;
+    padding-bottom: var(--spacing-xl);
   }
 
-  .method-row {
-    @include surface-row;
+  .step {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-md);
 
-    &.configured {
-      .name {
-        font: var(--t-body-sm-400);
-        color: var(--fg-white-70);
-      }
+    .step-label {
+      font: var(--t-body-xs-400);
+      color: var(--fg-white-70);
+    }
 
-      .tag {
-        font: var(--t-body-xs-400);
-        color: var(--fg-white-70);
-        white-space: nowrap;
-      }
+    .methods {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-md);
     }
   }
 }

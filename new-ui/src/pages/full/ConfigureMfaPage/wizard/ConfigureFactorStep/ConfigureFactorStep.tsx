@@ -55,7 +55,7 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
       }
       return api.mfaConfigSetupStart(sessionId, method);
     },
-    onError: handleApiError,
+    onError: (err) => handleApiError(err, () => startSetup()),
     onSuccess: (result) => {
       setTotpSecret(result.totp_secret);
     },
@@ -83,7 +83,7 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
       const result = await api.mfaConfigSetupFinish(sessionId, method, value);
       return { method, result };
     },
-    onError: handleApiError,
+    onError: (err) => handleApiError(err),
     onSuccess: ({ method: configured, result }) => {
       const store = useConfigureMfaStore.getState();
       store.factorConfigured(configured, result.recovery_codes);
@@ -145,12 +145,8 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
           value={code}
           onChange={handleCodeChange}
           error={error}
-          onSubmit={() => {
-            handleSubmit();
-          }}
-          onSuccessPaste={(value) => {
-            handleSubmit(value);
-          }}
+          onSubmit={handleSubmit}
+          loading={isBusy}
         />
       </div>
       <Controls>

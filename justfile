@@ -6,6 +6,14 @@ dev:
         "cd new-ui && pnpm dev" \
         "cargo tauri dev"
 
+# Run only the Tauri side with the local dev database and debug logging (Windows/PowerShell).
+dev-tauri:
+    cd src-tauri; $env:DATABASE_URL="sqlite:dev.db"; $env:DEFGUARD_CLIENT_DEV="1"; $env:DEFGUARD_CLIENT_LOG_LEVEL="debug"; cargo tauri dev
+
+# Run only the web frontend dev server.
+dev-web:
+    cd new-ui; pnpm dev
+
 build:
     cd new-ui; pnpm build
     cargo tauri build --config .\src-tauri\tauri.local.conf.json

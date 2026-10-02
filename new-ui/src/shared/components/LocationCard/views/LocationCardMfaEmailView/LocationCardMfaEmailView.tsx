@@ -1,4 +1,3 @@
-import { Enter } from '@fluentui/keyboard-keys';
 import { useCallback, useEffect, useState } from 'react';
 import { MfaMethod } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
@@ -88,12 +87,7 @@ export const LocationCardMfaEmailView = () => {
     return <LocationCardMfaStartLoader />;
   }
   return (
-    <div
-      className="location-card-mfa-email-view"
-      onKeyDown={(e) => {
-        if (e.key === Enter) handleVerify();
-      }}
-    >
+    <div className="location-card-mfa-email-view">
       <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title={stepLabel ?? 'Email verification'}>
         <p>Enter the 6-digit code sent to your email address.</p>
@@ -104,9 +98,8 @@ export const LocationCardMfaEmailView = () => {
         value={emailCode}
         onChange={handleCodeChange}
         error={startError ?? error}
-        onSuccessPaste={(value) => {
-          handleVerify(value);
-        }}
+        onSubmit={handleVerify}
+        loading={isStarting || isVerifying}
       />
       <Controls>
         <IconButton
