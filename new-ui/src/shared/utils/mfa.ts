@@ -153,14 +153,34 @@ export const isClientConfigurableMethod = (
 ): method is ClientConfigurableMethod =>
   CLIENT_CONFIGURABLE_METHODS.some((candidate) => candidate === method);
 
+type MfaCapabilitiesInstance = Pick<InstanceInfo, 'mfa_capabilities'>;
+
+/**
+ * Factors both this client and the instance's Core can set up, in the client's order. Empty
+ * when the Core cannot configure MFA from the client at all.
+ */
+export const setupMethodsOf = (
+  instance?: MfaCapabilitiesInstance | null,
+): ClientConfigurableMethod[] => {
+  const coreSetupMethods = instance?.mfa_capabilities?.setup_methods ?? [];
+  return CLIENT_CONFIGURABLE_METHODS.filter((method) =>
+    coreSetupMethods.includes(method),
+  );
+};
+
+export const canSetUpMfaMethod = (
+  method: MfaMethodValue,
+  instance?: MfaCapabilitiesInstance,
+): method is ClientConfigurableMethod =>
+  setupMethodsOf(instance).some((candidate) => candidate === method);
+
 /** How far the user can get connecting this location with the factors they hold. */
 export const ConnectionAbility = {
   /** A whole path through the steps runs on factors already on the account. */
   Available: 'available',
-  /** Blocked, but every blocking step offers a factor this client can set up. */
+  /** Blocked, but every blocking step offers a factor this client can set up there. */
   Configurable: 'configurable',
-  /** Blocked on a factor the client cannot set up - the mobile client's, or an
-   *  instance too old to configure factors from here. */
+  /** Blocked on a factor that cannot be set up from this client on this instance. */
   Unavailable: 'unavailable',
 } as const;
 
@@ -174,20 +194,15 @@ export type ConnectionAbilityValue =
  */
 export const connectionAbilityOf = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
+  instance?: Pick<InstanceInfo, 'mfa_configured_methods' | 'mfa_capabilities'>,
 ): ConnectionAbilityValue => {
   const blockedSteps = mfaStepsOf(location).filter(
     (step) => usableMfaMethods(step, instance).length === 0,
   );
   if (blockedSteps.length === 0) return ConnectionAbility.Available;
 
-  // An instance that never reported its factors cannot configure them from here.
-  if (!isPresent(instance?.mfa_configured_methods)) return ConnectionAbility.Unavailable;
-
   const isFixable = (step: MfaStep): boolean =>
-    step.methods.some(
-      (entry) => isDesktopDrivable(entry) && isClientConfigurableMethod(entry.method),
-    );
+    step.methods.some((entry) => canSetUpMfaMethod(entry.method, instance));
 
   return blockedSteps.every(isFixable)
     ? ConnectionAbility.Configurable

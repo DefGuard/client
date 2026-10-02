@@ -185,6 +185,7 @@ mod tests {
             disable_tunnels: false,
             openid_display_name: None,
             mfa_configured_methods: None,
+            mfa_capabilities: None,
         }
         .save(pool)
         .await

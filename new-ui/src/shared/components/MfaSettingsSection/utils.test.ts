@@ -28,8 +28,14 @@ const threeSteps = [
   step([MfaMethod.Fido2, true], [MfaMethod.MobileApprove, false]),
 ];
 
+const capabilities = {
+  setup_methods: [MfaMethod.Totp, MfaMethod.Email, MfaMethod.Fido2],
+  authorize_methods: [MfaMethod.Totp, MfaMethod.Email, MfaMethod.Fido2, MfaMethod.Oidc],
+};
+
 const instance = {
   mfa_configured_methods: [MfaMethod.Totp, MfaMethod.Oidc, MfaMethod.Fido2],
+  mfa_capabilities: capabilities,
   openid_display_name: null,
 };
 
@@ -99,10 +105,22 @@ describe('mfaSettingsStepsOf', () => {
     expect(steps[2].factors[1].action).toBe(MfaFactorAction.None);
   });
 
-  it('never offers configuration on an instance that does not report its factors', () => {
+  it('never offers configuration on an instance that cannot configure from the client', () => {
     const steps = mfaSettingsStepsOf({
       location: locationOf(threeSteps),
-      instance: { mfa_configured_methods: null, openid_display_name: null },
+      instance: { ...instance, mfa_capabilities: null },
+      configurable: true,
+    });
+    expect(steps[0].factors[1].action).toBe(MfaFactorAction.None);
+  });
+
+  it('never offers a factor the instance cannot set up', () => {
+    const steps = mfaSettingsStepsOf({
+      location: locationOf(threeSteps),
+      instance: {
+        ...instance,
+        mfa_capabilities: { ...capabilities, setup_methods: [MfaMethod.Totp] },
+      },
       configurable: true,
     });
     expect(steps[0].factors[1].action).toBe(MfaFactorAction.None);

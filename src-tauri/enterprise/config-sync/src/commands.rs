@@ -7,7 +7,7 @@ use defguard_client_core::{
 use defguard_client_core::{
     database::{
         models::{
-            instance::{mfa_configured_methods, ClientTrafficPolicy, Instance},
+            instance::{ClientTrafficPolicy, Instance},
             location::{infer_mfa_method, Location},
             Id, NoId,
         },
@@ -22,7 +22,7 @@ use defguard_client_proto::defguard::client::v1::{
 };
 use defguard_client_proto::defguard::client_types::DeviceConfigResponse;
 use defguard_client_service_locations::to_service_location;
-use sqlx::{types::Json, Sqlite, SqliteExecutor, Transaction};
+use sqlx::{Sqlite, SqliteExecutor, Transaction};
 
 pub async fn locations_changed(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -59,9 +59,8 @@ pub async fn do_update_instance(
     let instance_info = response
         .instance
         .expect("Missing instance info in device config response");
-    // Read before the struct is picked apart below. Stays `None` when the proxy reports no
-    // state at all, so "unsupported" is not confused with an account that has no factors.
-    let configured_methods = mfa_configured_methods(&instance_info).map(Json);
+    // before the struct is picked apart below
+    instance.sync_mfa_state(&instance_info);
     instance.name = instance_info.name;
     instance.url = instance_info.url;
     instance.proxy_url = instance_info.proxy_url;
@@ -76,7 +75,6 @@ pub async fn do_update_instance(
     instance.client_traffic_policy = instance_info.client_traffic_policy.into();
     instance.openid_display_name = instance_info.openid_display_name;
     instance.disable_tunnels = instance_info.disable_tunnels.unwrap_or(false);
-    instance.mfa_configured_methods = configured_methods;
     instance.uuid = instance_info.id;
     if response.token.is_some() {
         instance.token = response.token;

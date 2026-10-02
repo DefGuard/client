@@ -6,6 +6,6 @@ import { type ConnectionAbilityValue, connectionAbilityOf } from '../utils/mfa';
  *  as `connectionAbility`; cards outside that context call this directly. */
 export const useConnectionAbility = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
+  instance?: Pick<InstanceInfo, 'mfa_configured_methods' | 'mfa_capabilities'>,
 ): ConnectionAbilityValue =>
   useMemo(() => connectionAbilityOf(location, instance), [location, instance]);

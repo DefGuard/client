@@ -42,9 +42,10 @@ export const mfaStepsOf = (methods: MfaMethodValue[]): ConfigureMfaStepValue[] =
 export const isMfaFactorOfferable = (
   method: MfaMethodValue,
   configuredMethods: MfaMethodValue[],
+  setupMethods: MfaMethodValue[],
 ): boolean => {
   const factor = mfaFactor(method);
-  if (!factor) return false;
+  if (!factor || !setupMethods.includes(method)) return false;
   return factor.repeatable || !configuredMethods.includes(method);
 };
 

@@ -20,7 +20,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    database::models::Id,
+    database::models::{instance::MfaCapabilities, Id},
     mfa::{OIDC_POLL_INTERVAL, OIDC_POLL_TIMEOUT},
     proxy::{post_with_headers, read_error_message},
 };
@@ -34,7 +34,7 @@ const SETUP_START: &str = "api/v1/mfa-config/setup/start";
 const SETUP_FINISH: &str = "api/v1/mfa-config/setup/finish";
 const END: &str = "api/v1/mfa-config/end";
 
-// mirrors the methods Core accepts in mfa_config_authorize, keep in step
+// what this client can authorize with, narrowed per instance by `MfaCapabilities`
 pub const AUTHORIZING_METHODS: &[MfaMethod] = &[
     MfaMethod::Totp,
     MfaMethod::Email,
@@ -52,7 +52,7 @@ const ALREADY_AUTHORIZED_MESSAGE: &str = "session already authorized";
 // a prefix, Core's login flow words it "OIDC authentication not completed yet"
 const OIDC_PENDING_MESSAGE: &str = "OIDC authentication not completed";
 
-// Mirrors the methods Core accepts in `mfa_setup_start` / `mfa_setup_finish`, keep in step.
+// what this client can set up, narrowed per instance by `MfaCapabilities`
 pub const CONFIGURABLE_METHODS: &[MfaMethod] =
     &[MfaMethod::Totp, MfaMethod::Email, MfaMethod::Fido2];
 
@@ -94,6 +94,7 @@ pub struct MfaConfigSession {
     pub proxy_url: Url,
     pub session_token: String,
     pub deadline_timestamp: i64,
+    pub capabilities: MfaCapabilities,
 }
 
 impl MfaConfigSession {
@@ -111,6 +112,7 @@ impl fmt::Debug for MfaConfigSession {
             .field("proxy_url", &self.proxy_url)
             .field("session_token", &"<redacted>")
             .field("deadline_timestamp", &self.deadline_timestamp)
+            .field("capabilities", &self.capabilities)
             .finish()
     }
 }
@@ -185,12 +187,23 @@ fn method_name(method: MfaMethod) -> &'static str {
     }
 }
 
-fn ensure_can_authorize(proof: &AuthorizeProof) -> Result<(), MfaConfigError> {
+fn ensure_can_authorize(
+    proof: &AuthorizeProof,
+    capabilities: &MfaCapabilities,
+) -> Result<(), MfaConfigError> {
     let method = proof.method();
     if !AUTHORIZING_METHODS.contains(&method) {
         return Err(MfaConfigError::UnsupportedMethod {
             message: format!(
                 "A {} cannot authorize MFA configuration.",
+                method_name(method)
+            ),
+        });
+    }
+    if !capabilities.can_authorize(method.into()) {
+        return Err(MfaConfigError::UnsupportedMethod {
+            message: format!(
+                "This Defguard instance does not accept a {} to authorize MFA configuration.",
                 method_name(method)
             ),
         });
@@ -206,27 +219,42 @@ fn ensure_can_authorize(proof: &AuthorizeProof) -> Result<(), MfaConfigError> {
     Ok(())
 }
 
-fn ensure_can_configure(method: MfaMethod) -> Result<(), MfaConfigError> {
-    if CONFIGURABLE_METHODS.contains(&method) {
-        Ok(())
-    } else {
-        Err(MfaConfigError::UnsupportedMethod {
+fn ensure_can_configure(
+    method: MfaMethod,
+    capabilities: &MfaCapabilities,
+) -> Result<(), MfaConfigError> {
+    if !CONFIGURABLE_METHODS.contains(&method) {
+        return Err(MfaConfigError::UnsupportedMethod {
             message: format!(
                 "Configuring a {} from the desktop client is not supported.",
                 method_name(method)
             ),
-        })
+        });
     }
+    if !capabilities.can_set_up(method.into()) {
+        return Err(MfaConfigError::UnsupportedMethod {
+            message: format!(
+                "This Defguard instance does not support configuring a {} from the desktop client.",
+                method_name(method)
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// Unknown method numbers are dropped so a newer Core cannot break an older client.
 #[must_use]
-pub fn authorizing_methods(response: &MfaConfigStartResponse) -> Vec<MfaMethod> {
+pub fn authorizing_methods(
+    response: &MfaConfigStartResponse,
+    capabilities: &MfaCapabilities,
+) -> Vec<MfaMethod> {
     response
         .available_methods
         .iter()
         .filter_map(|value| MfaMethod::try_from(*value).ok())
-        .filter(|method| AUTHORIZING_METHODS.contains(method))
+        .filter(|method| {
+            AUTHORIZING_METHODS.contains(method) && capabilities.can_authorize((*method).into())
+        })
         .collect()
 }
 
@@ -332,8 +360,9 @@ pub async fn mfa_config_authorize(
     proxy_url: Url,
     session_token: String,
     proof: AuthorizeProof,
+    capabilities: &MfaCapabilities,
 ) -> Result<MfaConfigAuthorizeResponse, MfaConfigError> {
-    ensure_can_authorize(&proof)?;
+    ensure_can_authorize(&proof, capabilities)?;
     debug!("Authorizing MFA configuration session");
     let method = proof.method() as i32;
     let (code, signature, auth_data, credential_id) = match proof {
@@ -367,6 +396,7 @@ pub async fn mfa_config_poll_oidc(
     proxy_url: Url,
     session_token: String,
     deadline_timestamp: i64,
+    capabilities: &MfaCapabilities,
     cancel: CancellationToken,
 ) -> Result<MfaConfigAuthorizeResponse, MfaConfigError> {
     let session_left = u64::try_from(deadline_timestamp - Utc::now().timestamp()).unwrap_or(0);
@@ -393,6 +423,7 @@ pub async fn mfa_config_poll_oidc(
             proxy_url.clone(),
             session_token.clone(),
             AuthorizeProof::Oidc,
+            capabilities,
         )
         .await
         {
@@ -406,8 +437,9 @@ pub async fn mfa_config_setup_start(
     proxy_url: Url,
     session_token: String,
     method: MfaMethod,
+    capabilities: &MfaCapabilities,
 ) -> Result<CodeMfaSetupStartResponse, MfaConfigError> {
-    ensure_can_configure(method)?;
+    ensure_can_configure(method, capabilities)?;
     debug!("Starting MFA factor setup");
     let request = CodeMfaSetupStartRequest {
         method: method as i32,
@@ -422,8 +454,9 @@ pub async fn mfa_config_setup_finish(
     session_token: String,
     method: MfaMethod,
     proof: SetupProof,
+    capabilities: &MfaCapabilities,
 ) -> Result<CodeMfaSetupFinishResponse, MfaConfigError> {
-    ensure_can_configure(method)?;
+    ensure_can_configure(method, capabilities)?;
     debug!("Finishing MFA factor setup");
     // The proto spells the unused half as empty rather than absent.
     let (code, name, fido2_attestation) = match proof {

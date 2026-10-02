@@ -291,6 +291,14 @@ export type InstanceInfo = {
   openid_display_name: string | null;
   /** Factors set up on the account, as last reported. Null when the instance predates the API. */
   mfa_configured_methods: MfaMethodValue[] | null;
+  /** Null when this Core cannot configure MFA from the client. */
+  mfa_capabilities: MfaCapabilities | null;
+};
+
+/** What Core accepts, static per Core version. Offer only what this client also drives. */
+export type MfaCapabilities = {
+  setup_methods: MfaMethodValue[];
+  authorize_methods: MfaMethodValue[];
 };
 
 export type MfaStepMethod = {

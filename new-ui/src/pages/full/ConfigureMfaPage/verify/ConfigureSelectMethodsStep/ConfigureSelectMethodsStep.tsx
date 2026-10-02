@@ -15,15 +15,17 @@ import {
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import {
+  isClientConfigurableMethod,
   isDesktopDrivableMethod,
   mfaStepsOf as locationMfaSteps,
   mfaToText,
+  setupMethodsOf,
 } from '../../../../../shared/utils/mfa';
 import {
   discardMfaConfiguration,
   useConfigureMfaStore,
 } from '../../hooks/useConfigureMfaStore';
-import { isMfaFactorOfferable, MFA_CONFIGURABLE_FACTORS } from '../../utils';
+import { isMfaFactorOfferable } from '../../utils';
 import '../style.scss';
 import './style.scss';
 import { MethodRow, type MethodRowState } from './components/MethodRow';
@@ -32,19 +34,18 @@ interface Props {
   onCancel: () => void;
 }
 
-const CLIENT_CONFIGURABLE_METHODS = MFA_CONFIGURABLE_FACTORS.map(
-  (factor) => factor.method,
-);
-
 export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
   const configuredMethods = useConfigureMfaStore((s) => s.configuredMethods);
   const emailFallback = useConfigureMfaStore((s) => s.emailFallback);
   const location = useConfigureMfaStore((s) => s.location);
   const initialSelection = useConfigureMfaStore((s) => s.initialSelection);
+  const instance = useConfigureMfaStore((s) => s.instance);
+
+  const setupMethods = useMemo(() => setupMethodsOf(instance), [instance]);
 
   // Listing order, matching what `toggle` keeps.
   const [selected, setSelected] = useState<MfaMethodValue[]>(() =>
-    CLIENT_CONFIGURABLE_METHODS.filter((method) => initialSelection.includes(method)),
+    setupMethods.filter((method) => initialSelection.includes(method)),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -74,7 +75,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
   );
 
   const groups = useMemo(() => {
-    let result = [CLIENT_CONFIGURABLE_METHODS];
+    let result: MfaMethodValue[][] = [setupMethods];
     if (isLocationAware) {
       result = locationSteps.map((step) => step.methods.map((entry) => entry.method));
     }
@@ -84,18 +85,18 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       return [
         [...result[0]].sort(
           (a, b) =>
-            Number(!isMfaFactorOfferable(a, configuredMethods)) -
-            Number(!isMfaFactorOfferable(b, configuredMethods)),
+            Number(!isMfaFactorOfferable(a, configuredMethods, setupMethods)) -
+            Number(!isMfaFactorOfferable(b, configuredMethods, setupMethods)),
         ),
       ];
     }
     return result;
-  }, [isLocationAware, locationSteps, configuredMethods]);
+  }, [isLocationAware, locationSteps, configuredMethods, setupMethods]);
 
   const describeMethod = useCallback(
     (method: MfaMethodValue): MethodRowState => {
       // A repeatable factor stays offerable once configured, keeping its badge and its pick.
-      const disabled = !isMfaFactorOfferable(method, configuredMethods);
+      const disabled = !isMfaFactorOfferable(method, configuredMethods, setupMethods);
       const configured = accountConfigured.includes(method);
       const satisfied = configuredMethods.includes(method);
 
@@ -104,6 +105,8 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         if (satisfied) {
           // Reached only via the email fallback, which registers the factor as it verifies.
           hint = `${mfaToText(method)} is required to continue.`;
+        } else if (isClientConfigurableMethod(method)) {
+          hint = `This Defguard instance does not support configuring ${mfaToText(method)} from the desktop client.`;
         } else {
           hint = `${mfaToText(method)} cannot be configured in the desktop client.`;
         }
@@ -121,7 +124,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         hint,
       };
     },
-    [accountConfigured, configuredMethods, selected],
+    [accountConfigured, configuredMethods, setupMethods, selected],
   );
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
@@ -129,18 +132,21 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     onSettled: onCancel,
   });
 
-  const toggle = useCallback((method: MfaMethodValue) => {
-    setError(null);
-    // Kept in listing order, which is the order the wizard sets them up in.
-    setSelected((current) => {
-      if (current.includes(method)) {
-        return current.filter((picked) => picked !== method);
-      }
-      return CLIENT_CONFIGURABLE_METHODS.filter(
-        (candidate) => candidate === method || current.includes(candidate),
-      );
-    });
-  }, []);
+  const toggle = useCallback(
+    (method: MfaMethodValue) => {
+      setError(null);
+      // Kept in listing order, which is the order the wizard sets them up in.
+      setSelected((current) => {
+        if (current.includes(method)) {
+          return current.filter((picked) => picked !== method);
+        }
+        return setupMethods.filter(
+          (candidate) => candidate === method || current.includes(candidate),
+        );
+      });
+    },
+    [setupMethods],
+  );
 
   const handleSubmit = useCallback(() => {
     if (isLocationAware) {

@@ -81,6 +81,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .type_attribute(".defguard.client_types.InstanceInfo", "#[serde(default)]")
         .type_attribute(
+            ".defguard.client_types.MfaCapabilities",
+            "#[serde(default)]",
+        )
+        .type_attribute(
             ".defguard.client_types.EnrollmentStartResponse",
             "#[serde(default)]",
         )

@@ -1,6 +1,7 @@
 import { queryOptions, skipToken } from '@tanstack/react-query';
 
 import { isPresent } from '../utils/isPresent';
+import { setupMethodsOf } from '../utils/mfa';
 import { api } from './api';
 import type {
   ConnectionArgs,
@@ -16,9 +17,8 @@ import type {
 export const tunnelsDisabled = (instances: InstanceInfo[]): boolean =>
   instances.some((i) => i.disable_tunnels);
 
-/** An instance that never reported its MFA state predates the configuration API. */
 export const supportsMfaConfiguration = (instance: InstanceInfo): boolean =>
-  isPresent(instance.mfa_configured_methods);
+  setupMethodsOf(instance).length > 0;
 
 /** Shared by the Add page, its route guard and the instance picker, so all three count alike. */
 export const mfaConfigurableInstances = (instances: InstanceInfo[]): InstanceInfo[] =>

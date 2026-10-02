@@ -19,10 +19,30 @@ vi.mock('../../../../shared/rust-api/api', () => ({ api: {} }));
 const sessionId = 'session-1';
 const authorizeResult = { deadline_timestamp: 1_900_000_000, recovery_codes: [] };
 
+const instance: InstanceInfo = {
+  id: 1,
+  name: 'instance',
+  uuid: 'instance-uuid',
+  url: 'https://core.example',
+  proxy_url: 'https://proxy.example',
+  active: false,
+  pubkey: 'pubkey',
+  client_traffic_policy: ClientTrafficPolicy.None,
+  enterprise_enabled: false,
+  disable_tunnels: false,
+  openid_display_name: null,
+  mfa_configured_methods: [],
+  mfa_capabilities: {
+    setup_methods: [MfaMethod.Totp, MfaMethod.Fido2],
+    authorize_methods: [MfaMethod.Totp],
+  },
+};
+
 describe('applyAuthorization', () => {
   beforeEach(() => {
     useConfigureMfaStore.getState().reset();
     useConfigureMfaStore.setState({
+      instance,
       sessionId,
       configuredMethods: [MfaMethod.Email],
       verificationMethods: [MfaMethod.Email],
@@ -79,19 +99,11 @@ describe('applyAuthorization', () => {
 });
 
 describe('startMfaConfiguration', () => {
-  const instance: InstanceInfo = {
-    id: 1,
-    name: 'instance',
-    uuid: 'instance-uuid',
-    url: 'https://core.example',
-    proxy_url: 'https://proxy.example',
-    active: false,
-    pubkey: 'pubkey',
-    client_traffic_policy: ClientTrafficPolicy.None,
-    enterprise_enabled: false,
-    disable_tunnels: false,
-    openid_display_name: null,
-    mfa_configured_methods: [],
+  const startResult = {
+    session_id: 'session-2',
+    available_methods: [MfaMethod.Totp],
+    email_fallback: false,
+    deadline_timestamp: 1_900_000_000,
   };
 
   it('waits for the previous session to end before starting a new one', async () => {
@@ -99,12 +111,7 @@ describe('startMfaConfiguration', () => {
     const ended = new Promise<void>((resolve) => {
       endPrevious = resolve;
     });
-    const mfaConfigStart = vi.fn().mockResolvedValue({
-      session_id: 'session-2',
-      available_methods: [MfaMethod.Totp],
-      email_fallback: false,
-      deadline_timestamp: 1_900_000_000,
-    });
+    const mfaConfigStart = vi.fn().mockResolvedValue(startResult);
     Object.assign(api, { mfaConfigCancel: vi.fn(() => ended), mfaConfigStart });
     useConfigureMfaStore.setState({ sessionId });
 
@@ -117,5 +124,15 @@ describe('startMfaConfiguration', () => {
     await started;
     expect(mfaConfigStart).toHaveBeenCalledOnce();
     expect(useConfigureMfaStore.getState().sessionId).toBe('session-2');
+  });
+
+  it('drops preselected factors the instance cannot set up', async () => {
+    Object.assign(api, { mfaConfigStart: vi.fn().mockResolvedValue(startResult) });
+
+    await startMfaConfiguration(instance, {
+      preselectedMethods: [MfaMethod.Email, MfaMethod.Fido2],
+    });
+
+    expect(useConfigureMfaStore.getState().initialSelection).toEqual([MfaMethod.Fido2]);
   });
 });
