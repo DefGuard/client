@@ -159,6 +159,22 @@ async fn test_send_code_tolerates_empty_body() {
 }
 
 #[tokio::test]
+async fn test_end_sends_session_token() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(format!("/{END}")))
+        .and(body_partial_json(json!({ "session_token": SESSION_TOKEN })))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    mfa_config_end(mock_url(&server), SESSION_TOKEN.into())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn test_setup_start_returns_totp_secret() {
     let server = MockServer::start().await;
     mount(

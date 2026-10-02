@@ -7,8 +7,8 @@ use chrono::Utc;
 use defguard_client_proto::defguard::client_types::{
     CodeMfaSetupFinishRequest, CodeMfaSetupFinishResponse, CodeMfaSetupStartRequest,
     CodeMfaSetupStartResponse, MfaConfigAuthorizeRequest, MfaConfigAuthorizeResponse,
-    MfaConfigFido2ChallengeRequest, MfaConfigFido2ChallengeResponse, MfaConfigSendCodeRequest,
-    MfaConfigStartRequest, MfaConfigStartResponse, MfaMethod,
+    MfaConfigEndRequest, MfaConfigFido2ChallengeRequest, MfaConfigFido2ChallengeResponse,
+    MfaConfigSendCodeRequest, MfaConfigStartRequest, MfaConfigStartResponse, MfaMethod,
 };
 use reqwest::{Response, StatusCode, Url};
 use serde::{de::DeserializeOwned, Serialize};
@@ -32,6 +32,7 @@ const AUTHORIZE: &str = "api/v1/mfa-config/authorize";
 const FIDO2_CHALLENGE: &str = "api/v1/mfa-config/fido2-challenge";
 const SETUP_START: &str = "api/v1/mfa-config/setup/start";
 const SETUP_FINISH: &str = "api/v1/mfa-config/setup/finish";
+const END: &str = "api/v1/mfa-config/end";
 
 // mirrors the methods Core accepts in mfa_config_authorize, keep in step
 pub const AUTHORIZING_METHODS: &[MfaMethod] = &[
@@ -437,6 +438,14 @@ pub async fn mfa_config_setup_finish(
         fido2_attestation,
     };
     parse(post(&proxy_url, SETUP_FINISH, &request).await?).await
+}
+
+/// Lets Core drop the session before its deadline. The proxy answers with an empty 200.
+pub async fn mfa_config_end(proxy_url: Url, session_token: String) -> Result<(), MfaConfigError> {
+    debug!("Ending MFA configuration session");
+    let request = MfaConfigEndRequest { session_token };
+    post(&proxy_url, END, &request).await?;
+    Ok(())
 }
 
 #[cfg(test)]
