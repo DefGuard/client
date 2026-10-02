@@ -2103,6 +2103,11 @@ impl Drop for CeremonyGuard<'_> {
 fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
     match err {
         Fido2Error::NoDevice => "No security key detected".to_string(),
+        // The CTAP backend cannot choose between keys yet.
+        Fido2Error::MultipleDevices => {
+            "More than one security key is connected. Leave only one plugged in and try again"
+                .to_string()
+        }
         // The key was blinking for a touch that never came.
         Fido2Error::Timeout => "Security key timed out waiting to be touched".to_string(),
         Fido2Error::NoCredentials => {

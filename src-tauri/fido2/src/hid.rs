@@ -8,7 +8,7 @@
 use ctap_hid_fido2::{
     fidokey::make_credential::{CredentialSupportedKeyType, MakeCredentialArgsBuilder},
     public_key_credential_user_entity::PublicKeyCredentialUserEntity,
-    FidoKeyHidFactory, LibCfg,
+    FidoKeyHid, FidoKeyHidFactory, HidInfo, HidParam, LibCfg,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -57,12 +57,26 @@ fn ceremony_error(err: &impl std::fmt::Display) -> Fido2Error {
     }
 }
 
-fn open_device() -> Result<ctap_hid_fido2::FidoKeyHid, Fido2Error> {
+/// The crate's own factory refuses several keys with the same error text as none, so the
+/// count is checked here to tell the two apart.
+fn single_device(mut devices: Vec<HidInfo>) -> Result<HidParam, Fido2Error> {
+    match devices.len() {
+        0 => Err(Fido2Error::NoDevice),
+        1 => Ok(devices.pop().expect("length checked above").param),
+        count => {
+            tracing::debug!("{count} FIDO2 devices connected");
+            Err(Fido2Error::MultipleDevices)
+        }
+    }
+}
+
+fn open_device() -> Result<FidoKeyHid, Fido2Error> {
+    let param = single_device(ctap_hid_fido2::get_fidokey_devices())?;
     let mut cfg = LibCfg::init();
     // Suppress the crate's keep-alive chatter on stdout.
     cfg.enable_keep_alive_msg = false;
-    FidoKeyHidFactory::create(&cfg).map_err(|err| {
-        tracing::debug!("No FIDO2 device: {err}");
+    FidoKeyHidFactory::create_by_params(&[param], &cfg).map_err(|err| {
+        tracing::debug!("Could not open the FIDO2 device: {err}");
         Fido2Error::NoDevice
     })
 }
@@ -212,6 +226,30 @@ mod tests {
             Some(CTAP2_ERR_PIN_INVALID)
         );
         assert_eq!(ctap_status(&Rendered("device not found")), None);
+    }
+
+    #[test]
+    fn test_single_device_rejects_none_and_many() {
+        let device = |path: &str| HidInfo {
+            pid: 0,
+            vid: 0,
+            product_string: String::new(),
+            info: String::new(),
+            param: HidParam::Path(path.to_string()),
+        };
+
+        assert!(matches!(
+            single_device(Vec::new()),
+            Err(Fido2Error::NoDevice)
+        ));
+        assert!(matches!(
+            single_device(vec![device("a")]),
+            Ok(HidParam::Path(path)) if path == "a"
+        ));
+        assert!(matches!(
+            single_device(vec![device("a"), device("b")]),
+            Err(Fido2Error::MultipleDevices)
+        ));
     }
 
     #[test]
