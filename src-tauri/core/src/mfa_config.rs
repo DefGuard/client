@@ -251,19 +251,27 @@ fn ensure_can_configure(
     Ok(())
 }
 
-/// Unknown method numbers are dropped so a newer Core cannot break an older client.
+/// Every factor Core reported for the account, including ones this instance cannot authorize
+/// with, so the wizard does not offer them for setup again. Unknown method numbers are dropped so
+/// a newer Core cannot break an older client.
+#[must_use]
+pub fn session_methods(response: &MfaConfigStartResponse) -> Vec<MfaMethod> {
+    response
+        .available_methods
+        .iter()
+        .filter_map(|value| MfaMethod::try_from(*value).ok())
+        .filter(|method| AUTHORIZING_METHODS.contains(method))
+        .collect()
+}
+
 #[must_use]
 pub fn authorizing_methods(
     response: &MfaConfigStartResponse,
     capabilities: &MfaCapabilities,
 ) -> Vec<MfaMethod> {
-    response
-        .available_methods
-        .iter()
-        .filter_map(|value| MfaMethod::try_from(*value).ok())
-        .filter(|method| {
-            AUTHORIZING_METHODS.contains(method) && capabilities.can_authorize((*method).into())
-        })
+    session_methods(response)
+        .into_iter()
+        .filter(|method| capabilities.can_authorize((*method).into()))
         .collect()
 }
 

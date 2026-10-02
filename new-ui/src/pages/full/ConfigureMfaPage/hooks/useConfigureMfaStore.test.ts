@@ -102,6 +102,7 @@ describe('startMfaConfiguration', () => {
   const startResult = {
     session_id: 'session-2',
     available_methods: [MfaMethod.Totp],
+    configured_methods: [MfaMethod.Totp],
     email_fallback: false,
     deadline_timestamp: 1_900_000_000,
   };
@@ -134,5 +135,21 @@ describe('startMfaConfiguration', () => {
     });
 
     expect(useConfigureMfaStore.getState().initialSelection).toEqual([MfaMethod.Fido2]);
+  });
+
+  it('does not offer a configured factor the instance cannot authorize with', async () => {
+    Object.assign(api, {
+      mfaConfigStart: vi.fn().mockResolvedValue({
+        ...startResult,
+        available_methods: [MfaMethod.Fido2],
+        configured_methods: [MfaMethod.Totp, MfaMethod.Fido2],
+      }),
+    });
+
+    await startMfaConfiguration(instance, { preselectedMethods: [MfaMethod.Totp] });
+
+    const state = useConfigureMfaStore.getState();
+    expect(state.configuredMethods).toContain(MfaMethod.Totp);
+    expect(state.initialSelection).toEqual([]);
   });
 });

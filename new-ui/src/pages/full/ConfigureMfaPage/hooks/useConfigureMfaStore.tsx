@@ -155,10 +155,14 @@ export const useConfigureMfaStore = create<Store>()(
         const sessionMethods = response.email_fallback
           ? [MfaMethod.Email]
           : response.available_methods;
+        // a factor the instance cannot authorize with is still configured
+        const sessionConfiguredMethods = response.email_fallback
+          ? [MfaMethod.Email]
+          : response.configured_methods;
         // the session and the snapshot may both list FIDO2
         const configuredMethods = [
           ...new Set([
-            ...sessionMethods,
+            ...sessionConfiguredMethods,
             ...(instance.mfa_configured_methods ?? []).filter(
               (method) => !isCodeMfaMethod(method),
             ),

@@ -566,10 +566,12 @@ export type MfaSetupFinishResult = {
   recovery_codes: string[];
 };
 
-/** Result from mfa_config_start. `available_methods` holds only factors that can authorize. */
+/** Result from mfa_config_start. `available_methods` holds only factors that can authorize,
+ *  `configured_methods` every factor Core reported, whether or not it can authorize. */
 export type MfaConfigStartResult = {
   session_id: string;
   available_methods: MfaMethodValue[];
+  configured_methods: MfaMethodValue[];
   email_fallback: boolean;
   deadline_timestamp: number;
 };

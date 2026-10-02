@@ -1059,6 +1059,34 @@ fn test_authorizing_methods_keeps_only_what_the_instance_accepts() {
 }
 
 #[test]
+fn test_session_methods_keeps_what_the_instance_cannot_authorize_with() {
+    let response = MfaConfigStartResponse {
+        session_token: SESSION_TOKEN.into(),
+        available_methods: vec![
+            MfaMethod::Totp as i32,
+            MfaMethod::Fido2 as i32,
+            MfaMethod::Biometric as i32,
+            99,
+        ],
+        email_fallback: false,
+        deadline_timestamp: 0,
+    };
+    let capabilities = MfaCapabilities {
+        setup_methods: Vec::new(),
+        authorize_methods: vec![LocationMfaMethod::Fido2],
+    };
+
+    assert_eq!(
+        authorizing_methods(&response, &capabilities),
+        vec![MfaMethod::Fido2]
+    );
+    assert_eq!(
+        session_methods(&response),
+        vec![MfaMethod::Totp, MfaMethod::Fido2]
+    );
+}
+
+#[test]
 fn test_ensure_can_authorize_method_needs_the_client_and_the_instance() {
     let capabilities = MfaCapabilities {
         setup_methods: Vec::new(),

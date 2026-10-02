@@ -2376,6 +2376,7 @@ pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(
 pub struct MfaConfigStartResult {
     session_id: String,
     available_methods: Vec<LocationMfaMethod>,
+    configured_methods: Vec<LocationMfaMethod>,
     email_fallback: bool,
     deadline_timestamp: i64,
 }
@@ -2438,6 +2439,10 @@ pub async fn mfa_config_start(
         .into_iter()
         .map(LocationMfaMethod::from)
         .collect();
+    let configured_methods = mfa_config::session_methods(&response)
+        .into_iter()
+        .map(LocationMfaMethod::from)
+        .collect();
     let session = MfaConfigSession {
         instance_id,
         proxy_url,
@@ -2461,6 +2466,7 @@ pub async fn mfa_config_start(
     Ok(MfaConfigStartResult {
         session_id: session_uuid.to_string(),
         available_methods,
+        configured_methods,
         email_fallback: response.email_fallback,
         deadline_timestamp: response.deadline_timestamp,
     })
