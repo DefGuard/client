@@ -572,6 +572,7 @@ pub(crate) async fn build_instance_info(
         enterprise_enabled: instance.enterprise_enabled,
         disable_tunnels: instance.disable_tunnels,
         openid_display_name: instance.openid_display_name,
+        openid_provider_kind: instance.openid_provider_kind,
         mfa_configured_methods: instance.mfa_configured_methods.map(|json| json.0),
         mfa_capabilities: instance.mfa_capabilities.map(|json| json.0),
     })
