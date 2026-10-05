@@ -20,7 +20,7 @@ use defguard_core::{
     connection::active_state::active_state,
     database::{
         models::{
-            instance::{ClientTrafficPolicy, Instance},
+            instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
             location::{Location, LocationMfaMode, ServiceLocationMode},
             NoId,
         },
@@ -172,6 +172,7 @@ async fn test_active_state_lists_interfaces(pool: DbPool) {
         enterprise_enabled: false,
         disable_tunnels: false,
         openid_display_name: None,
+        openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
         mfa_capabilities: None,
     }

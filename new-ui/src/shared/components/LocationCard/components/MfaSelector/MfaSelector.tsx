@@ -15,7 +15,7 @@ import { openIdProviderIcon } from './consts';
 
 interface Props {
   factor: MfaMethodValue;
-  instance?: Pick<InstanceInfo, 'openid_display_name'>;
+  instance?: Pick<InstanceInfo, 'openid_display_name' | 'openid_provider_kind'>;
   selected?: boolean;
   active?: boolean;
   isDefault?: boolean;

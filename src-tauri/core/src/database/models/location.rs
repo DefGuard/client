@@ -727,7 +727,7 @@ mod tests {
     use sqlx::SqlitePool;
 
     use super::*;
-    use crate::database::models::instance::{ClientTrafficPolicy, Instance};
+    use crate::database::models::instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind};
 
     fn new_instance() -> Instance<NoId> {
         Instance {
@@ -742,6 +742,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_capabilities: None,
         }
