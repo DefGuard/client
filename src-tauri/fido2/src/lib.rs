@@ -55,6 +55,10 @@ impl PlatformContext {
 pub enum Fido2Error {
     #[error("no security key detected")]
     NoDevice,
+    /// A key was found but could not be opened. `permission_denied` is set only where the system
+    /// said so, on Linux that means nothing grants this user access to hidraw security keys.
+    #[error("the security key was found but could not be opened")]
+    DeviceInaccessible { permission_denied: bool },
     /// The CTAP backend drives one key and cannot pick between several.
     #[error("more than one security key is connected")]
     MultipleDevices,

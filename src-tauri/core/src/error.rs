@@ -60,6 +60,8 @@ pub enum Error {
     ServiceUnavailable(String),
     #[error("{0}")]
     AllTrafficConflict(String),
+    #[error("System VPN error: {0}")]
+    SystemVpn(String),
 }
 
 // we must manually implement serde::Serialize

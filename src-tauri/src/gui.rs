@@ -162,6 +162,13 @@ async fn startup(app_handle: &AppHandle) {
 pub fn run_app() {
     info!("Starting Defguard client version {VERSION}");
 
+    // A panic in a background task otherwise only reaches stderr, which nobody sees.
+    let default_panic = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        error!("Panic: {info}");
+        default_panic(info);
+    }));
+
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,

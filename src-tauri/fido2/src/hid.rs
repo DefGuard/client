@@ -1,15 +1,23 @@
 //! Talks to the key directly over CTAP-HID. The PIN is ours to collect, it is what makes the key
 //! report the user verification Core requires.
 //!
-//! The crate's API is blocking and a waiting key cannot be interrupted, so ceremonies run on the
-//! blocking pool and a cancelled one still runs to completion. Its result is discarded rather
-//! than returned, so nothing a cancelled ceremony produced can reach the caller.
+//! The crate's API is blocking and a waiting key cannot be interrupted, so ceremonies run on a
+//! dedicated thread, see [`HID_THREAD`], and a cancelled one still runs to completion. Its result
+//! is discarded rather than returned, so nothing a cancelled ceremony produced can reach the
+//! caller.
+
+use std::{
+    any::Any,
+    panic::{catch_unwind, AssertUnwindSafe},
+    sync::{mpsc, LazyLock},
+};
 
 use ctap_hid_fido2::{
     fidokey::make_credential::{CredentialSupportedKeyType, MakeCredentialArgsBuilder},
     public_key_credential_user_entity::PublicKeyCredentialUserEntity,
     FidoKeyHid, FidoKeyHidFactory, HidInfo, HidParam, LibCfg,
 };
+use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -32,6 +40,72 @@ const CTAP2_ERR_PIN_BLOCKED: u8 = 0x32;
 const CTAP2_ERR_PIN_REQUIRED: u8 = 0x36;
 const CTAP2_ERR_PIN_AUTH_BLOCKED: u8 = 0x34;
 const CTAP2_ERR_ACTION_TIMEOUT: u8 = 0x3A;
+
+type Job = Box<dyn FnOnce() + Send>;
+
+/// The one thread every HID call runs on, for the life of the process.
+///
+/// On macOS hidapi binds its device manager to the run loop of whichever thread first touches
+/// it. A blocking-pool thread idles out and takes that run loop with it, and the next enumeration
+/// schedules devices on freed memory and kills the process. Elsewhere one thread is merely
+/// tidier, and it keeps hidapi's unsynchronised global error string to a single writer.
+static HID_THREAD: LazyLock<Result<mpsc::Sender<Job>, String>> = LazyLock::new(|| {
+    let (sender, receiver) = mpsc::channel::<Job>();
+    std::thread::Builder::new()
+        .name("fido2-hid".to_string())
+        .spawn(move || {
+            while let Ok(job) = receiver.recv() {
+                job();
+            }
+        })
+        .map(|_| sender)
+        .map_err(|err| err.to_string())
+});
+
+fn panic_message(payload: &(dyn Any + Send)) -> &str {
+    payload
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("unknown panic")
+}
+
+/// Run `job` on [`HID_THREAD`]. The crate unwraps on malformed key responses, so a panic is
+/// contained here: it fails this ceremony rather than the thread every later one needs.
+async fn on_hid_thread<T, F>(job: F) -> Result<T, Fido2Error>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, Fido2Error> + Send + 'static,
+{
+    let sender = HID_THREAD.as_ref().map_err(|err| Fido2Error::Backend {
+        message: format!("the security key thread could not be started: {err}"),
+        code: None,
+    })?;
+
+    let (result_sender, result_receiver) = oneshot::channel();
+    let job: Job = Box::new(move || {
+        let result = catch_unwind(AssertUnwindSafe(job)).unwrap_or_else(|payload| {
+            tracing::error!("FIDO2 ceremony panicked: {}", panic_message(&*payload));
+            Err(Fido2Error::Backend {
+                message: "the security key sent a response the client could not process"
+                    .to_string(),
+                code: None,
+            })
+        });
+        let _ = result_sender.send(result);
+    });
+    sender.send(job).map_err(|_| Fido2Error::Backend {
+        message: "the security key thread has stopped".to_string(),
+        code: None,
+    })?;
+
+    result_receiver.await.unwrap_or_else(|_| {
+        Err(Fido2Error::Backend {
+            message: "the security key thread ended without a result".to_string(),
+            code: None,
+        })
+    })
+}
 
 /// The crate surfaces the status only inside its error text, as `"0x31 CTAP2_ERR_PIN_INVALID ..."`.
 /// Read back the leading byte, matching on the name conflates a rejected PIN with a missing one.
@@ -70,14 +144,34 @@ fn single_device(mut devices: Vec<HidInfo>) -> Result<HidParam, Fido2Error> {
     }
 }
 
+/// The crate drops the reason it could not open a key it had just found. On Linux ask the system
+/// directly, so missing hidraw permissions are told apart from a key that is busy or was pulled.
+fn inaccessible(param: &HidParam) -> Fido2Error {
+    #[cfg(target_os = "linux")]
+    let permission_denied = match param {
+        HidParam::Path(path) => std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .is_err_and(|err| err.kind() == std::io::ErrorKind::PermissionDenied),
+        HidParam::VidPid { .. } => false,
+    };
+    #[cfg(not(target_os = "linux"))]
+    let permission_denied = {
+        let _ = param;
+        false
+    };
+    Fido2Error::DeviceInaccessible { permission_denied }
+}
+
 fn open_device() -> Result<FidoKeyHid, Fido2Error> {
     let param = single_device(ctap_hid_fido2::get_fidokey_devices())?;
     let mut cfg = LibCfg::init();
     // Suppress the crate's keep-alive chatter on stdout.
     cfg.enable_keep_alive_msg = false;
-    FidoKeyHidFactory::create_by_params(&[param], &cfg).map_err(|err| {
+    FidoKeyHidFactory::create_by_params(std::slice::from_ref(&param), &cfg).map_err(|err| {
         tracing::debug!("Could not open the FIDO2 device: {err}");
-        Fido2Error::NoDevice
+        inaccessible(&param)
     })
 }
 
@@ -107,7 +201,7 @@ pub(crate) async fn register(
     }
     let request = request.clone();
 
-    let result = tokio::task::spawn_blocking(move || {
+    let result = on_hid_thread(move || {
         let device = open_device()?;
 
         let user = PublicKeyCredentialUserEntity::new(
@@ -139,11 +233,7 @@ pub(crate) async fn register(
             authenticator_data: attestation.auth_data,
         })
     })
-    .await
-    .map_err(|err| Fido2Error::Backend {
-        message: format!("registration task failed: {err}"),
-        code: None,
-    })?;
+    .await;
 
     // The key was touched only after the user backed out. Checked ahead of the ceremony's own
     // outcome, since a cancelled attempt that went on to time out is still a cancellation.
@@ -163,7 +253,7 @@ pub(crate) async fn assert(
     let pin = pin.ok_or(Fido2Error::PinRequired)?;
     let request = request.clone();
 
-    let result = tokio::task::spawn_blocking(move || {
+    let result = on_hid_thread(move || {
         let device = open_device()?;
 
         // The key picks the credential it holds and names it back, so nothing to narrow here.
@@ -193,11 +283,7 @@ pub(crate) async fn assert(
             signature: assertion.signature,
         })
     })
-    .await
-    .map_err(|err| Fido2Error::Backend {
-        message: format!("assertion task failed: {err}"),
-        code: None,
-    })?;
+    .await;
 
     // As in `register`: an assertion the user cancelled must not go on to authorize anything.
     if cancel.is_cancelled() {
@@ -250,6 +336,36 @@ mod tests {
             single_device(vec![device("a"), device("b")]),
             Err(Fido2Error::MultipleDevices)
         ));
+    }
+
+    /// Every job lands on the same long-lived thread wherever it was sent from, which is what
+    /// keeps hidapi's macOS run loop alive between ceremonies.
+    #[tokio::test]
+    async fn test_hid_jobs_share_one_thread() {
+        let current = || Ok(std::thread::current().id());
+        let first = on_hid_thread(current).await.unwrap();
+        let from_blocking = tokio::task::spawn_blocking(move || {
+            tokio::runtime::Handle::current().block_on(on_hid_thread(current))
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(first, from_blocking);
+        assert_ne!(first, std::thread::current().id());
+    }
+
+    /// A panic fails only its own ceremony, the thread stays up for the next one.
+    #[tokio::test]
+    async fn test_hid_job_panic_is_contained() {
+        let panicked =
+            on_hid_thread(|| -> Result<(), Fido2Error> { panic!("malformed response") }).await;
+        assert!(matches!(
+            panicked,
+            Err(Fido2Error::Backend { code: None, .. })
+        ));
+
+        assert!(matches!(on_hid_thread(|| Ok(7)).await, Ok(7)));
     }
 
     #[test]

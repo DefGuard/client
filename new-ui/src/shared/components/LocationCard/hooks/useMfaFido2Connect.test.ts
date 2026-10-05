@@ -34,6 +34,57 @@ describe('useMfaFido2Connect', () => {
     mocks.mfaFido2Pin.mockResolvedValue('task-1');
   });
 
+  const startWithHandlers = async () => {
+    const handlers: Record<string, (event: { payload: unknown }) => void> = {};
+    mocks.listen.mockImplementation(
+      (name: string, handler: (event: { payload: unknown }) => void) => {
+        handlers[name] = handler;
+        return Promise.resolve(vi.fn());
+      },
+    );
+    const hook = renderHook(() =>
+      useMfaFido2Connect(location, {
+        stepPlan: ['fido2'],
+        mfaToken: null,
+        setMfaToken: mocks.setMfaToken,
+      }),
+    );
+    await act(async () => {
+      await hook.result.current.verify('1234');
+    });
+    return { hook, handlers };
+  };
+
+  it('shows why the tunnel failed after the key was accepted', async () => {
+    const { hook, handlers } = await startWithHandlers();
+
+    act(() => {
+      handlers[TauriEvent.MfaFido2Error]?.({
+        payload: {
+          error: 'VPN connection failed: System VPN error: could not start the VPN',
+        },
+      });
+    });
+
+    expect(hook.result.current.isVerifying).toBe(false);
+    expect(hook.result.current.verifyError).toBe(
+      'VPN connection failed: System VPN error: could not start the VPN',
+    );
+  });
+
+  it('ends a cancelled attempt without an error', async () => {
+    const { hook, handlers } = await startWithHandlers();
+
+    act(() => {
+      handlers[TauriEvent.MfaFido2Error]?.({
+        payload: { error: '{"type":"cancelled"}' },
+      });
+    });
+
+    expect(hook.result.current.isVerifying).toBe(false);
+    expect(hook.result.current.verifyError).toBeNull();
+  });
+
   it('does not start a task after unmount during listener registration', async () => {
     const resolveListeners: Array<(unlisten: () => void) => void> = [];
     mocks.listen.mockImplementation(

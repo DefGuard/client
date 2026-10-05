@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Mutex, PoisonError},
+};
 
 use defguard_client_core::{
     connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
@@ -70,7 +73,7 @@ impl AppState {
     pub(crate) fn set_multi_step_mfa_capable(&self, instance_id: Id, capable: bool) {
         self.multi_step_mfa_capabilities
             .lock()
-            .expect("multi_step_mfa_capabilities mutex poisoned")
+            .unwrap_or_else(PoisonError::into_inner)
             .insert(instance_id, capable);
     }
 
@@ -78,7 +81,7 @@ impl AppState {
     pub(crate) fn is_multi_step_mfa_capable(&self, instance_id: Id) -> bool {
         self.multi_step_mfa_capabilities
             .lock()
-            .expect("multi_step_mfa_capabilities mutex poisoned")
+            .unwrap_or_else(PoisonError::into_inner)
             .get(&instance_id)
             .copied()
             .unwrap_or(false)
@@ -106,7 +109,7 @@ impl AppState {
         let Some(old_handle) = self
             .stat_threads
             .lock()
-            .unwrap()
+            .unwrap_or_else(PoisonError::into_inner)
             .insert(location_id, handle)
         else {
             debug!("Added new network statistics thread for location ID {location_id}");

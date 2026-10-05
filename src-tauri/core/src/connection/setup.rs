@@ -1,6 +1,6 @@
-use std::process::Command;
 /// Connection setup helpers.
 use std::str::FromStr;
+use std::{process::Command, time::Duration};
 
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
 use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;
@@ -26,6 +26,20 @@ use crate::{
     error::Error,
     ConnectionType, DEFAULT_ROUTE_IPV4, DEFAULT_ROUTE_IPV6,
 };
+
+/// A healthy background service answers within seconds. A hung one would otherwise leave the
+/// connection attempt, and the spinner in front of it, waiting forever.
+const CREATE_INTERFACE_TIMEOUT: Duration = Duration::from_secs(60);
+
+async fn create_interface(request: CreateInterfaceRequest) -> Result<(), tonic::Status> {
+    tokio::time::timeout(
+        CREATE_INTERFACE_TIMEOUT,
+        DAEMON_CLIENT.clone().create_interface(request),
+    )
+    .await
+    .map_err(|_| tonic::Status::unavailable("the background service did not respond in time"))?
+    .map(|_| ())
+}
 
 #[cfg(not(target_os = "macos"))]
 pub async fn setup_interface(
@@ -63,7 +77,7 @@ pub async fn setup_interface(
         config: Some(interface_config.clone().into()),
         dns: location.dns.clone(),
     };
-    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+    if let Err(error) = create_interface(request).await {
         if error.code() == Code::Unavailable {
             error!(
                 "Failed to set up connection for location {location}; background service is \
@@ -208,7 +222,7 @@ pub async fn setup_interface_tunnel(
             interface_config.name
         );
     }
-    if let Err(error) = DAEMON_CLIENT.clone().create_interface(request).await {
+    if let Err(error) = create_interface(request).await {
         error!(
             "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
             interface_config.name

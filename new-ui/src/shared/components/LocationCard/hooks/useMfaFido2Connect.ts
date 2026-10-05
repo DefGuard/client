@@ -5,7 +5,7 @@ import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
 import { fido2ShowsTouchPrompt } from '../../../rust-api/fido2';
 import {
-  isConnectFailure,
+  isCancelled,
   isMfaPostureError,
   isServiceUnavailable,
   mfaErrorMessage,
@@ -115,6 +115,7 @@ export const useMfaFido2Connect = (
                 `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
               );
 
+              if (isCancelled(event.payload.error)) return;
               if (isMfaPostureError(event.payload.error, location)) {
                 onPostureError?.(mfaErrorMessage(event.payload.error));
                 return;
@@ -123,13 +124,9 @@ export const useMfaFido2Connect = (
                 onServiceUnavailable?.();
                 return;
               }
-              const message = mfaErrorMessage(event.payload.error);
-              // Show the server error; it tells the user whether the key, PIN, or touch failed.
-              setVerifyError(
-                isConnectFailure(message)
-                  ? 'Failed to establish VPN connection'
-                  : message,
-              );
+              // Show the backend error as is: it says whether the key, the PIN, the touch or
+              // the tunnel failed, and the tunnel's reason is what the user can act on.
+              setVerifyError(mfaErrorMessage(event.payload.error));
             }),
           ),
         ]);

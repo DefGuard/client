@@ -1,11 +1,7 @@
 use std::{
-    hint::spin_loop,
     net::IpAddr,
     str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{mpsc, PoisonError},
 };
 
 use block2::RcBlock;
@@ -197,9 +193,8 @@ impl TunnelConfiguration {
     }
 
     /// Create or update system VPN settings with this configuration.
-    pub fn save(&self) {
-        let spinlock = Arc::new(AtomicBool::new(false));
-        let spinlock_clone = Arc::clone(&spinlock);
+    pub fn save(&self) -> Result<(), Error> {
+        let (tx, rx) = mpsc::channel();
         let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
 
         let provider_manager = self
@@ -227,47 +222,71 @@ impl TunnelConfiguration {
 
             // Save to system settings.
             let handler = RcBlock::new(move |error_ptr: *mut NSError| {
-                if error_ptr.is_null() {
-                    debug!("Saved tunnel configuration for {name} to system settings");
-                } else {
-                    error!("Failed to save tunnel configuration for: {name} to system settings");
-                }
-                spinlock_clone.store(true, Ordering::Release);
+                let result = match error_ptr.as_ref() {
+                    None => {
+                        debug!("Saved tunnel configuration for {name} to system settings");
+                        Ok(())
+                    }
+                    Some(err) => {
+                        error!(
+                            "Failed to save tunnel configuration for: {name} to system settings: \
+                            {err}"
+                        );
+                        Err(err.to_string())
+                    }
+                };
+                let _ = tx.send(result);
             });
             provider_manager.saveToPreferencesWithCompletionHandler(Some(&*handler));
         }
 
-        while !spinlock.load(Ordering::Acquire) {
-            spin_loop();
+        match rx.recv() {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(reason)) => Err(Error::SystemVpn(format!(
+                "could not save the VPN configuration: {reason}"
+            ))),
+            Err(_) => Err(Error::SystemVpn(
+                "the system did not confirm saving the VPN configuration".to_string(),
+            )),
         }
     }
 
     /// Start tunnel for this configuration.
-    pub fn start_tunnel(&self) {
-        if let Some(provider_manager) = self.tunnel_provider_manager() {
-            if let Err(err) =
-                unsafe { provider_manager.connection().startVPNTunnelAndReturnError() }
-            {
-                error!("Failed to start VPN: {err}");
-            } else {
-                OBSERVER_COMMS
-                    .0
-                    .lock()
-                    .expect("Failed to lock observer sender")
-                    .send((
-                        self.location_id
-                            .map_or_else(|| TUNNEL_ID, |_location_id| LOCATION_ID),
-                        self.location_id.or(self.tunnel_id).unwrap(),
-                    ))
-                    .expect("Failed to send to observer channel");
-                info!("VPN started");
-            }
-        } else {
+    pub fn start_tunnel(&self) -> Result<(), Error> {
+        let Some(provider_manager) = self.tunnel_provider_manager() else {
             debug!(
                 "Couldn't find configuration from system settings for {}",
                 self.name
             );
+            return Err(Error::SystemVpn(format!(
+                "the VPN configuration for {} was not found in system settings",
+                self.name
+            )));
+        };
+        unsafe { provider_manager.connection().startVPNTunnelAndReturnError() }.map_err(|err| {
+            error!("Failed to start VPN: {err}");
+            Error::SystemVpn(format!("could not start the VPN: {err}"))
+        })?;
+        info!("VPN started");
+
+        // The observer only drives status updates, a tunnel that is already up is not failed
+        // over it.
+        let observed = self
+            .location_id
+            .map(|id| (LOCATION_ID, id))
+            .or_else(|| self.tunnel_id.map(|id| (TUNNEL_ID, id)));
+        let registered = observed.is_some_and(|message| {
+            OBSERVER_COMMS
+                .0
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .send(message)
+                .is_ok()
+        });
+        if !registered {
+            warn!("Could not observe the VPN status for {}", self.name);
         }
+        Ok(())
     }
 }
 

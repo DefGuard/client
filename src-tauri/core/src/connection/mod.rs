@@ -145,9 +145,9 @@ pub async fn bring_up(
             ConnectionTarget::Tunnel(tun) => tun.tunnel_configuration(mtu),
         }?;
 
-        tunnel_config.save();
+        tunnel_config.save()?;
         sleep(TUNNEL_START_DELAY).await;
-        tunnel_config.start_tunnel();
+        tunnel_config.start_tunnel()?;
 
         // On macOS the interface name is managed by the system.
         Ok(String::new())

@@ -97,7 +97,10 @@ pub fn observer_thread(
                     continue;
                 }
 
-                let manager = manager_for_key_and_value(key, value).unwrap();
+                let Some(manager) = manager_for_key_and_value(key, value) else {
+                    warn!("No manager with key: {key}, value: {value} to observe, skipping");
+                    continue;
+                };
                 let connection = unsafe { manager.connection() };
                 let observer = create_observer(&connection);
 
@@ -320,13 +323,17 @@ pub fn manager_for_key_and_value(
 
     let handler = RcBlock::new(
         move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
+            // Always answer: `handler` outlives this call and keeps `tx` alive, so a branch that
+            // sends nothing would leave `rx.recv()` below waiting forever.
             if !error_ptr.is_null() {
                 error!("Failed to load tunnel provider managers.");
+                let _ = tx.send(None);
                 return;
             }
 
             let Some(managers) = (unsafe { managers_ptr.as_ref() }) else {
                 error!("No managers");
+                let _ = tx.send(None);
                 return;
             };
 
@@ -334,20 +341,20 @@ pub fn manager_for_key_and_value(
                 if let Some(id) = id_from_manager(&manager, &key_string) {
                     if id == value {
                         // This is the manager we were looking for.
-                        tx.send(Some(manager)).expect("Sender is dead");
+                        let _ = tx.send(Some(manager));
                         return;
                     }
                 }
             }
 
-            tx.send(None).expect("Sender is dead");
+            let _ = tx.send(None);
         },
     );
     unsafe {
         NETunnelProviderManager::loadAllFromPreferencesWithCompletionHandler(&handler);
     }
 
-    rx.recv().expect("Receiver is dead")
+    rx.recv().ok().flatten()
 }
 
 /// Synchronize locations and tunnels with system settings.
@@ -363,7 +370,9 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
             );
             continue;
         };
-        tunnel_config.save();
+        if let Err(err) = tunnel_config.save() {
+            error!("Failed to sync location {}: {err}", location.name);
+        }
     }
 
     // Update tunnel settings.
@@ -376,7 +385,9 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
             );
             continue;
         };
-        tunnel_config.save();
+        if let Err(err) = tunnel_config.save() {
+            error!("Failed to sync tunnel {}: {err}", tunnel.name);
+        }
     }
 
     debug!("Saved all configurations with system settings.");

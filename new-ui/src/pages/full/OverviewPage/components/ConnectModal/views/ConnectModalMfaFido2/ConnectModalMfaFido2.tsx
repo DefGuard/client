@@ -39,6 +39,9 @@ export const ConnectModalMfaFido2 = () => {
   const collectsPin = fido2CollectsPinInApp();
 
   const handleVerify = useCallback(() => {
+    // Enter bypasses the disabled button. A second submit would cancel the running attempt
+    // while the key keeps going, costing the user a PIN retry.
+    if (isVerifying) return;
     if (!collectsPin) {
       verify(null);
       return;
@@ -48,7 +51,7 @@ export const ConnectModalMfaFido2 = () => {
       return;
     }
     verify(pin);
-  }, [collectsPin, pin, verify]);
+  }, [collectsPin, isVerifying, pin, verify]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: side effect of pin input
   useEffect(() => {

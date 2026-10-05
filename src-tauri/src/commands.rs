@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, env, future::Future, str::FromStr};
+use std::{collections::HashMap, env, future::Future, str::FromStr, sync::PoisonError};
 
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Duration, Utc};
@@ -148,7 +148,10 @@ async fn connect_location_with_psk(
     handle_connection_for_location(location.clone(), preshared_key, handle).await?;
     reload_tray_menu(handle).await;
     info!("Connected to location {location}");
-    configure_tray_icon(handle).await?;
+    // The tunnel is up, so a tray failure must not be reported as a failed connection.
+    if let Err(err) = configure_tray_icon(handle).await {
+        warn!("Failed to update the tray icon after connecting to {location}: {err}");
+    }
     Ok(())
 }
 
@@ -1916,18 +1919,18 @@ where
         .state::<AppState>()
         .mfa_tasks
         .lock()
-        .expect("mfa_tasks mutex poisoned")
+        .unwrap_or_else(PoisonError::into_inner)
         .insert(task_id.clone(), cancel.clone());
 
     let task_id_for_task = task_id.clone();
     let listen_handle = handle.clone();
-    tokio::spawn(async move {
+    let work = tokio::spawn(async move {
         let result = run(cancel).await;
         listen_handle
             .state::<AppState>()
             .mfa_tasks
             .lock()
-            .expect("mfa_tasks mutex poisoned")
+            .unwrap_or_else(PoisonError::into_inner)
             .remove(&task_id_for_task);
         match result {
             Ok(MfaTaskOutcome::Completed { preshared_key }) => {
@@ -1963,6 +1966,32 @@ where
                     },
                 );
             }
+        }
+    });
+
+    // The frontend waits for one of the events above. If the task panics before sending one, the
+    // panic arrives here instead, and the user gets an error rather than a spinner that never ends.
+    let task_id_for_guard = task_id.clone();
+    let guard_handle = handle.clone();
+    tokio::spawn(async move {
+        if let Err(err) = work.await {
+            error!("MFA task {task_id_for_guard} ended unexpectedly: {err}");
+            guard_handle
+                .state::<AppState>()
+                .mfa_tasks
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(&task_id_for_guard);
+            let _ = guard_handle.emit(
+                error_event.into(),
+                MfaErrorPayload {
+                    error: err_to_json(mfa::MfaError::Other {
+                        message: "Connection failed due to an unexpected internal error. Please \
+                                  try again."
+                            .to_string(),
+                    }),
+                },
+            );
         }
     });
 
@@ -2104,6 +2133,17 @@ impl Drop for CeremonyGuard<'_> {
 fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
     match err {
         Fido2Error::NoDevice => "No security key detected".to_string(),
+        // Found by enumeration, which needs no access, then refused when opened.
+        Fido2Error::DeviceInaccessible {
+            permission_denied: true,
+        } => "The security key was found but this user is not allowed to access it. Install \
+              the udev rules for FIDO2 security keys, then unplug the key and plug it back in"
+            .to_string(),
+        Fido2Error::DeviceInaccessible {
+            permission_denied: false,
+        } => "The security key was found but could not be opened. Close other apps that may be \
+              using it, then unplug the key and plug it back in"
+            .to_string(),
         // The CTAP backend cannot choose between keys yet.
         Fido2Error::MultipleDevices => {
             "More than one security key is connected. Leave only one plugged in and try again"
@@ -2368,7 +2408,10 @@ pub async fn mfa_fido2_pin(
 pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(), String> {
     debug!("Cancelling MFA task {task_id}");
     let cancel = {
-        let tasks = state.mfa_tasks.lock().expect("mfa_tasks mutex poisoned");
+        let tasks = state
+            .mfa_tasks
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         tasks
             .get(&task_id)
             .cloned()

@@ -1,10 +1,10 @@
-#[cfg(target_os = "macos")]
-use std::time::Duration;
 #[cfg(not(target_os = "macos"))]
 use std::{collections::HashMap, str::FromStr};
 use std::{env, process::Command};
 #[cfg(target_os = "linux")]
 use std::{fs, path::Path};
+#[cfg(target_os = "macos")]
+use std::{sync::PoisonError, time::Duration};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
@@ -540,9 +540,9 @@ pub async fn setup_interface_tunnel(
 
     let tunnel_config = tunnel.tunnel_configuration(mtu)?;
 
-    tunnel_config.save();
+    tunnel_config.save()?;
     tokio::time::sleep(TUNNEL_START_DELAY).await;
-    tunnel_config.start_tunnel();
+    tunnel_config.start_tunnel()?;
 
     // FIXME: not really useful nor true.
     Ok(String::new())
@@ -690,7 +690,7 @@ pub(crate) async fn handle_connection_for_location(
     let mtu = state
         .app_config
         .lock()
-        .expect("failed to lock app state")
+        .unwrap_or_else(PoisonError::into_inner)
         .mtu();
     let interface_name = bring_up(
         ConnectionTarget::Location(location.clone()),
@@ -704,15 +704,15 @@ pub(crate) async fn handle_connection_for_location(
         .add_connection(location.id, &interface_name, ConnectionType::Location)
         .await;
 
+    // The tunnel is up from here on, so nothing below may fail the connection: the user would
+    // be told it failed while traffic is already flowing.
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle
-        .emit(EventKey::ConnectionChanged.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
-    debug!("Event informing the frontend that a new connection has been created sent.");
+    if let Err(err) = handle.emit(EventKey::ConnectionChanged.into(), ()) {
+        warn!("Failed to notify the frontend about the connection to {location}: {err}");
+    }
 
-    // spawn log watcher
     debug!("Spawning service log watcher for location {location}.");
-    spawn_log_watcher_task(
+    if let Err(err) = spawn_log_watcher_task(
         handle,
         location.id,
         interface_name,
@@ -720,8 +720,10 @@ pub(crate) async fn handle_connection_for_location(
         Level::DEBUG,
         None,
     )
-    .await?;
-    debug!("Service log watcher for location {location} spawned.");
+    .await
+    {
+        warn!("Failed to spawn service log watcher for location {location}: {err}");
+    }
     Ok(())
 }
 
@@ -738,7 +740,7 @@ pub(crate) async fn handle_connection_for_tunnel(
     let mtu = state
         .app_config
         .lock()
-        .expect("failed to lock app state")
+        .unwrap_or_else(PoisonError::into_inner)
         .mtu();
     let interface_name = bring_up(
         ConnectionTarget::Tunnel(tunnel),

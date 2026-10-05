@@ -12,6 +12,7 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
     str::FromStr,
+    sync::PoisonError,
     thread::sleep,
     time::Duration,
 };
@@ -450,7 +451,7 @@ pub async fn spawn_log_watcher_task(
         let mut log_watchers = app_state
             .log_watchers
             .lock()
-            .expect("Failed to lock log watchers mutex");
+            .unwrap_or_else(PoisonError::into_inner);
         if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
             // cancel previous log watcher for this interface
             debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
@@ -534,7 +535,7 @@ pub async fn spawn_log_watcher_task(
         let mut log_watchers = app_state
             .log_watchers
             .lock()
-            .expect("Failed to lock log watchers mutex");
+            .unwrap_or_else(PoisonError::into_inner);
         if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
             // cancel previous log watcher for this interface
             debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
@@ -560,7 +561,7 @@ pub fn stop_log_watcher_task(handle: &AppHandle, interface_name: &str) -> Result
     let mut log_watchers = app_state
         .log_watchers
         .lock()
-        .expect("Failed to lock log watchers mutex");
+        .unwrap_or_else(PoisonError::into_inner);
 
     log_watchers.remove(interface_name).map_or_else(
         || {
