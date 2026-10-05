@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO instance (name, uuid, url, proxy_url, username, token, client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind, mfa_configured_methods, mfa_capabilities, mfa_contract) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 14
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5458703f8fd8bbb5a944ca41f2b121e78f973108c1f83e1258972543d669c347"
+}

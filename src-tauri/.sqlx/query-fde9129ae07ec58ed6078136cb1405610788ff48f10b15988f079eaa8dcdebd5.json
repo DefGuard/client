@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\" FROM instance WHERE name = $1;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\" FROM instance WHERE name = $1;",
   "describe": {
     "columns": [
       {
@@ -125,8 +125,19 @@
         }
       },
       {
-        "name": "mfa_configured_methods: _",
+        "name": "openid_provider_kind: _",
         "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "openid_provider_kind"
+          }
+        }
+      },
+      {
+        "name": "mfa_configured_methods: _",
+        "ordinal": 12,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -137,7 +148,7 @@
       },
       {
         "name": "mfa_capabilities: _",
-        "ordinal": 12,
+        "ordinal": 13,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -148,7 +159,7 @@
       },
       {
         "name": "mfa_contract: _",
-        "ordinal": 13,
+        "ordinal": 14,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -173,10 +184,11 @@
       false,
       false,
       true,
+      false,
       true,
       true,
       false
     ]
   },
-  "hash": "4d139988ee8ae61c138e6bf92e9a58efcaba571195bf141e5b0132c4b9ca875d"
+  "hash": "fde9129ae07ec58ed6078136cb1405610788ff48f10b15988f079eaa8dcdebd5"
 }

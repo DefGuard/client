@@ -1,0 +1,1 @@
+ALTER TABLE instance ADD COLUMN openid_provider_kind INTEGER NOT NULL DEFAULT 1;

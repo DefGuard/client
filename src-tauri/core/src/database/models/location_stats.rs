@@ -242,7 +242,7 @@ mod tests {
     use super::*;
     use crate::{
         database::models::{
-            instance::{ClientTrafficPolicy, Instance},
+            instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
             location::{LocationMfaMode, ServiceLocationMode},
         },
         mfa_contract::MfaContract,
@@ -261,6 +261,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,

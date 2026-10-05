@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
 use super::{location::LocationMfaMethod, Id, NoId};
-use crate::{mfa_contract::MfaContract, proto};
+use crate::{
+    mfa_contract::MfaContract,
+    proto::{self, client_types::OpenIdProviderKind as ProtoOpenIdProviderKind},
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Instance<I = NoId> {
@@ -19,6 +22,7 @@ pub struct Instance<I = NoId> {
     pub enterprise_enabled: bool,
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
+    pub openid_provider_kind: OpenIdProviderKind,
     /// None when the proxy never sent MfaUserState.
     pub mfa_configured_methods: Option<Json<Vec<LocationMfaMethod>>>,
     pub mfa_contract: MfaContract,
@@ -117,6 +121,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
         let mfa_configured_methods = mfa_configured_methods(&instance_info).map(Json);
         let mfa_contract = mfa_contract_from_instance_info(&instance_info);
         let mfa_capabilities = mfa_capabilities(&instance_info).map(Json);
+        let openid_provider_kind = instance_info.openid_provider_kind().into();
         Self {
             id: NoId,
             name: instance_info.name,
@@ -129,6 +134,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             enterprise_enabled: instance_info.enterprise_enabled,
             disable_tunnels: instance_info.disable_tunnels.unwrap_or(false),
             openid_display_name: instance_info.openid_display_name,
+            openid_provider_kind,
             mfa_configured_methods,
             mfa_contract,
             mfa_capabilities,
@@ -144,9 +150,9 @@ impl Instance<Id> {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
             client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, \
-            openid_display_name = $10, mfa_configured_methods = $11, \
-            mfa_capabilities = $12, mfa_contract = $13 \
-            WHERE id = $14;",
+            openid_display_name = $10, openid_provider_kind = $11, mfa_configured_methods = $12, \
+            mfa_capabilities = $13, mfa_contract = $14 \
+            WHERE id = $15;",
             self.name,
             self.uuid,
             self.url,
@@ -157,6 +163,7 @@ impl Instance<Id> {
             self.disable_tunnels,
             self.token,
             self.openid_display_name,
+            self.openid_provider_kind,
             self.mfa_configured_methods,
             self.mfa_capabilities,
             self.mfa_contract,
@@ -193,6 +200,7 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
             mfa_contract \"mfa_contract: _\" \
@@ -211,6 +219,7 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
             mfa_contract \"mfa_contract: _\" \
@@ -230,6 +239,7 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
             mfa_contract \"mfa_contract: _\" \
@@ -268,6 +278,7 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
+            openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
             mfa_contract \"mfa_contract: _\" \
@@ -317,6 +328,7 @@ impl PartialEq<proto::client_types::InstanceInfo> for Instance<Id> {
             && self.enterprise_enabled == other.enterprise_enabled
             && self.disable_tunnels == other.disable_tunnels.unwrap_or(false)
             && self.openid_display_name == other.openid_display_name
+            && self.openid_provider_kind == other.openid_provider_kind().into()
             && self.mfa_configured_methods.as_ref().map(|json| &json.0)
                 == mfa_configured_methods(other).as_ref()
             && self.mfa_capabilities.as_ref().map(|json| &json.0)
@@ -334,8 +346,8 @@ impl Instance<NoId> {
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
             client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name, \
-            mfa_configured_methods, mfa_capabilities, mfa_contract) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id;",
+            openid_provider_kind, mfa_configured_methods, mfa_capabilities, mfa_contract) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -346,6 +358,7 @@ impl Instance<NoId> {
             self.enterprise_enabled,
             self.disable_tunnels,
             self.openid_display_name,
+            self.openid_provider_kind,
             self.mfa_configured_methods,
             self.mfa_capabilities,
             self.mfa_contract
@@ -364,6 +377,7 @@ impl Instance<NoId> {
             enterprise_enabled: self.enterprise_enabled,
             disable_tunnels: self.disable_tunnels,
             openid_display_name: self.openid_display_name,
+            openid_provider_kind: self.openid_provider_kind,
             mfa_configured_methods: self.mfa_configured_methods,
             mfa_contract: self.mfa_contract,
             mfa_capabilities: self.mfa_capabilities,
@@ -384,6 +398,7 @@ pub struct InstanceInfo<I = NoId> {
     pub enterprise_enabled: bool,
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
+    pub openid_provider_kind: OpenIdProviderKind,
     pub mfa_configured_methods: Option<Vec<LocationMfaMethod>>,
     /// None when this Core cannot configure MFA from the client.
     pub mfa_capabilities: Option<MfaCapabilities>,
@@ -406,6 +421,31 @@ pub enum ClientTrafficPolicy {
     DisableAllTraffic = 1,
     /// Clients are forced to route all traffic through the VPN.
     ForceAllTraffic = 2,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Type)]
+#[repr(u32)]
+#[serde(rename_all = "lowercase")]
+pub enum OpenIdProviderKind {
+    Custom = 1,
+    Google = 2,
+    Microsoft = 3,
+    Okta = 4,
+    JumpCloud = 5,
+}
+
+impl From<ProtoOpenIdProviderKind> for OpenIdProviderKind {
+    fn from(value: ProtoOpenIdProviderKind) -> Self {
+        match value {
+            ProtoOpenIdProviderKind::Unspecified
+            | ProtoOpenIdProviderKind::Custom
+            | ProtoOpenIdProviderKind::Zitadel => Self::Custom,
+            ProtoOpenIdProviderKind::Google => Self::Google,
+            ProtoOpenIdProviderKind::Microsoft => Self::Microsoft,
+            ProtoOpenIdProviderKind::Okta => Self::Okta,
+            ProtoOpenIdProviderKind::Jumpcloud => Self::JumpCloud,
+        }
+    }
 }
 
 /// Retrieves `ClientTrafficPolicy` from `proto::InstanceInfo` while ensuring backwards compatibility
@@ -467,6 +507,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
@@ -749,6 +790,7 @@ mod tests {
             enterprise_enabled: info.enterprise_enabled,
             disable_tunnels: false,
             openid_display_name: info.openid_display_name.clone(),
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
@@ -815,6 +857,7 @@ mod tests {
             enterprise_enabled: info.enterprise_enabled,
             disable_tunnels: false,
             openid_display_name: info.openid_display_name.clone(),
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
@@ -847,6 +890,7 @@ mod tests {
             enterprise_enabled: info.enterprise_enabled,
             disable_tunnels: false,
             openid_display_name: info.openid_display_name.clone(),
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: Some(Json(vec![
                 LocationMfaMethod::Totp,
                 LocationMfaMethod::Fido2,
@@ -928,6 +972,7 @@ mod tests {
             enterprise_enabled: info.enterprise_enabled,
             disable_tunnels: false,
             openid_display_name: info.openid_display_name.clone(),
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,

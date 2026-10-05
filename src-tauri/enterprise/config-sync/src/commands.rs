@@ -61,6 +61,7 @@ pub async fn do_update_instance(
         .expect("Missing instance info in device config response");
     // before the struct is picked apart below
     instance.sync_mfa_state(&instance_info);
+    instance.openid_provider_kind = instance_info.openid_provider_kind().into();
     instance.name = instance_info.name;
     instance.url = instance_info.url;
     instance.proxy_url = instance_info.proxy_url;

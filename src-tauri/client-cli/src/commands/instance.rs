@@ -126,7 +126,8 @@ impl CommandOutput for InstanceShowResult {
 #[cfg(test)]
 mod tests {
     use defguard_core::{
-        database::models::instance::ClientTrafficPolicy, mfa_contract::MfaContract,
+        database::models::instance::{ClientTrafficPolicy, OpenIdProviderKind},
+        mfa_contract::MfaContract,
     };
 
     use super::*;
@@ -144,6 +145,7 @@ mod tests {
             enterprise_enabled: false,
             disable_tunnels: false,
             openid_display_name: None,
+            openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,

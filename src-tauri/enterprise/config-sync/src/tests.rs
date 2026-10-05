@@ -8,7 +8,7 @@ use std::{
 
 use defguard_client_core::{
     database::models::{
-        instance::{ClientTrafficPolicy, MfaCapabilities},
+        instance::{ClientTrafficPolicy, MfaCapabilities, OpenIdProviderKind},
         location::{Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode},
         NoId,
     },
@@ -116,6 +116,7 @@ fn instance_with_token(token: Option<&str>) -> Instance<Id> {
         enterprise_enabled: false,
         disable_tunnels: false,
         openid_display_name: None,
+        openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
         mfa_contract: MfaContract::Legacy,
         mfa_capabilities: None,
@@ -197,6 +198,7 @@ async fn seed_instance(
         enterprise_enabled: true,
         disable_tunnels: false,
         openid_display_name: None,
+        openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
         mfa_contract: MfaContract::Legacy,
         mfa_capabilities: None,

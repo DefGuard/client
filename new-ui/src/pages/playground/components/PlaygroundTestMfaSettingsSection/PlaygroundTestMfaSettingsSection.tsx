@@ -58,6 +58,7 @@ const instance: MfaSettingsInstance = {
     authorize_methods: [MfaMethod.Totp, MfaMethod.Email, MfaMethod.Fido2, MfaMethod.Oidc],
   },
   openid_display_name: null,
+  openid_provider_kind: 'custom',
 };
 
 const Demo = ({
