@@ -8,7 +8,10 @@ export type MfaSettingsLocation = Pick<
 
 export type MfaSettingsInstance = Pick<
   InstanceInfo,
-  'mfa_configured_methods' | 'mfa_capabilities' | 'openid_display_name'
+  | 'mfa_configured_methods'
+  | 'mfa_capabilities'
+  | 'openid_display_name'
+  | 'openid_provider_kind'
 >;
 
 /** What clicking a factor row does. */

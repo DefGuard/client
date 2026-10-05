@@ -31,6 +31,7 @@ const instance: InstanceInfo = {
   enterprise_enabled: false,
   disable_tunnels: false,
   openid_display_name: null,
+  openid_provider_kind: 'custom',
   mfa_configured_methods: [],
   mfa_capabilities: {
     setup_methods: [MfaMethod.Totp, MfaMethod.Fido2],

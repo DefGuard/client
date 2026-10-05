@@ -19,7 +19,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Fido2]: 'Security key',
 };
 
-type OpenIdInstance = Pick<InstanceInfo, 'openid_display_name'>;
+type OpenIdInstance = Pick<InstanceInfo, 'openid_display_name' | 'openid_provider_kind'>;
 
 export const openIdProviderName = (instance?: OpenIdInstance): string =>
   instance?.openid_display_name || mfaMethodLabels[MfaMethod.Oidc];
@@ -32,8 +32,8 @@ export const mfaToText = (factor: MfaMethodValue, instance?: OpenIdInstance): st
 };
 
 export const findOpenIdProvider = (instance?: OpenIdInstance) =>
-  Object.values(OpenIdProvider).find((provider) =>
-    instance?.openid_display_name?.toLowerCase().includes(provider),
+  Object.values(OpenIdProvider).find(
+    (provider) => provider === instance?.openid_provider_kind,
   );
 
 export const mfaMethodApiValues: Record<MfaMethodValue, string> = {

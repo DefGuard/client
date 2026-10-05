@@ -5,7 +5,11 @@ import {
   type MfaMethodValue,
   type MfaStep,
 } from '../../rust-api/types';
-import { MfaFactorAction, type MfaSettingsLocation } from './types';
+import {
+  MfaFactorAction,
+  type MfaSettingsInstance,
+  type MfaSettingsLocation,
+} from './types';
 import { mfaSettingsStepsOf } from './utils';
 
 const step = (...methods: [MfaMethodValue, boolean][]): MfaStep => ({
@@ -33,10 +37,11 @@ const capabilities = {
   authorize_methods: [MfaMethod.Totp, MfaMethod.Email, MfaMethod.Fido2, MfaMethod.Oidc],
 };
 
-const instance = {
+const instance: MfaSettingsInstance = {
   mfa_configured_methods: [MfaMethod.Totp, MfaMethod.Oidc, MfaMethod.Fido2],
   mfa_capabilities: capabilities,
   openid_display_name: null,
+  openid_provider_kind: 'custom',
 };
 
 describe('mfaSettingsStepsOf', () => {

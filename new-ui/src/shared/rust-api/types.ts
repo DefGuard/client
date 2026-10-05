@@ -289,6 +289,7 @@ export type InstanceInfo = {
   enterprise_enabled: boolean;
   disable_tunnels: boolean;
   openid_display_name: string | null;
+  openid_provider_kind: 'custom' | 'google' | 'microsoft' | 'okta' | 'jumpcloud';
   /** Factors set up on the account, as last reported. Null when the instance predates the API. */
   mfa_configured_methods: MfaMethodValue[] | null;
   /** Null when this Core cannot configure MFA from the client. */
