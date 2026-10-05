@@ -1,3 +1,4 @@
+import { decode, encode } from '@stablelib/base64';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type LocationInfo, TauriEvent } from '../../../rust-api/types';
@@ -35,6 +36,11 @@ const location = {
   posture_check_required: false,
 } as LocationInfo;
 
+const decodeQr = (qrValue: string | null) => {
+  if (qrValue === null) throw new Error('Expected approval QR to be available');
+  return new TextDecoder().decode(decode(qrValue));
+};
+
 type HookProps = {
   onConnected: () => void;
   onStepAdvanced: (nextStep: number) => void;
@@ -65,6 +71,73 @@ describe('useMfaMobileConnect', () => {
     vi.clearAllMocks();
     mocks.cancelMfa.mockResolvedValue(undefined);
     mocks.listen.mockResolvedValue(vi.fn());
+  });
+
+  it('uses the current step attempt ID and challenge in the approval QR', async () => {
+    mocks.mfaBeginStep
+      .mockResolvedValueOnce({
+        challenge: 'challenge-1',
+        token: 'token-1',
+        stepAttemptId: 'attempt-1',
+      })
+      .mockResolvedValueOnce({
+        challenge: 'challenge-2',
+        token: 'token-2',
+        stepAttemptId: 'attempt-2',
+      });
+    mocks.mfaConnectMobileApprove.mockResolvedValue('task-1');
+
+    const { result } = renderMobileHook();
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const firstQrValue = result.current.qrValue;
+    expect(firstQrValue).not.toBeNull();
+    expect(JSON.parse(decodeQr(firstQrValue))).toStrictEqual({
+      token: 'token-1',
+      challenge: 'challenge-1',
+      step_attempt_id: 'attempt-1',
+      instance_id: 'instance-uuid',
+    });
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const reopenedQrValue = result.current.qrValue;
+    expect(reopenedQrValue).not.toBe(firstQrValue);
+    expect(JSON.parse(decodeQr(reopenedQrValue))).toStrictEqual({
+      token: 'token-2',
+      challenge: 'challenge-2',
+      step_attempt_id: 'attempt-2',
+      instance_id: 'instance-uuid',
+    });
+  });
+
+  it('keeps the legacy approval QR JSON byte-identical', async () => {
+    const token = 'legacy-token';
+    const challenge = 'legacy-challenge';
+    mocks.mfaBeginStep.mockResolvedValue({
+      challenge,
+      token,
+      stepAttemptId: null,
+    });
+    mocks.mfaConnectMobileApprove.mockResolvedValue('task-legacy');
+
+    const { result } = renderMobileHook();
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const expectedJson = JSON.stringify({
+      token,
+      challenge,
+      instance_id: 'instance-uuid',
+    });
+    expect(result.current.qrValue).toBe(encode(new TextEncoder().encode(expectedJson)));
   });
 
   it('does not re-park a rejected token after a callback rerender', async () => {

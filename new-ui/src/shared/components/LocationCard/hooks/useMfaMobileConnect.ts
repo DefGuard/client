@@ -24,6 +24,7 @@ import { isPresent } from '../../../utils/isPresent';
 type TokenData = {
   token: string;
   challenge: string;
+  stepAttemptId: string | null;
 };
 
 type Options = {
@@ -171,6 +172,9 @@ export const useMfaMobileConnect = (
     const json = JSON.stringify({
       token: tokenData.token,
       challenge: tokenData.challenge,
+      ...(isPresent(tokenData.stepAttemptId)
+        ? { step_attempt_id: tokenData.stepAttemptId }
+        : {}),
       instance_id: instance.uuid,
     });
     return encode(new TextEncoder().encode(json));
@@ -203,7 +207,11 @@ export const useMfaMobileConnect = (
         return;
       }
 
-      setTokenData({ token: session.token, challenge: session.challenge });
+      setTokenData({
+        token: session.token,
+        challenge: session.challenge,
+        stepAttemptId: session.stepAttemptId,
+      });
     } catch (e) {
       void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
