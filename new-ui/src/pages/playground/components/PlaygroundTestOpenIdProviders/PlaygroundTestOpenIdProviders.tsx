@@ -7,13 +7,16 @@ import { PlaygroundCard } from '../PlaygroundCard/PlaygroundCard';
 
 const noop = () => {};
 
-const instances: Pick<InstanceInfo, 'openid_display_name'>[] = [
-  { openid_display_name: 'Microsoft' },
-  { openid_display_name: 'Google' },
-  { openid_display_name: 'Okta' },
-  { openid_display_name: 'JumpCloud' },
-  { openid_display_name: 'Keycloak' },
-  { openid_display_name: 'Contoso Enterprise Single Sign-On Identity Provider' },
+const instances: Pick<InstanceInfo, 'openid_display_name' | 'openid_provider_kind'>[] = [
+  { openid_display_name: 'Microsoft', openid_provider_kind: 'microsoft' },
+  { openid_display_name: 'Google', openid_provider_kind: 'google' },
+  { openid_display_name: 'Okta', openid_provider_kind: 'okta' },
+  { openid_display_name: 'JumpCloud', openid_provider_kind: 'jumpcloud' },
+  { openid_display_name: 'Keycloak', openid_provider_kind: 'custom' },
+  {
+    openid_display_name: 'Contoso Enterprise Single Sign-On Identity Provider',
+    openid_provider_kind: 'custom',
+  },
 ];
 
 export const PlaygroundTestOpenIdProviders = () => {
