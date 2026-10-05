@@ -192,6 +192,7 @@ mod tests {
             openid_display_name: None,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
+            mfa_capabilities: None,
         }
     }
 

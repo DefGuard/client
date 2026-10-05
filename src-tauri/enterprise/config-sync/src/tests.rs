@@ -8,14 +8,15 @@ use std::{
 
 use defguard_client_core::{
     database::models::{
-        instance::ClientTrafficPolicy,
-        location::{Location, LocationMfaMode, ServiceLocationMode},
+        instance::{ClientTrafficPolicy, MfaCapabilities},
+        location::{Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode},
         NoId,
     },
     mfa_contract::MfaContract,
 };
 use defguard_client_proto::defguard::client_types::{
-    DeviceConfig, DeviceConfigResponse, InstanceInfo, InstanceInfoResponse, MfaUserState,
+    DeviceConfig, DeviceConfigResponse, InstanceInfo, MfaCapabilities as ProtoMfaCapabilities,
+    MfaMethod, MfaUserState,
 };
 use sqlx::SqlitePool;
 
@@ -117,6 +118,7 @@ fn instance_with_token(token: Option<&str>) -> Instance<Id> {
         openid_display_name: None,
         mfa_configured_methods: None,
         mfa_contract: MfaContract::Legacy,
+        mfa_capabilities: None,
     }
 }
 
@@ -197,6 +199,7 @@ async fn seed_instance(
         openid_display_name: None,
         mfa_configured_methods: None,
         mfa_contract: MfaContract::Legacy,
+        mfa_capabilities: None,
     }
     .save(pool)
     .await
@@ -399,19 +402,23 @@ async fn test_poll_instance_changed_while_active_does_not_update_db(pool: Sqlite
     assert_eq!(location.endpoint, "1.2.3.4:51820");
 }
 
-/// The migration leaves a null snapshot, which the frontend reads as "cannot configure MFA",
+/// The migrations leave a null snapshot, which the frontend reads as "cannot configure MFA",
 /// so deferring it behind an active connection would hide the instance until the VPN dropped.
 #[sqlx::test(migrations = "../../migrations")]
 async fn test_poll_instance_persists_mfa_snapshot_while_active(pool: SqlitePool) {
     let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
     seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
     assert!(instance.mfa_configured_methods.is_none());
+    assert!(instance.mfa_capabilities.is_none());
 
     let mut response =
         device_config_response(&instance, device_config(1, "office", "5.6.7.8:51820"));
-    // An account with no factors still reports state, which is what tells the client the
-    // proxy speaks the API at all.
-    response.instance.as_mut().unwrap().mfa_user_state = Some(MfaUserState::default());
+    let info = response.instance.as_mut().unwrap();
+    info.mfa_user_state = Some(MfaUserState::default());
+    info.mfa_capabilities = Some(ProtoMfaCapabilities {
+        setup_methods: vec![MfaMethod::Totp as i32],
+        authorize_methods: vec![MfaMethod::Email as i32],
+    });
     let server = MockPollServer::new(vec![poll_response(response)]);
     instance.proxy_url = server.url();
     instance.save(&pool).await.unwrap();
@@ -436,6 +443,13 @@ async fn test_poll_instance_persists_mfa_snapshot_while_active(pool: SqlitePool)
     assert_eq!(
         stored.mfa_configured_methods.map(|json| json.0),
         Some(Vec::new())
+    );
+    assert_eq!(
+        stored.mfa_capabilities.map(|json| json.0),
+        Some(MfaCapabilities {
+            setup_methods: vec![LocationMfaMethod::Totp],
+            authorize_methods: vec![LocationMfaMethod::Email],
+        })
     );
     // The rest of the config still waits for the disconnect.
     let location = Location::find_by_instance_id(&pool, instance.id, true)

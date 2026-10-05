@@ -1,8 +1,7 @@
 import type { MfaStepMethod } from '../../rust-api/types';
 import { isPresent } from '../../utils/isPresent';
 import {
-  isClientConfigurableMethod,
-  isDesktopDrivableMethod,
+  canSetUpMfaMethod,
   isMfaMethodConfigured,
   isMfaMethodUsable,
   mfaStepsOf,
@@ -24,14 +23,9 @@ const mfaFactorActionOf = (
 ): MfaFactorActionValue => {
   if (isMfaMethodUsable(entry, instance)) return MfaFactorAction.Pick;
 
-  // Like `connectionAbilityOf`, an instance without reported factors cannot configure.
-  const canConfigure =
-    configurable &&
-    isPresent(instance?.mfa_configured_methods) &&
-    isDesktopDrivableMethod(entry.method) &&
-    isClientConfigurableMethod(entry.method);
-
-  return canConfigure ? MfaFactorAction.Configure : MfaFactorAction.None;
+  return configurable && canSetUpMfaMethod(entry.method, instance)
+    ? MfaFactorAction.Configure
+    : MfaFactorAction.None;
 };
 
 export const mfaSettingsStepsOf = ({

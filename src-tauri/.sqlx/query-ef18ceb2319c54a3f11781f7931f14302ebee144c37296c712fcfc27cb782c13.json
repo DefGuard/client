@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, mfa_configured_methods \"mfa_configured_methods: _\", mfa_contract \"mfa_contract: _\" FROM instance WHERE name = $1;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\" FROM instance ORDER BY name ASC;",
   "describe": {
     "columns": [
       {
@@ -136,8 +136,19 @@
         }
       },
       {
-        "name": "mfa_contract: _",
+        "name": "mfa_capabilities: _",
         "ordinal": 12,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "mfa_capabilities"
+          }
+        }
+      },
+      {
+        "name": "mfa_contract: _",
+        "ordinal": 13,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -148,7 +159,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       false,
@@ -163,8 +174,9 @@
       false,
       true,
       true,
+      true,
       false
     ]
   },
-  "hash": "c442d8c23fef3c5dae19b5627d13903417d52c9f6e224f922cff5c3431b387c9"
+  "hash": "ef18ceb2319c54a3f11781f7931f14302ebee144c37296c712fcfc27cb782c13"
 }

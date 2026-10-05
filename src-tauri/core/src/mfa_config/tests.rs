@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use reqwest::Url;
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
@@ -7,6 +9,7 @@ use wiremock::{
 };
 
 use super::*;
+use crate::database::models::location::LocationMfaMethod;
 
 const SESSION_TOKEN: &str = "mfa-config-session";
 /// Stand-ins for the WebAuthn JSON the client and Core exchange verbatim.
@@ -15,6 +18,17 @@ const ATTESTATION: &str = r#"{"id":"cred"}"#;
 
 /// far enough out that only OIDC_POLL_TIMEOUT bounds a poll
 const LIVE_DEADLINE: i64 = 4_000_000_000;
+
+static ALL_CAPABILITIES: LazyLock<MfaCapabilities> = LazyLock::new(|| MfaCapabilities {
+    setup_methods: CONFIGURABLE_METHODS
+        .iter()
+        .map(|&method| method.into())
+        .collect(),
+    authorize_methods: AUTHORIZING_METHODS
+        .iter()
+        .map(|&method| method.into())
+        .collect(),
+});
 
 fn mock_url(server: &MockServer) -> Url {
     Url::parse(&server.uri()).expect("MockServer URI should be valid")
@@ -132,17 +146,24 @@ async fn test_method_is_sent_as_a_number() {
         url.clone(),
         SESSION_TOKEN.into(),
         code(MfaMethod::Email, "123456"),
+        &ALL_CAPABILITIES,
     )
     .await
     .unwrap();
-    mfa_config_setup_start(url.clone(), SESSION_TOKEN.into(), MfaMethod::Totp)
-        .await
-        .unwrap();
+    mfa_config_setup_start(
+        url.clone(),
+        SESSION_TOKEN.into(),
+        MfaMethod::Totp,
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap();
     mfa_config_setup_finish(
         url,
         SESSION_TOKEN.into(),
         MfaMethod::Totp,
         SetupProof::Code("654321".into()),
+        &ALL_CAPABILITIES,
     )
     .await
     .unwrap();
@@ -184,9 +205,14 @@ async fn test_setup_start_returns_totp_secret() {
     )
     .await;
 
-    let response = mfa_config_setup_start(mock_url(&server), SESSION_TOKEN.into(), MfaMethod::Totp)
-        .await
-        .unwrap();
+    let response = mfa_config_setup_start(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        MfaMethod::Totp,
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(response.totp_secret.as_deref(), Some("JBSWY3DPEHPK3PXP"));
 }
@@ -201,10 +227,14 @@ async fn test_setup_start_secret_is_absent_for_email() {
     )
     .await;
 
-    let response =
-        mfa_config_setup_start(mock_url(&server), SESSION_TOKEN.into(), MfaMethod::Email)
-            .await
-            .unwrap();
+    let response = mfa_config_setup_start(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        MfaMethod::Email,
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap();
 
     assert!(response.totp_secret.is_none());
 }
@@ -225,6 +255,7 @@ async fn test_setup_finish_returns_recovery_codes() {
         SESSION_TOKEN.into(),
         MfaMethod::Totp,
         SetupProof::Code("654321".into()),
+        &ALL_CAPABILITIES,
     )
     .await
     .unwrap();
@@ -248,6 +279,7 @@ async fn test_setup_finish_accepts_empty_recovery_codes() {
         SESSION_TOKEN.into(),
         MfaMethod::Email,
         SetupProof::Code("111111".into()),
+        &ALL_CAPABILITIES,
     )
     .await
     .unwrap();
@@ -275,7 +307,7 @@ async fn test_one_session_configures_two_factors() {
 
     let url = mock_url(&server);
     for (method, code) in [(MfaMethod::Totp, "654321"), (MfaMethod::Email, "111111")] {
-        mfa_config_setup_start(url.clone(), SESSION_TOKEN.into(), method)
+        mfa_config_setup_start(url.clone(), SESSION_TOKEN.into(), method, &ALL_CAPABILITIES)
             .await
             .unwrap();
         mfa_config_setup_finish(
@@ -283,6 +315,7 @@ async fn test_one_session_configures_two_factors() {
             SESSION_TOKEN.into(),
             method,
             SetupProof::Code(code.into()),
+            &ALL_CAPABILITIES,
         )
         .await
         .unwrap();
@@ -307,9 +340,14 @@ async fn test_not_found_off_the_start_route_is_a_proxy_error() {
     let server = MockServer::start().await;
     mount(&server, SETUP_START, ResponseTemplate::new(404)).await;
 
-    let err = mfa_config_setup_start(mock_url(&server), SESSION_TOKEN.into(), MfaMethod::Totp)
-        .await
-        .unwrap_err();
+    let err = mfa_config_setup_start(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        MfaMethod::Totp,
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap_err();
 
     assert!(matches!(
         err,
@@ -331,6 +369,7 @@ async fn test_unauthorized_means_session_expired() {
         mock_url(&server),
         "stale".into(),
         code(MfaMethod::Email, "000000"),
+        &ALL_CAPABILITIES,
     )
     .await
     .unwrap_err();
@@ -349,9 +388,14 @@ async fn test_unauthorized_invalid_code_is_an_invalid_code() {
     )
     .await;
 
-    let err = mfa_config_authorize(mock_url(&server), SESSION_TOKEN.into(), fido2_proof())
-        .await
-        .unwrap_err();
+    let err = mfa_config_authorize(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        fido2_proof(),
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap_err();
 
     assert!(matches!(err, MfaConfigError::InvalidCode { .. }));
 }
@@ -383,9 +427,14 @@ async fn test_other_forbidden_carries_the_core_message() {
     )
     .await;
 
-    let err = mfa_config_authorize(mock_url(&server), SESSION_TOKEN.into(), fido2_proof())
-        .await
-        .unwrap_err();
+    let err = mfa_config_authorize(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        fido2_proof(),
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap_err();
 
     match err {
         MfaConfigError::Forbidden { message } => assert_eq!(message, "user is inactive"),
@@ -403,9 +452,14 @@ async fn test_no_fido2_challenge_is_a_failed_precondition() {
     )
     .await;
 
-    let err = mfa_config_authorize(mock_url(&server), SESSION_TOKEN.into(), fido2_proof())
-        .await
-        .unwrap_err();
+    let err = mfa_config_authorize(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        fido2_proof(),
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap_err();
 
     match err {
         MfaConfigError::FailedPrecondition { message } => {
@@ -430,6 +484,7 @@ async fn test_bad_request_carries_the_proxy_message() {
         SESSION_TOKEN.into(),
         MfaMethod::Totp,
         SetupProof::Code("000000".into()),
+        &ALL_CAPABILITIES,
     )
     .await
     .unwrap_err();
@@ -482,13 +537,18 @@ async fn test_unsupported_methods_are_rejected_before_the_request() {
         MfaMethod::MobileApprove,
     ] {
         assert!(matches!(
-            mfa_config_authorize(url.clone(), "t".into(), code(unsupported, "1"))
-                .await
-                .unwrap_err(),
+            mfa_config_authorize(
+                url.clone(),
+                "t".into(),
+                code(unsupported, "1"),
+                &ALL_CAPABILITIES
+            )
+            .await
+            .unwrap_err(),
             MfaConfigError::UnsupportedMethod { .. }
         ));
         assert!(matches!(
-            mfa_config_setup_start(url.clone(), "t".into(), unsupported)
+            mfa_config_setup_start(url.clone(), "t".into(), unsupported, &ALL_CAPABILITIES)
                 .await
                 .unwrap_err(),
             MfaConfigError::UnsupportedMethod { .. }
@@ -498,7 +558,8 @@ async fn test_unsupported_methods_are_rejected_before_the_request() {
                 url.clone(),
                 "t".into(),
                 unsupported,
-                SetupProof::Code("1".into())
+                SetupProof::Code("1".into()),
+                &ALL_CAPABILITIES
             )
             .await
             .unwrap_err(),
@@ -518,13 +579,64 @@ async fn test_fido2_cannot_authorize_with_a_code() {
         .await;
 
     assert!(matches!(
-        mfa_config_authorize(mock_url(&server), "t".into(), code(MfaMethod::Fido2, "1"))
-            .await
-            .unwrap_err(),
+        mfa_config_authorize(
+            mock_url(&server),
+            "t".into(),
+            code(MfaMethod::Fido2, "1"),
+            &ALL_CAPABILITIES
+        )
+        .await
+        .unwrap_err(),
         MfaConfigError::UnsupportedMethod { .. }
     ));
     assert!(CONFIGURABLE_METHODS.contains(&MfaMethod::Fido2));
     assert!(AUTHORIZING_METHODS.contains(&MfaMethod::Fido2));
+}
+
+/// an older Core must not be sent a factor only a newer client knows how to drive
+#[tokio::test]
+async fn test_methods_the_instance_lacks_are_rejected_before_the_request() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let capabilities = MfaCapabilities {
+        setup_methods: vec![LocationMfaMethod::Totp],
+        authorize_methods: vec![LocationMfaMethod::Totp],
+    };
+
+    let url = mock_url(&server);
+    assert!(matches!(
+        mfa_config_authorize(
+            url.clone(),
+            "t".into(),
+            code(MfaMethod::Email, "1"),
+            &capabilities
+        )
+        .await
+        .unwrap_err(),
+        MfaConfigError::UnsupportedMethod { .. }
+    ));
+    assert!(matches!(
+        mfa_config_setup_start(url.clone(), "t".into(), MfaMethod::Fido2, &capabilities)
+            .await
+            .unwrap_err(),
+        MfaConfigError::UnsupportedMethod { .. }
+    ));
+    assert!(matches!(
+        mfa_config_setup_finish(
+            url,
+            "t".into(),
+            MfaMethod::Email,
+            SetupProof::Code("1".into()),
+            &capabilities
+        )
+        .await
+        .unwrap_err(),
+        MfaConfigError::UnsupportedMethod { .. }
+    ));
 }
 
 fn fido2_proof() -> AuthorizeProof {
@@ -595,9 +707,14 @@ async fn test_fido2_authorize_sends_the_assertion() {
         .mount(&server)
         .await;
 
-    let response = mfa_config_authorize(mock_url(&server), SESSION_TOKEN.into(), fido2_proof())
-        .await
-        .unwrap();
+    let response = mfa_config_authorize(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        fido2_proof(),
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(response.deadline_timestamp, 7);
     assert!(response.recovery_codes.is_empty());
@@ -626,6 +743,7 @@ async fn test_oidc_pending_matches_both_wordings() {
             mock_url(&server),
             SESSION_TOKEN.into(),
             AuthorizeProof::Oidc,
+            &ALL_CAPABILITIES,
         )
         .await
         .unwrap_err();
@@ -662,6 +780,7 @@ async fn test_oidc_poll_keeps_going_until_the_login_completes() {
         mock_url(&server),
         SESSION_TOKEN.into(),
         LIVE_DEADLINE,
+        &ALL_CAPABILITIES,
         CancellationToken::new(),
     )
     .await
@@ -688,6 +807,7 @@ async fn test_oidc_poll_stops_on_session_already_authorized() {
         mock_url(&server),
         SESSION_TOKEN.into(),
         LIVE_DEADLINE,
+        &ALL_CAPABILITIES,
         CancellationToken::new(),
     )
     .await
@@ -715,6 +835,7 @@ async fn test_oidc_poll_keeps_an_answer_that_lands_after_cancel() {
         mock_url(&server),
         SESSION_TOKEN.into(),
         LIVE_DEADLINE,
+        &ALL_CAPABILITIES,
         cancel.clone(),
     ));
 
@@ -746,6 +867,7 @@ async fn test_oidc_poll_stops_when_the_session_ends() {
         mock_url(&server),
         SESSION_TOKEN.into(),
         LIVE_DEADLINE,
+        &ALL_CAPABILITIES,
         CancellationToken::new(),
     )
     .await
@@ -763,6 +885,7 @@ async fn test_oidc_poll_times_out() {
         mock_url(&server),
         SESSION_TOKEN.into(),
         LIVE_DEADLINE,
+        &ALL_CAPABILITIES,
         CancellationToken::new(),
     )
     .await
@@ -784,6 +907,7 @@ async fn test_oidc_poll_is_bounded_by_the_session_deadline() {
         mock_url(&server),
         SESSION_TOKEN.into(),
         0,
+        &ALL_CAPABILITIES,
         CancellationToken::new(),
     )
     .await
@@ -807,6 +931,7 @@ async fn test_oidc_poll_stops_on_cancel() {
         mock_url(&server),
         SESSION_TOKEN.into(),
         LIVE_DEADLINE,
+        &ALL_CAPABILITIES,
         cancel,
     )
     .await
@@ -842,6 +967,7 @@ async fn test_setup_finish_sends_the_fido2_attestation() {
             name: "Yubikey".into(),
             attestation: ATTESTATION.into(),
         },
+        &ALL_CAPABILITIES,
     )
     .await
     .unwrap();
@@ -859,10 +985,14 @@ async fn test_setup_start_returns_the_fido2_creation_challenge() {
     )
     .await;
 
-    let response =
-        mfa_config_setup_start(mock_url(&server), SESSION_TOKEN.into(), MfaMethod::Fido2)
-            .await
-            .unwrap();
+    let response = mfa_config_setup_start(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        MfaMethod::Fido2,
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         response.fido2_creation_challenge.as_deref(),
@@ -887,7 +1017,7 @@ fn test_authorizing_methods_drops_unknown_and_non_authorizing_entries() {
     };
 
     assert_eq!(
-        authorizing_methods(&response),
+        authorizing_methods(&response, &ALL_CAPABILITIES),
         vec![
             MfaMethod::Totp,
             MfaMethod::Fido2,
@@ -906,7 +1036,72 @@ fn test_authorizing_methods_is_empty_for_the_email_fallback() {
         deadline_timestamp: 0,
     };
 
-    assert!(authorizing_methods(&response).is_empty());
+    assert!(authorizing_methods(&response, &ALL_CAPABILITIES).is_empty());
+}
+
+#[test]
+fn test_authorizing_methods_keeps_only_what_the_instance_accepts() {
+    let response = MfaConfigStartResponse {
+        session_token: SESSION_TOKEN.into(),
+        available_methods: vec![MfaMethod::Totp as i32, MfaMethod::Oidc as i32],
+        email_fallback: false,
+        deadline_timestamp: 0,
+    };
+    let capabilities = MfaCapabilities {
+        setup_methods: Vec::new(),
+        authorize_methods: vec![LocationMfaMethod::Totp],
+    };
+
+    assert_eq!(
+        authorizing_methods(&response, &capabilities),
+        vec![MfaMethod::Totp]
+    );
+}
+
+#[test]
+fn test_session_methods_keeps_what_the_instance_cannot_authorize_with() {
+    let response = MfaConfigStartResponse {
+        session_token: SESSION_TOKEN.into(),
+        available_methods: vec![
+            MfaMethod::Totp as i32,
+            MfaMethod::Fido2 as i32,
+            MfaMethod::Biometric as i32,
+            99,
+        ],
+        email_fallback: false,
+        deadline_timestamp: 0,
+    };
+    let capabilities = MfaCapabilities {
+        setup_methods: Vec::new(),
+        authorize_methods: vec![LocationMfaMethod::Fido2],
+    };
+
+    assert_eq!(
+        authorizing_methods(&response, &capabilities),
+        vec![MfaMethod::Fido2]
+    );
+    assert_eq!(
+        session_methods(&response),
+        vec![MfaMethod::Totp, MfaMethod::Fido2]
+    );
+}
+
+#[test]
+fn test_ensure_can_authorize_method_needs_the_client_and_the_instance() {
+    let capabilities = MfaCapabilities {
+        setup_methods: Vec::new(),
+        authorize_methods: vec![LocationMfaMethod::Fido2, LocationMfaMethod::MobileApprove],
+    };
+
+    assert!(ensure_can_authorize_method(MfaMethod::Fido2, &capabilities).is_ok());
+    assert!(matches!(
+        ensure_can_authorize_method(MfaMethod::Oidc, &capabilities),
+        Err(MfaConfigError::UnsupportedMethod { .. })
+    ));
+    assert!(matches!(
+        ensure_can_authorize_method(MfaMethod::MobileApprove, &capabilities),
+        Err(MfaConfigError::UnsupportedMethod { .. })
+    ));
 }
 
 /// A proxy URL may carry a base path, which a leading slash on the endpoint would discard.

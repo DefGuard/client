@@ -55,6 +55,9 @@ impl PlatformContext {
 pub enum Fido2Error {
     #[error("no security key detected")]
     NoDevice,
+    /// The CTAP backend drives one key and cannot pick between several.
+    #[error("more than one security key is connected")]
+    MultipleDevices,
     #[error("the security key timed out waiting to be touched")]
     Timeout,
     #[error("the ceremony was cancelled")]

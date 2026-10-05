@@ -7,10 +7,7 @@ pub mod commands;
 
 use defguard_client_core::{
     database::{
-        models::{
-            instance::{mfa_configured_methods, Instance},
-            Id,
-        },
+        models::{instance::Instance, Id},
         DbPool,
     },
     error::Error,
@@ -26,7 +23,7 @@ use futures_util::future::join_all;
 use reqwest::{StatusCode, Url};
 use semver::Version;
 use serde::Serialize;
-use sqlx::{types::Json, Sqlite, Transaction};
+use sqlx::{Sqlite, Transaction};
 
 use crate::commands::{
     disable_enterprise_features, do_update_instance, sync_service_locations_best_effort,
@@ -239,16 +236,12 @@ async fn apply_fetched_config(
             }
             // Says nothing about the tunnel, and deferring it would keep the instance unable to
             // configure MFA for as long as the VPN stayed up.
-            let configured_methods = mfa_configured_methods(info).map(Json);
-            if instance.mfa_configured_methods.as_ref().map(|json| &json.0)
-                != configured_methods.as_ref().map(|json| &json.0)
-            {
+            if instance.sync_mfa_state(info) {
                 debug!(
                     "MFA state changed for instance {}({}) while a connection is active, \
                     persisting the snapshot immediately.",
                     instance.name, instance.id
                 );
-                instance.mfa_configured_methods = configured_methods;
                 instance_updated = true;
             }
         }

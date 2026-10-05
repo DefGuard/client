@@ -633,6 +633,7 @@ pub(crate) async fn build_instance_info(
         disable_tunnels: instance.disable_tunnels,
         openid_display_name: instance.openid_display_name,
         mfa_configured_methods: instance.mfa_configured_methods.map(|json| json.0),
+        mfa_capabilities: instance.mfa_capabilities.map(|json| json.0),
     })
 }
 
@@ -2206,6 +2207,11 @@ impl Drop for CeremonyGuard<'_> {
 fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
     match err {
         Fido2Error::NoDevice => "No security key detected".to_string(),
+        // The CTAP backend cannot choose between keys yet.
+        Fido2Error::MultipleDevices => {
+            "More than one security key is connected. Leave only one plugged in and try again"
+                .to_string()
+        }
         // The key was blinking for a touch that never came.
         Fido2Error::Timeout => "Security key timed out waiting to be touched".to_string(),
         Fido2Error::NoCredentials => {
@@ -2515,6 +2521,7 @@ pub async fn cancel_mfa(task_id: String, state: State<'_, AppState>) -> Result<(
 pub struct MfaConfigStartResult {
     session_id: String,
     available_methods: Vec<LocationMfaMethod>,
+    configured_methods: Vec<LocationMfaMethod>,
     email_fallback: bool,
     deadline_timestamp: i64,
 }
@@ -2562,6 +2569,10 @@ pub async fn mfa_config_start(
         .clone()
         .filter(|token| !token.is_empty())
         .ok_or_else(|| err_to_json(MfaConfigError::NoToken))?;
+    let capabilities = instance
+        .mfa_capabilities
+        .map(|json| json.0)
+        .ok_or_else(|| err_to_json(MfaConfigError::Unsupported))?;
     let proxy_url = Url::parse(&instance.proxy_url)
         .map_err(|e| mfa_config_other(format!("Invalid proxy URL: {e}")))?;
 
@@ -2569,7 +2580,11 @@ pub async fn mfa_config_start(
         .await
         .map_err(err_to_json)?;
 
-    let available_methods = mfa_config::authorizing_methods(&response)
+    let available_methods = mfa_config::authorizing_methods(&response, &capabilities)
+        .into_iter()
+        .map(LocationMfaMethod::from)
+        .collect();
+    let configured_methods = mfa_config::session_methods(&response)
         .into_iter()
         .map(LocationMfaMethod::from)
         .collect();
@@ -2578,6 +2593,7 @@ pub async fn mfa_config_start(
         proxy_url,
         session_token: response.session_token,
         deadline_timestamp: response.deadline_timestamp,
+        capabilities,
     };
 
     let session_uuid = Uuid::new_v4();
@@ -2595,6 +2611,7 @@ pub async fn mfa_config_start(
     Ok(MfaConfigStartResult {
         session_id: session_uuid.to_string(),
         available_methods,
+        configured_methods,
         email_fallback: response.email_fallback,
         deadline_timestamp: response.deadline_timestamp,
     })
@@ -2627,6 +2644,7 @@ pub async fn mfa_config_authorize(
         session.proxy_url,
         session.session_token,
         AuthorizeProof::Code { method, code },
+        &session.capabilities,
     )
     .await
     .map_err(err_to_json)?;
@@ -2669,6 +2687,8 @@ pub async fn mfa_config_authorize_fido2(
     let uid = parse_mfa_config_session_id(&session_id)?;
     let ceremony = CeremonyGuard::register(&state, uid).map_err(err_to_json)?;
     let session = get_mfa_config_session(&state, &session_id)?;
+    mfa_config::ensure_can_authorize_method(MfaMethod::Fido2, &session.capabilities)
+        .map_err(err_to_json)?;
     let instance = Instance::find_by_id(&*DB_POOL, session.instance_id)
         .await
         .map_err(|err| mfa_config_other(err.to_string()))?
@@ -2724,6 +2744,7 @@ pub async fn mfa_config_authorize_fido2(
             auth_data: assertion.authenticator_data,
             credential_id: assertion.credential_id,
         },
+        &session.capabilities,
     )
     .await
     .map_err(err_to_json)?;
@@ -2741,6 +2762,8 @@ pub async fn mfa_config_oidc_url(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let session = get_mfa_config_session(&state, &session_id)?;
+    mfa_config::ensure_can_authorize_method(MfaMethod::Oidc, &session.capabilities)
+        .map_err(err_to_json)?;
     let mut url = session
         .proxy_url
         .join("openid/mfa")
@@ -2765,6 +2788,7 @@ pub async fn mfa_config_authorize_oidc(
         session.proxy_url,
         session.session_token,
         session.deadline_timestamp,
+        &session.capabilities,
         attempt.token(),
     )
     .await
@@ -2784,9 +2808,14 @@ pub async fn mfa_config_setup_start(
     debug!("Starting MFA factor setup");
     let method = parse_mfa_method(&method)?;
     let session = get_mfa_config_session(&state, &session_id)?;
-    mfa_config::mfa_config_setup_start(session.proxy_url, session.session_token, method)
-        .await
-        .map_err(err_to_json)
+    mfa_config::mfa_config_setup_start(
+        session.proxy_url,
+        session.session_token,
+        method,
+        &session.capabilities,
+    )
+    .await
+    .map_err(err_to_json)
 }
 
 /// Keeps the session alive so the user can configure another factor without authorizing again.
@@ -2806,6 +2835,7 @@ pub async fn mfa_config_setup_finish(
         session.session_token,
         method,
         SetupProof::Code(code),
+        &session.capabilities,
     )
     .await
     .map_err(err_to_json)?;
@@ -2864,6 +2894,7 @@ pub async fn mfa_config_setup_fido2(
         session.proxy_url.clone(),
         session.session_token.clone(),
         MfaMethod::Fido2,
+        &session.capabilities,
     )
     .await
     .map_err(err_to_json)?;
@@ -2909,6 +2940,7 @@ pub async fn mfa_config_setup_fido2(
         session.session_token,
         MfaMethod::Fido2,
         SetupProof::Fido2 { name, attestation },
+        &session.capabilities,
     )
     .await
     .map_err(err_to_json)?;
@@ -2988,6 +3020,7 @@ pub async fn mfa_config_cancel(
 
 #[cfg(test)]
 mod tests {
+    use defguard_client_core::database::models::instance::MfaCapabilities;
     use defguard_client_proto::defguard::client_types::{
         mfa_flow_start_response, mfa_step_started, MfaAdvanced, MfaAwaitingExternal, MfaCompleted,
         MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartResponse, MfaFlowStepStartResponse,
@@ -3432,6 +3465,7 @@ mod tests {
             proxy_url: Url::parse("https://proxy.example.com").expect("valid proxy URL"),
             session_token: "session-token".into(),
             deadline_timestamp,
+            capabilities: MfaCapabilities::default(),
         }
     }
 

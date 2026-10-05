@@ -19,9 +19,39 @@ pub struct Instance<I = NoId> {
     pub enterprise_enabled: bool,
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
-    /// `None` when the proxy never sent `MfaUserState`, so factors cannot be configured there.
+    /// None when the proxy never sent MfaUserState.
     pub mfa_configured_methods: Option<Json<Vec<LocationMfaMethod>>>,
     pub mfa_contract: MfaContract,
+    /// None when this Core cannot configure MFA from the client.
+    pub mfa_capabilities: Option<Json<MfaCapabilities>>,
+}
+
+/// Factors a Core accepts in an MFA configuration session, static per Core version. Only
+/// factors this client also drives may be offered, so callers intersect with their own lists.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MfaCapabilities {
+    pub setup_methods: Vec<LocationMfaMethod>,
+    pub authorize_methods: Vec<LocationMfaMethod>,
+}
+
+impl MfaCapabilities {
+    #[must_use]
+    pub fn can_set_up(&self, method: LocationMfaMethod) -> bool {
+        self.setup_methods.contains(&method)
+    }
+
+    #[must_use]
+    pub fn can_authorize(&self, method: LocationMfaMethod) -> bool {
+        self.authorize_methods.contains(&method)
+    }
+}
+
+fn sorted_methods(
+    methods: impl Iterator<Item = proto::client_types::MfaMethod>,
+) -> Vec<LocationMfaMethod> {
+    let mut methods: Vec<_> = methods.map(LocationMfaMethod::from).collect();
+    methods.sort_unstable();
+    methods
 }
 
 /// Keeps "not reported" distinct from "reported as none", and sorts so a reordered report is
@@ -30,14 +60,38 @@ pub struct Instance<I = NoId> {
 pub fn mfa_configured_methods(
     instance_info: &proto::client_types::InstanceInfo,
 ) -> Option<Vec<LocationMfaMethod>> {
-    instance_info.mfa_user_state.as_ref().map(|state| {
-        let mut methods: Vec<_> = state
-            .configured_methods()
-            .map(LocationMfaMethod::from)
-            .collect();
-        methods.sort_unstable();
-        methods
-    })
+    instance_info
+        .mfa_user_state
+        .as_ref()
+        .map(|state| sorted_methods(state.configured_methods()))
+}
+
+/// Same contract as [mfa_configured_methods]. Methods this client does not know are dropped.
+#[must_use]
+pub fn mfa_capabilities(
+    instance_info: &proto::client_types::InstanceInfo,
+) -> Option<MfaCapabilities> {
+    instance_info
+        .mfa_capabilities
+        .as_ref()
+        .map(|capabilities| MfaCapabilities {
+            setup_methods: sorted_methods(capabilities.setup_methods()),
+            authorize_methods: sorted_methods(capabilities.authorize_methods()),
+        })
+}
+
+impl<I> Instance<I> {
+    /// Returns whether either MFA field changed.
+    pub fn sync_mfa_state(&mut self, instance_info: &proto::client_types::InstanceInfo) -> bool {
+        let configured_methods = mfa_configured_methods(instance_info);
+        let capabilities = mfa_capabilities(instance_info);
+        let changed = self.mfa_configured_methods.as_ref().map(|json| &json.0)
+            != configured_methods.as_ref()
+            || self.mfa_capabilities.as_ref().map(|json| &json.0) != capabilities.as_ref();
+        self.mfa_configured_methods = configured_methods.map(Json);
+        self.mfa_capabilities = capabilities.map(Json);
+        changed
+    }
 }
 
 #[must_use]
@@ -62,6 +116,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
         let client_traffic_policy = ClientTrafficPolicy::from(&instance_info);
         let mfa_configured_methods = mfa_configured_methods(&instance_info).map(Json);
         let mfa_contract = mfa_contract_from_instance_info(&instance_info);
+        let mfa_capabilities = mfa_capabilities(&instance_info).map(Json);
         Self {
             id: NoId,
             name: instance_info.name,
@@ -76,6 +131,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             openid_display_name: instance_info.openid_display_name,
             mfa_configured_methods,
             mfa_contract,
+            mfa_capabilities,
         }
     }
 }
@@ -88,8 +144,9 @@ impl Instance<Id> {
         query!(
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
             client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, \
-            openid_display_name = $10, mfa_configured_methods = $11, mfa_contract = $12 \
-            WHERE id = $13;",
+            openid_display_name = $10, mfa_configured_methods = $11, \
+            mfa_capabilities = $12, mfa_contract = $13 \
+            WHERE id = $14;",
             self.name,
             self.uuid,
             self.url,
@@ -101,6 +158,7 @@ impl Instance<Id> {
             self.token,
             self.openid_display_name,
             self.mfa_configured_methods,
+            self.mfa_capabilities,
             self.mfa_contract,
             self.id
         )
@@ -135,7 +193,9 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
-            mfa_configured_methods \"mfa_configured_methods: _\", mfa_contract \"mfa_contract: _\" \
+            mfa_configured_methods \"mfa_configured_methods: _\", \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\" \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -151,7 +211,9 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
-            mfa_configured_methods \"mfa_configured_methods: _\", mfa_contract \"mfa_contract: _\" \
+            mfa_configured_methods \"mfa_configured_methods: _\", \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\" \
             FROM instance WHERE id = $1;",
             id
         )
@@ -168,7 +230,9 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
-            mfa_configured_methods \"mfa_configured_methods: _\", mfa_contract \"mfa_contract: _\" \
+            mfa_configured_methods \"mfa_configured_methods: _\", \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\" \
             FROM instance WHERE name = $1;",
             name
         )
@@ -204,7 +268,9 @@ impl Instance<Id> {
             Self,
             "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, \
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
-            mfa_configured_methods \"mfa_configured_methods: _\", mfa_contract \"mfa_contract: _\" \
+            mfa_configured_methods \"mfa_configured_methods: _\", \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\" \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
@@ -253,6 +319,8 @@ impl PartialEq<proto::client_types::InstanceInfo> for Instance<Id> {
             && self.openid_display_name == other.openid_display_name
             && self.mfa_configured_methods.as_ref().map(|json| &json.0)
                 == mfa_configured_methods(other).as_ref()
+            && self.mfa_capabilities.as_ref().map(|json| &json.0)
+                == mfa_capabilities(other).as_ref()
     }
 }
 
@@ -266,8 +334,8 @@ impl Instance<NoId> {
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
             client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name, \
-            mfa_configured_methods, mfa_contract) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id;",
+            mfa_configured_methods, mfa_capabilities, mfa_contract) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -279,6 +347,7 @@ impl Instance<NoId> {
             self.disable_tunnels,
             self.openid_display_name,
             self.mfa_configured_methods,
+            self.mfa_capabilities,
             self.mfa_contract
         )
         .fetch_one(executor)
@@ -297,6 +366,7 @@ impl Instance<NoId> {
             openid_display_name: self.openid_display_name,
             mfa_configured_methods: self.mfa_configured_methods,
             mfa_contract: self.mfa_contract,
+            mfa_capabilities: self.mfa_capabilities,
         })
     }
 }
@@ -314,9 +384,9 @@ pub struct InstanceInfo<I = NoId> {
     pub enterprise_enabled: bool,
     pub disable_tunnels: bool,
     pub openid_display_name: Option<String>,
-    /// `None` when the instance never reported its MFA state, which the frontend reads as
-    /// "cannot configure factors here".
     pub mfa_configured_methods: Option<Vec<LocationMfaMethod>>,
+    /// None when this Core cannot configure MFA from the client.
+    pub mfa_capabilities: Option<MfaCapabilities>,
 }
 
 impl fmt::Display for InstanceInfo<Id> {
@@ -399,6 +469,7 @@ mod tests {
             openid_display_name: None,
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
+            mfa_capabilities: None,
         }
     }
 
@@ -680,6 +751,7 @@ mod tests {
             openid_display_name: info.openid_display_name.clone(),
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
+            mfa_capabilities: None,
         };
         // Model has false, proto has true → not equal.
         assert_ne!(instance, info);
@@ -745,6 +817,7 @@ mod tests {
             openid_display_name: info.openid_display_name.clone(),
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
+            mfa_capabilities: None,
         };
         // Never reported vs reported as [totp], a change the poller has to persist.
         assert_ne!(instance, info);
@@ -779,8 +852,121 @@ mod tests {
                 LocationMfaMethod::Fido2,
             ])),
             mfa_contract: MfaContract::Legacy,
+            mfa_capabilities: None,
         };
         // The same factors in another order are not a change worth a full config update.
         assert_eq!(instance, info);
+    }
+
+    fn proto_capabilities(
+        setup_methods: &[i32],
+        authorize_methods: &[i32],
+    ) -> proto::client_types::MfaCapabilities {
+        proto::client_types::MfaCapabilities {
+            setup_methods: setup_methods.to_vec(),
+            authorize_methods: authorize_methods.to_vec(),
+        }
+    }
+
+    #[test]
+    fn test_instance_from_proto_mfa_capabilities_absent() {
+        let instance: Instance<NoId> = base_info().into();
+        assert!(instance.mfa_capabilities.is_none());
+    }
+
+    #[test]
+    fn test_instance_from_proto_mfa_capabilities_sorts_and_drops_unknown_methods() {
+        let mut info = base_info();
+        info.mfa_capabilities = Some(proto_capabilities(
+            &[
+                proto::client_types::MfaMethod::Fido2 as i32,
+                99,
+                proto::client_types::MfaMethod::Totp as i32,
+            ],
+            &[proto::client_types::MfaMethod::Oidc as i32, 99],
+        ));
+        let instance: Instance<NoId> = info.into();
+        assert_eq!(
+            instance.mfa_capabilities.map(|json| json.0),
+            Some(MfaCapabilities {
+                setup_methods: vec![LocationMfaMethod::Totp, LocationMfaMethod::Fido2],
+                authorize_methods: vec![LocationMfaMethod::Oidc],
+            })
+        );
+    }
+
+    #[test]
+    fn test_instance_from_proto_mfa_capabilities_empty_is_not_absent() {
+        let mut info = base_info();
+        info.mfa_capabilities = Some(proto_capabilities(&[], &[]));
+        let instance: Instance<NoId> = info.into();
+        assert_eq!(
+            instance.mfa_capabilities.map(|json| json.0),
+            Some(MfaCapabilities::default())
+        );
+    }
+
+    #[test]
+    fn test_instance_partial_eq_detects_mfa_capabilities_change() {
+        let mut info = base_info();
+        info.mfa_capabilities = Some(proto_capabilities(
+            &[
+                proto::client_types::MfaMethod::Fido2 as i32,
+                proto::client_types::MfaMethod::Totp as i32,
+            ],
+            &[],
+        ));
+        let mut instance = Instance::<Id> {
+            id: 1,
+            name: info.name.clone(),
+            uuid: info.id.clone(),
+            url: info.url.clone(),
+            proxy_url: info.proxy_url.clone(),
+            username: info.username.clone(),
+            token: Some("tok".into()),
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: info.enterprise_enabled,
+            disable_tunnels: false,
+            openid_display_name: info.openid_display_name.clone(),
+            mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
+            mfa_capabilities: None,
+        };
+        // a Core upgraded to configure MFA from the client
+        assert_ne!(instance, info);
+
+        instance.mfa_capabilities = Some(Json(MfaCapabilities {
+            setup_methods: vec![LocationMfaMethod::Totp, LocationMfaMethod::Fido2],
+            authorize_methods: Vec::new(),
+        }));
+        assert_eq!(instance, info);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_mfa_capabilities_round_trip(pool: SqlitePool) {
+        let capabilities = MfaCapabilities {
+            setup_methods: vec![LocationMfaMethod::Totp, LocationMfaMethod::Fido2],
+            authorize_methods: vec![LocationMfaMethod::Email, LocationMfaMethod::Oidc],
+        };
+        let mut instance = new_instance();
+        instance.mfa_capabilities = Some(Json(capabilities.clone()));
+        let mut saved = instance.save(&pool).await.unwrap();
+
+        let persisted = Instance::find_by_id(&pool, saved.id)
+            .await
+            .unwrap()
+            .expect("instance should exist");
+        assert_eq!(
+            persisted.mfa_capabilities.map(|json| json.0),
+            Some(capabilities)
+        );
+
+        saved.mfa_capabilities = None;
+        saved.save(&pool).await.unwrap();
+        let persisted = Instance::find_by_id(&pool, saved.id)
+            .await
+            .unwrap()
+            .expect("instance should exist");
+        assert!(persisted.mfa_capabilities.is_none());
     }
 }
