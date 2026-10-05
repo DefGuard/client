@@ -22,26 +22,28 @@
 
   inherit (import ./versions.nix pkgs) nodejs pnpm;
 
-  buildInputs = with pkgs; [
-    at-spi2-atk
-    atkmm
-    cairo
-    dbus
-    gdk-pixbuf
-    glib
-    glib-networking
-    gtk3
-    harfbuzz
-    librsvg
-    libsoup_3
-    pango
-    webkitgtk_4_1
-    openssl
-    libayatana-appindicator
-    libayatana-indicator
-    ayatana-ido
-    libdbusmenu-gtk3
-  ] ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.systemd];
+  buildInputs = with pkgs;
+    [
+      at-spi2-atk
+      atkmm
+      cairo
+      dbus
+      gdk-pixbuf
+      glib
+      glib-networking
+      gtk3
+      harfbuzz
+      librsvg
+      libsoup_3
+      pango
+      webkitgtk_4_1
+      openssl
+      libayatana-appindicator
+      libayatana-indicator
+      ayatana-ido
+      libdbusmenu-gtk3
+    ]
+    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.systemd];
 
   # Rust/cargo inputs shared by buildDepsOnly and the main build.
   cargoNativeBuildInputs = [
@@ -90,7 +92,7 @@
     inherit version pnpm;
     src = ../new-ui;
     fetcherVersion = 4;
-    hash = "sha256-b1jJn2qlCLncgah7RHchbFjIuBZRFg0eMGSQCdoMG18=";
+    hash = "sha256-TakYQ2WSBXMfluYMbKAO5LwFFaoypHMwuu4Vrzt/+2o=";
   };
 
   # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".
