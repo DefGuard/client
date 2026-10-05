@@ -7,16 +7,15 @@ pub mod commands;
 
 use defguard_client_core::{
     database::{
-        models::{instance::Instance, Id},
+        models::{
+            instance::{mfa_contract_from_instance_info, Instance},
+            Id,
+        },
         DbPool,
     },
     error::Error,
-    mfa_contract::MfaContract,
     proxy::post_with_headers,
-    version::{
-        mfa_contract_from_headers, CORE_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION,
-        PROXY_VERSION_HEADER,
-    },
+    version::{CORE_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION, PROXY_VERSION_HEADER},
 };
 use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
 use futures_util::future::join_all;
@@ -38,7 +37,6 @@ const CORE_CONNECTED_HEADER: &str = "defguard-core-connected";
 pub struct FetchedConfig {
     pub response: InstanceInfoResponse,
     pub version_mismatch: Option<VersionMismatchPayload>,
-    pub mfa_contract: MfaContract,
 }
 
 /// Result of polling a single instance once.
@@ -132,7 +130,6 @@ pub async fn fetch_instance_config(instance: &Instance<Id>) -> Result<FetchedCon
     }
 
     let version_mismatch = check_min_version(&response, instance);
-    let mfa_contract = mfa_contract_from_headers(response.headers());
 
     // Parse the response
     debug!(
@@ -158,7 +155,6 @@ pub async fn fetch_instance_config(instance: &Instance<Id>) -> Result<FetchedCon
     Ok(FetchedConfig {
         response,
         version_mismatch,
-        mfa_contract,
     })
 }
 
@@ -196,12 +192,16 @@ async fn apply_fetched_config(
     let FetchedConfig {
         response,
         version_mismatch,
-        mfa_contract,
     } = fetched;
     let device_config = response
         .device_config
         .as_ref()
         .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+    let instance_info = device_config
+        .instance
+        .as_ref()
+        .ok_or_else(|| Error::InternalError("Instance info not present in response".to_string()))?;
+    let mfa_contract = mfa_contract_from_instance_info(instance_info);
     let mfa_contract_changed = instance.mfa_contract != mfa_contract;
     if !config_changed(transaction, instance, device_config).await? {
         if mfa_contract_changed {
@@ -222,28 +222,26 @@ async fn apply_fetched_config(
 
     if has_active_connections {
         let mut instance_updated = false;
-        if let Some(ref info) = device_config.instance {
-            // add dedicated override to disable tunnels without waiting for a disconnect
-            let new_tunnels_disabled = info.disable_tunnels.unwrap_or(false);
-            if new_tunnels_disabled && !instance.disable_tunnels {
-                debug!(
-                    "Tunnels were disabled for instance {}({}) while a connection is active, \
-                    persisting the flag immediately.",
-                    instance.name, instance.id
-                );
-                instance.disable_tunnels = true;
-                instance_updated = true;
-            }
-            // Says nothing about the tunnel, and deferring it would keep the instance unable to
-            // configure MFA for as long as the VPN stayed up.
-            if instance.sync_mfa_state(info) {
-                debug!(
-                    "MFA state changed for instance {}({}) while a connection is active, \
-                    persisting the snapshot immediately.",
-                    instance.name, instance.id
-                );
-                instance_updated = true;
-            }
+        // add dedicated override to disable tunnels without waiting for a disconnect
+        let new_tunnels_disabled = instance_info.disable_tunnels.unwrap_or(false);
+        if new_tunnels_disabled && !instance.disable_tunnels {
+            debug!(
+                "Tunnels were disabled for instance {}({}) while a connection is active, \
+                persisting the flag immediately.",
+                instance.name, instance.id
+            );
+            instance.disable_tunnels = true;
+            instance_updated = true;
+        }
+        // Says nothing about the tunnel, and deferring it would keep the instance unable to
+        // configure MFA for as long as the VPN stayed up.
+        if instance.sync_mfa_state(instance_info) {
+            debug!(
+                "MFA state changed for instance {}({}) while a connection is active, \
+                persisting the snapshot immediately.",
+                instance.name, instance.id
+            );
+            instance_updated = true;
         }
         if instance_updated {
             instance.mfa_contract = mfa_contract;
