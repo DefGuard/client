@@ -77,7 +77,7 @@ export const PasswordStep = () => {
     onSubmit: async ({ value }) => {
       try {
         const { skipMfaChoice, skipMfa } = useEnrollmentStore.getState();
-        if (skipMfaChoice) {
+        if (!skipMfa && skipMfaChoice) {
           const mfaResponse = await startMfa();
           useEnrollmentStore.setState({
             userTotpSecret: mfaResponse.totp_secret,
