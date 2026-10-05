@@ -66,6 +66,14 @@ pub fn logging_setup(
         .with(json_file_layer)
         .init();
 
+    // Release builds unwind, so a panicking task no longer takes the service down and would
+    // otherwise only reach stderr.
+    let default_panic = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        tracing::error!("Panic: {info}");
+        default_panic(info);
+    }));
+
     Ok(guard)
 }
 

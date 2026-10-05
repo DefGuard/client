@@ -133,7 +133,11 @@ impl AppState {
 
         // Stop statistics thread
         {
-            let handle = self.stat_threads.lock().unwrap().remove(&location_id);
+            let handle = self
+                .stat_threads
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(&location_id);
             if let Some(handle) = handle {
                 debug!("Stopping network statistics thread for location ID {location_id}");
                 handle.abort();

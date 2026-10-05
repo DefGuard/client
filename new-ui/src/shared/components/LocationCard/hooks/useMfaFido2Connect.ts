@@ -111,11 +111,11 @@ export const useMfaFido2Connect = (
             listen<MfaErrorPayload>(TauriEvent.MfaFido2Error, (event) => {
               if (!tryFinishAttempt()) return;
               setMfaToken(null);
+              if (isCancelled(event.payload.error)) return;
               void error(
                 `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
               );
 
-              if (isCancelled(event.payload.error)) return;
               if (isMfaPostureError(event.payload.error, location)) {
                 onPostureError?.(mfaErrorMessage(event.payload.error));
                 return;

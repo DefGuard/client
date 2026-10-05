@@ -136,9 +136,7 @@ export const useMfaMobileConnect = (
             setTokenData(null);
             setMfaTokenRef.current(null);
             setConnectionError(
-              isConnectFailure(message)
-                ? 'Failed to establish VPN connection'
-                : 'Connection error. Please try again.',
+              isConnectFailure(message) ? message : 'Connection error. Please try again.',
             );
           },
         );

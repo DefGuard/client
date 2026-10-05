@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{LazyLock, Mutex},
+    sync::{LazyLock, Mutex, PoisonError},
     time::Duration,
 };
 
@@ -163,7 +163,9 @@ fn emit_version_mismatch(
     payload: Option<&VersionMismatchPayload>,
 ) {
     if let Some(payload) = payload {
-        let mut notified_instances = NOTIFIED_INSTANCES.lock().unwrap();
+        let mut notified_instances = NOTIFIED_INSTANCES
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if notified_instances.insert(instance_id) {
             if let Err(err) = handle.emit(EventKey::VersionMismatch.into(), payload.clone()) {
                 error!("Failed to emit version mismatch event to the frontend: {err}");

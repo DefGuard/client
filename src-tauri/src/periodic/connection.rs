@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::PoisonError, time::Duration};
 
 use chrono::{NaiveDateTime, TimeDelta, Utc};
 use defguard_client_core::connection::active_connections::ACTIVE_CONNECTIONS;
@@ -126,7 +126,11 @@ pub async fn verify_active_connections(app_handle: AppHandle) {
             );
         }
         let peer_alive_period = TimeDelta::seconds(i64::from(
-            app_state.app_config.lock().unwrap().peer_alive_period,
+            app_state
+                .app_config
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .peer_alive_period,
         ));
         // Check currently active connections.
         for con in &*connections {

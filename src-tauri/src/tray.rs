@@ -1,3 +1,5 @@
+use std::sync::PoisonError;
+
 use defguard_client_core::connection::active_connections::{
     get_connection_id_by_type, ACTIVE_CONNECTIONS,
 };
@@ -42,7 +44,10 @@ fn store_tray_click_position(app: &AppHandle, event: &TrayIconEvent) {
     };
 
     if let Some(position) = position {
-        *app.state::<AppState>().tray_click_position.lock().unwrap() = Some(position);
+        *app.state::<AppState>()
+            .tray_click_position
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(position);
     }
 }
 

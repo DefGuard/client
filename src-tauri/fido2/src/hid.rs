@@ -1,10 +1,8 @@
 //! Talks to the key directly over CTAP-HID. The PIN is ours to collect, it is what makes the key
 //! report the user verification Core requires.
 //!
-//! The crate's API is blocking and a waiting key cannot be interrupted, so ceremonies run on a
-//! dedicated thread, see [`HID_THREAD`], and a cancelled one still runs to completion. Its result
-//! is discarded rather than returned, so nothing a cancelled ceremony produced can reach the
-//! caller.
+//! The crate's API is blocking and a waiting key cannot be interrupted, so a cancelled ceremony
+//! still runs to completion on the HID thread. Its result is discarded, never returned.
 
 use std::{
     any::Any,
@@ -43,12 +41,8 @@ const CTAP2_ERR_ACTION_TIMEOUT: u8 = 0x3A;
 
 type Job = Box<dyn FnOnce() + Send>;
 
-/// The one thread every HID call runs on, for the life of the process.
-///
-/// On macOS hidapi binds its device manager to the run loop of whichever thread first touches
-/// it. A blocking-pool thread idles out and takes that run loop with it, and the next enumeration
-/// schedules devices on freed memory and kills the process. Elsewhere one thread is merely
-/// tidier, and it keeps hidapi's unsynchronised global error string to a single writer.
+/// hidapi binds its macOS device manager to the first caller's run loop, so a thread that exits
+/// frees it and the next enumeration crashes. Every HID call runs here, for the process lifetime.
 static HID_THREAD: LazyLock<Result<mpsc::Sender<Job>, String>> = LazyLock::new(|| {
     let (sender, receiver) = mpsc::channel::<Job>();
     std::thread::Builder::new()
@@ -70,8 +64,8 @@ fn panic_message(payload: &(dyn Any + Send)) -> &str {
         .unwrap_or("unknown panic")
 }
 
-/// Run `job` on [`HID_THREAD`]. The crate unwraps on malformed key responses, so a panic is
-/// contained here: it fails this ceremony rather than the thread every later one needs.
+/// The crate unwraps on malformed key responses, so a panic fails only this ceremony and leaves
+/// the thread up for the next one.
 async fn on_hid_thread<T, F>(job: F) -> Result<T, Fido2Error>
 where
     T: Send + 'static,
@@ -84,6 +78,10 @@ where
 
     let (result_sender, result_receiver) = oneshot::channel();
     let job: Job = Box::new(move || {
+        // The caller is gone, so running would only cost the user a touch or a PIN attempt.
+        if result_sender.is_closed() {
+            return;
+        }
         let result = catch_unwind(AssertUnwindSafe(job)).unwrap_or_else(|payload| {
             tracing::error!("FIDO2 ceremony panicked: {}", panic_message(&*payload));
             Err(Fido2Error::Backend {
@@ -146,22 +144,21 @@ fn single_device(mut devices: Vec<HidInfo>) -> Result<HidParam, Fido2Error> {
 
 /// The crate drops the reason it could not open a key it had just found. On Linux ask the system
 /// directly, so missing hidraw permissions are told apart from a key that is busy or was pulled.
-fn inaccessible(param: &HidParam) -> Fido2Error {
-    #[cfg(target_os = "linux")]
-    let permission_denied = match param {
+#[cfg(target_os = "linux")]
+fn permission_denied(param: &HidParam) -> bool {
+    match param {
         HidParam::Path(path) => std::fs::OpenOptions::new()
             .read(true)
             .write(true)
             .open(path)
             .is_err_and(|err| err.kind() == std::io::ErrorKind::PermissionDenied),
         HidParam::VidPid { .. } => false,
-    };
-    #[cfg(not(target_os = "linux"))]
-    let permission_denied = {
-        let _ = param;
-        false
-    };
-    Fido2Error::DeviceInaccessible { permission_denied }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn permission_denied(_param: &HidParam) -> bool {
+    false
 }
 
 fn open_device() -> Result<FidoKeyHid, Fido2Error> {
@@ -171,7 +168,9 @@ fn open_device() -> Result<FidoKeyHid, Fido2Error> {
     cfg.enable_keep_alive_msg = false;
     FidoKeyHidFactory::create_by_params(std::slice::from_ref(&param), &cfg).map_err(|err| {
         tracing::debug!("Could not open the FIDO2 device: {err}");
-        inaccessible(&param)
+        Fido2Error::DeviceInaccessible {
+            permission_denied: permission_denied(&param),
+        }
     })
 }
 
@@ -200,8 +199,13 @@ pub(crate) async fn register(
         ));
     }
     let request = request.clone();
+    let job_cancel = cancel.clone();
 
     let result = on_hid_thread(move || {
+        // A cancel that landed while the job waited for the thread must not reach the key.
+        if job_cancel.is_cancelled() {
+            return Err(Fido2Error::Cancelled);
+        }
         let device = open_device()?;
 
         let user = PublicKeyCredentialUserEntity::new(
@@ -252,8 +256,12 @@ pub(crate) async fn assert(
 ) -> Result<Assertion, Fido2Error> {
     let pin = pin.ok_or(Fido2Error::PinRequired)?;
     let request = request.clone();
+    let job_cancel = cancel.clone();
 
     let result = on_hid_thread(move || {
+        if job_cancel.is_cancelled() {
+            return Err(Fido2Error::Cancelled);
+        }
         let device = open_device()?;
 
         // The key picks the credential it holds and names it back, so nothing to narrow here.
@@ -285,7 +293,7 @@ pub(crate) async fn assert(
     })
     .await;
 
-    // As in `register`: an assertion the user cancelled must not go on to authorize anything.
+    // As in register, an assertion the user cancelled must not go on to authorize anything.
     if cancel.is_cancelled() {
         return Err(Fido2Error::Cancelled);
     }

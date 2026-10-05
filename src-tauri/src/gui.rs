@@ -3,7 +3,7 @@ use std::{env, str::FromStr, sync::LazyLock};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, PoisonError,
     },
     thread::spawn,
 };
@@ -106,7 +106,7 @@ async fn startup(app_handle: &AppHandle) {
         let mtu = app_state
             .app_config
             .lock()
-            .expect("failed to lock app state")
+            .unwrap_or_else(PoisonError::into_inner)
             .mtu();
         let handle = async_runtime::spawn(async move {
             if let Err(err) = sync_locations_and_tunnels(mtu).await {

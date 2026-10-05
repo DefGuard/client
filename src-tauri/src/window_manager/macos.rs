@@ -1,3 +1,5 @@
+use std::sync::PoisonError;
+
 use objc2_app_kit::{NSWindow, NSWindowButton, NSWindowStyleMask, NSWindowTitleVisibility};
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, Position, Runtime, WebviewWindow,
@@ -63,7 +65,11 @@ fn get_tray_window_position(
     let mut x;
     let mut y;
 
-    if let Some(tray_position) = *app_state.tray_click_position.lock().unwrap() {
+    if let Some(tray_position) = *app_state
+        .tray_click_position
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+    {
         let monitor = get_monitor_for_position(app, tray_position.x, tray_position.y)?;
 
         let scale_factor = monitor.scale_factor();

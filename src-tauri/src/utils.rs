@@ -1,10 +1,10 @@
+#[cfg(target_os = "macos")]
+use std::time::Duration;
 #[cfg(not(target_os = "macos"))]
 use std::{collections::HashMap, str::FromStr};
-use std::{env, process::Command};
+use std::{env, process::Command, sync::PoisonError};
 #[cfg(target_os = "linux")]
 use std::{fs, path::Path};
-#[cfg(target_os = "macos")]
-use std::{sync::PoisonError, time::Duration};
 
 #[cfg(not(target_os = "macos"))]
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
@@ -754,15 +754,14 @@ pub(crate) async fn handle_connection_for_tunnel(
         .add_connection(tunnel_id, &interface_name, ConnectionType::Tunnel)
         .await;
 
+    // As for locations, the tunnel is up and nothing below may fail the connection.
     debug!("Sending event informing the frontend that a new connection has been created.");
-    handle
-        .emit(EventKey::ConnectionChanged.into(), ())
-        .map_err(crate::tauri_err_to_app_err)?;
-    debug!("Event informing the frontend that a new connection has been created sent.");
+    if let Err(err) = handle.emit(EventKey::ConnectionChanged.into(), ()) {
+        warn!("Failed to notify the frontend about the connection to tunnel {tunnel_name}: {err}");
+    }
 
-    // spawn log watcher
     debug!("Spawning log watcher for tunnel {tunnel_name}");
-    spawn_log_watcher_task(
+    if let Err(err) = spawn_log_watcher_task(
         handle,
         tunnel_id,
         interface_name,
@@ -770,8 +769,10 @@ pub(crate) async fn handle_connection_for_tunnel(
         Level::DEBUG,
         None,
     )
-    .await?;
-    debug!("Log watcher for tunnel {tunnel_name} spawned");
+    .await
+    {
+        warn!("Failed to spawn log watcher for tunnel {tunnel_name}: {err}");
+    }
     Ok(())
 }
 

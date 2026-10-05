@@ -453,7 +453,6 @@ pub async fn spawn_log_watcher_task(
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
-            // cancel previous log watcher for this interface
             debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
             old_token.cancel();
         }
@@ -537,7 +536,6 @@ pub async fn spawn_log_watcher_task(
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         if let Some(old_token) = log_watchers.insert(interface_name.clone(), token) {
-            // cancel previous log watcher for this interface
             debug!("Existing log watcher for interface {interface_name} found. Cancelling...");
             old_token.cancel();
         }

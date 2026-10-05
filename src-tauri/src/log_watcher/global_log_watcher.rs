@@ -4,7 +4,7 @@
 
 #[cfg(not(target_os = "macos"))]
 use std::fs::read_dir;
-use std::{path::PathBuf, str::FromStr, time::Duration};
+use std::{path::PathBuf, str::FromStr, sync::PoisonError, time::Duration};
 
 #[cfg(not(target_os = "macos"))]
 use chrono::NaiveDate;
@@ -647,7 +647,7 @@ pub async fn spawn_global_log_watcher_task(
     let mut log_watchers = app_state
         .log_watchers
         .lock()
-        .expect("Failed to lock log watchers mutex");
+        .unwrap_or_else(PoisonError::into_inner);
     if let Some(old_token) = log_watchers.insert("GLOBAL".to_string(), token) {
         // cancel previous global log watcher
         debug!("Existing global log watcher found. Cancelling...");
@@ -666,7 +666,7 @@ pub fn stop_global_log_watcher_task(handle: &AppHandle) -> Result<(), Error> {
     let mut log_watchers = app_state
         .log_watchers
         .lock()
-        .expect("Failed to lock log watchers mutex");
+        .unwrap_or_else(PoisonError::into_inner);
 
     log_watchers.remove("GLOBAL").map_or_else(
         || {

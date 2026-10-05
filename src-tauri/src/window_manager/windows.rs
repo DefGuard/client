@@ -1,4 +1,4 @@
-use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+use std::{ffi::OsString, os::windows::ffi::OsStringExt, sync::PoisonError};
 
 use tauri::Manager;
 use windows::Win32::{
@@ -139,7 +139,10 @@ impl WindowManager {
 
     pub fn open_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWindow> {
         let state = tauri::Manager::state::<crate::appstate::AppState>(app);
-        let tray_pos = *state.tray_click_position.lock().unwrap();
+        let tray_pos = *state
+            .tray_click_position
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let monitors = Self::get_monitors();
         let primary = monitors
             .iter()

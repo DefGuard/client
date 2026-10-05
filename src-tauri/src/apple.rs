@@ -1,6 +1,6 @@
 //! Interchangeability and communication with VPNExtension (written in Swift).
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::PoisonError, time::Duration};
 
 use defguard_client_core::connection::{
     active_connections::find_connection,
@@ -32,7 +32,7 @@ pub async fn connection_state_update_thread(app_handle: &AppHandle) {
         let mut rx_opt = VPN_STATE_UPDATE_COMMS
             .1
             .lock()
-            .expect("Failed to lock state update receiver");
+            .unwrap_or_else(PoisonError::into_inner);
         rx_opt.take().expect("Receiver already taken")
     };
 

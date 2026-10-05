@@ -34,21 +34,6 @@ use crate::{
     },
 };
 
-/// Bounds the single-request MFA calls, so an Edge that accepts the connection and never answers
-/// fails the attempt instead of leaving the user waiting forever.
-const MFA_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// A request that ran out of time is reported as such, anything else as unreachable.
-fn send_error(err: &reqwest::Error) -> MfaError {
-    if err.is_timeout() {
-        MfaError::Timeout
-    } else {
-        MfaError::NetworkError {
-            message: format!("Failed to reach proxy: {err}"),
-        }
-    }
-}
-
 const ATTEMPT_LIMIT_MESSAGE: &str = "Too many failed MFA attempts. Please try connecting again.";
 
 /// Registration guidance for an unavailable mobile-approve step.
@@ -57,6 +42,20 @@ const ATTEMPT_LIMIT_MESSAGE: &str = "Too many failed MFA attempts. Please try co
 const MOBILE_NOT_REGISTERED_MESSAGE: &str =
     "No mobile authenticator is registered for your account. \
      Register one in the Defguard mobile app, then retry.";
+
+/// Bounds each MFA request, so an Edge that accepts the connection and never answers fails the
+/// attempt instead of leaving the user waiting forever.
+const MFA_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+fn request_error(err: reqwest::Error) -> MfaError {
+    if err.is_timeout() {
+        MfaError::Timeout
+    } else {
+        MfaError::NetworkError {
+            message: format!("Failed to reach proxy: {err}"),
+        }
+    }
+}
 
 /// Error type returned by MFA operations.
 ///
@@ -168,7 +167,7 @@ pub async fn mfa_start_with_capability(
         req = req.header(k, v);
     }
 
-    let response = req.send().await.map_err(|e| send_error(&e))?;
+    let response = req.send().await.map_err(request_error)?;
 
     #[allow(deprecated)]
     let response = match check_mfa_response(response).await {
@@ -262,7 +261,7 @@ pub async fn mfa_step_start(
         request_builder = request_builder.header(header_name, header_value);
     }
 
-    let response = request_builder.send().await.map_err(|e| send_error(&e))?;
+    let response = request_builder.send().await.map_err(request_error)?;
 
     let response = check_mfa_response(response).await?;
     response.json().await.map_err(|e| MfaError::Other {
@@ -310,7 +309,7 @@ pub async fn mfa_finish_code(
         req = req.header(k, v);
     }
 
-    let response = req.send().await.map_err(|e| send_error(&e))?;
+    let response = req.send().await.map_err(request_error)?;
 
     let response = check_mfa_response(response).await?;
     response.json().await.map_err(|e| MfaError::Other {
@@ -370,7 +369,10 @@ pub async fn poll_openid_mfa(
             return Err(MfaError::Timeout);
         }
 
-        let mut req = client.post(url.clone()).json(&request);
+        let mut req = client
+            .post(url.clone())
+            .json(&request)
+            .timeout(remaining.min(MFA_REQUEST_TIMEOUT));
         for (k, v) in standard_headers() {
             req = req.header(k, v);
         }
@@ -380,9 +382,7 @@ pub async fn poll_openid_mfa(
                 return Err(MfaError::Cancelled);
             }
             result = req.send() => {
-                let response = result.map_err(|err| MfaError::NetworkError {
-                    message: format!("Failed to reach Edge: {err}"),
-                })?;
+                let response = result.map_err(request_error)?;
 
                 let status = response.status();
                 if status == StatusCode::OK {

@@ -138,7 +138,7 @@ export const useMfaConnect = (
             'Authentication request could not be started. Please try again.',
           );
         } else if (isConnectFailure(message)) {
-          setVerifyError('Failed to establish VPN connection');
+          setVerifyError(message);
         } else if (isInvalidCode(message)) {
           setVerifyError('Invalid code');
         } else if (isSessionExpired(message)) {

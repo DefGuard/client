@@ -131,7 +131,7 @@ fn get_enrollment_session(
     state
         .enrollment_sessions
         .lock()
-        .expect("enrollment_sessions mutex poisoned")
+        .unwrap_or_else(PoisonError::into_inner)
         .get(&uid)
         .cloned()
         .ok_or_else(|| "Enrollment session not found".to_string())
@@ -206,8 +206,9 @@ pub async fn connect(
         );
         handle_connection_for_tunnel(tunnel.clone(), &handle).await?;
         info!("Successfully connected to tunnel {tunnel}");
-        // Update tray icon to reflect connection state.
-        configure_tray_icon(&handle).await?;
+        if let Err(err) = configure_tray_icon(&handle).await {
+            warn!("Failed to update the tray icon after connecting to tunnel {tunnel}: {err}");
+        }
     } else {
         error!("Tunnel {location_id} not found");
         return Err(Error::NotFound.into());
@@ -1345,7 +1346,11 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
 #[tauri::command]
 pub fn command_get_app_config(app_state: State<'_, AppState>) -> Result<AppConfig, Error> {
     debug!("Running command get app config.");
-    let res = app_state.app_config.lock().unwrap().clone();
+    let res = app_state
+        .app_config
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
     trace!("Returning config: {res:?}");
     Ok(res)
 }
@@ -1360,7 +1365,10 @@ pub async fn command_set_app_config(
     debug!("Command set app config received.");
     trace!("Command payload: {config_patch:?}");
     let res = {
-        let mut app_config = app_state.app_config.lock().unwrap();
+        let mut app_config = app_state
+            .app_config
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         app_config.apply(config_patch);
         let config_dir = app_handle
             .path()
@@ -1469,7 +1477,7 @@ pub async fn enrollment_start(
     state
         .enrollment_sessions
         .lock()
-        .expect("enrollment_sessions mutex poisoned")
+        .unwrap_or_else(PoisonError::into_inner)
         .insert(session_uuid, session);
     let login = response
         .user
@@ -1578,7 +1586,7 @@ pub async fn enrollment_finish(
         let mut sessions = state
             .enrollment_sessions
             .lock()
-            .expect("enrollment_sessions mutex poisoned");
+            .unwrap_or_else(PoisonError::into_inner);
         sessions
             .remove(&uid)
             .ok_or_else(|| "Enrollment session not found".to_string())?
@@ -2087,7 +2095,7 @@ impl<'a> CeremonyGuard<'a> {
         let mut ceremonies = state
             .mfa_config_ceremonies
             .lock()
-            .expect("mfa_config_ceremonies mutex poisoned");
+            .unwrap_or_else(PoisonError::into_inner);
         // a second claim would leave the first attempt's cancel unreachable
         if ceremonies.contains_key(&session) {
             return Err(MfaConfigError::SecurityKey {
@@ -2120,7 +2128,7 @@ impl Drop for CeremonyGuard<'_> {
             .state
             .mfa_config_ceremonies
             .lock()
-            .expect("mfa_config_ceremonies mutex poisoned");
+            .unwrap_or_else(PoisonError::into_inner);
         // A cancel may have taken our entry and a newer ceremony the slot, leave that one alone.
         if matches!(ceremonies.get(&self.session), Some(c) if c.id == self.id) {
             ceremonies.remove(&self.session);
@@ -2442,7 +2450,7 @@ fn get_mfa_config_session(state: &AppState, session_id: &str) -> Result<MfaConfi
     let mut sessions = state
         .mfa_config_sessions
         .lock()
-        .expect("mfa_config_sessions mutex poisoned");
+        .unwrap_or_else(PoisonError::into_inner);
     sessions.retain(|_, session| !session.is_expired(now));
     sessions
         .get(&uid)
@@ -2506,7 +2514,7 @@ pub async fn mfa_config_start(
         let mut sessions = state
             .mfa_config_sessions
             .lock()
-            .expect("mfa_config_sessions mutex poisoned");
+            .unwrap_or_else(PoisonError::into_inner);
         sessions.retain(|_, session| !session.is_expired(now));
         sessions.insert(session_uuid, session);
     }
@@ -2563,7 +2571,7 @@ fn extend_mfa_config_session(state: &AppState, uid: Uuid, response: &MfaConfigAu
     if let Some(session) = state
         .mfa_config_sessions
         .lock()
-        .expect("mfa_config_sessions mutex poisoned")
+        .unwrap_or_else(PoisonError::into_inner)
         .get_mut(&uid)
     {
         session.deadline_timestamp = response.deadline_timestamp;
@@ -2871,7 +2879,7 @@ fn abort_mfa_config_attempt(state: &AppState, uid: Uuid) {
     if let Some(ceremony) = state
         .mfa_config_ceremonies
         .lock()
-        .expect("mfa_config_ceremonies mutex poisoned")
+        .unwrap_or_else(PoisonError::into_inner)
         .remove(&uid)
     {
         ceremony.token.cancel();
@@ -2882,7 +2890,7 @@ fn cancel_mfa_config_session(state: &AppState, uid: Uuid) -> Option<MfaConfigSes
     let session = state
         .mfa_config_sessions
         .lock()
-        .expect("mfa_config_sessions mutex poisoned")
+        .unwrap_or_else(PoisonError::into_inner)
         .remove(&uid);
     abort_mfa_config_attempt(state, uid);
     session

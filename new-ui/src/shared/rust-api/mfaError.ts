@@ -18,18 +18,18 @@ export const parseMfaError = (err: unknown): ParsedMfaError | null => {
 };
 
 /** Wording for errors the backend sends as a bare type, without a message of their own. */
-const MESSAGE_BY_TYPE: Record<string, string> = {
+const messageByType: Record<string, string> = {
   timeout: 'The operation timed out. Please try again.',
   cancelled: 'Authentication was cancelled.',
 };
 
-/** Returns the error message, or the original error text when it is not a JSON error. */
+/** A JSON error without a message gets generic wording, never the raw JSON. */
 export const mfaErrorMessage = (err: unknown): string => {
   const parsed = parseMfaError(err);
   if (!parsed) return String(err);
   return (
     parsed.message ??
-    MESSAGE_BY_TYPE[parsed.type] ??
+    messageByType[parsed.type] ??
     'Authentication failed. Please try again.'
   );
 };
@@ -150,7 +150,7 @@ export const classifyOidcPollFailure = (rawError: string): OidcPollFailure => {
     return { kind: 'timeout', message: 'Authentication timed out. Please try again.' };
   }
   if (isConnectFailure(message)) {
-    return { kind: 'connectFailure', message: 'Failed to establish VPN connection' };
+    return { kind: 'connectFailure', message };
   }
   if (isSessionExpired(message)) {
     return { kind: 'sessionExpired', message: 'Session expired. Please try again.' };

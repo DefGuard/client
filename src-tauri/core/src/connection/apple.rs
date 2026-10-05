@@ -7,7 +7,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{self, channel, Receiver, RecvTimeoutError, Sender},
-        Arc, LazyLock, Mutex,
+        Arc, LazyLock, Mutex, PoisonError,
     },
     time::Duration,
 };
@@ -67,7 +67,7 @@ pub fn observer_thread(
         let mut rx_opt = OBSERVER_COMMS
             .1
             .lock()
-            .expect("Failed to lock observer receiver");
+            .unwrap_or_else(PoisonError::into_inner);
         rx_opt.take().expect("Receiver already taken")
     };
 
@@ -323,8 +323,8 @@ pub fn manager_for_key_and_value(
 
     let handler = RcBlock::new(
         move |managers_ptr: *mut NSArray<NETunnelProviderManager>, error_ptr: *mut NSError| {
-            // Always answer: `handler` outlives this call and keeps `tx` alive, so a branch that
-            // sends nothing would leave `rx.recv()` below waiting forever.
+            // Every branch must send. The block keeps the sender alive, so a silent branch would
+            // leave the receiver below waiting forever.
             if !error_ptr.is_null() {
                 error!("Failed to load tunnel provider managers.");
                 let _ = tx.send(None);
@@ -340,7 +340,6 @@ pub fn manager_for_key_and_value(
             for manager in managers {
                 if let Some(id) = id_from_manager(&manager, &key_string) {
                     if id == value {
-                        // This is the manager we were looking for.
                         let _ = tx.send(Some(manager));
                         return;
                     }

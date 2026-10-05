@@ -1,6 +1,4 @@
-/// Connection setup helpers.
-use std::str::FromStr;
-use std::{process::Command, time::Duration};
+use std::{process::Command, str::FromStr, time::Duration};
 
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
 use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;
@@ -37,7 +35,9 @@ async fn create_interface(request: CreateInterfaceRequest) -> Result<(), tonic::
         DAEMON_CLIENT.clone().create_interface(request),
     )
     .await
-    .map_err(|_| tonic::Status::unavailable("the background service did not respond in time"))?
+    .map_err(|_| {
+        tonic::Status::deadline_exceeded("the background service did not respond in time")
+    })?
     .map(|_| ())
 }
 
@@ -78,7 +78,17 @@ pub async fn setup_interface(
         dns: location.dns.clone(),
     };
     if let Err(error) = create_interface(request).await {
-        if error.code() == Code::Unavailable {
+        if error.code() == Code::DeadlineExceeded {
+            error!(
+                "Timed out setting up connection for location {location}, the background service \
+                did not respond: {error}"
+            );
+            remove_late_interface(interface_name, location.endpoint.clone());
+            Err(Error::InternalError(
+                "Background service did not respond in time. Try again, or restart the service."
+                    .into(),
+            ))
+        } else if error.code() == Code::Unavailable {
             error!(
                 "Failed to set up connection for location {location}; background service is \
                 unavailable. Make sure the service is running. Error: {error}"
@@ -227,6 +237,10 @@ pub async fn setup_interface_tunnel(
             "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
             interface_config.name
         );
+        #[cfg(not(target_os = "macos"))]
+        if error.code() == Code::DeadlineExceeded {
+            remove_late_interface(interface_name, tunnel.endpoint.clone());
+        }
         return Err(Error::InternalError(format!(
             "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
             Check logs for more details.",
@@ -258,6 +272,17 @@ pub async fn setup_interface_tunnel(
     );
 
     Ok(interface_name)
+}
+
+/// The service may still finish a request the client gave up on. Removal queues behind it, and
+/// runs detached so a hung service cannot hang the failed attempt too.
+#[cfg(not(target_os = "macos"))]
+fn remove_late_interface(interface_name: String, endpoint: String) {
+    tokio::spawn(async move {
+        if let Err(err) = request_interface_removal(interface_name, endpoint).await {
+            debug!("Nothing to clean up after the timed out interface setup: {err}");
+        }
+    });
 }
 
 /// Asks the background service to remove an interface.
