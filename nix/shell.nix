@@ -50,7 +50,6 @@ in
       [
         rustToolchain
         fmtImports
-        trunk
         sqlx-cli
         cargo-nextest
         vtsls
