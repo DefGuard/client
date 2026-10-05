@@ -26,8 +26,9 @@ import {
   isMfaFactorOfferable,
   isMfaSetupStep,
   mfaFactorStep,
-  verificationMethodsOf,
+  sessionVerificationMethodsOf,
 } from '../utils';
+import { NoVerificationMethodError } from './noVerificationMethodError';
 
 type StoreValues = {
   activeStep: ConfigureMfaStepValue;
@@ -151,11 +152,8 @@ export const useConfigureMfaStore = create<Store>()(
     (set, get) => ({
       ...defaults,
       start: (instance, response, origin) => {
-        // The fallback mails a code to the address on file, registering email along the way.
-        const sessionMethods = response.email_fallback
-          ? [MfaMethod.Email]
-          : response.available_methods;
-        // a factor the instance cannot authorize with is still configured
+        // The fallback registers email as it mails the code. A factor the instance cannot
+        // authorize with is still configured.
         const sessionConfiguredMethods = response.email_fallback
           ? [MfaMethod.Email]
           : response.configured_methods;
@@ -173,7 +171,7 @@ export const useConfigureMfaStore = create<Store>()(
           instance,
           sessionId: response.session_id,
           configuredMethods,
-          verificationMethods: verificationMethodsOf(sessionMethods),
+          verificationMethods: sessionVerificationMethodsOf(response),
           emailFallback: response.email_fallback,
           deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
           ...origin,
@@ -287,6 +285,11 @@ export const startMfaConfiguration = async (
   await pendingEnd;
   const response = await api.mfaConfigStart(instance.id);
   dismissEdgeComsError();
+  if (sessionVerificationMethodsOf(response).length === 0) {
+    pendingEnd = endSession(response.session_id);
+    await pendingEnd;
+    throw new NoVerificationMethodError();
+  }
   useConfigureMfaStore.getState().start(instance, response, { source, location });
   // Only pre-ticks, the user still confirms in the selection step.
   const { configuredMethods } = useConfigureMfaStore.getState();

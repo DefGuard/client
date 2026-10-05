@@ -81,15 +81,41 @@ export const isDesktopDrivableMethod = (method: MfaMethodValue): boolean =>
 const isDesktopDrivable = (entry: MfaStepMethod): boolean =>
   isDesktopDrivableMethod(entry.method);
 
+export type MfaAvailabilityInstance = Pick<
+  InstanceInfo,
+  'smtp_configured' | 'openid_available'
+>;
+
+/** Whether the instance can run this factor at all. An unreported flag counts as available. */
+export const isMfaMethodAvailable = (
+  method: MfaMethodValue,
+  instance?: MfaAvailabilityInstance | null,
+): boolean => {
+  switch (method) {
+    case MfaMethod.Email:
+      return instance?.smtp_configured !== false;
+    case MfaMethod.Oidc:
+      return instance?.openid_available !== false;
+    default:
+      return true;
+  }
+};
+
+type MfaUsabilityInstance = Pick<InstanceInfo, 'mfa_configured_methods'> &
+  MfaAvailabilityInstance;
+
 /** Whether the desktop can carry this method for the user as it stands. */
 export const isMfaMethodUsable = (
   entry: MfaStepMethod,
-  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
-): boolean => isDesktopDrivable(entry) && isMfaMethodConfigured(entry, instance);
+  instance?: MfaUsabilityInstance,
+): boolean =>
+  isDesktopDrivable(entry) &&
+  isMfaMethodConfigured(entry, instance) &&
+  isMfaMethodAvailable(entry.method, instance);
 
 export const usableMfaMethods = (
   step: MfaStep,
-  instance?: Pick<InstanceInfo, 'mfa_configured_methods'>,
+  instance?: MfaUsabilityInstance,
 ): MfaStepMethod[] => step.methods.filter((entry) => isMfaMethodUsable(entry, instance));
 
 export const pickableMfaMethods = (step: MfaStep): MfaStepMethod[] => {
@@ -100,14 +126,22 @@ export const pickableMfaMethods = (step: MfaStep): MfaStepMethod[] => {
 /** gates the MFA settings view, which has nothing to pick otherwise */
 export const hasMfaMethodChoice = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-): boolean => mfaStepsOf(location).some((step) => pickableMfaMethods(step).length > 1);
+  instance?: MfaAvailabilityInstance | null,
+): boolean =>
+  mfaStepsOf(location).some(
+    (step) =>
+      pickableMfaMethods(step).filter((entry) =>
+        isMfaMethodAvailable(entry.method, instance),
+      ).length > 1,
+  );
 
 export const resolveMfaStepPlan = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps' | 'mfa_step_plan'>,
   oneOffPlan: MfaMethodValue[] = [],
+  instance?: MfaUsabilityInstance,
 ): MfaMethodValue[] =>
   mfaStepsOf(location).map((step, index) => {
-    const usableMethods = usableMfaMethods(step);
+    const usableMethods = usableMfaMethods(step, instance);
     const isUsable = (method: MfaMethodValue) =>
       usableMethods.some((entry) => entry.method === method);
 
@@ -138,7 +172,7 @@ export const isMfaMethodConfigured = (
 
 /**
  * Factors this client can set up on its own, so a step missing only these is one the user can
- * unblock without leaving the app. Email assumes the instance has SMTP; it is never reported.
+ * unblock without leaving the app.
  */
 export const CLIENT_CONFIGURABLE_METHODS = [
   MfaMethod.Totp,
@@ -153,15 +187,17 @@ export const isClientConfigurableMethod = (
 ): method is ClientConfigurableMethod =>
   CLIENT_CONFIGURABLE_METHODS.some((candidate) => candidate === method);
 
-type MfaCapabilitiesInstance = Pick<InstanceInfo, 'mfa_capabilities'>;
+type MfaCapabilitiesInstance = Pick<InstanceInfo, 'mfa_capabilities'> &
+  MfaAvailabilityInstance;
 
 /** in client order, which the picker and wizard rely on */
 export const setupMethodsOf = (
   instance?: MfaCapabilitiesInstance | null,
 ): ClientConfigurableMethod[] => {
   const coreSetupMethods = instance?.mfa_capabilities?.setup_methods ?? [];
-  return CLIENT_CONFIGURABLE_METHODS.filter((method) =>
-    coreSetupMethods.includes(method),
+  return CLIENT_CONFIGURABLE_METHODS.filter(
+    (method) =>
+      coreSetupMethods.includes(method) && isMfaMethodAvailable(method, instance),
   );
 };
 
@@ -171,13 +207,41 @@ export const canSetUpMfaMethod = (
 ): method is ClientConfigurableMethod =>
   setupMethodsOf(instance).some((candidate) => candidate === method);
 
+/** What this client can authorize an MFA configuration session with. Mirrors
+ *  AUTHORIZING_METHODS in core mfa_config.rs. */
+const clientAuthorizingMethods: MfaMethodValue[] = [
+  MfaMethod.Totp,
+  MfaMethod.Email,
+  MfaMethod.Fido2,
+  MfaMethod.Oidc,
+];
+
+export type MfaConfigInstance = Pick<InstanceInfo, 'mfa_configured_methods'> &
+  MfaCapabilitiesInstance;
+
+/**
+ * Whether a configuration session could be authorized, by a factor the account holds and the
+ * instance accepts, or by the email fallback Core offers an account with none of those.
+ */
+export const canAuthorizeMfaConfig = (instance?: MfaConfigInstance | null): boolean => {
+  const authorizeMethods = instance?.mfa_capabilities?.authorize_methods ?? [];
+  const configuredMethods = instance?.mfa_configured_methods ?? [];
+  const holdsAuthorizer = clientAuthorizingMethods.some(
+    (method) =>
+      authorizeMethods.includes(method) &&
+      configuredMethods.includes(method) &&
+      isMfaMethodAvailable(method, instance),
+  );
+  return holdsAuthorizer || isMfaMethodAvailable(MfaMethod.Email, instance);
+};
+
 /** How far the user can get connecting this location with the factors they hold. */
 export const ConnectionAbility = {
   /** A whole path through the steps runs on factors already on the account. */
   Available: 'available',
   /** Blocked, but every blocking step offers a factor this client can set up there. */
   Configurable: 'configurable',
-  /** Blocked on a factor that cannot be set up from this client on this instance. */
+  /** Blocked on a factor that cannot be set up here, or with no way to authorize the setup. */
   Unavailable: 'unavailable',
 } as const;
 
@@ -191,7 +255,7 @@ export type ConnectionAbilityValue =
  */
 export const connectionAbilityOf = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps'>,
-  instance?: Pick<InstanceInfo, 'mfa_configured_methods' | 'mfa_capabilities'>,
+  instance?: MfaConfigInstance,
 ): ConnectionAbilityValue => {
   const blockedSteps = mfaStepsOf(location).filter(
     (step) => usableMfaMethods(step, instance).length === 0,
@@ -201,7 +265,7 @@ export const connectionAbilityOf = (
   const isFixable = (step: MfaStep): boolean =>
     step.methods.some((entry) => canSetUpMfaMethod(entry.method, instance));
 
-  return blockedSteps.every(isFixable)
+  return blockedSteps.every(isFixable) && canAuthorizeMfaConfig(instance)
     ? ConnectionAbility.Configurable
     : ConnectionAbility.Unavailable;
 };

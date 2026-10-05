@@ -1,7 +1,7 @@
 import { queryOptions, skipToken } from '@tanstack/react-query';
 
 import { isPresent } from '../utils/isPresent';
-import { setupMethodsOf } from '../utils/mfa';
+import { canAuthorizeMfaConfig, setupMethodsOf } from '../utils/mfa';
 import { api } from './api';
 import type {
   ConnectionArgs,
@@ -17,8 +17,9 @@ import type {
 export const tunnelsDisabled = (instances: InstanceInfo[]): boolean =>
   instances.some((i) => i.disable_tunnels);
 
+/** Something to set up, and some way to verify the session that sets it up. */
 export const supportsMfaConfiguration = (instance: InstanceInfo): boolean =>
-  setupMethodsOf(instance).length > 0;
+  setupMethodsOf(instance).length > 0 && canAuthorizeMfaConfig(instance);
 
 /** Shared by the Add page, its route guard and the instance picker, so all three count alike. */
 export const mfaConfigurableInstances = (instances: InstanceInfo[]): InstanceInfo[] =>

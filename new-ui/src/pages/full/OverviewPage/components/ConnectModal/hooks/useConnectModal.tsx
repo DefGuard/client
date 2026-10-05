@@ -4,8 +4,6 @@ import {
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../../../shared/rust-api/types';
-import { isPresent } from '../../../../../../shared/utils/isPresent';
-import { resolveMfaStepPlan } from '../../../../../../shared/utils/mfa';
 import { type ConnectModalViewValue, mfaMethodToConnectModalView } from './types';
 
 interface StoreValues {
@@ -50,9 +48,7 @@ export const useConnectModal = create<Store>((set, get) => ({
     set(defaults);
   },
   open: (init) => {
-    const location = init?.location ?? null;
-    const stepPlan = isPresent(location) ? resolveMfaStepPlan(location) : [];
-    set({ ...defaults, ...init, stepPlan, visible: true });
+    set({ ...defaults, ...init, visible: true });
   },
   setMfaToken: (token) => {
     set({ mfaToken: token });

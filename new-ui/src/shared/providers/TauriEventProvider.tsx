@@ -10,6 +10,7 @@ import { useConnectModal } from '../../pages/full/OverviewPage/components/Connec
 import { WindowId } from '../consts';
 import { useAppData } from '../providers/AppDataContext';
 import { api } from '../rust-api/api';
+import { getInstancesQueryOptions } from '../rust-api/query';
 import {
   type AddInstanceEventPayload,
   type ConfigureFactorsPayload,
@@ -70,14 +71,17 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             };
             void (async () => {
               const appConfig = await api.getAppConfig();
-              const mfaMethod = resolveMfaStepPlan(location)[0];
+              const instances = await queryClient.fetchQuery(getInstancesQueryOptions);
+              const instance = instances.find(({ id }) => id === location.instance_id);
+              const stepPlan = resolveMfaStepPlan(location, [], instance);
 
               await navigate({ to: '/full/overview' });
               useConnectModal.getState().open({
-                view: mfaMethodToConnectModalView(mfaMethod),
+                view: mfaMethodToConnectModalView(stepPlan[0]),
                 location,
+                stepPlan,
                 autoStartOpenId: appConfig.auto_start_openid_mfa,
-                mfaMethod,
+                mfaMethod: stepPlan[0],
               });
             })();
           }

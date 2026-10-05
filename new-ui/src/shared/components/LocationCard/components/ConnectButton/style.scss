@@ -21,7 +21,7 @@
   box-sizing: border-box;
   padding: 0 var(--spacing-lg);
 
-  &:not(.connected):hover {
+  &:not(.connected, .disabled):hover {
     --bg: var(--bg-white-80);
   }
 
@@ -30,19 +30,18 @@
     --color: var(--fg-white-100);
     --border: var(--border-default);
 
-    &:hover {
+    &:not(.disabled):hover {
       --border: var(--border-default);
       --bg: var(--bg-white-10);
     }
   }
 
-  &:disabled {
-    cursor: not-allowed;
-    pointer-events: none;
-
+  &.disabled {
     --bg: var(--bg-white-20);
     --color: var(--fg-white-40);
     --border: transparent;
+
+    cursor: not-allowed;
   }
 
   .icon {

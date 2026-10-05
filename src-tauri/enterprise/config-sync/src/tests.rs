@@ -116,6 +116,8 @@ fn instance_with_token(token: Option<&str>) -> Instance<Id> {
         openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
         mfa_capabilities: None,
+        smtp_configured: None,
+        openid_available: None,
     }
 }
 
@@ -197,6 +199,8 @@ async fn seed_instance(
         openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
         mfa_capabilities: None,
+        smtp_configured: None,
+        openid_available: None,
     }
     .save(pool)
     .await
@@ -383,6 +387,8 @@ async fn test_poll_instance_persists_mfa_snapshot_while_active(pool: SqlitePool)
         setup_methods: vec![MfaMethod::Totp as i32],
         authorize_methods: vec![MfaMethod::Email as i32],
     });
+    info.smtp_configured = Some(false);
+    info.openid_available = Some(true);
     let server = MockPollServer::new(vec![poll_response(response)]);
     instance.proxy_url = server.url();
     instance.save(&pool).await.unwrap();
@@ -415,6 +421,8 @@ async fn test_poll_instance_persists_mfa_snapshot_while_active(pool: SqlitePool)
             authorize_methods: vec![LocationMfaMethod::Email],
         })
     );
+    assert_eq!(stored.smtp_configured, Some(false));
+    assert_eq!(stored.openid_available, Some(true));
     // The rest of the config still waits for the disconnect.
     let location = Location::find_by_instance_id(&pool, instance.id, true)
         .await

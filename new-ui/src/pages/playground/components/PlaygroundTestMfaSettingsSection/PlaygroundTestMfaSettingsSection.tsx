@@ -59,6 +59,8 @@ const instance: MfaSettingsInstance = {
   },
   openid_display_name: null,
   openid_provider_kind: 'custom',
+  smtp_configured: null,
+  openid_available: null,
 };
 
 const Demo = ({

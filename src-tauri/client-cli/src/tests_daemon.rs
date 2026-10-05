@@ -175,6 +175,8 @@ async fn test_active_state_lists_interfaces(pool: DbPool) {
         openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
         mfa_capabilities: None,
+        smtp_configured: None,
+        openid_available: None,
     }
     .save(&pool)
     .await

@@ -1,5 +1,7 @@
-use defguard_client_core::connection::active_connections::{
-    get_connection_id_by_type, ACTIVE_CONNECTIONS,
+use defguard_client_core::{
+    connection::active_connections::{get_connection_id_by_type, ACTIVE_CONNECTIONS},
+    connection_ability::{connection_ability, ConnectionAbility, InstanceMfaState},
+    database::models::{instance::InstanceInfo, Id},
 };
 use tauri::{
     image::Image,
@@ -11,8 +13,11 @@ use tauri::{
 
 use crate::{
     appstate::AppState,
-    commands::{all_instances, all_locations, connect, disconnect},
-    database::{models::location::Location, DB_POOL},
+    commands::{all_instances, all_locations, connect, disconnect, LocationInfo},
+    database::{
+        models::{instance::Instance, location::Location},
+        DB_POOL,
+    },
     error::Error,
     window_manager::{show_tray_or_full_view, trigger_mfa, COMPACT_WINDOW_ID},
     ConnectionType,
@@ -90,7 +95,7 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                     all_locations.len(),
                 );
                 // TODO: Use icons instead of Connect/Disconnect when Defguard utilizes tauri v2.
-                for location in all_locations {
+                for location in tray_locations(instance, all_locations) {
                     let menu_item = MenuItem::with_id(
                         app,
                         location.id.to_string(),
@@ -109,9 +114,13 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
                         "Found {} locations for the {instance} instance to display in the tray menu",
                         all_locations.len(),
                     );
+                    let locations = tray_locations(&instance, all_locations);
+                    if locations.is_empty() {
+                        continue;
+                    }
 
                     // TODO: Use icons instead of Connect/Disconnect when Defguard utilizes tauri v2.
-                    for location in all_locations {
+                    for location in locations {
                         let menu_item = MenuItem::with_id(
                             app,
                             location.id.to_string(),
@@ -140,6 +149,20 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         .item(&quit)
         .build()
         .map_err(crate::tauri_err_to_app_err)
+}
+
+/// Leaves out a location the user cannot connect to, unless it is connected and has to stay
+/// listed for its disconnect.
+fn tray_locations(instance: &InstanceInfo<Id>, locations: Vec<LocationInfo>) -> Vec<LocationInfo> {
+    let mfa_state = InstanceMfaState::from(instance);
+    locations
+        .into_iter()
+        .filter(|location| {
+            location.active
+                || connection_ability(&location.mfa_steps, &mfa_state)
+                    != ConnectionAbility::Unavailable
+        })
+        .collect()
 }
 
 /// Setup system tray.
@@ -285,6 +308,20 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
     }
 }
 
+async fn is_connectable(location: &Location<Id>) -> bool {
+    match Instance::find_by_id(&*DB_POOL, location.instance_id).await {
+        Ok(Some(instance)) => {
+            connection_ability(&location.mfa_steps.0, &InstanceMfaState::from(&instance))
+                != ConnectionAbility::Unavailable
+        }
+        Ok(None) => false,
+        Err(err) => {
+            warn!("Unable to find the instance of location {location}: {err:?}");
+            false
+        }
+    }
+}
+
 async fn handle_location_tray_menu(id: String, app: &AppHandle) {
     match id.parse::<i64>() {
         Ok(location_id) => {
@@ -297,6 +334,11 @@ async fn handle_location_tray_menu(id: String, app: &AppHandle) {
                         info!("Disconnect location with ID {id}");
                         let _ =
                             disconnect(location_id, ConnectionType::Location, app.clone()).await;
+                    } else if !is_connectable(&location).await {
+                        info!(
+                            "Location with ID {id} cannot be connected to with the factors at \
+                            hand, ignoring a stale tray menu entry"
+                        );
                     } else {
                         info!("Connect location with ID {id}");
                         // Check if MFA is enabled. If so, trigger modal on frontend.

@@ -190,6 +190,8 @@ mod tests {
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
             mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
         }
     }
 

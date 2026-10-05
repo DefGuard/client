@@ -87,7 +87,7 @@ export const LocationCardProvider = ({
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
   const [mfaMethod, setMfaMethod] = useState<MfaMethodValue>(
-    resolveMfaStepPlan(location)[0] ?? MfaMethod.Totp,
+    resolveMfaStepPlan(location, [], instance)[0] ?? MfaMethod.Totp,
   );
 
   const mfaSteps = useMemo<MfaStep[]>(
@@ -99,8 +99,8 @@ export const LocationCardProvider = ({
   // one-off choice made through "Other methods", dropped when a new flow starts
   const [stepPlanOnce, setStepPlanOnce] = useState<MfaMethodValue[]>([]);
   const stepPlan = useMemo<MfaMethodValue[]>(
-    () => resolveMfaStepPlan(location, stepPlanOnce),
-    [location, stepPlanOnce],
+    () => resolveMfaStepPlan(location, stepPlanOnce, instance),
+    [location, stepPlanOnce, instance],
   );
   const [stepIndex, setStepIndex] = useState(0);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
@@ -111,7 +111,7 @@ export const LocationCardProvider = ({
     if (location.active) {
       setCurrentView(LocationCardViews.Connected);
     } else {
-      setMfaMethod(resolveMfaStepPlan(location)[0] ?? MfaMethod.Totp);
+      setMfaMethod(resolveMfaStepPlan(location, [], instance)[0] ?? MfaMethod.Totp);
       setCurrentView(LocationCardViews.Default);
       setStepIndex(0);
       setMfaToken(null);
@@ -139,13 +139,13 @@ export const LocationCardProvider = ({
     mfaStarted.current = true;
     const appConfig = await api.getAppConfig();
     setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
-    const defaultPlan = resolveMfaStepPlan(location);
+    const defaultPlan = resolveMfaStepPlan(location, [], instance);
     setStepPlanOnce([]);
     setStepIndex(0);
     setMfaToken(null);
     setMfaMethod(defaultPlan[0]);
     setView(mfaMethodToLocationCardView(defaultPlan[0]));
-  }, [setView, location]);
+  }, [setView, location, instance]);
 
   const mfaAutoStartRequested = useAppStore(
     (s) => s.mfaAutoStartLocationId === location.id,

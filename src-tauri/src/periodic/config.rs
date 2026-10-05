@@ -26,7 +26,9 @@ use sqlx::{Sqlite, Transaction};
 use tauri::{AppHandle, Emitter};
 use tokio::time::sleep;
 
-use crate::{commands::disconnect_all_tunnels, events::TunnelsEnabledPayload};
+use crate::{
+    commands::disconnect_all_tunnels, events::TunnelsEnabledPayload, tray::reload_tray_menu,
+};
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
 
@@ -74,12 +76,14 @@ pub async fn poll_config(handle: AppHandle) {
         );
 
         let mut config_retrieved = 0;
+        let mut tray_stale = false;
         for outcome in outcomes {
             let instance_name = outcome.instance_name;
             let instance_id = outcome.instance_id;
             match outcome.result {
                 Ok(result) => {
                     config_retrieved += 1;
+                    tray_stale |= instance_changed(&result);
                     emit_version_mismatch(&handle, instance_id, version_mismatch(&result));
                     emit_poll_result_events(&handle, instance_id, &instance_name, result);
                     debug!(
@@ -106,6 +110,9 @@ pub async fn poll_config(handle: AppHandle) {
 
         if let Err(err) = handle.emit(EventKey::InstanceUpdate.into(), ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
+        }
+        if tray_stale {
+            reload_tray_menu(&handle).await;
         }
 
         let currently_disabled = Instance::tunnels_disabled(&*DB_POOL).await.unwrap_or(false);
@@ -143,18 +150,32 @@ pub async fn poll_config(handle: AppHandle) {
 /// Retrieves configuration for a given [`Instance`].
 /// Updates the instance if there aren't any active connections, otherwise emits
 /// a ConfigChanged event so the frontend can prompt the user to reconnect.
+/// Returns whether the instance itself was written.
 pub async fn poll_instance_with_events(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
     handle: &AppHandle,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     let has_active_connections = !active_connections(instance).await?.is_empty();
     let result = poll_instance(transaction, instance, has_active_connections).await?;
+    let changed = instance_changed(&result);
 
     emit_version_mismatch(handle, instance.id, version_mismatch(&result));
     emit_poll_result_events(handle, instance.id, &instance.name, result);
 
-    Ok(())
+    Ok(changed)
+}
+
+/// Whether the poll wrote to the instance, which the tray menu is built from.
+fn instance_changed(result: &PollInstanceResult) -> bool {
+    matches!(
+        result,
+        PollInstanceResult::Updated { .. }
+            | PollInstanceResult::ChangedWhileActive {
+                instance_updated: true,
+                ..
+            }
+    )
 }
 
 fn emit_version_mismatch(

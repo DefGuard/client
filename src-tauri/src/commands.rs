@@ -431,10 +431,14 @@ async fn refresh_instance_config(instance_id: Id, handle: &AppHandle) -> Result<
         error!("Instance {instance_id} not found, skipping config update check");
         return Err(Error::NotFound);
     };
-    poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
+    let instance_changed =
+        poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
 
     sync_service_locations_best_effort(&DB_POOL, &instance).await;
+    if instance_changed {
+        reload_tray_menu(handle).await;
+    }
 
     handle
         .emit(EventKey::InstanceUpdate.into(), ())
@@ -575,6 +579,8 @@ pub(crate) async fn build_instance_info(
         openid_provider_kind: instance.openid_provider_kind,
         mfa_configured_methods: instance.mfa_configured_methods.map(|json| json.0),
         mfa_capabilities: instance.mfa_capabilities.map(|json| json.0),
+        smtp_configured: instance.smtp_configured,
+        openid_available: instance.openid_available,
     })
 }
 

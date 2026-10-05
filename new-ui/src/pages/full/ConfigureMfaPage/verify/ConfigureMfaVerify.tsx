@@ -28,7 +28,7 @@ export const ConfigureMfaVerify = ({ onCancel, onSessionExpired }: Props) => {
     return <ConfigureSelectVerificationStep />;
   }
 
-  // for the type only, a session always offers a method or falls back to email
+  // for the type only, a session with nothing to verify with is refused at start
   const method: MfaVerificationMethod =
     verificationMethod ?? candidates[0] ?? MfaMethod.Email;
 

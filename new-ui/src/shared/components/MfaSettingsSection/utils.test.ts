@@ -42,6 +42,8 @@ const instance: MfaSettingsInstance = {
   mfa_capabilities: capabilities,
   openid_display_name: null,
   openid_provider_kind: 'custom',
+  smtp_configured: null,
+  openid_available: null,
 };
 
 describe('mfaSettingsStepsOf', () => {
@@ -129,5 +131,15 @@ describe('mfaSettingsStepsOf', () => {
       configurable: true,
     });
     expect(steps[0].factors[1].action).toBe(MfaFactorAction.None);
+  });
+
+  it('neither picks nor configures a factor the instance cannot run', () => {
+    const steps = mfaSettingsStepsOf({
+      location: locationOf(threeSteps),
+      instance: { ...instance, smtp_configured: false, openid_available: false },
+      configurable: true,
+    });
+    expect(steps[0].factors[1].action).toBe(MfaFactorAction.None);
+    expect(steps[1].factors[0].action).toBe(MfaFactorAction.None);
   });
 });

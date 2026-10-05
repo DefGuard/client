@@ -39,7 +39,7 @@ export const mfaSettingsStepsOf = ({
   stepIndices?: number[];
   configurable?: boolean;
 }): MfaSettingsStep[] => {
-  const defaultPlan = resolveMfaStepPlan(location);
+  const defaultPlan = resolveMfaStepPlan(location, [], instance);
 
   return mfaStepsOf(location)
     .map((step, stepIndex) => ({
