@@ -31,7 +31,7 @@ pub struct Ceremony {
 pub struct AppState {
     pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
     pub mfa_config_sessions: Mutex<HashMap<Uuid, MfaConfigSession>>,
-    pub mfa_route_handles: Mutex<HashMap<String, MfaAuthSession>>,
+    pub mfa_auth_sessions: Mutex<HashMap<String, MfaAuthSession>>,
     /// Keyed by configuration session, so abandoning one dismisses the prompt it left on screen.
     pub mfa_config_ceremonies: Mutex<HashMap<Uuid, Ceremony>>,
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
@@ -49,7 +49,7 @@ impl AppState {
         Self {
             enrollment_sessions: Mutex::new(HashMap::new()),
             mfa_config_sessions: Mutex::new(HashMap::new()),
-            mfa_route_handles: Mutex::new(HashMap::new()),
+            mfa_auth_sessions: Mutex::new(HashMap::new()),
             mfa_config_ceremonies: Mutex::new(HashMap::new()),
             log_watchers: Mutex::new(HashMap::new()),
             mfa_tasks: Mutex::new(HashMap::new()),

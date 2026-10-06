@@ -137,16 +137,16 @@ fn get_enrollment_session(
         .ok_or_else(|| "Enrollment session not found".to_string())
 }
 
-fn get_mfa_route_handle(
+fn get_mfa_auth_session(
     state: &AppState,
     token: &str,
     instance_id: Id,
     location_id: Id,
 ) -> Result<MfaAuthSession, String> {
     let route = state
-        .mfa_route_handles
+        .mfa_auth_sessions
         .lock()
-        .expect("mfa_route_handles mutex poisoned")
+        .expect("mfa_auth_sessions mutex poisoned")
         .get(token)
         .cloned()
         .ok_or_else(|| "MFA session route is unavailable; restart authentication".to_string())?;
@@ -181,19 +181,19 @@ fn mfa_route_step_attempt_id(
     }
 }
 
-fn remember_mfa_route_handle(state: &AppState, token: String, route: MfaAuthSession) {
+fn remember_mfa_auth_session(state: &AppState, token: String, route: MfaAuthSession) {
     state
-        .mfa_route_handles
+        .mfa_auth_sessions
         .lock()
-        .expect("mfa_route_handles mutex poisoned")
+        .expect("mfa_auth_sessions mutex poisoned")
         .insert(token, route);
 }
 
-fn forget_mfa_route_handle(state: &AppState, token: &str) {
+fn forget_mfa_auth_session(state: &AppState, token: &str) {
     state
-        .mfa_route_handles
+        .mfa_auth_sessions
         .lock()
-        .expect("mfa_route_handles mutex poisoned")
+        .expect("mfa_auth_sessions mutex poisoned")
         .remove(token);
 }
 
@@ -1880,7 +1880,7 @@ pub async fn mfa_begin_step(
         .ok_or_else(|| "Instance not found".to_string())?;
     let existing = token
         .as_deref()
-        .map(|token| get_mfa_route_handle(&state, token, instance_id, location_id))
+        .map(|token| get_mfa_auth_session(&state, token, instance_id, location_id))
         .transpose()?;
     let contract = mfa_contract_for_session(instance.mfa_contract, existing.as_ref());
     let proxy_url = match &existing {
@@ -1904,9 +1904,9 @@ pub async fn mfa_begin_step(
         .await
         .map_err(err_to_json)?;
     if let Some(token) = token_to_replace {
-        forget_mfa_route_handle(&state, &token);
+        forget_mfa_auth_session(&state, &token);
     }
-    remember_mfa_route_handle(
+    remember_mfa_auth_session(
         &state,
         response.token.clone(),
         MfaAuthSession {
@@ -1935,7 +1935,7 @@ pub async fn mfa_finish_code(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let route = get_mfa_route_handle(&state, &token, instance_id, location_id)?;
+    let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
     let step_attempt_id = mfa_route_step_attempt_id(&route, step_attempt_id)?;
     let response = mfa::mfa_finish(
         route.contract,
@@ -1960,7 +1960,7 @@ pub async fn mfa_finish_code(
             Ok(Some(advanced.next_step))
         }
         Some(mfa_step_result::Outcome::Completed(completed)) => {
-            forget_mfa_route_handle(&state, &token);
+            forget_mfa_auth_session(&state, &token);
             connect_after_mfa(location_id, Some(completed.preshared_key), &handle).await?;
             Ok(None)
         }
@@ -1970,7 +1970,7 @@ pub async fn mfa_finish_code(
             }))
         }
         None if route.contract == MfaContract::Legacy => {
-            forget_mfa_route_handle(&state, &token);
+            forget_mfa_auth_session(&state, &token);
             connect_after_mfa(location_id, Some(legacy_preshared_key), &handle).await?;
             Ok(None)
         }
@@ -2016,7 +2016,7 @@ where
             .remove(&task_id_for_task);
         if matches!(result, Ok(MfaTaskOutcome::Completed { .. })) {
             if let Some(token) = session_token.as_deref() {
-                forget_mfa_route_handle(&listen_handle.state::<AppState>(), token);
+                forget_mfa_auth_session(&listen_handle.state::<AppState>(), token);
             }
         }
         match result {
@@ -2073,7 +2073,7 @@ pub async fn mfa_poll_openid(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let route = get_mfa_route_handle(&state, &token, instance_id, location_id)?;
+    let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
     let step_attempt_id = mfa_route_step_attempt_id(&route, step_attempt_id)?;
     let proxy_url = route.proxy_url.clone();
     let session_token = token.clone();
@@ -2106,7 +2106,7 @@ pub async fn mfa_connect_mobile_approve(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let route = get_mfa_route_handle(&state, &token, instance_id, location_id)?;
+    let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
     let step_attempt_id = mfa_route_step_attempt_id(&route, None)?;
     let ws_url = mfa::derive_ws_url(
         route.contract,
@@ -2369,7 +2369,7 @@ async fn run_fido2_mfa(
     };
     let session_token = challenge.token.clone();
     let step_attempt_id = challenge.step_attempt_id.clone();
-    remember_mfa_route_handle(
+    remember_mfa_auth_session(
         &handle.state::<AppState>(),
         session_token.clone(),
         MfaAuthSession {
@@ -2426,7 +2426,7 @@ async fn run_fido2_mfa(
     .await?;
     let outcome = classify_fido2_response(response, session_token.clone(), contract)?;
     if matches!(&outcome, MfaTaskOutcome::Completed { .. }) {
-        forget_mfa_route_handle(&handle.state::<AppState>(), &session_token);
+        forget_mfa_auth_session(&handle.state::<AppState>(), &session_token);
     }
     Ok(outcome)
 }
@@ -2470,7 +2470,7 @@ pub async fn mfa_fido2_pin(
         .ok_or_else(|| "Instance not found".to_string())?;
     let route = token
         .as_deref()
-        .map(|token| get_mfa_route_handle(&state, token, instance_id, location_id))
+        .map(|token| get_mfa_auth_session(&state, token, instance_id, location_id))
         .transpose()?;
     let proxy_url = match &route {
         Some(route) => route.proxy_url.clone(),
@@ -3164,7 +3164,7 @@ mod tests {
     fn test_mfa_route_is_bound_to_its_location_and_original_proxy() {
         let state = AppState::new(AppConfig::default(), None);
         let proxy_url = Url::parse("https://original-proxy.example.com").unwrap();
-        remember_mfa_route_handle(
+        remember_mfa_auth_session(
             &state,
             "token-1".into(),
             MfaAuthSession {
@@ -3176,10 +3176,10 @@ mod tests {
             },
         );
 
-        let route = get_mfa_route_handle(&state, "token-1", 1, 2).unwrap();
+        let route = get_mfa_auth_session(&state, "token-1", 1, 2).unwrap();
         assert_eq!(route.proxy_url, proxy_url);
-        assert!(get_mfa_route_handle(&state, "token-1", 3, 2).is_err());
-        assert!(get_mfa_route_handle(&state, "unknown", 1, 2).is_err());
+        assert!(get_mfa_auth_session(&state, "token-1", 3, 2).is_err());
+        assert!(get_mfa_auth_session(&state, "unknown", 1, 2).is_err());
     }
 
     #[test]
