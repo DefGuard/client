@@ -146,7 +146,7 @@ export const SettingsPage = () => {
         </div>
       )}
       {activeTab === 'startup' && (
-        <div className="sections">
+        <div className="sections startup-settings">
           <SettingRow
             title="Start Defguard automatically when your operating system starts"
             inline

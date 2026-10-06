@@ -7,6 +7,19 @@
     display: flex;
     flex-direction: column;
 
+    &.startup-settings {
+      .setting-row {
+        .head {
+          justify-content: flex-start;
+          gap: var(--spacing-md);
+
+          .control {
+            order: -1;
+          }
+        }
+      }
+    }
+
     .setting-row {
       .head {
         display: flex;
