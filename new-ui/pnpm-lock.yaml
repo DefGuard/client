@@ -35,6 +35,9 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.12.0
         version: 2.12.0
+      '@tauri-apps/plugin-autostart':
+        specifier: ^2.7.0
+        version: 2.7.0
       '@tauri-apps/plugin-clipboard-manager':
         specifier: ^2.4.0
         version: 2.4.0
@@ -924,6 +927,9 @@ packages:
 
   '@tauri-apps/api@2.12.0':
     resolution: {integrity: sha512-fUSxFX8VABYe9W9K5ROdEaKVkNUFRcMSRofjruvaxztXA+I0XnQHcYHF8m/a6iExRUxsUf0HsFWhPBuH9IgzJw==}
+
+  '@tauri-apps/plugin-autostart@2.7.0':
+    resolution: {integrity: sha512-4uRq+rqKSAh6MWAxgk6FnUPigc8VMG8eDVYTLk3A7OfKs9sLVwfeM8kbUvzjpabRQvyl4zd9tfzXBTrrtuprsA==}
 
   '@tauri-apps/plugin-clipboard-manager@2.4.0':
     resolution: {integrity: sha512-yAuTffXc/sm+4oYnrwxbUkaJXQMTesPJ9dim0ADcA31rpboyhAN2TGQqs9VCcPIpb60LFOeePkvhpP2I3xhejg==}
@@ -3135,6 +3141,10 @@ snapshots:
   '@tanstack/virtual-file-routes@1.162.0': {}
 
   '@tauri-apps/api@2.12.0': {}
+
+  '@tauri-apps/plugin-autostart@2.7.0':
+    dependencies:
+      '@tauri-apps/api': 2.12.0
 
   '@tauri-apps/plugin-clipboard-manager@2.4.0':
     dependencies:
