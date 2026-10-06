@@ -70,7 +70,19 @@ fn single_device(mut devices: Vec<HidInfo>) -> Result<HidParam, Fido2Error> {
     }
 }
 
+/// On macOS `HidApi::new()` must run on the main thread. Both calls below create one.
+/// See: https://github.com/ruabmbua/hidapi-rs/issues/127
+#[cfg(target_os = "macos")]
 fn open_device() -> Result<FidoKeyHid, Fido2Error> {
+    dispatch2::run_on_main(|_| open_device_helper())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn open_device() -> Result<FidoKeyHid, Fido2Error> {
+    open_device_helper()
+}
+
+fn open_device_helper() -> Result<FidoKeyHid, Fido2Error> {
     let param = single_device(ctap_hid_fido2::get_fidokey_devices())?;
     let mut cfg = LibCfg::init();
     // Suppress the crate's keep-alive chatter on stdout.

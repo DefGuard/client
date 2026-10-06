@@ -29,6 +29,10 @@ url = "2.5"
 # Needs libudev on Linux, pulled in through hidapi.
 ctap-hid-fido2.workspace = true
 
+# Runs `HidApi::new()` on the main thread.
+[target.'cfg(target_os = "macos")'.dependencies]
+dispatch2 = "0.3"
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [
     "Win32_Foundation",
