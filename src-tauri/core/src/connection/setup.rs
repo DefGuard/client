@@ -1,3 +1,9 @@
+#[cfg(not(target_os = "macos"))]
+use std::{
+    collections::HashMap,
+    future::Future,
+    sync::{LazyLock, Mutex, MutexGuard, PoisonError},
+};
 use std::{process::Command, str::FromStr, time::Duration};
 
 use defguard_client_common::{find_free_tcp_port, get_interface_name};
@@ -5,6 +11,9 @@ use defguard_client_proto::defguard::client::v1::CreateInterfaceRequest;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::RemoveInterfaceRequest;
 use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
+use tokio::time::{timeout_at, Instant};
+#[cfg(not(target_os = "macos"))]
+use tokio_util::sync::CancellationToken;
 #[cfg(not(target_os = "macos"))]
 use tonic::Code;
 
@@ -29,16 +38,38 @@ use crate::{
 /// connection attempt, and the spinner in front of it, waiting forever.
 const CREATE_INTERFACE_TIMEOUT: Duration = Duration::from_secs(60);
 
-async fn create_interface(request: CreateInterfaceRequest) -> Result<(), tonic::Status> {
-    tokio::time::timeout(
-        CREATE_INTERFACE_TIMEOUT,
-        DAEMON_CLIENT.clone().create_interface(request),
-    )
-    .await
-    .map_err(|_| {
-        tonic::Status::deadline_exceeded("the background service did not respond in time")
-    })?
-    .map(|_| ())
+/// The daemon removes interfaces by name, so a retry must wait for an earlier attempt's removal
+/// or that removal could take down the retry's interface.
+#[cfg(not(target_os = "macos"))]
+static PENDING_CLEANUPS: LazyLock<Mutex<HashMap<String, CancellationToken>>> =
+    LazyLock::new(Mutex::default);
+
+#[cfg_attr(
+    target_os = "macos",
+    allow(unused_variables, reason = "macOS tunnels don't go through the daemon")
+)]
+async fn create_interface(
+    interface_name: &str,
+    endpoint: &str,
+    request: CreateInterfaceRequest,
+) -> Result<(), tonic::Status> {
+    let deadline = Instant::now() + CREATE_INTERFACE_TIMEOUT;
+    #[cfg(not(target_os = "macos"))]
+    if !cleanup_finished_before(interface_name, deadline).await {
+        return Err(service_timed_out());
+    }
+    match timeout_at(deadline, DAEMON_CLIENT.clone().create_interface(request)).await {
+        Ok(result) => result.map(|_| ()),
+        Err(_) => {
+            #[cfg(not(target_os = "macos"))]
+            remove_late_interface(interface_name.to_string(), endpoint.to_string());
+            Err(service_timed_out())
+        }
+    }
+}
+
+fn service_timed_out() -> tonic::Status {
+    tonic::Status::deadline_exceeded("the background service did not respond in time")
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -77,13 +108,12 @@ pub async fn setup_interface(
         config: Some(interface_config.clone().into()),
         dns: location.dns.clone(),
     };
-    if let Err(error) = create_interface(request).await {
+    if let Err(error) = create_interface(&interface_name, &location.endpoint, request).await {
         if error.code() == Code::DeadlineExceeded {
             error!(
                 "Timed out setting up connection for location {location}, the background service \
                 did not respond: {error}"
             );
-            remove_late_interface(interface_name, location.endpoint.clone());
             Err(Error::InternalError(
                 "Background service did not respond in time. Try again, or restart the service."
                     .into(),
@@ -232,15 +262,11 @@ pub async fn setup_interface_tunnel(
             interface_config.name
         );
     }
-    if let Err(error) = create_interface(request).await {
+    if let Err(error) = create_interface(&interface_name, &tunnel.endpoint, request).await {
         error!(
             "Failed to create a network interface ({}) for tunnel {tunnel}: {error}",
             interface_config.name
         );
-        #[cfg(not(target_os = "macos"))]
-        if error.code() == Code::DeadlineExceeded {
-            remove_late_interface(interface_name, tunnel.endpoint.clone());
-        }
         return Err(Error::InternalError(format!(
             "Failed to create a network interface ({}) for tunnel {tunnel}, error message: {}. \
             Check logs for more details.",
@@ -278,11 +304,49 @@ pub async fn setup_interface_tunnel(
 /// runs detached so a hung service cannot hang the failed attempt too.
 #[cfg(not(target_os = "macos"))]
 fn remove_late_interface(interface_name: String, endpoint: String) {
+    spawn_cleanup(
+        interface_name.clone(),
+        request_interface_removal(interface_name, endpoint),
+    );
+}
+
+#[cfg(not(target_os = "macos"))]
+fn pending_cleanups() -> MutexGuard<'static, HashMap<String, CancellationToken>> {
+    PENDING_CLEANUPS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn spawn_cleanup(
+    interface_name: String,
+    removal: impl Future<Output = Result<(), Error>> + Send + 'static,
+) {
+    let done = CancellationToken::new();
+    pending_cleanups().insert(interface_name.clone(), done.clone());
     tokio::spawn(async move {
-        if let Err(err) = request_interface_removal(interface_name, endpoint).await {
+        if let Err(err) = removal.await {
             debug!("Nothing to clean up after the timed out interface setup: {err}");
         }
+        let mut pending = pending_cleanups();
+        done.cancel();
+        // a newer cleanup for this name may have replaced the entry, which must stay until it ends
+        if pending
+            .get(&interface_name)
+            .is_some_and(CancellationToken::is_cancelled)
+        {
+            pending.remove(&interface_name);
+        }
     });
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn cleanup_finished_before(interface_name: &str, deadline: Instant) -> bool {
+    let pending = pending_cleanups().get(interface_name).cloned();
+    match pending {
+        Some(done) => timeout_at(deadline, done.cancelled()).await.is_ok(),
+        None => true,
+    }
 }
 
 /// Asks the background service to remove an interface.
@@ -450,4 +514,51 @@ pub fn execute_command(command: &str) -> Result<(), Error> {
         }
     }
     Ok(())
+}
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod tests {
+    use std::{
+        future::pending,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    };
+
+    use tokio::time::sleep;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn retry_waits_for_late_cleanup() {
+        let name = "test-retry-waits";
+        let removed = Arc::new(AtomicBool::new(false));
+        let removal_done = Arc::clone(&removed);
+        spawn_cleanup(name.to_string(), async move {
+            sleep(Duration::from_millis(50)).await;
+            removal_done.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        assert!(cleanup_finished_before(name, deadline).await);
+        assert!(removed.load(Ordering::SeqCst));
+        assert!(!pending_cleanups().contains_key(name));
+    }
+
+    #[tokio::test]
+    async fn retry_gives_up_on_stuck_cleanup() {
+        let name = "test-retry-stuck";
+        spawn_cleanup(name.to_string(), pending());
+
+        let deadline = Instant::now() + Duration::from_millis(50);
+        assert!(!cleanup_finished_before(name, deadline).await);
+        assert!(pending_cleanups().contains_key(name));
+    }
+
+    #[tokio::test]
+    async fn retry_without_cleanup_proceeds() {
+        assert!(cleanup_finished_before("test-retry-none", Instant::now()).await);
+    }
 }
