@@ -161,6 +161,8 @@ async fn startup(app_handle: &AppHandle) {
 
 pub fn run_app() {
     info!("Starting Defguard client version {VERSION}");
+    // Still on the main thread here, which is what this needs.
+    defguard_client_fido2::init_on_main_thread();
 
     let app = Builder::default()
         .invoke_handler(tauri::generate_handler![

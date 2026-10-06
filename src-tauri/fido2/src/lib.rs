@@ -99,6 +99,19 @@ pub enum Fido2Error {
     Encoding(String),
 }
 
+/// Must be called from the main thread before any ceremony. A no-op outside macOS.
+///
+/// On macOS hidapi's first call schedules its process-wide `IOHIDManager` on the calling thread's
+/// run loop, and nothing ever moves it. Made from a blocking-pool thread, which exits when idle,
+/// that leaves the manager on a dead run loop and the next enumeration crashes in
+/// `CFRunLoopAddSource`. The main thread's run loop lives as long as the process.
+pub fn init_on_main_thread() {
+    #[cfg(target_os = "macos")]
+    if let Err(err) = hidapi::HidApi::new() {
+        tracing::warn!("Failed to initialise HID access, security keys will not work: {err}");
+    }
+}
+
 #[must_use]
 pub fn pin_policy() -> PinPolicy {
     backend::PIN_POLICY
