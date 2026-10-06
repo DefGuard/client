@@ -29,8 +29,8 @@ url = "2.5"
 # Needs libudev on Linux, pulled in through hidapi.
 ctap-hid-fido2.workspace = true
 
-# Only to initialise the HID manager from the main thread, see `init_on_main_thread`. The C library
-# `links` once per build, so this is the same instance the CTAP crate uses.
+# Only to init the HID manager on the main thread, see init_on_main_thread. hidapi sets links,
+# so Cargo allows one copy and this is the same instance ctap-hid-fido2 uses.
 [target.'cfg(target_os = "macos")'.dependencies]
 hidapi = { version = "2.6.7", default-features = false }
 
