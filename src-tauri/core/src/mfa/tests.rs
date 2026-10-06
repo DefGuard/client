@@ -16,6 +16,18 @@ use wiremock::{
 use super::*;
 use crate::test_helpers::{start_ws_stub, WsStubCommand};
 
+#[test]
+fn test_mfa_route_display() {
+    for (route, expected) in [
+        (MfaRoute::Start, "MFA start"),
+        (MfaRoute::StepStart, "MFA step start"),
+        (MfaRoute::Finish, "MFA finish"),
+        (MfaRoute::Remote, "MFA remote"),
+    ] {
+        assert_eq!(route.to_string(), expected);
+    }
+}
+
 fn mock_url(server: &MockServer) -> Url {
     Url::parse(&server.uri()).expect("MockServer URI should be valid")
 }

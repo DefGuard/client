@@ -218,6 +218,17 @@ enum MfaRoute {
     Remote,
 }
 
+impl std::fmt::Display for MfaRoute {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Start => "MFA start",
+            Self::StepStart => "MFA step start",
+            Self::Finish => "MFA finish",
+            Self::Remote => "MFA remote",
+        })
+    }
+}
+
 fn route_path(contract: MfaContract, route: MfaRoute) -> Option<&'static str> {
     match (contract, route) {
         (MfaContract::Legacy, MfaRoute::Start) => Some("api/v1/client-mfa/start"),
@@ -232,17 +243,11 @@ fn route_path(contract: MfaContract, route: MfaRoute) -> Option<&'static str> {
 }
 
 fn route_url(proxy_url: &Url, contract: MfaContract, route: MfaRoute) -> Result<Url, MfaError> {
-    let name = match route {
-        MfaRoute::Start => "MFA start",
-        MfaRoute::StepStart => "MFA step start",
-        MfaRoute::Finish => "MFA finish",
-        MfaRoute::Remote => "MFA remote",
-    };
     let path = route_path(contract, route).ok_or_else(|| MfaError::Other {
         message: "The legacy MFA contract does not support step start".into(),
     })?;
     proxy_url.join(path).map_err(|e| MfaError::Other {
-        message: format!("Failed to build {name} URL: {e}"),
+        message: format!("Failed to build {route} URL: {e}"),
     })
 }
 
