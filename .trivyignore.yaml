@@ -2,3 +2,6 @@ vulnerabilities:
   - id: GHSA-wrw7-89jp-8q8g
     expired_at: 2026-10-30
     statement: "glib is a transitive dependency of Tauri which we cannot update ourselves. Waiting for tauri to finish migration to gtk4-rs: https://github.com/tauri-apps/tauri/issues/12563"
+  - id: CVE-2026-93749
+    expired_at: 2026-11-06
+    statement: "source-map-js DoS via malformed indexed source maps. Transitive dependency of postcss/sass used only at build time; to be bumped to 1.2.2."

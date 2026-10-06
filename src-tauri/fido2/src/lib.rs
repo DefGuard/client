@@ -99,6 +99,15 @@ pub enum Fido2Error {
     Encoding(String),
 }
 
+/// hidapi binds its process-wide IOHIDManager to the first caller's run loop. From a blocking-pool
+/// thread that loop dies when idle, and the next enumeration crashes in CFRunLoopAddSource.
+pub fn init_on_main_thread() {
+    #[cfg(target_os = "macos")]
+    if let Err(err) = hidapi::HidApi::new() {
+        tracing::warn!("Failed to initialise HID access, security keys will not work: {err}");
+    }
+}
+
 #[must_use]
 pub fn pin_policy() -> PinPolicy {
     backend::PIN_POLICY
