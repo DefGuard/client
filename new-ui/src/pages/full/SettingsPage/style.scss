@@ -1,4 +1,8 @@
 #settings-page-view {
+  .tabs {
+    margin-bottom: var(--spacing-xl);
+  }
+
   .sections {
     display: flex;
     flex-direction: column;
