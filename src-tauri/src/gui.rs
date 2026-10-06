@@ -349,6 +349,7 @@ pub fn run_app() {
 
             // If deriving from env value fails, use config default (env overrides config file).
             let config_log_level = config.log_level;
+            let start_minimized = config.start_minimized;
             let log_level = match &env::var("DEFGUARD_CLIENT_LOG_LEVEL") {
                 Ok(env_value) => LevelFilter::from_str(env_value).unwrap_or(config_log_level),
                 Err(_) => config_log_level,
@@ -453,6 +454,8 @@ pub fn run_app() {
             if launched_by_deep_link {
                 info!("App launched via deep link, opening full view directly.");
                 let _ = WindowManager::open_full_view(app_handle);
+            } else if start_minimized {
+                info!("Starting minimized to the system tray.");
             } else if open_welcome_view {
                 info!("Opening welcome view.");
                 let _ = WindowManager::open_welcome_view(app_handle);
