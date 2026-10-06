@@ -85,6 +85,11 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Threading",
     # Network address change notifications (NotifyAddrChange)
     "Win32_NetworkManagement_IpHelper",
+    # Interface LUIDs (ConvertInterfaceAliasToLuid)
+    "Win32_NetworkManagement_Ndis",
+    # IPv6 block filter for tunnels without an IPv6 address
+    "Win32_NetworkManagement_WindowsFilteringPlatform",
+    "Win32_System_Rpc",
 ] }
 wiremock = "0.6"
 wmi = {version = "0.18", default-features = false}
