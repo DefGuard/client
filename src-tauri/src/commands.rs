@@ -1786,12 +1786,24 @@ fn reusable_mfa_continuation_token(
     token.filter(|_| mfa_contract == MfaContract::MultiStep)
 }
 
+fn ensure_fido2_supported(contract: MfaContract) -> Result<(), mfa::MfaError> {
+    if contract == MfaContract::Legacy {
+        return Err(mfa::MfaError::Other {
+            message: "FIDO2 requires the multi-step MFA contract".into(),
+        });
+    }
+    Ok(())
+}
+
 async fn begin_mfa_step(
     contract: MfaContract,
     proxy_url: Url,
     method: MfaMethod,
     input: MfaBeginStepInput,
 ) -> Result<MfaBeginStepResponse, mfa::MfaError> {
+    if method == MfaMethod::Fido2 {
+        ensure_fido2_supported(contract)?;
+    }
     match input {
         MfaBeginStepInput::Start(request) => {
             let response = mfa::mfa_start(contract, proxy_url, *request).await?;
@@ -1803,7 +1815,12 @@ async fn begin_mfa_step(
             })
         }
         MfaBeginStepInput::Continue(token) => {
-            let response = mfa::mfa_step_start(contract, proxy_url, token.clone(), method).await?;
+            if contract != MfaContract::MultiStep {
+                return Err(mfa::MfaError::Other {
+                    message: "The legacy MFA contract does not support step start".into(),
+                });
+            }
+            let response = mfa::mfa_step_start(proxy_url, token.clone(), method).await?;
             Ok(MfaBeginStepResponse {
                 token,
                 challenge: response.challenge,
@@ -2457,6 +2474,7 @@ pub async fn mfa_fido2_pin(
     let contract = route
         .as_ref()
         .map_or(instance.mfa_contract, |route| route.contract);
+    ensure_fido2_supported(contract).map_err(|error| error.to_string())?;
 
     let start = Fido2Start {
         instance_id,
@@ -3010,6 +3028,12 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_fido2_requires_multi_step_contract() {
+        assert!(ensure_fido2_supported(MfaContract::Legacy).is_err());
+        assert!(ensure_fido2_supported(MfaContract::MultiStep).is_ok());
+    }
+
     fn mock_url(server: &MockServer) -> Url {
         Url::parse(&server.uri()).expect("MockServer URI should be valid")
     }
@@ -3095,13 +3119,6 @@ mod tests {
                 }),
             }),
         })
-    }
-
-    fn fido2_start_response(token: &str, challenge: &str) -> ResponseTemplate {
-        ResponseTemplate::new(200).set_body_json(json!({
-            "token": token,
-            "challenge": challenge,
-        }))
     }
 
     #[test]
@@ -3240,28 +3257,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_mfa_begin_step_legacy_has_no_attempt_or_credential_ids() {
+    async fn test_mfa_begin_step_rejects_legacy_fido2_before_request() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/v1/client-mfa/start"))
-            .respond_with(fido2_start_response("token-1", "fido2-challenge"))
-            .expect(1)
+            .respond_with(ResponseTemplate::new(500))
+            .expect(0)
             .mount(&server)
             .await;
 
-        let result = begin_mfa_step(
+        let err = begin_mfa_step(
             MfaContract::Legacy,
             mock_url(&server),
             MfaMethod::Fido2,
             MfaBeginStepInput::Start(Box::new(start_request_with_method(MfaMethod::Fido2))),
         )
         .await
-        .unwrap();
+        .unwrap_err();
 
-        assert_eq!(result.token, "token-1");
-        assert_eq!(result.challenge.as_deref(), Some("fido2-challenge"));
-        assert!(result.step_attempt_id.is_none());
-        assert!(result.credential_ids.is_empty());
+        assert!(err
+            .to_string()
+            .contains("FIDO2 requires the multi-step MFA contract"));
         server.verify().await;
     }
 
@@ -3348,6 +3364,31 @@ mod tests {
         assert_eq!(result.token, "token-2");
         assert_eq!(result.challenge.as_deref(), Some("step-challenge"));
         assert_eq!(result.step_attempt_id.as_deref(), Some("attempt-2"));
+        server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn test_mfa_begin_step_rejects_legacy_continuation() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/mfa-flow/step-start"))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(0)
+            .mount(&server)
+            .await;
+
+        let err = begin_mfa_step(
+            MfaContract::Legacy,
+            mock_url(&server),
+            MfaMethod::Totp,
+            MfaBeginStepInput::Continue("token-1".into()),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("The legacy MFA contract does not support step start"));
         server.verify().await;
     }
 

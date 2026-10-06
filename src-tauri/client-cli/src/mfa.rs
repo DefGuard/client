@@ -490,7 +490,7 @@ pub(crate) async fn authorize_multistep(
         let step = if contract == MfaContract::MultiStep {
             Some(match first_step.take() {
                 Some(step) => step,
-                None => step_start(contract, &proxy_url, &token, *method).await?,
+                None => step_start(&proxy_url, &token, *method).await?,
             })
         } else {
             None
@@ -587,12 +587,11 @@ pub(crate) async fn authorize_multistep(
 
 /// Open a step on an existing session.
 async fn step_start(
-    contract: MfaContract,
     proxy_url: &Url,
     token: &str,
     method: MfaMethod,
 ) -> Result<mfa::MfaStepStartResponse, CliError> {
-    mfa::mfa_step_start(contract, proxy_url.clone(), token.to_string(), method)
+    mfa::mfa_step_start(proxy_url.clone(), token.to_string(), method)
         .await
         .map_err(into_cli)
 }

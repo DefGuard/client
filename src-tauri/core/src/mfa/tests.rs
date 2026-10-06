@@ -164,6 +164,29 @@ async fn test_mfa_start_success() {
 }
 
 #[tokio::test]
+async fn test_mfa_start_rejects_fido2_for_legacy_contract() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/client-mfa/start"))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(0)
+        .mount(&server)
+        .await;
+
+    let mut request = start_request();
+    request.selected_methods = vec![MfaMethod::Fido2];
+    let err = super::mfa_start(MfaContract::Legacy, mock_url(&server), request)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        err,
+        MfaError::Other { message } if message == "FIDO2 requires the multi-step MFA contract"
+    ));
+    server.verify().await;
+}
+
+#[tokio::test]
 async fn test_mfa_start_selects_multi_step_route_from_contract() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
@@ -223,14 +246,9 @@ async fn test_mfa_step_start_returns_typed_fido2_challenge() {
         .mount(&server)
         .await;
 
-    let response = super::mfa_step_start(
-        MfaContract::MultiStep,
-        mock_url(&server),
-        "flow-token".into(),
-        MfaMethod::Fido2,
-    )
-    .await
-    .unwrap();
+    let response = super::mfa_step_start(mock_url(&server), "flow-token".into(), MfaMethod::Fido2)
+        .await
+        .unwrap();
     assert_eq!(response.step_attempt_id.as_deref(), Some("attempt-2"));
     assert_eq!(response.challenge.as_deref(), Some("fido-challenge"));
     assert_eq!(response.credential_ids, vec!["credential-1"]);

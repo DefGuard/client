@@ -288,6 +288,11 @@ pub async fn mfa_start(
             message: "MFA method plan is empty".into(),
         });
     };
+    if contract == MfaContract::Legacy && request.selected_methods.contains(&MfaMethod::Fido2) {
+        return Err(MfaError::Other {
+            message: "FIDO2 requires the multi-step MFA contract".into(),
+        });
+    }
     let selected_methods = request
         .selected_methods
         .iter()
@@ -418,7 +423,6 @@ fn rejection_message(rejection: &MfaStepRejection, selected_method: Option<i32>)
 }
 
 pub async fn mfa_step_start(
-    contract: MfaContract,
     proxy_url: Url,
     token: String,
     method: MfaMethod,
@@ -427,7 +431,7 @@ pub async fn mfa_step_start(
         token,
         method: method as i32,
     };
-    let url = route_url(&proxy_url, contract, MfaRoute::StepStart)?;
+    let url = route_url(&proxy_url, MfaContract::MultiStep, MfaRoute::StepStart)?;
     let mut builder = http_client().post(url).json(&request);
     for (key, value) in standard_headers() {
         builder = builder.header(key, value);
