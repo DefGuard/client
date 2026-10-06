@@ -46,7 +46,7 @@ async fn mfa_finish_code(
         MfaFinishRequest {
             token: request.token,
             step_attempt_id: None,
-            submission: request.code.map(MfaSubmission::Code),
+            submission: request.code.map(MfaFinishSubmission::Code),
         },
     )
     .await
@@ -503,7 +503,10 @@ async fn test_mfa_finish_code_success() {
     )
     .await
     .unwrap();
-    assert_eq!(psk.preshared_key, "psk-123");
+    assert!(matches!(
+        psk,
+        MfaFinishResponse::Legacy { preshared_key } if preshared_key == "psk-123"
+    ));
 }
 
 #[tokio::test]
@@ -562,14 +565,18 @@ async fn test_mfa_finish_multi_step_sends_typed_code() {
         MfaFinishRequest {
             token: "flow-token".into(),
             step_attempt_id: Some("attempt-1".into()),
-            submission: Some(MfaSubmission::Code("123456".into())),
+            submission: Some(MfaFinishSubmission::Code("123456".into())),
         },
     )
     .await
     .unwrap();
     assert!(matches!(
-        response.result.and_then(|result| result.outcome),
-        Some(mfa_step_result::Outcome::Completed(completed)) if completed.preshared_key == "psk"
+        response,
+        MfaFinishResponse::MultiStep {
+            result: MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+            }
+        } if completed.preshared_key == "psk"
     ));
 }
 
@@ -613,7 +620,7 @@ async fn test_mfa_finish_multi_step_sends_typed_fido2_assertion() {
         MfaFinishRequest {
             token: "flow-token".into(),
             step_attempt_id: Some("attempt-2".into()),
-            submission: Some(MfaSubmission::Fido2(assertion)),
+            submission: Some(MfaFinishSubmission::Fido2(assertion)),
         },
     )
     .await
@@ -669,12 +676,13 @@ async fn test_poll_openid_multi_step_advanced_returns_result() {
     .await
     .unwrap();
 
-    assert!(response.preshared_key.is_empty());
     assert!(matches!(
-        response.result,
-        Some(MfaStepResult {
-            outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
-        }) if advanced.next_step == 1
+        response,
+        MfaFinishResponse::MultiStep {
+            result: MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
+            }
+        } if advanced.next_step == 1
     ));
 }
 
@@ -712,10 +720,12 @@ async fn test_poll_openid_awaiting_external_then_completed() {
     .unwrap();
 
     assert!(matches!(
-        response.result,
-        Some(MfaStepResult {
-            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
-        }) if completed.preshared_key == "oidc-psk"
+        response,
+        MfaFinishResponse::MultiStep {
+            result: MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+            }
+        } if completed.preshared_key == "oidc-psk"
     ));
 }
 
@@ -747,10 +757,12 @@ async fn test_poll_openid_sends_step_attempt_id() {
     .unwrap();
 
     assert!(matches!(
-        response.result,
-        Some(MfaStepResult {
-            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
-        }) if completed.preshared_key == "oidc-psk"
+        response,
+        MfaFinishResponse::MultiStep {
+            result: MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+            }
+        } if completed.preshared_key == "oidc-psk"
     ));
 }
 
@@ -767,10 +779,13 @@ async fn test_poll_openid_success() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let psk = poll_openid_mfa(url, "token".into(), None, cancel)
+    let response = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap();
-    assert_eq!(psk.preshared_key, "oidc-psk");
+    assert!(matches!(
+        response,
+        MfaFinishResponse::Legacy { preshared_key } if preshared_key == "oidc-psk"
+    ));
 }
 
 #[tokio::test]
@@ -793,10 +808,13 @@ async fn test_poll_openid_428_then_success() {
 
     let url = mock_url(&server);
     let cancel = CancellationToken::new();
-    let psk = poll_openid_mfa(url, "token".into(), None, cancel)
+    let response = poll_openid_mfa(url, "token".into(), None, cancel)
         .await
         .unwrap();
-    assert_eq!(psk.preshared_key, "oidc-psk");
+    assert!(matches!(
+        response,
+        MfaFinishResponse::Legacy { preshared_key } if preshared_key == "oidc-psk"
+    ));
 }
 
 #[tokio::test]
@@ -878,12 +896,13 @@ async fn test_mobile_approve_advanced_result() {
     .unwrap();
 
     let response = handle.await.unwrap().unwrap();
-    assert!(response.preshared_key.is_empty());
     assert!(matches!(
-        response.result,
-        Some(MfaStepResult {
-            outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
-        }) if advanced.next_step == 1
+        response,
+        MfaFinishResponse::MultiStep {
+            result: MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Advanced(advanced)),
+            }
+        } if advanced.next_step == 1
     ));
 }
 
@@ -907,12 +926,13 @@ async fn test_mobile_approve_completed_result_uses_nested_key() {
     .unwrap();
 
     let response = handle.await.unwrap().unwrap();
-    assert!(response.preshared_key.is_empty());
     assert!(matches!(
-        response.result,
-        Some(MfaStepResult {
-            outcome: Some(mfa_step_result::Outcome::Completed(completed)),
-        }) if completed.preshared_key == "mobile-psk"
+        response,
+        MfaFinishResponse::MultiStep {
+            result: MfaStepResult {
+                outcome: Some(mfa_step_result::Outcome::Completed(completed)),
+            }
+        } if completed.preshared_key == "mobile-psk"
     ));
 }
 
@@ -961,7 +981,10 @@ async fn test_mobile_approve_success() {
     tx.send(WsStubCommand::Close).unwrap();
 
     let psk = handle.await.unwrap().unwrap();
-    assert_eq!(psk.preshared_key, "mobile-psk");
+    assert!(matches!(
+        psk,
+        MfaFinishResponse::Legacy { preshared_key } if preshared_key == "mobile-psk"
+    ));
 }
 
 #[tokio::test]
@@ -1076,6 +1099,19 @@ async fn test_mobile_approve_multi_step_rejects_legacy_frame() {
         ))
         .await,
         MfaError::Other { .. }
+    ));
+}
+
+#[tokio::test]
+async fn test_mobile_approve_multi_step_rejects_wrong_discriminator() {
+    let frame = mobile_result_frame(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+        next_step: 1,
+    }))
+    .replace("mfa_result", "mfa_success");
+
+    assert!(matches!(
+        multi_step_mobile_approve_error(WsStubCommand::SendMessage(frame)).await,
+        MfaError::Other { message } if message == "Invalid multi-step mobile MFA response"
     ));
 }
 
@@ -1286,9 +1322,11 @@ async fn test_mfa_flow_start_reads_fido2_credential_ids() {
 }
 
 fn finish_response(preshared_key: &str, result: Option<MfaStepResult>) -> MfaFinishResponse {
-    MfaFinishResponse {
-        preshared_key: preshared_key.into(),
-        result,
+    match result {
+        Some(result) => MfaFinishResponse::MultiStep { result },
+        None => MfaFinishResponse::Legacy {
+            preshared_key: preshared_key.into(),
+        },
     }
 }
 

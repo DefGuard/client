@@ -7,8 +7,9 @@ use std::time::Duration;
 
 use defguard_client_proto::defguard::{
     client_types::{
-        mfa_flow_start_response, mfa_flow_step_finish_request, mfa_step_result, mfa_step_started,
-        ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
+        mfa_flow_start_response,
+        mfa_flow_step_finish_request::Submission as MfaFlowFinishSubmission, mfa_step_result,
+        mfa_step_started, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
         ClientMfaStartResponse, MfaAdvanced, MfaCodeCredential, MfaCompleted, MfaFido2Assertion,
         MfaFlowStartRequest, MfaFlowStartResponse, MfaFlowStepFinishRequest,
         MfaFlowStepFinishResponse, MfaFlowStepStartRequest, MfaFlowStepStartResponse, MfaMethod,
@@ -100,7 +101,7 @@ pub struct MfaStartResponse {
     pub first_step: MfaStepStartResponse,
 }
 
-pub enum MfaSubmission {
+pub enum MfaFinishSubmission {
     Code(String),
     Fido2(MfaFido2Assertion),
 }
@@ -108,13 +109,13 @@ pub enum MfaSubmission {
 pub struct MfaFinishRequest {
     pub token: String,
     pub step_attempt_id: Option<String>,
-    pub submission: Option<MfaSubmission>,
+    pub submission: Option<MfaFinishSubmission>,
 }
 
 #[derive(Debug)]
-pub struct MfaFinishResponse {
-    pub preshared_key: String,
-    pub result: Option<MfaStepResult>,
+pub enum MfaFinishResponse {
+    Legacy { preshared_key: String },
+    MultiStep { result: MfaStepResult },
 }
 
 #[derive(Clone)]
@@ -127,17 +128,17 @@ pub struct MfaAuthSession {
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "type")]
-enum LegacyMobileMfaResponse {
-    #[serde(rename = "mfa_success")]
-    Success { preshared_key: String },
+struct LegacyMobileMfaResponse {
+    #[serde(rename = "type")]
+    kind: String,
+    preshared_key: String,
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "type")]
-enum MultiStepMobileMfaResponse {
-    #[serde(rename = "mfa_result")]
-    Result { result: MultiStepMobileMfaResult },
+struct MultiStepMobileMfaResponse {
+    #[serde(rename = "type")]
+    kind: String,
+    result: MultiStepMobileMfaResult,
 }
 
 #[derive(Deserialize)]
@@ -156,8 +157,12 @@ fn decode_multi_step_mobile_mfa_frame(text: &str) -> Result<MfaFinishResponse, M
         serde_json::from_str(text).map_err(|_| MfaError::Other {
             message: "Invalid multi-step mobile MFA response".into(),
         })?;
-    let MultiStepMobileMfaResponse::Result { result } = response;
-    let outcome = match result.outcome {
+    if response.kind != "mfa_result" {
+        return Err(MfaError::Other {
+            message: "Invalid multi-step mobile MFA response".into(),
+        });
+    }
+    let outcome = match response.result.outcome {
         MultiStepMobileMfaOutcome::Advanced(advanced) => {
             mfa_step_result::Outcome::Advanced(advanced)
         }
@@ -171,11 +176,10 @@ fn decode_multi_step_mobile_mfa_frame(text: &str) -> Result<MfaFinishResponse, M
         }
     };
 
-    Ok(MfaFinishResponse {
-        preshared_key: String::new(),
-        result: Some(MfaStepResult {
+    Ok(MfaFinishResponse::MultiStep {
+        result: MfaStepResult {
             outcome: Some(outcome),
-        }),
+        },
     })
 }
 
@@ -472,9 +476,9 @@ fn finish_request_body(
                 });
             }
             let (code, auth_pub_key) = match request.submission {
-                Some(MfaSubmission::Code(code)) => (Some(code), None),
+                Some(MfaFinishSubmission::Code(code)) => (Some(code), None),
                 None => (None, None),
-                Some(MfaSubmission::Fido2(_)) => {
+                Some(MfaFinishSubmission::Fido2(_)) => {
                     return Err(MfaError::Other {
                         message: "FIDO2 requires the multi-step MFA contract".into(),
                     });
@@ -495,12 +499,10 @@ fn finish_request_body(
                     message: "MFA flow request did not include a step attempt ID".into(),
                 })?;
             let submission = request.submission.map(|submission| match submission {
-                MfaSubmission::Code(code) => {
-                    mfa_flow_step_finish_request::Submission::Code(MfaCodeCredential { code })
+                MfaFinishSubmission::Code(code) => {
+                    MfaFlowFinishSubmission::Code(MfaCodeCredential { code })
                 }
-                MfaSubmission::Fido2(assertion) => {
-                    mfa_flow_step_finish_request::Submission::Fido2(assertion)
-                }
+                MfaFinishSubmission::Fido2(assertion) => MfaFlowFinishSubmission::Fido2(assertion),
             });
             serde_json::to_value(MfaFlowStepFinishRequest {
                 token: request.token,
@@ -525,9 +527,8 @@ async fn decode_finish_response(
                 response.json().await.map_err(|e| MfaError::Other {
                     message: format!("Invalid MFA finish response: {e}"),
                 })?;
-            Ok(MfaFinishResponse {
+            Ok(MfaFinishResponse::Legacy {
                 preshared_key: response.preshared_key,
-                result: None,
             })
         }
         MfaContract::MultiStep => {
@@ -538,10 +539,7 @@ async fn decode_finish_response(
             let result = response.result.ok_or_else(|| MfaError::Other {
                 message: "MFA flow finish response did not include a result".into(),
             })?;
-            Ok(MfaFinishResponse {
-                preshared_key: String::new(),
-                result: Some(result),
-            })
+            Ok(MfaFinishResponse::MultiStep { result })
         }
     }
 }
@@ -625,17 +623,20 @@ pub async fn poll_openid_mfa(
                 let status = response.status();
                 if status == StatusCode::OK {
                     let response = decode_finish_response(contract, response).await?;
-                    match response.result.as_ref().and_then(|result| result.outcome.as_ref()) {
-                        None if contract == MfaContract::Legacy => return Ok(response),
-                        Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {}
-                        Some(mfa_step_result::Outcome::Advanced(_) | mfa_step_result::Outcome::Completed(_)) => {
-                            return Ok(response);
-                        }
-                        None => {
-                            return Err(MfaError::Other {
-                                message: "The server returned an unexpected verification state".into(),
-                            });
-                        }
+                    match &response {
+                        MfaFinishResponse::Legacy { .. } => return Ok(response),
+                        MfaFinishResponse::MultiStep { result } => match result.outcome.as_ref() {
+                            Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {}
+                            Some(
+                                mfa_step_result::Outcome::Advanced(_)
+                                | mfa_step_result::Outcome::Completed(_),
+                            ) => return Ok(response),
+                            None => {
+                                return Err(MfaError::Other {
+                                    message: "The server returned an unexpected verification state".into(),
+                                });
+                            }
+                        },
                     }
                 } else if status != StatusCode::PRECONDITION_REQUIRED {
                     return Err(check_mfa_response(response).await.err().unwrap_or(
@@ -655,14 +656,12 @@ pub async fn poll_openid_mfa(
 /// Return the preshared key only when the MFA session completed.
 #[must_use]
 pub fn completed_preshared_key(response: &MfaFinishResponse) -> Option<String> {
-    let key = match response
-        .result
-        .as_ref()
-        .and_then(|result| result.outcome.as_ref())
-    {
-        Some(mfa_step_result::Outcome::Completed(completed)) => &completed.preshared_key,
-        Some(_) => return None,
-        None => &response.preshared_key,
+    let key = match response {
+        MfaFinishResponse::Legacy { preshared_key } => preshared_key,
+        MfaFinishResponse::MultiStep { result } => match result.outcome.as_ref() {
+            Some(mfa_step_result::Outcome::Completed(completed)) => &completed.preshared_key,
+            _ => return None,
+        },
     };
     (!key.is_empty()).then(|| key.clone())
 }
@@ -797,19 +796,19 @@ async fn wait_for_mfa_outcome(
             Message::Text(text) => match contract {
                 MfaContract::Legacy => {
                     match serde_json::from_str::<LegacyMobileMfaResponse>(&text) {
-                        Ok(LegacyMobileMfaResponse::Success { preshared_key }) => {
-                            if preshared_key.is_empty() {
+                        Ok(response) if response.kind == "mfa_success" => {
+                            if response.preshared_key.is_empty() {
                                 return Err(MfaError::MfaRejected {
                                     message: "mobile approval failed: Edge returned an empty preshared key"
                                         .into(),
                                 });
                             }
 
-                            return Ok(MfaFinishResponse {
-                                preshared_key,
-                                result: None,
+                            return Ok(MfaFinishResponse::Legacy {
+                                preshared_key: response.preshared_key,
                             });
                         }
+                        Ok(_) => debug!("Ignoring unrecognized mobile MFA frame"),
                         // Preserve legacy handling of frames that are not mfa_success.
                         Err(err) => debug!("Ignoring unrecognized mobile MFA frame: {err}"),
                     }

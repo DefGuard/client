@@ -440,7 +440,9 @@ pub(crate) async fn authorize(
         mfa::MfaFinishRequest {
             token: info.token,
             step_attempt_id: info.first_step.step_attempt_id,
-            submission: Some(mfa::MfaSubmission::Code(code.expose_secret().to_string())),
+            submission: Some(mfa::MfaFinishSubmission::Code(
+                code.expose_secret().to_string(),
+            )),
         },
     )
     .await
@@ -522,7 +524,7 @@ pub(crate) async fn authorize_multistep(
                         step_attempt_id: step
                             .as_ref()
                             .and_then(|step| step.step_attempt_id.clone()),
-                        submission: Some(mfa::MfaSubmission::Code(
+                        submission: Some(mfa::MfaFinishSubmission::Code(
                             code.expose_secret().to_string(),
                         )),
                     },
@@ -602,15 +604,22 @@ fn finish_psk(
     finish: mfa::MfaFinishResponse,
     contract: MfaContract,
 ) -> Result<Option<SecretString>, CliError> {
-    let outcome = finish
-        .result
-        .as_ref()
-        .and_then(|result| result.outcome.as_ref());
-    if contract == MfaContract::MultiStep && outcome.is_none() {
-        return Err(CliError::Other(
-            "MFA flow response did not include an outcome".into(),
-        ));
-    }
+    let outcome = match (&finish, contract) {
+        (mfa::MfaFinishResponse::Legacy { .. }, MfaContract::Legacy) => None,
+        (mfa::MfaFinishResponse::MultiStep { result }, MfaContract::MultiStep) => {
+            let Some(outcome) = result.outcome.as_ref() else {
+                return Err(CliError::Other(
+                    "MFA flow response did not include an outcome".into(),
+                ));
+            };
+            Some(outcome)
+        }
+        _ => {
+            return Err(CliError::Other(
+                "MFA finish response did not match the selected contract".into(),
+            ));
+        }
+    };
     if matches!(outcome, Some(mfa_step_result::Outcome::AwaitingExternal(_))) {
         return Err(CliError::Other(
             "The server returned an unexpected verification state".into(),
@@ -900,9 +909,8 @@ mod tests {
 
     #[test]
     fn test_finish_psk_uses_contract_for_completion() {
-        let legacy = mfa::MfaFinishResponse {
+        let legacy = mfa::MfaFinishResponse::Legacy {
             preshared_key: "legacy-key".into(),
-            result: None,
         };
         assert_eq!(
             finish_psk(legacy, MfaContract::Legacy)
@@ -912,12 +920,11 @@ mod tests {
             "legacy-key"
         );
 
-        let missing_flow_result = mfa::MfaFinishResponse {
-            preshared_key: "legacy-key".into(),
-            result: None,
+        let missing_flow_outcome = mfa::MfaFinishResponse::MultiStep {
+            result: Default::default(),
         };
         assert!(matches!(
-            finish_psk(missing_flow_result, MfaContract::MultiStep),
+            finish_psk(missing_flow_outcome, MfaContract::MultiStep),
             Err(CliError::Other(message))
                 if message == "MFA flow response did not include an outcome"
         ));

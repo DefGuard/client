@@ -25,7 +25,7 @@ use defguard_client_proto::defguard::{
         mfa_step_result, AdminInfo, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
         DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
         InstanceInfo as ProtoInstanceInfo, MfaConfigAuthorizeResponse, MfaFido2Assertion,
-        MfaMethod, MfaStepResult,
+        MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -1679,39 +1679,32 @@ fn classify_mfa_response(
     response: mfa::MfaFinishResponse,
     contract: MfaContract,
 ) -> Result<MfaTaskOutcome, mfa::MfaError> {
-    if contract == MfaContract::MultiStep
-        && response
-            .result
-            .as_ref()
-            .and_then(|result| result.outcome.as_ref())
-            .is_none()
-    {
-        return Err(mfa::MfaError::Other {
-            message: "MFA flow response did not include an outcome".into(),
-        });
-    }
-    let legacy_preshared_key = response.preshared_key;
+    let outcome = match (contract, response) {
+        (MfaContract::Legacy, mfa::MfaFinishResponse::Legacy { preshared_key }) => {
+            return Ok(MfaTaskOutcome::Completed { preshared_key });
+        }
+        (MfaContract::MultiStep, mfa::MfaFinishResponse::MultiStep { result }) => result.outcome,
+        (MfaContract::MultiStep, mfa::MfaFinishResponse::Legacy { .. })
+        | (MfaContract::Legacy, mfa::MfaFinishResponse::MultiStep { .. }) => {
+            return Err(mfa::MfaError::Other {
+                message: "MFA finish response did not match the selected contract".into(),
+            });
+        }
+    };
 
-    match response.result {
-        Some(MfaStepResult {
-            outcome: Some(outcome),
-        }) => match outcome {
-            mfa_step_result::Outcome::Advanced(advanced) => Ok(MfaTaskOutcome::Advanced {
-                next_step: advanced.next_step,
-                token: None,
-            }),
-            mfa_step_result::Outcome::Completed(completed) => Ok(MfaTaskOutcome::Completed {
-                preshared_key: completed.preshared_key,
-            }),
-            mfa_step_result::Outcome::AwaitingExternal(_) => Err(mfa::MfaError::Other {
-                message: "The server returned an unexpected verification state".to_string(),
-            }),
-        },
-        Some(MfaStepResult { outcome: None }) => Err(mfa::MfaError::Other {
+    match outcome {
+        Some(mfa_step_result::Outcome::Advanced(advanced)) => Ok(MfaTaskOutcome::Advanced {
+            next_step: advanced.next_step,
+            token: None,
+        }),
+        Some(mfa_step_result::Outcome::Completed(completed)) => Ok(MfaTaskOutcome::Completed {
+            preshared_key: completed.preshared_key,
+        }),
+        Some(mfa_step_result::Outcome::AwaitingExternal(_)) => Err(mfa::MfaError::Other {
             message: "The server returned an unexpected verification state".to_string(),
         }),
-        None => Ok(MfaTaskOutcome::Completed {
-            preshared_key: legacy_preshared_key,
+        None => Err(mfa::MfaError::Other {
+            message: "MFA flow response did not include an outcome".into(),
         }),
     }
 }
@@ -1780,9 +1773,9 @@ enum MfaBeginStepInput {
 
 fn mfa_contract_for_session(
     instance_contract: MfaContract,
-    existing_route: Option<&MfaAuthSession>,
+    existing_session: Option<&MfaAuthSession>,
 ) -> MfaContract {
-    existing_route.map_or(instance_contract, |route| route.contract)
+    existing_session.map_or(instance_contract, |session| session.contract)
 }
 
 /// Legacy sessions are bound to one method, so switching methods starts a new session.
@@ -1943,40 +1936,22 @@ pub async fn mfa_finish_code(
         mfa::MfaFinishRequest {
             token: token.clone(),
             step_attempt_id,
-            submission: Some(mfa::MfaSubmission::Code(code)),
+            submission: Some(mfa::MfaFinishSubmission::Code(code)),
         },
     )
     .await
     .map_err(err_to_json)?;
 
-    let legacy_preshared_key = response.preshared_key;
-
-    match response.result.and_then(|result| result.outcome) {
-        Some(mfa_step_result::Outcome::Advanced(advanced)) => {
-            debug!(
-                "MFA step passed, advancing to step index {}",
-                advanced.next_step
-            );
-            Ok(Some(advanced.next_step))
+    match classify_mfa_response(response, route.contract).map_err(err_to_json)? {
+        MfaTaskOutcome::Advanced { next_step, .. } => {
+            debug!("MFA step passed, advancing to step index {next_step}");
+            Ok(Some(next_step))
         }
-        Some(mfa_step_result::Outcome::Completed(completed)) => {
+        MfaTaskOutcome::Completed { preshared_key } => {
             forget_mfa_auth_session(&state, &token);
-            connect_after_mfa(location_id, Some(completed.preshared_key), &handle).await?;
+            connect_after_mfa(location_id, Some(preshared_key), &handle).await?;
             Ok(None)
         }
-        Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {
-            Err(err_to_json(mfa::MfaError::Other {
-                message: "The server returned an unexpected verification state".to_string(),
-            }))
-        }
-        None if route.contract == MfaContract::Legacy => {
-            forget_mfa_auth_session(&state, &token);
-            connect_after_mfa(location_id, Some(legacy_preshared_key), &handle).await?;
-            Ok(None)
-        }
-        None => Err(err_to_json(mfa::MfaError::Other {
-            message: "MFA flow finish response did not include an outcome".into(),
-        })),
     }
 }
 
@@ -2415,7 +2390,7 @@ async fn run_fido2_mfa(
         mfa::MfaFinishRequest {
             token: session_token.clone(),
             step_attempt_id,
-            submission: Some(mfa::MfaSubmission::Fido2(MfaFido2Assertion {
+            submission: Some(mfa::MfaFinishSubmission::Fido2(MfaFido2Assertion {
                 rp_id_hash: rp_id_hash.to_vec(),
                 authenticator_data: assertion.authenticator_data,
                 signature: assertion.signature,
@@ -3025,7 +3000,7 @@ mod tests {
     use defguard_client_proto::defguard::client_types::{
         mfa_flow_start_response, mfa_step_started, MfaAdvanced, MfaAwaitingExternal, MfaCompleted,
         MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartResponse, MfaFlowStepStartResponse,
-        MfaStepStarted,
+        MfaStepResult, MfaStepStarted,
     };
     use serde_json::json;
     use wiremock::{
@@ -3377,11 +3352,8 @@ mod tests {
     }
 
     fn finish_response(outcome: Option<mfa_step_result::Outcome>) -> mfa::MfaFinishResponse {
-        mfa::MfaFinishResponse {
-            preshared_key: "legacy-key".into(),
-            result: outcome.map(|outcome| MfaStepResult {
-                outcome: Some(outcome),
-            }),
+        mfa::MfaFinishResponse::MultiStep {
+            result: MfaStepResult { outcome },
         }
     }
 
@@ -3439,11 +3411,37 @@ mod tests {
 
     #[test]
     fn test_classify_mfa_response_legacy_completion() {
-        let response = finish_response(None);
+        let response = mfa::MfaFinishResponse::Legacy {
+            preshared_key: "legacy-key".into(),
+        };
 
         assert!(matches!(
             classify_mfa_response(response, MfaContract::Legacy),
             Ok(MfaTaskOutcome::Completed { preshared_key }) if preshared_key == "legacy-key"
+        ));
+    }
+
+    #[test]
+    fn test_classify_mfa_response_rejects_contract_mismatch() {
+        assert!(matches!(
+            classify_mfa_response(
+                mfa::MfaFinishResponse::Legacy {
+                    preshared_key: "legacy-key".into(),
+                },
+                MfaContract::MultiStep,
+            ),
+            Err(mfa::MfaError::Other { message })
+                if message == "MFA finish response did not match the selected contract"
+        ));
+        assert!(matches!(
+            classify_mfa_response(
+                finish_response(Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+                    next_step: 1,
+                }))),
+                MfaContract::Legacy,
+            ),
+            Err(mfa::MfaError::Other { message })
+                if message == "MFA finish response did not match the selected contract"
         ));
     }
 
