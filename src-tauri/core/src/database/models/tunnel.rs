@@ -1,15 +1,15 @@
 use std::{fmt, time::SystemTime};
 
 use chrono::{NaiveDateTime, Utc};
-use defguard_wireguard_rs::peer::Peer;
+use defguard_wireguard_rs::{net::IpAddrMask, peer::Peer};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use sqlx::{query, query_as, query_scalar, SqliteExecutor};
 
 use super::{connection::ActiveConnection, Id, NoId, PURGE_DURATION};
 use crate::{
-    contains_default_route, CommonConnection, CommonConnectionInfo, CommonLocationStats,
-    ConnectionType, DateTimeAggregation,
+    CommonConnection, CommonConnectionInfo, CommonLocationStats, ConnectionType,
+    DateTimeAggregation,
 };
 
 #[serde_as]
@@ -64,12 +64,12 @@ impl Tunnel<Id> {
     }
 
     #[must_use]
-    pub fn holds_default_route(&self, route_all_traffic: Option<bool>) -> bool {
-        self.effective_route_all_traffic(route_all_traffic)
-            || self
-                .allowed_ips
-                .as_deref()
-                .is_some_and(contains_default_route)
+    pub fn routed_networks(&self, route_all_traffic: Option<bool>) -> Vec<IpAddrMask> {
+        crate::routed_networks(
+            &self.address,
+            self.allowed_ips.as_deref().unwrap_or_default(),
+            self.effective_route_all_traffic(route_all_traffic),
+        )
     }
 
     pub async fn save<'e, E>(&mut self, executor: E) -> sqlx::Result<()>

@@ -8,7 +8,7 @@ use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
     connection::{
         active_connections::{find_connection, get_connection_id_by_type, ACTIVE_CONNECTIONS},
-        disconnect_interface, ConnectionTarget,
+        disconnect_interface, ConflictingConnection, ConnectionTarget,
     },
     enrollment::{self},
     mfa,
@@ -79,25 +79,33 @@ use crate::{
 use crate::{periodic::config::sync_service_locations, utils::execute_command};
 
 #[derive(Debug, Serialize, thiserror::Error)]
-#[serde(tag = "kind", content = "message", rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ConnectError {
-    #[error("Posture check failed: {0}")]
-    PostureCheckFailed(String),
-    #[error("Service unavailable: {0}")]
-    ServiceUnavailable(String),
-    #[error("{0}")]
-    AllTrafficConflict(String),
-    #[error("{0}")]
-    Other(String),
+    #[error("Posture check failed: {message}")]
+    PostureCheckFailed { message: String },
+    #[error("Service unavailable: {message}")]
+    ServiceUnavailable { message: String },
+    #[error("{message}")]
+    RouteConflict {
+        message: String,
+        conflicts: Vec<ConflictingConnection>,
+    },
+    #[error("{message}")]
+    Other { message: String },
 }
 
 impl From<Error> for ConnectError {
     fn from(error: Error) -> Self {
         match error {
-            Error::PostureCheckFailed(message) => Self::PostureCheckFailed(message),
-            Error::ServiceUnavailable(message) => Self::ServiceUnavailable(message),
-            Error::AllTrafficConflict(message) => Self::AllTrafficConflict(message),
-            error => Self::Other(error.to_string()),
+            Error::PostureCheckFailed(message) => Self::PostureCheckFailed { message },
+            Error::ServiceUnavailable(message) => Self::ServiceUnavailable { message },
+            Error::RouteConflict { ref conflicts, .. } => Self::RouteConflict {
+                conflicts: conflicts.clone(),
+                message: error.to_string(),
+            },
+            error => Self::Other {
+                message: error.to_string(),
+            },
         }
     }
 }
@@ -1782,7 +1790,7 @@ async fn mfa_start_request(
         .ok_or_else(|| "Location not found".to_string())?;
     // FIXME: ugly struct
     ConnectionTarget::Location(location.clone())
-        .ensure_single_all_traffic_connection(&DB_POOL, None)
+        .ensure_no_route_conflict(&DB_POOL, None)
         .await
         .map_err(|err| err.to_string())?;
     let posture_data = if location.posture_check_required {

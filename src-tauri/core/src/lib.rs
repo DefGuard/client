@@ -14,6 +14,7 @@ use database::models::{
     Id,
 };
 use defguard_client_proto::defguard::client_types::DeviceConfig;
+use defguard_wireguard_rs::net::IpAddrMask;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json;
 
@@ -129,12 +130,37 @@ pub struct CommonConnectionInfo {
 pub const DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub const DEFAULT_ROUTE_IPV6: &str = "::/0";
 
+/// Skips entries that fail to parse
 #[must_use]
-pub fn contains_default_route(allowed_ips: &str) -> bool {
-    allowed_ips
+pub fn routed_networks(
+    address: &str,
+    allowed_ips: &str,
+    route_all_traffic: bool,
+) -> Vec<IpAddrMask> {
+    let allowed_ips = if route_all_traffic {
+        format!("{DEFAULT_ROUTE_IPV4},{DEFAULT_ROUTE_IPV6}")
+    } else {
+        allowed_ips.to_string()
+    };
+    address
         .split(',')
-        .filter_map(|entry| defguard_wireguard_rs::net::IpAddrMask::from_str(entry.trim()).ok())
-        .any(|addr| addr.address.is_unspecified() && addr.cidr == 0)
+        .chain(allowed_ips.split(','))
+        .filter_map(|entry| IpAddrMask::from_str(entry.trim()).ok())
+        .collect()
+}
+
+/// A default route conflicts only with another default route, so one "route all traffic"
+/// connection can run next to split-tunnel connections.
+#[must_use]
+pub fn networks_conflict(a: &IpAddrMask, b: &IpAddrMask) -> bool {
+    if a.address.is_ipv4() != b.address.is_ipv4() {
+        return false;
+    }
+    if a.cidr == 0 || b.cidr == 0 {
+        return a.cidr == b.cidr;
+    }
+    let cidr = a.cidr.min(b.cidr);
+    IpAddrMask::new(a.address, cidr).normalized() == IpAddrMask::new(b.address, cidr).normalized()
 }
 
 pub enum DateTimeAggregation {
@@ -227,8 +253,26 @@ mod tests {
         MfaStepMethod as ProtoMfaStepMethod,
     };
 
-    use super::{get_aggregation, into_location, DateTimeAggregation};
+    use super::{get_aggregation, into_location, networks_conflict, DateTimeAggregation};
     use crate::database::models::location::{LocationMfaMethod, LocationMfaMode};
+
+    #[test]
+    fn test_networks_conflict() {
+        let conflict =
+            |a: &str, b: &str| networks_conflict(&a.parse().unwrap(), &b.parse().unwrap());
+
+        assert!(conflict("10.0.0.0/8", "10.0.0.0/8"));
+        assert!(conflict("10.0.0.0/8", "10.1.0.0/16"));
+        assert!(conflict("10.1.0.0/16", "10.0.0.0/8"));
+        assert!(!conflict("10.0.0.0/16", "10.1.0.0/16"));
+        assert!(conflict("0.0.0.0/0", "0.0.0.0/0"));
+        assert!(conflict("::/0", "::/0"));
+        assert!(!conflict("0.0.0.0/0", "10.0.0.0/8"));
+        assert!(!conflict("10.0.0.0/8", "0.0.0.0/0"));
+        assert!(!conflict("0.0.0.0/0", "::/0"));
+        assert!(!conflict("10.0.0.0/8", "fd00::/8"));
+        assert!(conflict("10.6.0.2/24", "10.6.0.0/24"));
+    }
 
     #[test]
     fn test_get_aggregation_hour() {

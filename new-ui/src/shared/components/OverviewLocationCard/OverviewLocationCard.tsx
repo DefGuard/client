@@ -56,7 +56,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
           view: ConnectModalView.PostureCheckFail,
           postureError: connectError.message,
         });
-      } else if (connectError?.kind === 'allTrafficConflict') {
+      } else if (connectError?.kind === 'routeConflict') {
         useConnectModal.getState().open({
           location,
           view: ConnectModalView.ConnectionError,

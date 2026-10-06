@@ -7,7 +7,7 @@ const connectErrorSchema = z.object({
   kind: z.enum([
     'postureCheckFailed',
     'serviceUnavailable',
-    'allTrafficConflict',
+    'routeConflict',
     'other',
   ]),
   message: z.string(),
