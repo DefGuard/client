@@ -1,5 +1,6 @@
 import './style.scss';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import clsx from 'clsx';
 import { type ReactNode, useMemo, useState } from 'react';
@@ -19,6 +20,8 @@ import { type AppConfigPatch, LogLevel } from '../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 
+const AUTOSTART_QUERY_KEY = ['autostart-enabled'] as const;
+
 const LOG_LEVEL_OPTIONS: SelectOption<LogLevel>[] = [
   { key: LogLevel.Off, label: 'Off', value: LogLevel.Off },
   { key: LogLevel.Error, label: 'Error', value: LogLevel.Error },
@@ -32,15 +35,36 @@ type SettingsTab = 'general' | 'startup';
 
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [startAutomatically, setStartAutomatically] = useState(false);
   const queryClient = useQueryClient();
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
+  const {
+    data: autostartEnabled,
+    isError: isAutostartStatusError,
+    isPending: isAutostartStatusPending,
+  } = useQuery({
+    queryKey: AUTOSTART_QUERY_KEY,
+    queryFn: isEnabled,
+  });
 
   const { mutate: patchConfig } = useMutation({
     mutationFn: (patch: AppConfigPatch) => api.setAppConfig(patch, true),
     onSuccess: (config) => {
       queryClient.setQueryData(getAppConfigQueryOptions.queryKey, config);
     },
+    onError: (error) => {
+      console.error(error);
+    },
+  });
+
+  const { mutate: setAutostart, isPending: isAutostartUpdating } = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (enabled) {
+        await enable();
+      } else {
+        await disable();
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: AUTOSTART_QUERY_KEY }),
     onError: (error) => {
       console.error(error);
     },
@@ -151,8 +175,11 @@ export const SettingsPage = () => {
             inline
           >
             <Toggle
-              active={startAutomatically}
-              onClick={() => setStartAutomatically((active) => !active)}
+              active={autostartEnabled ?? false}
+              disabled={
+                isAutostartStatusPending || isAutostartStatusError || isAutostartUpdating
+              }
+              onClick={() => setAutostart(!autostartEnabled)}
             />
           </SettingRow>
           <SettingRow title="Start the app minimized to the system tray" inline>
