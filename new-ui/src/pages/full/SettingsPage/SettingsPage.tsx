@@ -33,7 +33,6 @@ type SettingsTab = 'general' | 'startup';
 export const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [startAutomatically, setStartAutomatically] = useState(false);
-  const [startMinimized, setStartMinimized] = useState(false);
   const queryClient = useQueryClient();
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
 
@@ -158,8 +157,8 @@ export const SettingsPage = () => {
           </SettingRow>
           <SettingRow title="Start the app minimized to the system tray" inline>
             <Toggle
-              active={startMinimized}
-              onClick={() => setStartMinimized((active) => !active)}
+              active={appConfig.start_minimized}
+              onClick={() => patchConfig({ start_minimized: !appConfig.start_minimized })}
             />
           </SettingRow>
         </div>
