@@ -19,15 +19,18 @@ thiserror.workspace = true
 # thread reports through and the single-ceremony semaphore, `macros` to race that semaphore
 # against cancellation, `time` to re-issue a cancellation the platform was not ready for.
 tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
-tokio-util = "0.7"
+tokio-util.workspace = true
 tracing.workspace = true
-url = "2.5"
+url.workspace = true
 
 # Windows restricts direct HID access to a security key to elevated processes, so there the
 # ceremony goes through the platform WebAuthn API instead. Everywhere else it talks CTAP-HID.
 [target.'cfg(not(windows))'.dependencies]
 # Needs libudev on Linux, pulled in through hidapi.
 ctap-hid-fido2.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+dispatch2 = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

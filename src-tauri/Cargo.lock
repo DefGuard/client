@@ -1646,6 +1646,7 @@ dependencies = [
  "base64 0.23.1",
  "ciborium",
  "ctap-hid-fido2",
+ "dispatch2",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
