@@ -2,3 +2,6 @@ vulnerabilities:
   - id: GHSA-wrw7-89jp-8q8g
     expired_at: 2026-10-30
     statement: "glib is a transitive dependency of Tauri which we cannot update ourselves. Waiting for tauri to finish migration to gtk4-rs: https://github.com/tauri-apps/tauri/issues/12563"
+  - id: CVE-2026-93687
+    expired_at: 2026-12-31
+    statement: "braces (GHSA-vfj7-8cjw-p6xm) has no patched version yet. It is only pulled in by stylelint, a dev-only SCSS linter that runs on our own globs and is not shipped in the app."

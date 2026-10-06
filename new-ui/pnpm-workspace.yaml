@@ -8,3 +8,7 @@ minimumReleaseAgeExclude:
   - vite@8.0.16
   - fast-uri@3.1.4 || 3.1.5
   - js-yaml@4.3.1
+auditConfig:
+  ignoreGhsas:
+    # braces: no patched version yet, only reachable through dev-only stylelint
+    - GHSA-vfj7-8cjw-p6xm
