@@ -713,15 +713,19 @@ async fn run_mobile_step(
     step: Option<&MfaStepContext>,
     json_mode: bool,
 ) -> Result<mfa::MfaFinishResponse, CliError> {
+    let ws_url =
+        mfa::derive_ws_url(contract, proxy_url, token, step_attempt_id).map_err(into_cli)?;
     let badge = opt_step_badge(step);
-    let payload = mfa_qr::build_qr_payload(token, challenge, instance_uuid);
+    let qr_step_attempt_id = if contract == MfaContract::MultiStep {
+        step_attempt_id
+    } else {
+        None
+    };
+    let payload = mfa_qr::build_qr_payload(token, challenge, instance_uuid, qr_step_attempt_id);
     mfa_qr::render_qr(&payload, qr_file, &badge, json_mode)?;
     if !json_mode {
         eprintln!("{badge}Waiting for mobile approval... (Ctrl-C to cancel)");
     }
-
-    let ws_url =
-        mfa::derive_ws_url(contract, proxy_url, token, step_attempt_id).map_err(into_cli)?;
 
     with_ctrl_c(|cancel| mfa::connect_mobile_approve(contract, &ws_url, cancel))
         .await

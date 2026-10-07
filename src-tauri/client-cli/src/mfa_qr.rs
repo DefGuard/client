@@ -22,13 +22,23 @@ const QR_PNG_MIN_SIZE: u32 = 300;
 /// Build the base64-encoded QR payload for mobile-approve MFA.
 ///
 /// QR payload format:
-///   Base64(JSON{token, challenge, instance_id})
-pub(crate) fn build_qr_payload(token: &str, challenge: &str, instance_id: &str) -> String {
-    let json = json!({
+///   Base64(JSON{token, challenge, instance_id[, step_attempt_id]})
+pub(crate) fn build_qr_payload(
+    token: &str,
+    challenge: &str,
+    instance_id: &str,
+    step_attempt_id: Option<&str>,
+) -> String {
+    let mut json = json!({
         "token": token,
         "challenge": challenge,
         "instance_id": instance_id,
     });
+    if let Some(step_attempt_id) = step_attempt_id {
+        json.as_object_mut()
+            .expect("QR payload is a JSON object")
+            .insert("step_attempt_id".into(), json!(step_attempt_id));
+    }
     let raw = serde_json::to_string(&json).expect("JSON serialization is infallible");
     BASE64_STANDARD.encode(raw.as_bytes())
 }
@@ -121,20 +131,33 @@ mod tests {
 
     #[test]
     fn test_build_qr_payload_bytes() {
-        let payload = build_qr_payload("tok-abc", "chal-xyz", "uuid-001");
+        let payload = build_qr_payload("tok-abc", "chal-xyz", "uuid-001", None);
+        assert_eq!(
+            payload,
+            "eyJjaGFsbGVuZ2UiOiJjaGFsLXh5eiIsImluc3RhbmNlX2lkIjoidXVpZC0wMDEiLCJ0b2tlbiI6InRvay1hYmMifQ=="
+        );
         // Decode and verify the JSON structure.
         let decoded = BASE64_STANDARD.decode(&payload).expect("valid base64");
         let json: serde_json::Value = serde_json::from_slice(&decoded).expect("valid JSON");
         assert_eq!(json["token"], "tok-abc");
         assert_eq!(json["challenge"], "chal-xyz");
         assert_eq!(json["instance_id"], "uuid-001");
+        assert!(json.get("step_attempt_id").is_none());
+    }
+
+    #[test]
+    fn test_build_qr_payload_includes_step_attempt_id() {
+        let payload = build_qr_payload("tok", "chal", "inst", Some("attempt-2"));
+        let decoded = BASE64_STANDARD.decode(&payload).expect("valid base64");
+        let json: serde_json::Value = serde_json::from_slice(&decoded).expect("valid JSON");
+        assert_eq!(json["step_attempt_id"], "attempt-2");
     }
 
     #[test]
     fn test_build_qr_payload_deterministic() {
         // Same inputs must produce identical payloads.
-        let a = build_qr_payload("tok", "chal", "inst");
-        let b = build_qr_payload("tok", "chal", "inst");
+        let a = build_qr_payload("tok", "chal", "inst", None);
+        let b = build_qr_payload("tok", "chal", "inst", None);
         assert_eq!(a, b);
     }
 }
