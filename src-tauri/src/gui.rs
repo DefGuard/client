@@ -458,11 +458,11 @@ pub fn run_app() {
             if launched_by_deep_link {
                 info!("App launched via deep link, opening full view directly.");
                 let _ = WindowManager::open_full_view(app_handle);
-            } else if start_minimized {
-                info!("Starting minimized to the system tray.");
             } else if open_welcome_view {
                 info!("Opening welcome view.");
                 let _ = WindowManager::open_welcome_view(app_handle);
+            } else if start_minimized {
+                info!("Starting minimized to the system tray.");
             } else {
                 show_tray_or_full_view(app_handle);
             }
