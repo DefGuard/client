@@ -29,7 +29,7 @@ export const useMfaSettingsSection = ({
   configurable = false,
 }: Options) => {
   const [plan, setPlan] = useState<MfaMethodValue[]>(
-    () => initialPlan ?? resolveMfaStepPlan(location),
+    () => initialPlan ?? resolveMfaStepPlan(location, [], instance),
   );
   const [configureMethods, setConfigureMethods] = useState<ClientConfigurableMethod[]>(
     [],

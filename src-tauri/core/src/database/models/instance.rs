@@ -28,6 +28,10 @@ pub struct Instance<I = NoId> {
     pub mfa_contract: MfaContract,
     /// None when this Core cannot configure MFA from the client.
     pub mfa_capabilities: Option<Json<MfaCapabilities>>,
+    /// None when Core predates the report, read as configured.
+    pub smtp_configured: Option<bool>,
+    /// None when Core predates the report, read as available.
+    pub openid_available: Option<bool>,
 }
 
 /// Factors a Core accepts in an MFA configuration session, static per Core version. Only
@@ -85,15 +89,19 @@ pub fn mfa_capabilities(
 }
 
 impl<I> Instance<I> {
-    /// Returns whether either MFA field changed.
+    /// Returns whether any MFA field changed, factor availability included.
     pub fn sync_mfa_state(&mut self, instance_info: &proto::client_types::InstanceInfo) -> bool {
         let configured_methods = mfa_configured_methods(instance_info);
         let capabilities = mfa_capabilities(instance_info);
         let changed = self.mfa_configured_methods.as_ref().map(|json| &json.0)
             != configured_methods.as_ref()
-            || self.mfa_capabilities.as_ref().map(|json| &json.0) != capabilities.as_ref();
+            || self.mfa_capabilities.as_ref().map(|json| &json.0) != capabilities.as_ref()
+            || self.smtp_configured != instance_info.smtp_configured
+            || self.openid_available != instance_info.openid_available;
         self.mfa_configured_methods = configured_methods.map(Json);
         self.mfa_capabilities = capabilities.map(Json);
+        self.smtp_configured = instance_info.smtp_configured;
+        self.openid_available = instance_info.openid_available;
         changed
     }
 }
@@ -138,6 +146,8 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             mfa_configured_methods,
             mfa_contract,
             mfa_capabilities,
+            smtp_configured: instance_info.smtp_configured,
+            openid_available: instance_info.openid_available,
         }
     }
 }
@@ -151,8 +161,8 @@ impl Instance<Id> {
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
             client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, \
             openid_display_name = $10, openid_provider_kind = $11, mfa_configured_methods = $12, \
-            mfa_capabilities = $13, mfa_contract = $14 \
-            WHERE id = $15;",
+            mfa_capabilities = $13, mfa_contract = $14, smtp_configured = $15, \
+            openid_available = $16 WHERE id = $17;",
             self.name,
             self.uuid,
             self.url,
@@ -167,6 +177,8 @@ impl Instance<Id> {
             self.mfa_configured_methods,
             self.mfa_capabilities,
             self.mfa_contract,
+            self.smtp_configured,
+            self.openid_available,
             self.id
         )
         .execute(executor)
@@ -203,7 +215,7 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\" \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -222,7 +234,7 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\" \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance WHERE id = $1;",
             id
         )
@@ -242,7 +254,7 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\" \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance WHERE name = $1;",
             name
         )
@@ -281,7 +293,7 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\" \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
@@ -333,6 +345,8 @@ impl PartialEq<proto::client_types::InstanceInfo> for Instance<Id> {
                 == mfa_configured_methods(other).as_ref()
             && self.mfa_capabilities.as_ref().map(|json| &json.0)
                 == mfa_capabilities(other).as_ref()
+            && self.smtp_configured == other.smtp_configured
+            && self.openid_available == other.openid_available
     }
 }
 
@@ -346,8 +360,10 @@ impl Instance<NoId> {
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
             client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name, \
-            openid_provider_kind, mfa_configured_methods, mfa_capabilities, mfa_contract) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id;",
+            openid_provider_kind, mfa_configured_methods, mfa_capabilities, mfa_contract, \
+            smtp_configured, openid_available) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) \
+            RETURNING id;",
             self.name,
             self.uuid,
             url,
@@ -361,7 +377,9 @@ impl Instance<NoId> {
             self.openid_provider_kind,
             self.mfa_configured_methods,
             self.mfa_capabilities,
-            self.mfa_contract
+            self.mfa_contract,
+            self.smtp_configured,
+            self.openid_available
         )
         .fetch_one(executor)
         .await?;
@@ -381,6 +399,8 @@ impl Instance<NoId> {
             mfa_configured_methods: self.mfa_configured_methods,
             mfa_contract: self.mfa_contract,
             mfa_capabilities: self.mfa_capabilities,
+            smtp_configured: self.smtp_configured,
+            openid_available: self.openid_available,
         })
     }
 }
@@ -402,6 +422,8 @@ pub struct InstanceInfo<I = NoId> {
     pub mfa_configured_methods: Option<Vec<LocationMfaMethod>>,
     /// None when this Core cannot configure MFA from the client.
     pub mfa_capabilities: Option<MfaCapabilities>,
+    pub smtp_configured: Option<bool>,
+    pub openid_available: Option<bool>,
 }
 
 impl fmt::Display for InstanceInfo<Id> {
@@ -511,6 +533,8 @@ mod tests {
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
         }
     }
 
@@ -794,6 +818,8 @@ mod tests {
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
         };
         // Model has false, proto has true → not equal.
         assert_ne!(instance, info);
@@ -861,6 +887,8 @@ mod tests {
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
         };
         // Never reported vs reported as [totp], a change the poller has to persist.
         assert_ne!(instance, info);
@@ -897,6 +925,8 @@ mod tests {
             ])),
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
         };
         // The same factors in another order are not a change worth a full config update.
         assert_eq!(instance, info);
@@ -976,6 +1006,8 @@ mod tests {
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
         };
         // a Core upgraded to configure MFA from the client
         assert_ne!(instance, info);
@@ -1013,5 +1045,60 @@ mod tests {
             .unwrap()
             .expect("instance should exist");
         assert!(persisted.mfa_capabilities.is_none());
+    }
+
+    #[test]
+    fn test_instance_from_proto_keeps_unreported_availability_apart() {
+        let instance: Instance<NoId> = base_info().into();
+        assert_eq!(instance.smtp_configured, None);
+        assert_eq!(instance.openid_available, None);
+
+        let mut info = base_info();
+        info.smtp_configured = Some(false);
+        info.openid_available = Some(true);
+        let instance: Instance<NoId> = info.into();
+        assert_eq!(instance.smtp_configured, Some(false));
+        assert_eq!(instance.openid_available, Some(true));
+    }
+
+    #[test]
+    fn test_sync_mfa_state_detects_availability_change() {
+        let mut instance = new_instance();
+        let mut info = base_info();
+        assert!(!instance.sync_mfa_state(&info));
+
+        info.smtp_configured = Some(false);
+        assert!(instance.sync_mfa_state(&info));
+        assert_eq!(instance.smtp_configured, Some(false));
+
+        info.openid_available = Some(false);
+        assert!(instance.sync_mfa_state(&info));
+        assert_eq!(instance.openid_available, Some(false));
+        assert!(!instance.sync_mfa_state(&info));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_mfa_availability_round_trip(pool: SqlitePool) {
+        let mut instance = new_instance();
+        instance.smtp_configured = Some(false);
+        instance.openid_available = Some(true);
+        let mut saved = instance.save(&pool).await.unwrap();
+
+        let persisted = Instance::find_by_id(&pool, saved.id)
+            .await
+            .unwrap()
+            .expect("instance should exist");
+        assert_eq!(persisted.smtp_configured, Some(false));
+        assert_eq!(persisted.openid_available, Some(true));
+
+        saved.smtp_configured = None;
+        saved.openid_available = Some(false);
+        saved.save(&pool).await.unwrap();
+        let persisted = Instance::find_by_id(&pool, saved.id)
+            .await
+            .unwrap()
+            .expect("instance should exist");
+        assert_eq!(persisted.smtp_configured, None);
+        assert_eq!(persisted.openid_available, Some(false));
     }
 }

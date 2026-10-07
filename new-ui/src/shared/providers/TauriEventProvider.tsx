@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { debug } from '@tauri-apps/plugin-log';
+import { debug, error as logError } from '@tauri-apps/plugin-log';
 import { Fragment, type PropsWithChildren, useEffect } from 'react';
 import { runConfigureFactorsRequest } from '../../pages/full/ConfigureMfaPage/hooks/runConfigureFactorsRequest';
 import { mfaMethodToConnectModalView } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
@@ -15,6 +15,7 @@ import {
 import { WindowId } from '../consts';
 import { useAppData } from '../providers/AppDataContext';
 import { api } from '../rust-api/api';
+import { getInstancesQueryOptions } from '../rust-api/query';
 import {
   type AddInstanceEventPayload,
   type ConfigureFactorsPayload,
@@ -75,16 +76,28 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             };
             void (async () => {
               const appConfig = await api.getAppConfig();
-              const mfaMethod = resolveMfaStepPlan(location)[0];
+              // A failed refresh keeps the cached instances. With none, the plan uses
+              // the steps' own flags, which beats dropping the prompt.
+              let instances = queryClient.getQueryData(getInstancesQueryOptions.queryKey);
+              try {
+                instances = await queryClient.fetchQuery(getInstancesQueryOptions);
+              } catch (err) {
+                void logError(`MfaTrigger: failed to load instances: ${err}`);
+              }
+              const instance = instances?.find(({ id }) => id === location.instance_id);
+              const stepPlan = resolveMfaStepPlan(location, [], instance);
 
               await navigate({ to: '/full/overview' });
               useConnectModal.getState().open({
-                view: mfaMethodToConnectModalView(mfaMethod),
+                view: mfaMethodToConnectModalView(stepPlan[0]),
                 location,
+                stepPlan,
                 autoStartOpenId: appConfig.auto_start_openid_mfa,
-                mfaMethod,
+                mfaMethod: stepPlan[0],
               });
-            })();
+            })().catch((err) => {
+              void logError(`MfaTrigger: failed to open the MFA prompt: ${err}`);
+            });
           }
         },
       ),

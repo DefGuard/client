@@ -194,6 +194,8 @@ mod tests {
             mfa_configured_methods: None,
             mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
         }
     }
 

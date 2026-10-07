@@ -41,10 +41,11 @@ export const LocationCardMfaEdit = ({
   const label =
     stepCount > 1
       ? mfaStepsToText(stepCount)
-      : mfaToText(resolveMfaStepPlan(location)[0], instance);
+      : mfaToText(resolveMfaStepPlan(location, [], instance)[0], instance);
 
   const canEdit =
-    connectionAbility === ConnectionAbility.Available && hasMfaMethodChoice(location);
+    connectionAbility === ConnectionAbility.Available &&
+    hasMfaMethodChoice(location, instance);
 
   const canConfigure = connectionAbility === ConnectionAbility.Configurable;
 

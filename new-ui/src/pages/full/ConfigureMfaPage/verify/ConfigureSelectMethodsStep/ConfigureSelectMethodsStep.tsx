@@ -18,6 +18,7 @@ import {
   CLIENT_CONFIGURABLE_METHODS,
   isClientConfigurableMethod,
   isDesktopDrivableMethod,
+  isMfaMethodAvailable,
   mfaStepsOf as locationMfaSteps,
   mfaToText,
   setupMethodsOf,
@@ -63,16 +64,17 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     return configuredMethods.filter((method) => method !== MfaMethod.Email);
   }, [emailFallback, configuredMethods]);
 
-  /** A step the user is already past: it offers a factor the desktop can drive and the account
-   *  holds. Mirrors `usableMfaMethods`, on the session's fresher list of configured factors. */
+  /** A step the user is already past: it offers a factor the desktop can drive, the account
+   *  holds and the instance runs. Mirrors usableMfaMethods, on the session's fresher list. */
   const isStepSatisfied = useCallback(
     (step: MfaStep): boolean =>
       step.methods.some(
         (entry) =>
           isDesktopDrivableMethod(entry.method) &&
-          configuredMethods.includes(entry.method),
+          configuredMethods.includes(entry.method) &&
+          isMfaMethodAvailable(entry.method, instance),
       ),
-    [configuredMethods],
+    [configuredMethods, instance],
   );
 
   const groups = useMemo(() => {
@@ -99,10 +101,13 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       // A repeatable factor stays offerable once configured, keeping its badge and its pick.
       const disabled = !isMfaFactorOfferable(method, configuredMethods, setupMethods);
       const configured = accountConfigured.includes(method);
-      const satisfied = configuredMethods.includes(method);
+      const available = isMfaMethodAvailable(method, instance);
+      const satisfied = configuredMethods.includes(method) && available;
 
       let hint: string | null = null;
-      if (disabled && !configured) {
+      if (!available) {
+        hint = `${mfaToText(method, instance ?? undefined)} is not available on this Defguard instance.`;
+      } else if (disabled && !configured) {
         if (satisfied) {
           // Reached only via the email fallback, which registers the factor as it verifies.
           hint = `${mfaToText(method)} is required to continue.`;
@@ -125,7 +130,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         hint,
       };
     },
-    [accountConfigured, configuredMethods, setupMethods, selected],
+    [accountConfigured, configuredMethods, setupMethods, selected, instance],
   );
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({

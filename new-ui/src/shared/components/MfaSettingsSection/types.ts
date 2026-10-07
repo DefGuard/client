@@ -10,6 +10,8 @@ export type MfaSettingsInstance = Pick<
   InstanceInfo,
   | 'mfa_configured_methods'
   | 'mfa_capabilities'
+  | 'smtp_configured'
+  | 'openid_available'
   | 'openid_display_name'
   | 'openid_provider_kind'
 >;

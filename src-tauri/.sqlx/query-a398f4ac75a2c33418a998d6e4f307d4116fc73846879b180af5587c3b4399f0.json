@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\" FROM instance WHERE id = $1;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\", smtp_configured, openid_available FROM instance WHERE token IS NOT NULL ORDER BY name ASC;",
   "describe": {
     "columns": [
       {
@@ -70,7 +70,7 @@
         }
       },
       {
-        "name": "token?",
+        "name": "token",
         "ordinal": 6,
         "type_info": "Text",
         "origin": {
@@ -167,10 +167,32 @@
             "name": "mfa_contract"
           }
         }
+      },
+      {
+        "name": "smtp_configured",
+        "ordinal": 15,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "smtp_configured"
+          }
+        }
+      },
+      {
+        "name": "openid_available",
+        "ordinal": 16,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "openid_available"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       false,
@@ -187,8 +209,10 @@
       false,
       true,
       true,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "db8cef8e441cc59d3ef94c9eb177d5054ce466286c1152ffa69471c3912c1c88"
+  "hash": "a398f4ac75a2c33418a998d6e4f307d4116fc73846879b180af5587c3b4399f0"
 }

@@ -5,7 +5,9 @@ import {
   type InstanceInfo,
   MfaMethod,
 } from '../../../../shared/rust-api/types';
+import { isMfaMethodAvailable } from '../../../../shared/utils/mfa';
 import { ConfigureMfaStep } from '../types';
+import { NoVerificationMethodError } from './noVerificationMethodError';
 import {
   applyAuthorization,
   discardMfaConfiguration,
@@ -32,6 +34,8 @@ const instance: InstanceInfo = {
   disable_tunnels: false,
   openid_display_name: null,
   openid_provider_kind: 'custom',
+  smtp_configured: null,
+  openid_available: null,
   mfa_configured_methods: [],
   mfa_capabilities: {
     setup_methods: [MfaMethod.Totp, MfaMethod.Fido2],
@@ -152,5 +156,70 @@ describe('startMfaConfiguration', () => {
     const state = useConfigureMfaStore.getState();
     expect(state.configuredMethods).toContain(MfaMethod.Totp);
     expect(state.initialSelection).toEqual([]);
+  });
+
+  it('trusts the email fallback over a snapshot that still reports no SMTP', async () => {
+    Object.assign(api, {
+      mfaConfigStart: vi.fn().mockResolvedValue({
+        ...startResult,
+        available_methods: [],
+        configured_methods: [],
+        email_fallback: true,
+      }),
+    });
+
+    await startMfaConfiguration({ ...instance, smtp_configured: false });
+
+    expect(useConfigureMfaStore.getState().verificationMethods).toEqual([
+      MfaMethod.Email,
+    ]);
+  });
+
+  it('reads email as available after the fallback, without offering it', async () => {
+    Object.assign(api, {
+      mfaConfigStart: vi.fn().mockResolvedValue({
+        ...startResult,
+        available_methods: [],
+        configured_methods: [],
+        email_fallback: true,
+      }),
+    });
+
+    await startMfaConfiguration(
+      {
+        ...instance,
+        smtp_configured: false,
+        mfa_capabilities: {
+          setup_methods: [MfaMethod.Totp, MfaMethod.Email],
+          authorize_methods: [MfaMethod.Totp],
+        },
+      },
+      { preselectedMethods: [MfaMethod.Email] },
+    );
+
+    const state = useConfigureMfaStore.getState();
+    expect(isMfaMethodAvailable(MfaMethod.Email, state.instance)).toBe(true);
+    expect(state.configuredMethods).toContain(MfaMethod.Email);
+    expect(state.initialSelection).toEqual([]);
+  });
+
+  it('refuses a session nothing can verify', async () => {
+    useConfigureMfaStore.getState().reset();
+    const mfaConfigCancel = vi.fn().mockResolvedValue(undefined);
+    Object.assign(api, {
+      mfaConfigCancel,
+      mfaConfigStart: vi.fn().mockResolvedValue({
+        ...startResult,
+        available_methods: [],
+        configured_methods: [],
+        email_fallback: false,
+      }),
+    });
+
+    await expect(startMfaConfiguration(instance)).rejects.toBeInstanceOf(
+      NoVerificationMethodError,
+    );
+    expect(mfaConfigCancel).toHaveBeenCalledWith('session-2');
+    expect(useConfigureMfaStore.getState().sessionId).toBeNull();
   });
 });

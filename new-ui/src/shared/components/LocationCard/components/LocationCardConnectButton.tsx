@@ -8,12 +8,15 @@ import { openRouteConflictInFullView, parseConnectError } from '../api/connectEr
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 import { ConnectButton } from './ConnectButton/ConnectButton';
+import { connectBlockedTooltip } from './ConnectButton/consts';
 
 export const LocationCardConnectButton = () => {
   const { location, connectionAbility, setPostureError, setView, startMfa } =
     useLocationCardContext();
 
   const canConfigureMfa = connectionAbility === ConnectionAbility.Configurable;
+  const isBlocked =
+    !location.active && connectionAbility === ConnectionAbility.Unavailable;
 
   const { mutate: connect, isPending: isConnecting } = useMutation({
     mutationFn: api.connect,
@@ -85,10 +88,8 @@ export const LocationCardConnectButton = () => {
       text={canConfigureMfa ? 'Configure MFA' : null}
       active={location.active}
       onClick={handleClick}
-      disabled={
-        isBusy ||
-        (!location.active && connectionAbility === ConnectionAbility.Unavailable)
-      }
+      disabled={isBusy || isBlocked}
+      tooltip={isBlocked ? connectBlockedTooltip : null}
     />
   );
 };

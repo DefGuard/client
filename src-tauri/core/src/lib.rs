@@ -20,6 +20,7 @@ use sqlx::types::Json;
 
 pub mod app_config;
 pub mod connection;
+pub mod connection_ability;
 pub mod database;
 pub mod enrollment;
 pub mod error;

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\" FROM instance WHERE token IS NOT NULL ORDER BY name ASC;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\", smtp_configured, openid_available FROM instance WHERE id = $1;",
   "describe": {
     "columns": [
       {
@@ -70,7 +70,7 @@
         }
       },
       {
-        "name": "token",
+        "name": "token?",
         "ordinal": 6,
         "type_info": "Text",
         "origin": {
@@ -167,10 +167,32 @@
             "name": "mfa_contract"
           }
         }
+      },
+      {
+        "name": "smtp_configured",
+        "ordinal": 15,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "smtp_configured"
+          }
+        }
+      },
+      {
+        "name": "openid_available",
+        "ordinal": 16,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "openid_available"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -187,8 +209,10 @@
       false,
       true,
       true,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "2e7e3de7c3001fed77c73939e2baf8236ee79f14a40a9ed655eccf3eb0336dc9"
+  "hash": "d3e98d5eccb1006a5baeba66f94464a44e3cbad6fc446435f639885a7204f27a"
 }

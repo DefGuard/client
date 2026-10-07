@@ -22,6 +22,7 @@ import { Divider } from '../Divider/Divider';
 import { IconKind } from '../Icon';
 import { handleFullViewConnectError } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
+import { connectBlockedTooltip } from '../LocationCard/components/ConnectButton/consts';
 import { LocationCardConnectionInfo } from '../LocationCard/components/LocationCardConnectionInfo/LocationCardConnectionInfo';
 import { LocationCardConnectionTiles } from '../LocationCard/components/LocationCardConnectionTiles/LocationCardConnectionTiles';
 import { LocationCardHeaderInfo } from '../LocationCard/components/LocationCardHeaderInfo/LocationCardHeaderInfo';
@@ -93,10 +94,11 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
     }
 
     if (shouldStartMfa(location)) {
-      const stepPlan = resolveMfaStepPlan(location);
+      const stepPlan = resolveMfaStepPlan(location, [], instance);
       useConnectModal.getState().open({
         view: mfaMethodToConnectModalView(stepPlan[0]),
         location,
+        stepPlan,
         autoStartOpenId: appConfig.auto_start_openid_mfa,
         mfaMethod: stepPlan[0],
       });
@@ -107,6 +109,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
   };
 
   const canConfigureMfa = connectionAbility === ConnectionAbility.Configurable;
+  const isBlocked =
+    !location.active && connectionAbility === ConnectionAbility.Unavailable;
 
   const traficLabel = useMemo(() => {
     if (location.route_all_traffic) {
@@ -138,10 +142,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
             text={canConfigureMfa ? 'Configure MFA' : null}
             active={location.active}
             onClick={handleConnectClick}
-            disabled={
-              isBusy ||
-              (!location.active && connectionAbility === ConnectionAbility.Unavailable)
-            }
+            disabled={isBusy || isBlocked}
+            tooltip={isBlocked ? connectBlockedTooltip : null}
           />
         </div>
       </div>
@@ -178,11 +180,13 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
                 connectionAbility={connectionAbility}
                 onEdit={() => {
                   if (isPresent(location)) {
+                    const stepPlan = resolveMfaStepPlan(location, [], instance);
                     useConnectModal.getState().open({
                       view: ConnectModalView.MfaSettings,
                       location: location,
                       perviousView: null,
-                      mfaMethod: resolveMfaStepPlan(location)[0],
+                      mfaMethod: stepPlan[0],
+                      stepPlan,
                     });
                   }
                 }}

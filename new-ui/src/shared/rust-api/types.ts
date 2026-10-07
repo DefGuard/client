@@ -297,6 +297,10 @@ export type InstanceInfo = {
   mfa_configured_methods: MfaMethodValue[] | null;
   /** Null when this Core cannot configure MFA from the client. */
   mfa_capabilities: MfaCapabilities | null;
+  /** Null when Core predates the report, read as configured. */
+  smtp_configured: boolean | null;
+  /** Null when Core predates the report, read as available. */
+  openid_available: boolean | null;
 };
 
 /** What Core accepts, static per Core version. Offer only what this client also drives. */
