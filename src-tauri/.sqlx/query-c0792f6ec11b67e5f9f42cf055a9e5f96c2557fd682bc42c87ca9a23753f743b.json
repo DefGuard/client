@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", smtp_configured, openid_available FROM instance WHERE name = $1;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\", smtp_configured, openid_available FROM instance WHERE name = $1;",
   "describe": {
     "columns": [
       {
@@ -158,8 +158,19 @@
         }
       },
       {
-        "name": "smtp_configured",
+        "name": "mfa_contract: _",
         "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "mfa_contract"
+          }
+        }
+      },
+      {
+        "name": "smtp_configured",
+        "ordinal": 15,
         "type_info": "Bool",
         "origin": {
           "Table": {
@@ -170,7 +181,7 @@
       },
       {
         "name": "openid_available",
-        "ordinal": 15,
+        "ordinal": 16,
         "type_info": "Bool",
         "origin": {
           "Table": {
@@ -198,9 +209,10 @@
       false,
       true,
       true,
+      false,
       true,
       true
     ]
   },
-  "hash": "1f7cfd28be881b1f7f725edefabef5a4126af4f4aa4e8f196440d4c135cadaaf"
+  "hash": "c0792f6ec11b67e5f9f42cf055a9e5f96c2557fd682bc42c87ca9a23753f743b"
 }

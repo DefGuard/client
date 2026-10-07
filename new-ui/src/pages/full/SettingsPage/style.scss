@@ -1,7 +1,24 @@
 #settings-page-view {
+  .tabs {
+    margin-bottom: var(--spacing-xl);
+  }
+
   .sections {
     display: flex;
     flex-direction: column;
+
+    &.startup-settings {
+      .setting-row {
+        .head {
+          justify-content: flex-start;
+          gap: var(--spacing-md);
+
+          .control {
+            order: -1;
+          }
+        }
+      }
+    }
 
     .setting-row {
       .head {

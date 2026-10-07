@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, openid_display_name = $10, openid_provider_kind = $11, mfa_configured_methods = $12, mfa_capabilities = $13, mfa_contract = $14, smtp_configured = $15, openid_available = $16 WHERE id = $17;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 17
+    },
+    "nullable": []
+  },
+  "hash": "8700227750b6a568bc0ddac73c0697998dad62717bcbd1b7447d106a8bef868d"
+}

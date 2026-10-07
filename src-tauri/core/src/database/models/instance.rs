@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
 use super::{location::LocationMfaMethod, Id, NoId};
-use crate::proto::{self, client_types::OpenIdProviderKind as ProtoOpenIdProviderKind};
+use crate::{
+    mfa_contract::MfaContract,
+    proto::{self, client_types::OpenIdProviderKind as ProtoOpenIdProviderKind},
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Instance<I = NoId> {
@@ -22,6 +25,7 @@ pub struct Instance<I = NoId> {
     pub openid_provider_kind: OpenIdProviderKind,
     /// None when the proxy never sent MfaUserState.
     pub mfa_configured_methods: Option<Json<Vec<LocationMfaMethod>>>,
+    pub mfa_contract: MfaContract,
     /// None when this Core cannot configure MFA from the client.
     pub mfa_capabilities: Option<Json<MfaCapabilities>>,
     /// None when Core predates the report, read as configured.
@@ -102,6 +106,17 @@ impl<I> Instance<I> {
     }
 }
 
+#[must_use]
+pub fn mfa_contract_from_instance_info(
+    instance_info: &proto::client_types::InstanceInfo,
+) -> MfaContract {
+    if instance_info.mfa_user_state.is_some() {
+        MfaContract::MultiStep
+    } else {
+        MfaContract::Legacy
+    }
+}
+
 impl fmt::Display for Instance<Id> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}(ID: {})", self.name, self.id)
@@ -112,6 +127,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
     fn from(instance_info: proto::client_types::InstanceInfo) -> Self {
         let client_traffic_policy = ClientTrafficPolicy::from(&instance_info);
         let mfa_configured_methods = mfa_configured_methods(&instance_info).map(Json);
+        let mfa_contract = mfa_contract_from_instance_info(&instance_info);
         let mfa_capabilities = mfa_capabilities(&instance_info).map(Json);
         let openid_provider_kind = instance_info.openid_provider_kind().into();
         Self {
@@ -128,6 +144,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             openid_display_name: instance_info.openid_display_name,
             openid_provider_kind,
             mfa_configured_methods,
+            mfa_contract,
             mfa_capabilities,
             smtp_configured: instance_info.smtp_configured,
             openid_available: instance_info.openid_available,
@@ -144,8 +161,8 @@ impl Instance<Id> {
             "UPDATE instance SET name = $1, uuid = $2, url = $3, proxy_url = $4, username = $5, \
             client_traffic_policy = $6, enterprise_enabled = $7, disable_tunnels = $8, token = $9, \
             openid_display_name = $10, openid_provider_kind = $11, mfa_configured_methods = $12, \
-            mfa_capabilities = $13, smtp_configured = $14, openid_available = $15 \
-            WHERE id = $16;",
+            mfa_capabilities = $13, mfa_contract = $14, smtp_configured = $15, \
+            openid_available = $16 WHERE id = $17;",
             self.name,
             self.uuid,
             self.url,
@@ -159,6 +176,7 @@ impl Instance<Id> {
             self.openid_provider_kind,
             self.mfa_configured_methods,
             self.mfa_capabilities,
+            self.mfa_contract,
             self.smtp_configured,
             self.openid_available,
             self.id
@@ -166,6 +184,24 @@ impl Instance<Id> {
         .execute(executor)
         .await?;
         Ok(())
+    }
+
+    pub async fn update_mfa_contract<'e, E>(
+        executor: E,
+        id: Id,
+        mfa_contract: MfaContract,
+    ) -> Result<bool, sqlx::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let result = query!(
+            "UPDATE instance SET mfa_contract = $1 WHERE id = $2;",
+            mfa_contract,
+            id
+        )
+        .execute(executor)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 
     pub async fn all<'e, E>(executor: E) -> Result<Vec<Self>, sqlx::Error>
@@ -178,7 +214,8 @@ impl Instance<Id> {
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
-            mfa_capabilities \"mfa_capabilities: _\", smtp_configured, openid_available \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -196,7 +233,8 @@ impl Instance<Id> {
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
-            mfa_capabilities \"mfa_capabilities: _\", smtp_configured, openid_available \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance WHERE id = $1;",
             id
         )
@@ -215,7 +253,8 @@ impl Instance<Id> {
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
-            mfa_capabilities \"mfa_capabilities: _\", smtp_configured, openid_available \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance WHERE name = $1;",
             name
         )
@@ -253,7 +292,8 @@ impl Instance<Id> {
             client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, \
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
-            mfa_capabilities \"mfa_capabilities: _\", smtp_configured, openid_available \
+            mfa_capabilities \"mfa_capabilities: _\", \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
@@ -320,9 +360,9 @@ impl Instance<NoId> {
         let result = query!(
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
             client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name, \
-            openid_provider_kind, mfa_configured_methods, mfa_capabilities, smtp_configured, \
-            openid_available) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) \
+            openid_provider_kind, mfa_configured_methods, mfa_capabilities, mfa_contract, \
+            smtp_configured, openid_available) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) \
             RETURNING id;",
             self.name,
             self.uuid,
@@ -337,6 +377,7 @@ impl Instance<NoId> {
             self.openid_provider_kind,
             self.mfa_configured_methods,
             self.mfa_capabilities,
+            self.mfa_contract,
             self.smtp_configured,
             self.openid_available
         )
@@ -356,6 +397,7 @@ impl Instance<NoId> {
             openid_display_name: self.openid_display_name,
             openid_provider_kind: self.openid_provider_kind,
             mfa_configured_methods: self.mfa_configured_methods,
+            mfa_contract: self.mfa_contract,
             mfa_capabilities: self.mfa_capabilities,
             smtp_configured: self.smtp_configured,
             openid_available: self.openid_available,
@@ -489,6 +531,7 @@ mod tests {
             openid_display_name: None,
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
@@ -497,7 +540,9 @@ mod tests {
 
     #[sqlx::test(migrations = "../migrations")]
     async fn test_instance_crud_round_trip(pool: SqlitePool) {
-        let instance = new_instance().save(&pool).await.unwrap();
+        let mut instance = new_instance();
+        instance.mfa_contract = MfaContract::MultiStep;
+        let instance = instance.save(&pool).await.unwrap();
 
         let found = Instance::find_by_id(&pool, instance.id)
             .await
@@ -505,6 +550,7 @@ mod tests {
             .expect("instance should exist");
         assert_eq!(found.uuid, "uuid-1");
         assert_eq!(found.name, "instance");
+        assert_eq!(found.mfa_contract, MfaContract::MultiStep);
 
         let all = Instance::all(&pool).await.unwrap();
         assert_eq!(all.len(), 1);
@@ -520,6 +566,55 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_update_mfa_contract_changes_only_contract(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+
+        assert!(
+            Instance::update_mfa_contract(&pool, instance.id, MfaContract::MultiStep)
+                .await
+                .unwrap()
+        );
+        let updated = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.mfa_contract, MfaContract::MultiStep);
+        assert_eq!(updated.name, instance.name);
+        assert_eq!(updated.proxy_url, instance.proxy_url);
+
+        assert!(
+            Instance::update_mfa_contract(&pool, instance.id, MfaContract::Legacy)
+                .await
+                .unwrap()
+        );
+        let updated = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.mfa_contract, MfaContract::Legacy);
+        assert_eq!(updated.name, instance.name);
+        assert_eq!(updated.proxy_url, instance.proxy_url);
+
+        assert!(
+            !Instance::update_mfa_contract(&pool, 999, MfaContract::MultiStep)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_mfa_contract_rejects_invalid_value(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let error = sqlx::query("UPDATE instance SET mfa_contract = 2 WHERE id = $1")
+            .bind(instance.id)
+            .execute(&pool)
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("CHECK constraint failed"));
     }
 
     #[sqlx::test(migrations = "../migrations")]
@@ -630,6 +725,7 @@ mod tests {
         assert_eq!(instance.openid_display_name, Some("OIDC".to_string()));
         assert_eq!(instance.client_traffic_policy, ClientTrafficPolicy::None);
         assert!(!instance.disable_tunnels);
+        assert_eq!(instance.mfa_contract, MfaContract::Legacy);
     }
 
     fn new_instance_with_tunnels_disabled(disable: bool) -> Instance<NoId> {
@@ -720,6 +816,7 @@ mod tests {
             openid_display_name: info.openid_display_name.clone(),
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
@@ -734,6 +831,21 @@ mod tests {
         let instance: Instance<NoId> = info.into();
         // A proxy that never reported the state is not the same as one reporting no factors.
         assert!(instance.mfa_configured_methods.is_none());
+        assert_eq!(instance.mfa_contract, MfaContract::Legacy);
+    }
+
+    #[test]
+    fn test_instance_from_proto_empty_mfa_user_state_selects_multi_step() {
+        let mut info = base_info();
+        info.mfa_user_state = Some(proto::client_types::MfaUserState::default());
+
+        let instance: Instance<NoId> = info.into();
+
+        assert_eq!(instance.mfa_contract, MfaContract::MultiStep);
+        assert_eq!(
+            instance.mfa_configured_methods.map(|json| json.0),
+            Some(vec![])
+        );
     }
 
     #[test]
@@ -750,6 +862,7 @@ mod tests {
             instance.mfa_configured_methods.map(|json| json.0),
             Some(vec![LocationMfaMethod::Totp, LocationMfaMethod::Fido2])
         );
+        assert_eq!(instance.mfa_contract, MfaContract::MultiStep);
     }
 
     #[test]
@@ -772,6 +885,7 @@ mod tests {
             openid_display_name: info.openid_display_name.clone(),
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
@@ -809,6 +923,7 @@ mod tests {
                 LocationMfaMethod::Totp,
                 LocationMfaMethod::Fido2,
             ])),
+            mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
@@ -889,6 +1004,7 @@ mod tests {
             openid_display_name: info.openid_display_name.clone(),
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,

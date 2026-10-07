@@ -6,10 +6,13 @@ use std::{
     time::Duration,
 };
 
-use defguard_client_core::database::models::{
-    instance::{ClientTrafficPolicy, MfaCapabilities, OpenIdProviderKind},
-    location::{Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode},
-    NoId,
+use defguard_client_core::{
+    database::models::{
+        instance::{ClientTrafficPolicy, MfaCapabilities, OpenIdProviderKind},
+        location::{Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode},
+        NoId,
+    },
+    mfa_contract::MfaContract,
 };
 use defguard_client_proto::defguard::client_types::{
     DeviceConfig, DeviceConfigResponse, InstanceInfo, MfaCapabilities as ProtoMfaCapabilities,
@@ -115,6 +118,7 @@ fn instance_with_token(token: Option<&str>) -> Instance<Id> {
         openid_display_name: None,
         openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
+        mfa_contract: MfaContract::Legacy,
         mfa_capabilities: None,
         smtp_configured: None,
         openid_available: None,
@@ -198,6 +202,7 @@ async fn seed_instance(
         openid_display_name: None,
         openid_provider_kind: OpenIdProviderKind::Custom,
         mfa_configured_methods: None,
+        mfa_contract: MfaContract::Legacy,
         mfa_capabilities: None,
         smtp_configured: None,
         openid_available: None,
@@ -343,6 +348,78 @@ async fn test_config_changed_true_when_location_changes(pool: SqlitePool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn test_poll_persists_mfa_contract_when_config_is_unchanged(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    instance.mfa_configured_methods = Some(sqlx::types::Json(Vec::new()));
+    instance.save(&pool).await.unwrap();
+    seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "office", "1.2.3.4:51820"));
+    response.instance.as_mut().unwrap().mfa_user_state = Some(MfaUserState::default());
+    sqlx::query("UPDATE instance SET name = 'database-name' WHERE id = ?")
+        .bind(instance.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let fetched = Ok(FetchedConfig {
+        response: InstanceInfoResponse {
+            device_config: Some(response),
+        },
+        version_mismatch: None,
+    });
+
+    let mut transaction = pool.begin().await.unwrap();
+    let result = apply_fetched_config(&mut transaction, &mut instance, false, fetched)
+        .await
+        .unwrap();
+    transaction.commit().await.unwrap();
+
+    assert!(matches!(result, PollInstanceResult::Unchanged { .. }));
+    let stored = Instance::find_by_id(&pool, instance.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.mfa_contract, MfaContract::MultiStep);
+    assert_eq!(stored.name, "database-name");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_poll_rejects_missing_instance_info(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    instance.mfa_contract = MfaContract::MultiStep;
+    instance.save(&pool).await.unwrap();
+    let mut response =
+        device_config_response(&instance, device_config(1, "office", "1.2.3.4:51820"));
+    response.instance = None;
+    let fetched = Ok(FetchedConfig {
+        response: InstanceInfoResponse {
+            device_config: Some(response),
+        },
+        version_mismatch: None,
+    });
+
+    let mut transaction = pool.begin().await.unwrap();
+    let error = apply_fetched_config(&mut transaction, &mut instance, false, fetched)
+        .await
+        .err()
+        .unwrap();
+
+    assert!(matches!(
+        error,
+        defguard_client_core::error::Error::InternalError(message)
+            if message == "Instance info not present in response"
+    ));
+    assert_eq!(instance.mfa_contract, MfaContract::MultiStep);
+    drop(transaction);
+
+    let stored = Instance::find_by_id(&pool, instance.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.mfa_contract, MfaContract::MultiStep);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_poll_instance_changed_while_active_does_not_update_db(pool: SqlitePool) {
     let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
     seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
@@ -410,6 +487,7 @@ async fn test_poll_instance_persists_mfa_snapshot_while_active(pool: SqlitePool)
         .await
         .unwrap()
         .unwrap();
+    assert_eq!(stored.mfa_contract, MfaContract::MultiStep);
     assert_eq!(
         stored.mfa_configured_methods.map(|json| json.0),
         Some(Vec::new())

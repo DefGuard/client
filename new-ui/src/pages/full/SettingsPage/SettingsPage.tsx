@@ -1,8 +1,9 @@
 import './style.scss';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import clsx from 'clsx';
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Divider } from '../../../shared/components/Divider/Divider';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { Icon, IconKind } from '../../../shared/components/Icon';
@@ -10,6 +11,7 @@ import { Input } from '../../../shared/components/Input/Input';
 import { Select } from '../../../shared/components/Select/Select';
 import type { SelectOption } from '../../../shared/components/Select/types';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
+import { Tabs } from '../../../shared/components/Tabs/Tabs';
 import { Toggle } from '../../../shared/components/Toggle/Toggle';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { api } from '../../../shared/rust-api/api';
@@ -17,6 +19,8 @@ import { getAppConfigQueryOptions } from '../../../shared/rust-api/query';
 import { type AppConfigPatch, LogLevel } from '../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
+
+const AUTOSTART_QUERY_KEY = ['autostart-enabled'] as const;
 
 const LOG_LEVEL_OPTIONS: SelectOption<LogLevel>[] = [
   { key: LogLevel.Off, label: 'Off', value: LogLevel.Off },
@@ -27,15 +31,40 @@ const LOG_LEVEL_OPTIONS: SelectOption<LogLevel>[] = [
   { key: LogLevel.Trace, label: 'Trace', value: LogLevel.Trace },
 ];
 
+type SettingsTab = 'general' | 'startup';
+
 export const SettingsPage = () => {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const queryClient = useQueryClient();
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
+  const {
+    data: autostartEnabled,
+    isError: isAutostartStatusError,
+    isPending: isAutostartStatusPending,
+  } = useQuery({
+    queryKey: AUTOSTART_QUERY_KEY,
+    queryFn: isEnabled,
+  });
 
   const { mutate: patchConfig } = useMutation({
     mutationFn: (patch: AppConfigPatch) => api.setAppConfig(patch, true),
     onSuccess: (config) => {
       queryClient.setQueryData(getAppConfigQueryOptions.queryKey, config);
     },
+    onError: (error) => {
+      console.error(error);
+    },
+  });
+
+  const { mutate: setAutostart, isPending: isAutostartUpdating } = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (enabled) {
+        await enable();
+      } else {
+        await disable();
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: AUTOSTART_QUERY_KEY }),
     onError: (error) => {
       console.error(error);
     },
@@ -53,76 +82,114 @@ export const SettingsPage = () => {
   return (
     <FullPage id="settings-page-view" hideScrollContainer>
       <FullPageTitle title="Settings" spacing={ThemeSpacing.Xl} />
-      <div className="sections">
-        <SettingRow
-          title="Logging threshold"
-          description="Defines the minimum severity level of events that will be recorded in the logs. Only events at or above this level are captured to reduce noise and improve log clarity."
-        >
-          <Select
-            options={LOG_LEVEL_OPTIONS}
-            value={selectedLogLevel}
-            onChange={(option) => patchConfig({ log_level: option.value })}
-          />
-        </SettingRow>
-
-        <SettingRow
-          title="Session timeout"
-          description="If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically."
-        >
-          <Input
-            type="number"
-            value={appConfig.peer_alive_period}
-            onChange={(value) => {
-              if (value === null || value === '') return;
-              patchConfig({ peer_alive_period: Number(value) });
-            }}
-          />
-        </SettingRow>
-
-        <SettingRow
-          title="Maximum Transmission Unit"
-          description="MTU sets the largest packet size sent through the network. Lowering it can improve connection stability in restrictive or unreliable ISP networks. The default value on most systems is 1500. Try lowering it to 1300-1400 if you encounter ISP-related issues."
-        >
-          <Input
-            type="number"
-            value={appConfig.mtu}
-            onChange={(value) => {
-              if (value === null || value === '') return;
-              patchConfig({ mtu: Number(value) });
-            }}
-          />
-        </SettingRow>
-
-        <SettingRow title="Check for updates automatically" inline>
-          <Toggle
-            active={appConfig.check_for_updates}
-            onClick={() =>
-              patchConfig({ check_for_updates: !appConfig.check_for_updates })
-            }
-          />
-        </SettingRow>
-
-        <SettingRow title="Auto start OpenID MFA" inline>
-          <Toggle
-            active={appConfig.auto_start_openid_mfa}
-            onClick={() =>
-              patchConfig({ auto_start_openid_mfa: !appConfig.auto_start_openid_mfa })
-            }
-          />
-        </SettingRow>
-
-        <p className="footer">
-          Defguard is made possible by other open-source software.{' '}
-          <button
-            type="button"
-            className="link"
-            onClick={() => openUrl('https://docs.defguard.net/')}
+      <Tabs
+        items={[
+          {
+            title: 'General',
+            active: activeTab === 'general',
+            onClick: () => setActiveTab('general'),
+          },
+          {
+            title: 'Startup & Auto-connect',
+            active: activeTab === 'startup',
+            onClick: () => setActiveTab('startup'),
+          },
+        ]}
+      />
+      {activeTab === 'general' && (
+        <div className="sections">
+          <SettingRow
+            title="Logging threshold"
+            description="Defines the minimum severity level of events that will be recorded in the logs. Only events at or above this level are captured to reduce noise and improve log clarity."
           >
-            Learn more here
-            <Icon icon={IconKind.OpenInNewWindow} size={14} />
-          </button>
-        </p>
-      </div>
+            <Select
+              options={LOG_LEVEL_OPTIONS}
+              value={selectedLogLevel}
+              onChange={(option) => patchConfig({ log_level: option.value })}
+            />
+          </SettingRow>
+
+          <SettingRow
+            title="Session timeout"
+            description="If active connection exceeds given time without making an handshake with the server. The connection will be considered invalid and disconnected automatically."
+          >
+            <Input
+              type="number"
+              value={appConfig.peer_alive_period}
+              onChange={(value) => {
+                if (value === null || value === '') return;
+                patchConfig({ peer_alive_period: Number(value) });
+              }}
+            />
+          </SettingRow>
+
+          <SettingRow
+            title="Maximum Transmission Unit"
+            description="MTU sets the largest packet size sent through the network. Lowering it can improve connection stability in restrictive or unreliable ISP networks. The default value on most systems is 1500. Try lowering it to 1300-1400 if you encounter ISP-related issues."
+          >
+            <Input
+              type="number"
+              value={appConfig.mtu}
+              onChange={(value) => {
+                if (value === null || value === '') return;
+                patchConfig({ mtu: Number(value) });
+              }}
+            />
+          </SettingRow>
+
+          <SettingRow title="Check for updates automatically" inline>
+            <Toggle
+              active={appConfig.check_for_updates}
+              onClick={() =>
+                patchConfig({ check_for_updates: !appConfig.check_for_updates })
+              }
+            />
+          </SettingRow>
+
+          <SettingRow title="Auto start OpenID MFA" inline>
+            <Toggle
+              active={appConfig.auto_start_openid_mfa}
+              onClick={() =>
+                patchConfig({ auto_start_openid_mfa: !appConfig.auto_start_openid_mfa })
+              }
+            />
+          </SettingRow>
+
+          <p className="footer">
+            Defguard is made possible by other open-source software.{' '}
+            <button
+              type="button"
+              className="link"
+              onClick={() => openUrl('https://docs.defguard.net/')}
+            >
+              Learn more here
+              <Icon icon={IconKind.OpenInNewWindow} size={14} />
+            </button>
+          </p>
+        </div>
+      )}
+      {activeTab === 'startup' && (
+        <div className="sections startup-settings">
+          <SettingRow
+            title="Start Defguard automatically when your operating system starts"
+            inline
+          >
+            <Toggle
+              active={autostartEnabled ?? false}
+              disabled={
+                isAutostartStatusPending || isAutostartStatusError || isAutostartUpdating
+              }
+              onClick={() => setAutostart(!autostartEnabled)}
+            />
+          </SettingRow>
+          <SettingRow title="Start the app minimized to the system tray" inline>
+            <Toggle
+              active={appConfig.start_minimized}
+              onClick={() => patchConfig({ start_minimized: !appConfig.start_minimized })}
+            />
+          </SettingRow>
+        </div>
+      )}
     </FullPage>
   );
 };

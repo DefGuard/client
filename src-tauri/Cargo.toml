@@ -155,6 +155,7 @@ tauri = { version = "2", features = [
     "image-png",
     "tray-icon",
 ] }
+tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"

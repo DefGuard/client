@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
 import { error } from '@tauri-apps/plugin-log';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { useMfaClientAttempt } from '../../../../../../shared/hooks/useMfaClientAttempt';
 import { api } from '../../../../../../shared/rust-api/api';
@@ -9,6 +9,7 @@ import {
   classifyOidcPollFailure,
   isMfaPostureError,
   isServiceUnavailable,
+  isTimeout,
   mfaErrorMessage,
 } from '../../../../../../shared/rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../../../../shared/rust-api/query';
@@ -41,11 +42,19 @@ export const useConnectModalMfaOidc = ({
   const [startError, setStartError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
+  const isPollingRef = useRef(false);
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const instance = instances?.find((i) => i.id === location?.instance_id);
 
   const { startAttempt } = useMfaClientAttempt();
+
+  useEffect(
+    () => () => {
+      if (isPollingRef.current) setMfaToken(null);
+    },
+    [setMfaToken],
+  );
 
   const start = useCallback(async () => {
     if (!instance || !location) {
@@ -53,10 +62,17 @@ export const useConnectModalMfaOidc = ({
       return;
     }
 
+    const replacedPollingAttempt = isPollingRef.current;
     const attempt = startAttempt();
+    if (replacedPollingAttempt) {
+      isPollingRef.current = false;
+      setIsPolling(false);
+      setMfaToken(null);
+    }
     setIsStarting(true);
     setStartError(null);
     setPollError(null);
+    let beginningStep = true;
 
     try {
       const session = await api.mfaBeginStep(
@@ -64,8 +80,9 @@ export const useConnectModalMfaOidc = ({
         location.id,
         MfaMethod.Oidc,
         stepPlan,
-        mfaToken,
+        replacedPollingAttempt ? null : mfaToken,
       );
+      beginningStep = false;
       if (!attempt.isLive()) return;
 
       const openIdUrl = buildOpenIdMfaUrl(
@@ -78,6 +95,7 @@ export const useConnectModalMfaOidc = ({
       setMfaToken(session.token);
 
       setIsStarting(false);
+      isPollingRef.current = true;
       setIsPolling(true);
 
       const taskId = await api.mfaPollOpenId(
@@ -95,6 +113,7 @@ export const useConnectModalMfaOidc = ({
       await attempt.ownListener(
         listen(TauriEvent.MfaOpenIdComplete, () => {
           if (!attempt.tryFinish()) return;
+          isPollingRef.current = false;
           setIsPolling(false);
         }),
       );
@@ -103,6 +122,7 @@ export const useConnectModalMfaOidc = ({
       await attempt.ownListener(
         listen<MfaStepAdvancedPayload>(TauriEvent.MfaOpenIdStepAdvanced, (event) => {
           if (!attempt.tryFinish()) return;
+          isPollingRef.current = false;
           setIsPolling(false);
           goToStep(event.payload.nextStep);
         }),
@@ -112,11 +132,15 @@ export const useConnectModalMfaOidc = ({
       await attempt.ownListener(
         listen<MfaErrorPayload>(TauriEvent.MfaOpenIdError, (event) => {
           if (!attempt.tryFinish()) return;
+          isPollingRef.current = false;
           setIsPolling(false);
           void error(
             `OIDC MFA failed for location ${location.id}: ${event.payload.error}`,
           );
           const failure = classifyOidcPollFailure(event.payload.error);
+          if (failure.kind !== 'timeout' && !isServiceUnavailable(event.payload.error)) {
+            setMfaToken(null);
+          }
           // The full view handles an expired session itself; the compact view shows a message.
           if (failure.kind === 'sessionExpired') {
             onSessionExpired?.();
@@ -128,6 +152,13 @@ export const useConnectModalMfaOidc = ({
     } catch (e) {
       if (!attempt.isLive()) return;
       attempt.abandon();
+      const retryable = isTimeout(e) || isServiceUnavailable(e);
+      if (beginningStep && !retryable) setMfaToken(null);
+      if (isPollingRef.current) {
+        isPollingRef.current = false;
+        setIsPolling(false);
+        if (!retryable) setMfaToken(null);
+      }
       void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
       if (isMfaPostureError(e, location)) {
         onPostureError?.(mfaErrorMessage(e));

@@ -37,8 +37,23 @@ if (-not $signtoolPath) {
     throw 'signtool.exe was not found.'
 }
 
+# Use the output directory of the most recently built main binary (--target aware).
+$targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { 'target' }
+$profileName = if ($env:TAURI_ENV_DEBUG -eq 'true') { 'debug' } else { 'release' }
+$candidates = @(Join-Path $targetDir $profileName)
+if ($env:TAURI_ENV_TARGET_TRIPLE) {
+    $candidates += Join-Path (Join-Path $targetDir $env:TAURI_ENV_TARGET_TRIPLE) $profileName
+}
+$outDir = $candidates |
+    Where-Object { Test-Path (Join-Path $_ 'defguard-client.exe') } |
+    Sort-Object { (Get-Item (Join-Path $_ 'defguard-client.exe')).LastWriteTime } -Descending |
+    Select-Object -First 1
+if (-not $outDir) {
+    throw "defguard-client.exe not found in: $($candidates -join ', ')"
+}
+
 $binaries = @(
-    'target\release\defguard-service.exe'
+    (Join-Path $outDir 'defguard-service.exe')
 )
 
 foreach ($binary in $binaries) {

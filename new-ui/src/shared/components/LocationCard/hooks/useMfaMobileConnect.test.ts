@@ -1,3 +1,4 @@
+import { decode, encode } from '@stablelib/base64';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type LocationInfo, TauriEvent } from '../../../rust-api/types';
@@ -35,6 +36,11 @@ const location = {
   posture_check_required: false,
 } as LocationInfo;
 
+const decodeQr = (qrValue: string | null) => {
+  if (qrValue === null) throw new Error('Expected approval QR to be available');
+  return new TextDecoder().decode(decode(qrValue));
+};
+
 type HookProps = {
   onConnected: () => void;
   onStepAdvanced: (nextStep: number) => void;
@@ -65,6 +71,73 @@ describe('useMfaMobileConnect', () => {
     vi.clearAllMocks();
     mocks.cancelMfa.mockResolvedValue(undefined);
     mocks.listen.mockResolvedValue(vi.fn());
+  });
+
+  it('uses the current step attempt ID and challenge in the approval QR', async () => {
+    mocks.mfaBeginStep
+      .mockResolvedValueOnce({
+        challenge: 'challenge-1',
+        token: 'token-1',
+        stepAttemptId: 'attempt-1',
+      })
+      .mockResolvedValueOnce({
+        challenge: 'challenge-2',
+        token: 'token-2',
+        stepAttemptId: 'attempt-2',
+      });
+    mocks.mfaConnectMobileApprove.mockResolvedValue('task-1');
+
+    const { result } = renderMobileHook();
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const firstQrValue = result.current.qrValue;
+    expect(firstQrValue).not.toBeNull();
+    expect(JSON.parse(decodeQr(firstQrValue))).toStrictEqual({
+      token: 'token-1',
+      challenge: 'challenge-1',
+      step_attempt_id: 'attempt-1',
+      instance_id: 'instance-uuid',
+    });
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const reopenedQrValue = result.current.qrValue;
+    expect(reopenedQrValue).not.toBe(firstQrValue);
+    expect(JSON.parse(decodeQr(reopenedQrValue))).toStrictEqual({
+      token: 'token-2',
+      challenge: 'challenge-2',
+      step_attempt_id: 'attempt-2',
+      instance_id: 'instance-uuid',
+    });
+  });
+
+  it('keeps the legacy approval QR JSON byte-identical', async () => {
+    const token = 'legacy-token';
+    const challenge = 'legacy-challenge';
+    mocks.mfaBeginStep.mockResolvedValue({
+      challenge,
+      token,
+      stepAttemptId: null,
+    });
+    mocks.mfaConnectMobileApprove.mockResolvedValue('task-legacy');
+
+    const { result } = renderMobileHook();
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    const expectedJson = JSON.stringify({
+      token,
+      challenge,
+      instance_id: 'instance-uuid',
+    });
+    expect(result.current.qrValue).toBe(encode(new TextEncoder().encode(expectedJson)));
   });
 
   it('does not re-park a rejected token after a callback rerender', async () => {
@@ -187,6 +260,117 @@ describe('useMfaMobileConnect', () => {
       await Promise.resolve();
     });
     expect(mocks.mfaConnectMobileApprove).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains and reuses the token after a retryable mobile timeout', async () => {
+    mocks.mfaBeginStep
+      .mockResolvedValueOnce({ challenge: 'challenge-1', token: 'token-1' })
+      .mockResolvedValueOnce({ challenge: 'challenge-2', token: 'token-2' });
+    mocks.mfaConnectMobileApprove.mockResolvedValue('task-1');
+
+    const { result, rerender } = renderMobileHook();
+    await act(async () => result.current.start());
+    await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(3));
+    const errorListener = mocks.listen.mock.calls.find(
+      ([event]) => event === TauriEvent.MfaMobileError,
+    )?.[1] as ((event: { payload: { error: string } }) => void) | undefined;
+
+    await act(async () => {
+      errorListener?.({ payload: { error: JSON.stringify({ type: 'timeout' }) } });
+    });
+
+    expect(mocks.setMfaToken).not.toHaveBeenCalledWith(null);
+    rerender({
+      onConnected: vi.fn(),
+      onStepAdvanced: vi.fn(),
+      mfaToken: 'token-1',
+    });
+    await act(async () => result.current.start());
+
+    expect(mocks.mfaBeginStep.mock.calls[1]?.[4]).toBe('token-1');
+  });
+
+  it('cancels and ignores completion from a replaced attempt before effect cleanup', async () => {
+    mocks.mfaBeginStep.mockResolvedValueOnce({
+      challenge: 'challenge-1',
+      token: 'token-1',
+    });
+    mocks.mfaConnectMobileApprove
+      .mockResolvedValueOnce('task-1')
+      .mockResolvedValueOnce('task-2');
+    const onConnected = vi.fn();
+    const { result } = renderMobileHook({
+      onConnected,
+      onStepAdvanced: vi.fn(),
+      mfaToken: null,
+    });
+
+    await act(async () => result.current.start());
+    await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(3));
+    const oldCompleteListener = mocks.listen.mock.calls.find(
+      ([event]) => event === TauriEvent.MfaMobileComplete,
+    )?.[1] as (() => void) | undefined;
+    mocks.mfaBeginStep.mockImplementationOnce(() => {
+      oldCompleteListener?.();
+      return Promise.resolve({ challenge: 'challenge-2', token: 'token-2' });
+    });
+
+    await act(async () => result.current.start());
+    await waitFor(() => expect(mocks.mfaConnectMobileApprove).toHaveBeenCalledTimes(2));
+
+    expect(mocks.cancelMfa).toHaveBeenCalledWith('task-1');
+    expect(mocks.mfaBeginStep.mock.calls[1]?.[4]).toBeNull();
+    expect(onConnected).not.toHaveBeenCalled();
+  });
+
+  it('invalidates completion immediately when reset cancels an active task', async () => {
+    mocks.mfaBeginStep.mockResolvedValue({ challenge: 'challenge-1', token: 'token-1' });
+    mocks.mfaConnectMobileApprove.mockResolvedValue('task-1');
+    const onConnected = vi.fn();
+    const { result } = renderMobileHook({
+      onConnected,
+      onStepAdvanced: vi.fn(),
+      mfaToken: null,
+    });
+
+    await act(async () => result.current.start());
+    await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(3));
+    const completeListener = mocks.listen.mock.calls.find(
+      ([event]) => event === TauriEvent.MfaMobileComplete,
+    )?.[1] as (() => void) | undefined;
+    mocks.cancelMfa.mockImplementationOnce(() => {
+      completeListener?.();
+      return Promise.resolve();
+    });
+
+    await act(async () => result.current.reset());
+
+    expect(onConnected).not.toHaveBeenCalled();
+  });
+
+  it('clears the token when a posture failure ends the session', async () => {
+    mocks.mfaBeginStep.mockRejectedValue(
+      JSON.stringify({ type: 'posture_rejected', message: 'Posture check failed' }),
+    );
+    const onPostureError = vi.fn();
+    const { result } = renderHook(() =>
+      useMfaMobileConnect(
+        { ...location, posture_check_required: true },
+        {
+          stepPlan: [],
+          mfaToken: 'existing-token',
+          setMfaToken: mocks.setMfaToken,
+          onStepAdvanced: vi.fn(),
+          onConnected: vi.fn(),
+          onPostureError,
+        },
+      ),
+    );
+
+    await act(async () => result.current.start());
+
+    expect(onPostureError).toHaveBeenCalledWith('Posture check failed');
+    expect(mocks.setMfaToken).toHaveBeenLastCalledWith(null);
   });
 
   it('uses a fresh token when explicitly retried', async () => {

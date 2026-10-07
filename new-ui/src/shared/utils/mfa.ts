@@ -1,3 +1,4 @@
+import { debug } from '@tauri-apps/plugin-log';
 import { OpenIdProvider } from '../consts';
 import {
   ConnectionType,
@@ -234,6 +235,32 @@ export const canAuthorizeMfaConfig = (instance?: MfaConfigInstance | null): bool
   );
   return holdsAuthorizer || isMfaMethodAvailable(MfaMethod.Email, instance);
 };
+
+/** Something to set up, and some way to verify the session that sets it up. */
+export const supportsMfaConfiguration = (instance: InstanceInfo): boolean => {
+  const canSetUp = setupMethodsOf(instance).length > 0;
+  const canAuthorize = canAuthorizeMfaConfig(instance);
+  if (canSetUp && canAuthorize) return true;
+  const excluded = `Instance (${instance.name}) is excluded from MFA configuration:`;
+  const capabilities = instance.mfa_capabilities;
+  if (canSetUp) {
+    void debug(`${excluded} no MFA method can authorize a configuration session`);
+  } else if (!isPresent(capabilities)) {
+    void debug(
+      `${excluded} it did not report MFA capabilities (version predates client MFA configuration)`,
+    );
+  } else if (capabilities.setup_methods.length === 0) {
+    void debug(`${excluded} it allows no MFA methods to be set up`);
+  } else {
+    void debug(
+      `${excluded} it allows setting up only ${capabilities.setup_methods.map(mfaToApi).join(', ')}, none of which this client can configure on this instance (${CLIENT_CONFIGURABLE_METHODS.map(mfaToApi).join(', ')})`,
+    );
+  }
+  return false;
+};
+
+export const mfaConfigurableInstances = (instances: InstanceInfo[]): InstanceInfo[] =>
+  instances.filter(supportsMfaConfiguration);
 
 /** How far the user can get connecting this location with the factors they hold. */
 export const ConnectionAbility = {

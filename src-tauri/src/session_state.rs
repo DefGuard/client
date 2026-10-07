@@ -24,6 +24,7 @@ pub enum SessionStateMfaMethod {
     Oidc,
     Biometric,
     MobileApprove,
+    Fido2,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -260,6 +261,7 @@ mod tests {
             openid_display_name: None,
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: defguard_client_core::mfa_contract::MfaContract::Legacy,
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
@@ -348,6 +350,27 @@ mod tests {
             .connection_mfa_method
             .insert("location-1".into(), Some(SessionStateMfaMethod::Totp));
         assert_eq!(state.persisted().view_selection, instance_selection(3));
+    }
+
+    // must accept every `MfaMethod` value from new-ui/src/shared/rust-api/types.ts
+    #[test]
+    fn test_patch_accepts_all_frontend_mfa_methods() {
+        for method in [
+            "totp",
+            "email",
+            "oidc",
+            "biometric",
+            "mobileapprove",
+            "fido2",
+        ] {
+            let patch: SessionStatePatch = serde_json::from_value(serde_json::json!({
+                "connection_mfa_method": { "location-1": method },
+            }))
+            .unwrap_or_else(|err| panic!("\"{method}\" rejected: {err}"));
+            let mut state = SessionState::default();
+            state.apply(patch);
+            assert!(state.connection_mfa_method["location-1"].is_some());
+        }
     }
 
     #[sqlx::test(migrations = "./migrations")]

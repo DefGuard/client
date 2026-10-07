@@ -1,7 +1,6 @@
 use core::fmt;
-use std::{collections::HashMap, env, future::Future, str::FromStr};
+use std::{collections::HashMap, env, future::Future, str::FromStr, sync::Arc};
 
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Duration, Utc};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
@@ -11,8 +10,9 @@ use defguard_client_core::{
         disconnect_interface, ConnectionTarget,
     },
     enrollment::{self},
-    mfa,
+    mfa::{self, MfaAuthSession},
     mfa_config::{self, AuthorizeProof, MfaConfigError, MfaConfigSession, SetupProof},
+    mfa_contract::MfaContract,
 };
 use defguard_client_fido2::{pin_policy, Assertion, Fido2Error, PinPolicy, PlatformContext};
 use defguard_client_posture::authorize_posture_session;
@@ -22,10 +22,10 @@ use defguard_client_proto::defguard::client::v1::{
 };
 use defguard_client_proto::defguard::{
     client_types::{
-        mfa_step_result, AdminInfo, ClientMfaFinishRequest, ClientMfaFinishResponse,
-        ClientMfaStartRequest, ClientMfaStepStartRequest, CodeMfaSetupFinishResponse,
-        CodeMfaSetupStartResponse, DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
-        InstanceInfo as ProtoInstanceInfo, MfaConfigAuthorizeResponse, MfaMethod, MfaStepResult,
+        mfa_step_result, AdminInfo, CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse,
+        DeviceConfigResponse, EnrollmentSettings, InitialUserInfo,
+        InstanceInfo as ProtoInstanceInfo, MfaConfigAuthorizeResponse, MfaFido2Assertion,
+        MfaMethod,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -45,7 +45,7 @@ use crate::{
     database::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
-            instance::{Instance, InstanceInfo},
+            instance::{mfa_contract_from_instance_info, Instance, InstanceInfo},
             location::{Location, LocationMfaMethod, LocationMfaMode, LocationMfaStep},
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
@@ -135,6 +135,101 @@ fn get_enrollment_session(
         .get(&uid)
         .cloned()
         .ok_or_else(|| "Enrollment session not found".to_string())
+}
+
+fn get_mfa_auth_session(
+    state: &AppState,
+    token: &str,
+    instance_id: Id,
+    location_id: Id,
+) -> Result<Arc<MfaAuthSession>, String> {
+    let route = state
+        .mfa_auth_sessions
+        .lock()
+        .expect("mfa_auth_sessions mutex poisoned")
+        .get(token)
+        .cloned()
+        .ok_or_else(|| "MFA session route is unavailable; restart authentication".to_string())?;
+    if route.instance_id != instance_id || route.location_id != location_id {
+        return Err("MFA session route is unavailable; restart authentication".into());
+    }
+    Ok(route)
+}
+
+fn mfa_route_step_attempt_id(
+    route: &MfaAuthSession,
+    requested: Option<String>,
+) -> Result<Option<String>, String> {
+    match route.contract {
+        MfaContract::Legacy if requested.is_some() => {
+            Err("Legacy MFA session does not use a step attempt ID".into())
+        }
+        MfaContract::Legacy => Ok(None),
+        MfaContract::MultiStep => {
+            let step_attempt_id = route
+                .step_attempt_id
+                .clone()
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| {
+                    "MFA session route is unavailable; restart authentication".to_string()
+                })?;
+            if matches!(requested.as_deref(), Some(requested) if requested != step_attempt_id) {
+                return Err("MFA step changed; restart authentication".into());
+            }
+            Ok(Some(step_attempt_id))
+        }
+    }
+}
+
+fn remember_mfa_auth_session(
+    state: &AppState,
+    token: String,
+    route: MfaAuthSession,
+) -> Arc<MfaAuthSession> {
+    let route = Arc::new(route);
+    state
+        .mfa_auth_sessions
+        .lock()
+        .expect("mfa_auth_sessions mutex poisoned")
+        .insert(token, route.clone());
+    route
+}
+
+fn forget_mfa_auth_session_if_current(
+    state: &AppState,
+    token: &str,
+    expected_route: &Arc<MfaAuthSession>,
+) -> bool {
+    let mut sessions = state
+        .mfa_auth_sessions
+        .lock()
+        .expect("mfa_auth_sessions mutex poisoned");
+    if matches!(sessions.get(token), Some(current) if Arc::ptr_eq(current, expected_route)) {
+        sessions.remove(token);
+        true
+    } else {
+        false
+    }
+}
+
+fn mfa_error_is_terminal(error: &mfa::MfaError) -> bool {
+    match error {
+        mfa::MfaError::Cancelled
+        | mfa::MfaError::AttemptLimit { .. }
+        | mfa::MfaError::PostureRejected { .. }
+        | mfa::MfaError::MfaRejected { .. }
+        | mfa::MfaError::Other { .. } => true,
+        mfa::MfaError::NetworkError { .. }
+        | mfa::MfaError::ProxyError { .. }
+        | mfa::MfaError::Timeout => false,
+    }
+}
+
+fn mfa_code_error_is_terminal(error: &mfa::MfaError) -> bool {
+    !matches!(error, mfa::MfaError::MfaRejected { message } if {
+        let message = message.trim();
+        message.eq_ignore_ascii_case("unauthorized") || message.eq_ignore_ascii_case("invalid code")
+    }) && mfa_error_is_terminal(error)
 }
 
 /// Bring up a location connection with an already-obtained preshared key and
@@ -758,6 +853,13 @@ pub async fn update_instance(
     trace!("Processing following response:\n {response:#?}");
     if let Some(mut instance) = Instance::find_by_id(&*DB_POOL, instance_id).await? {
         debug!("The instance with id {instance_id} to update was found: {instance}");
+        instance.mfa_contract = response
+            .instance
+            .as_ref()
+            .map(mfa_contract_from_instance_info)
+            .ok_or_else(|| {
+                Error::ResourceNotFound("instance info in device config response".to_string())
+            })?;
         let mut transaction = DB_POOL.begin().await?;
         let locations_changed =
             do_update_instance(&mut transaction, &mut instance, response).await?;
@@ -1606,6 +1708,22 @@ enum MfaTaskOutcome {
     },
 }
 
+fn cleanup_mfa_route_for_outcome(
+    state: &AppState,
+    session_route: Option<(&str, &Arc<MfaAuthSession>)>,
+    outcome: &Result<MfaTaskOutcome, mfa::MfaError>,
+) -> bool {
+    let should_cleanup = match outcome {
+        Ok(MfaTaskOutcome::Completed { .. }) => true,
+        Ok(MfaTaskOutcome::Advanced { .. }) => false,
+        Err(error) => mfa_error_is_terminal(error),
+    };
+    let Some((token, route)) = session_route.filter(|_| should_cleanup) else {
+        return false;
+    };
+    forget_mfa_auth_session_if_current(state, token, route)
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct MfaStepAdvancedPayload {
@@ -1615,40 +1733,45 @@ struct MfaStepAdvancedPayload {
 }
 
 fn classify_mfa_response(
-    response: ClientMfaFinishResponse,
+    response: mfa::MfaFinishResponse,
+    contract: MfaContract,
 ) -> Result<MfaTaskOutcome, mfa::MfaError> {
-    #[allow(deprecated)]
-    let legacy_preshared_key = response.preshared_key;
+    let outcome = match (contract, response) {
+        (MfaContract::Legacy, mfa::MfaFinishResponse::Legacy { preshared_key }) => {
+            return Ok(MfaTaskOutcome::Completed { preshared_key });
+        }
+        (MfaContract::MultiStep, mfa::MfaFinishResponse::MultiStep { result }) => result.outcome,
+        (MfaContract::MultiStep, mfa::MfaFinishResponse::Legacy { .. })
+        | (MfaContract::Legacy, mfa::MfaFinishResponse::MultiStep { .. }) => {
+            return Err(mfa::MfaError::Other {
+                message: "MFA finish response did not match the selected contract".into(),
+            });
+        }
+    };
 
-    match response.result {
-        Some(MfaStepResult {
-            outcome: Some(outcome),
-        }) => match outcome {
-            mfa_step_result::Outcome::Advanced(advanced) => Ok(MfaTaskOutcome::Advanced {
-                next_step: advanced.next_step,
-                token: None,
-            }),
-            mfa_step_result::Outcome::Completed(completed) => Ok(MfaTaskOutcome::Completed {
-                preshared_key: completed.preshared_key,
-            }),
-            mfa_step_result::Outcome::AwaitingExternal(_) => Err(mfa::MfaError::Other {
-                message: "The server returned an unexpected verification state".to_string(),
-            }),
-        },
-        Some(MfaStepResult { outcome: None }) => Err(mfa::MfaError::Other {
+    match outcome {
+        Some(mfa_step_result::Outcome::Advanced(advanced)) => Ok(MfaTaskOutcome::Advanced {
+            next_step: advanced.next_step,
+            token: None,
+        }),
+        Some(mfa_step_result::Outcome::Completed(completed)) => Ok(MfaTaskOutcome::Completed {
+            preshared_key: completed.preshared_key,
+        }),
+        Some(mfa_step_result::Outcome::AwaitingExternal(_)) => Err(mfa::MfaError::Other {
             message: "The server returned an unexpected verification state".to_string(),
         }),
-        None => Ok(MfaTaskOutcome::Completed {
-            preshared_key: legacy_preshared_key,
+        None => Err(mfa::MfaError::Other {
+            message: "MFA flow response did not include an outcome".into(),
         }),
     }
 }
 
 fn classify_fido2_response(
-    response: ClientMfaFinishResponse,
+    response: mfa::MfaFinishResponse,
     token: String,
+    contract: MfaContract,
 ) -> Result<MfaTaskOutcome, mfa::MfaError> {
-    match classify_mfa_response(response)? {
+    match classify_mfa_response(response, contract)? {
         MfaTaskOutcome::Advanced { next_step, .. } => Ok(MfaTaskOutcome::Advanced {
             next_step,
             token: Some(token),
@@ -1701,72 +1824,68 @@ pub struct MfaBeginStepResponse {
 }
 
 enum MfaBeginStepInput {
-    Start(Box<ClientMfaStartRequest>),
+    Start(Box<mfa::MfaStartRequest>),
     Continue(String),
 }
 
-/// Returns the existing MFA session token only for multi-step-capable instances.
-///
-/// Pre-2.2 sessions are bound to one method, so switching methods must start a
-/// new session to obtain the selected method's challenge.
+fn mfa_contract_for_session(
+    instance_contract: MfaContract,
+    existing_session: Option<&MfaAuthSession>,
+) -> MfaContract {
+    existing_session.map_or(instance_contract, |session| session.contract)
+}
+
+/// Legacy sessions are bound to one method, so switching methods starts a new session.
 fn reusable_mfa_continuation_token(
-    state: &AppState,
-    instance_id: Id,
+    mfa_contract: MfaContract,
     token: Option<String>,
 ) -> Option<String> {
-    token.filter(|_| state.is_multi_step_mfa_capable(instance_id))
+    token.filter(|_| mfa_contract == MfaContract::MultiStep)
+}
+
+fn ensure_fido2_supported(contract: MfaContract) -> Result<(), mfa::MfaError> {
+    if contract == MfaContract::Legacy {
+        return Err(mfa::MfaError::Other {
+            message: "FIDO2 requires the multi-step MFA contract".into(),
+        });
+    }
+    Ok(())
 }
 
 async fn begin_mfa_step(
-    state: &AppState,
-    instance_id: Id,
+    contract: MfaContract,
     proxy_url: Url,
     method: MfaMethod,
     input: MfaBeginStepInput,
 ) -> Result<MfaBeginStepResponse, mfa::MfaError> {
-    let (token, start_challenge, start_credential_ids, capable) = match input {
-        MfaBeginStepInput::Start(request) => {
-            let result = mfa::mfa_start_with_capability(proxy_url.clone(), *request).await?;
-            let capable = result.multi_step_mfa_capable;
-            state.set_multi_step_mfa_capable(instance_id, capable);
-            (
-                result.response.token,
-                result.response.challenge,
-                result.response.credential_ids,
-                capable,
-            )
-        }
-        MfaBeginStepInput::Continue(token) => (
-            token,
-            None,
-            Vec::new(),
-            state.is_multi_step_mfa_capable(instance_id),
-        ),
-    };
-
-    if capable {
-        let response = mfa::mfa_step_start(
-            proxy_url,
-            ClientMfaStepStartRequest {
-                token: token.clone(),
-                method: method as i32,
-            },
-        )
-        .await?;
-        return Ok(MfaBeginStepResponse {
-            token,
-            challenge: response.challenge.or(start_challenge),
-            step_attempt_id: Some(response.step_attempt_id),
-            credential_ids: response.credential_ids,
-        });
+    if method == MfaMethod::Fido2 {
+        ensure_fido2_supported(contract)?;
     }
-
-    Ok(MfaBeginStepResponse {
-        token,
-        challenge: start_challenge,
-        step_attempt_id: None,
-        credential_ids: start_credential_ids,
-    })
+    match input {
+        MfaBeginStepInput::Start(request) => {
+            let response = mfa::mfa_start(contract, proxy_url, *request).await?;
+            Ok(MfaBeginStepResponse {
+                token: response.token,
+                challenge: response.first_step.challenge,
+                step_attempt_id: response.first_step.step_attempt_id,
+                credential_ids: response.first_step.credential_ids,
+            })
+        }
+        MfaBeginStepInput::Continue(token) => {
+            if contract != MfaContract::MultiStep {
+                return Err(mfa::MfaError::Other {
+                    message: "The legacy MFA contract does not support step start".into(),
+                });
+            }
+            let response = mfa::mfa_step_start(proxy_url, token.clone(), method).await?;
+            Ok(MfaBeginStepResponse {
+                token,
+                challenge: response.challenge,
+                step_attempt_id: response.step_attempt_id,
+                credential_ids: response.credential_ids,
+            })
+        }
+    }
 }
 
 /// Builds the MFA start request from the method plan and device data.
@@ -1774,10 +1893,10 @@ async fn mfa_start_request(
     instance_id: Id,
     location_id: Id,
     step_methods: &[MfaMethod],
-) -> Result<ClientMfaStartRequest, String> {
-    let first_step_method = *step_methods
-        .first()
-        .ok_or_else(|| "MFA method plan is empty".to_string())?;
+) -> Result<mfa::MfaStartRequest, String> {
+    if step_methods.is_empty() {
+        return Err("MFA method plan is empty".to_string());
+    }
     let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
@@ -1786,6 +1905,9 @@ async fn mfa_start_request(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Location not found".to_string())?;
+    if location.instance_id != instance_id {
+        return Err("Location does not belong to the instance".into());
+    }
     // FIXME: ugly struct
     ConnectionTarget::Location(location.clone())
         .ensure_single_all_traffic_connection(&DB_POOL, None)
@@ -1800,16 +1922,11 @@ async fn mfa_start_request(
     } else {
         None
     };
-    #[allow(deprecated)]
-    Ok(ClientMfaStartRequest {
+    Ok(mfa::MfaStartRequest {
         location_id: location.network_id,
         pubkey: keys.pubkey,
-        method: first_step_method as i32,
         posture_data,
-        selected_methods: step_methods
-            .iter()
-            .map(|method| *method as i32)
-            .collect::<Vec<i32>>(),
+        selected_methods: step_methods.to_vec(),
     })
 }
 
@@ -1828,10 +1945,18 @@ pub async fn mfa_begin_step(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-
-    let input = if let Some(token) = reusable_mfa_continuation_token(&state, instance_id, token) {
+    let existing = token
+        .as_deref()
+        .map(|token| get_mfa_auth_session(&state, token, instance_id, location_id))
+        .transpose()?;
+    let contract = mfa_contract_for_session(instance.mfa_contract, existing.as_deref());
+    let proxy_url = match &existing {
+        Some(route) => route.proxy_url.clone(),
+        None => Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?,
+    };
+    let continuation = reusable_mfa_continuation_token(contract, token.clone());
+    let token_to_replace = token.clone().filter(|_| continuation.is_none());
+    let input = if let Some(token) = continuation {
         MfaBeginStepInput::Continue(token)
     } else {
         let step_methods = step_plan
@@ -1842,9 +1967,32 @@ pub async fn mfa_begin_step(
         MfaBeginStepInput::Start(Box::new(request))
     };
 
-    begin_mfa_step(&state, instance_id, proxy_url, method, input)
-        .await
-        .map_err(err_to_json)
+    let response = match begin_mfa_step(contract, proxy_url.clone(), method, input).await {
+        Ok(response) => response,
+        Err(error) => {
+            if mfa_error_is_terminal(&error) {
+                if let (Some(token), Some(route)) = (token.as_deref(), existing.as_ref()) {
+                    forget_mfa_auth_session_if_current(&state, token, route);
+                }
+            }
+            return Err(err_to_json(error));
+        }
+    };
+    if let (Some(token), Some(route)) = (token_to_replace.as_deref(), existing.as_ref()) {
+        forget_mfa_auth_session_if_current(&state, token, route);
+    }
+    remember_mfa_auth_session(
+        &state,
+        response.token.clone(),
+        MfaAuthSession {
+            contract,
+            step_attempt_id: response.step_attempt_id.clone(),
+            instance_id,
+            location_id,
+            proxy_url,
+        },
+    );
+    Ok(response)
 }
 
 #[tauri::command(async)]
@@ -1854,49 +2002,53 @@ pub async fn mfa_finish_code(
     token: String,
     code: String,
     step_attempt_id: Option<String>,
+    state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<Option<u32>, String> {
     debug!("Finishing MFA with code for instance {instance_id}");
-    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+    let _instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
-    let request = ClientMfaFinishRequest {
-        token,
-        code: Some(code),
-        auth_pub_key: None,
-        step_attempt_id,
-        auth_data: None,
-        credential_id: None,
+    let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
+    let step_attempt_id = mfa_route_step_attempt_id(&route, step_attempt_id)?;
+    let response = match mfa::mfa_finish(
+        route.contract,
+        route.proxy_url.clone(),
+        mfa::MfaFinishRequest {
+            token: token.clone(),
+            step_attempt_id,
+            submission: Some(mfa::MfaFinishSubmission::Code(code)),
+        },
+    )
+    .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            if mfa_code_error_is_terminal(&error) {
+                forget_mfa_auth_session_if_current(&state, &token, &route);
+            }
+            return Err(err_to_json(error));
+        }
     };
-    let response = mfa::mfa_finish_code(proxy_url, request)
-        .await
-        .map_err(err_to_json)?;
 
-    #[allow(deprecated)]
-    let legacy_preshared_key = response.preshared_key;
-
-    match response.result.and_then(|result| result.outcome) {
-        Some(mfa_step_result::Outcome::Advanced(advanced)) => {
-            debug!(
-                "MFA step passed, advancing to step index {}",
-                advanced.next_step
-            );
-            Ok(Some(advanced.next_step))
+    let outcome = match classify_mfa_response(response, route.contract) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            if mfa_code_error_is_terminal(&error) {
+                forget_mfa_auth_session_if_current(&state, &token, &route);
+            }
+            return Err(err_to_json(error));
         }
-        Some(mfa_step_result::Outcome::Completed(completed)) => {
-            connect_after_mfa(location_id, Some(completed.preshared_key), &handle).await?;
-            Ok(None)
+    };
+    match outcome {
+        MfaTaskOutcome::Advanced { next_step, .. } => {
+            debug!("MFA step passed, advancing to step index {next_step}");
+            Ok(Some(next_step))
         }
-        Some(mfa_step_result::Outcome::AwaitingExternal(_)) => {
-            Err(err_to_json(mfa::MfaError::Other {
-                message: "The server returned an unexpected verification state".to_string(),
-            }))
-        }
-        None => {
-            connect_after_mfa(location_id, Some(legacy_preshared_key), &handle).await?;
+        MfaTaskOutcome::Completed { preshared_key } => {
+            forget_mfa_auth_session_if_current(&state, &token, &route);
+            connect_after_mfa(location_id, Some(preshared_key), &handle).await?;
             Ok(None)
         }
     }
@@ -1910,6 +2062,7 @@ fn spawn_mfa_task<F, R>(
     complete_event: EventKey,
     advanced_event: EventKey,
     error_event: EventKey,
+    session_route: Option<(String, Arc<MfaAuthSession>)>,
     run: R,
 ) -> String
 where
@@ -1935,6 +2088,13 @@ where
             .lock()
             .expect("mfa_tasks mutex poisoned")
             .remove(&task_id_for_task);
+        cleanup_mfa_route_for_outcome(
+            &listen_handle.state::<AppState>(),
+            session_route
+                .as_ref()
+                .map(|(token, route)| (token.as_str(), route)),
+            &result,
+        );
         match result {
             Ok(MfaTaskOutcome::Completed { preshared_key }) => {
                 info!("MFA completed for task {task_id_for_task}");
@@ -1981,25 +2141,30 @@ pub async fn mfa_poll_openid(
     location_id: Id,
     token: String,
     step_attempt_id: Option<String>,
+    state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting OpenID MFA poll for instance {instance_id}");
-    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+    let _instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
+    let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
+    let step_attempt_id = mfa_route_step_attempt_id(&route, step_attempt_id)?;
+    let proxy_url = route.proxy_url.clone();
+    let session_token = token.clone();
+    let contract = route.contract;
     Ok(spawn_mfa_task(
         &handle,
         location_id,
         EventKey::MfaOpenIdComplete,
         EventKey::MfaOpenIdStepAdvanced,
         EventKey::MfaOpenIdError,
+        Some((session_token, route.clone())),
         move |cancel| async move {
-            mfa::poll_openid_mfa(proxy_url, token, step_attempt_id, cancel)
+            mfa::poll_openid_mfa(contract, proxy_url, token, step_attempt_id, cancel)
                 .await
-                .and_then(classify_mfa_response)
+                .and_then(|response| classify_mfa_response(response, contract))
         },
     ))
 }
@@ -2009,26 +2174,48 @@ pub async fn mfa_connect_mobile_approve(
     instance_id: Id,
     location_id: Id,
     token: String,
+    state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting mobile approve MFA for instance {instance_id}");
-    let instance = Instance::find_by_id(&*DB_POOL, instance_id)
+    let _instance = Instance::find_by_id(&*DB_POOL, instance_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
-    let ws_url = mfa::derive_ws_url(&proxy_url, &token).map_err(|e| e.to_string())?;
+    let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
+    let step_attempt_id = match mfa_route_step_attempt_id(&route, None) {
+        Ok(step_attempt_id) => step_attempt_id,
+        Err(error) => {
+            forget_mfa_auth_session_if_current(&state, &token, &route);
+            return Err(error);
+        }
+    };
+    let ws_url = match mfa::derive_ws_url(
+        route.contract,
+        &route.proxy_url,
+        &token,
+        step_attempt_id.as_deref(),
+    ) {
+        Ok(ws_url) => ws_url,
+        Err(error) => {
+            if mfa_error_is_terminal(&error) {
+                forget_mfa_auth_session_if_current(&state, &token, &route);
+            }
+            return Err(err_to_json(error));
+        }
+    };
+    let contract = route.contract;
     Ok(spawn_mfa_task(
         &handle,
         location_id,
         EventKey::MfaMobileComplete,
         EventKey::MfaMobileStepAdvanced,
         EventKey::MfaMobileError,
+        Some((token.clone(), route.clone())),
         move |cancel| async move {
-            mfa::connect_mobile_approve(&ws_url, cancel)
+            mfa::connect_mobile_approve(contract, &ws_url, cancel)
                 .await
-                .and_then(classify_mfa_response)
+                .and_then(|response| classify_mfa_response(response, contract))
         },
     ))
 }
@@ -2181,19 +2368,20 @@ struct Fido2Start {
     location_id: Id,
     methods: Vec<MfaMethod>,
     token: Option<String>,
+    contract: MfaContract,
 }
 
 /// Gets the FIDO2 challenge and available credentials from Edge.
 async fn fido2_challenge(
     proxy_url: &Url,
     start: Fido2Start,
-    handle: &AppHandle,
 ) -> Result<Fido2Challenge, mfa::MfaError> {
     let Fido2Start {
         instance_id,
         location_id,
         methods,
         token,
+        contract,
     } = start;
     let input = match token {
         Some(token) => MfaBeginStepInput::Continue(token),
@@ -2203,14 +2391,7 @@ async fn fido2_challenge(
                 .map_err(|message| mfa::MfaError::Other { message })?,
         )),
     };
-    let response = begin_mfa_step(
-        &handle.state::<AppState>(),
-        instance_id,
-        proxy_url.clone(),
-        MfaMethod::Fido2,
-        input,
-    )
-    .await?;
+    let response = begin_mfa_step(contract, proxy_url.clone(), MfaMethod::Fido2, input).await?;
 
     // A missing challenge means Edge did not recognize this as a FIDO2 step.
     let challenge = response.challenge.ok_or_else(|| mfa::MfaError::Other {
@@ -2268,49 +2449,81 @@ async fn run_fido2_mfa(
     cancel: CancellationToken,
     handle: AppHandle,
 ) -> Result<MfaTaskOutcome, mfa::MfaError> {
+    let contract = start.contract;
+    let instance_id = start.instance_id;
+    let location_id = start.location_id;
     let challenge = tokio::select! {
         () = cancel.cancelled() => return Err(mfa::MfaError::Cancelled),
-        challenge = fido2_challenge(&proxy_url, start, &handle) => challenge?,
+        challenge = fido2_challenge(&proxy_url, start) => challenge?,
     };
     let session_token = challenge.token.clone();
     let step_attempt_id = challenge.step_attempt_id.clone();
+    let route = remember_mfa_auth_session(
+        &handle.state::<AppState>(),
+        session_token.clone(),
+        MfaAuthSession {
+            contract,
+            step_attempt_id: step_attempt_id.clone(),
+            instance_id,
+            location_id,
+            proxy_url: proxy_url.clone(),
+        },
+    );
 
-    // Tell the frontend to ask for a touch.
-    let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
+    let result = async {
+        // Tell the frontend to ask for a touch.
+        let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
 
-    // The prompt must not open behind the panel that asked for it.
-    let _level = WindowLevelGuard::lower(&window);
-    // Handed to the ceremony rather than raced against here, since only the platform can take
-    // its own modal dialog down.
-    let assertion = fido2_assertion(
-        rp_id,
-        challenge,
-        pin,
-        platform_context(&window),
-        cancel.clone(),
-    )
-    .await?;
+        // The prompt must not open behind the panel that asked for it.
+        let _level = WindowLevelGuard::lower(&window);
+        // Handed to the ceremony rather than raced against here, since only the platform can take
+        // its own modal dialog down.
+        let assertion = fido2_assertion(
+            rp_id,
+            challenge,
+            pin,
+            platform_context(&window),
+            cancel.clone(),
+        )
+        .await?;
 
-    // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
-    // over. Finishing here would bring the tunnel up after the user backed out.
-    if cancel.is_cancelled() {
-        debug!("FIDO2 MFA was cancelled, discarding the assertion");
-        return Err(mfa::MfaError::Cancelled);
+        // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
+        // over. Finishing here would bring the tunnel up after the user backed out.
+        if cancel.is_cancelled() {
+            debug!("FIDO2 MFA was cancelled, discarding the assertion");
+            return Err(mfa::MfaError::Cancelled);
+        }
+
+        let Some(rp_id_hash) = assertion.authenticator_data.get(..32) else {
+            return Err(mfa::MfaError::Other {
+                message: "Security key returned malformed authenticator data".into(),
+            });
+        };
+        let response = mfa::mfa_finish(
+            contract,
+            proxy_url,
+            mfa::MfaFinishRequest {
+                token: session_token.clone(),
+                step_attempt_id,
+                submission: Some(mfa::MfaFinishSubmission::Fido2(MfaFido2Assertion {
+                    rp_id_hash: rp_id_hash.to_vec(),
+                    authenticator_data: assertion.authenticator_data,
+                    signature: assertion.signature,
+                    credential_id: assertion.credential_id,
+                })),
+            },
+        )
+        .await?;
+        classify_fido2_response(response, session_token.clone(), contract)
     }
+    .await;
 
-    let request = ClientMfaFinishRequest {
-        token: session_token.clone(),
-        // Send the signature in the legacy `auth_pub_key` field.
-        code: None,
-        auth_pub_key: Some(BASE64_URL_SAFE_NO_PAD.encode(&assertion.signature)),
-        step_attempt_id,
-        auth_data: Some(assertion.authenticator_data),
-        // Names the key that answered, so Core can offer just this credential
-        // next time instead of every one the user registered.
-        credential_id: Some(assertion.credential_id),
-    };
-    let response = mfa::mfa_finish_code(proxy_url, request).await?;
-    classify_fido2_response(response, session_token)
+    cleanup_mfa_route_for_outcome(
+        &handle.state::<AppState>(),
+        Some((&session_token, &route)),
+        &result,
+    );
+    result
 }
 
 /// Returns the host the security key must use for this instance.
@@ -2327,6 +2540,7 @@ fn fido2_rp_id(instance: &Instance<Id>) -> Result<String, String> {
 /// Emits `mfa-fido2-complete`, `mfa-fido2-step-advanced`, or `mfa-fido2-error` events.
 /// Returns the task ID used to cancel it.
 #[tauri::command(async)]
+#[allow(clippy::too_many_arguments)]
 pub async fn mfa_fido2_pin(
     instance_id: Id,
     location_id: Id,
@@ -2334,6 +2548,7 @@ pub async fn mfa_fido2_pin(
     token: Option<String>,
     pin: Option<String>,
     window: WebviewWindow,
+    state: State<'_, AppState>,
     handle: AppHandle,
 ) -> Result<String, String> {
     debug!("Starting FIDO2 MFA for location {location_id} of instance {instance_id}");
@@ -2348,15 +2563,29 @@ pub async fn mfa_fido2_pin(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
-    let proxy_url =
-        Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?;
+    let route = token
+        .as_deref()
+        .map(|token| get_mfa_auth_session(&state, token, instance_id, location_id))
+        .transpose()?;
+    let proxy_url = match &route {
+        Some(route) => route.proxy_url.clone(),
+        None => {
+            Url::parse(&instance.proxy_url).map_err(|err| format!("Invalid Edge URL: {err}"))?
+        }
+    };
     let rp_id = fido2_rp_id(&instance)?;
+    let contract = route
+        .as_ref()
+        .map_or(instance.mfa_contract, |route| route.contract);
+    ensure_fido2_supported(contract).map_err(|error| error.to_string())?;
 
+    let session_route = token.clone().zip(route.clone());
     let start = Fido2Start {
         instance_id,
         location_id,
         methods: step_methods,
         token,
+        contract,
     };
 
     let task_handle = handle.clone();
@@ -2366,6 +2595,7 @@ pub async fn mfa_fido2_pin(
         EventKey::MfaFido2Complete,
         EventKey::MfaFido2StepAdvanced,
         EventKey::MfaFido2Error,
+        session_route,
         move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, window, cancel, task_handle),
     ))
 }
@@ -2887,12 +3117,11 @@ pub async fn mfa_config_cancel(
 
 #[cfg(test)]
 mod tests {
-    use defguard_client_core::{
-        database::models::instance::MfaCapabilities,
-        version::{CORE_VERSION_HEADER, PROXY_VERSION_HEADER},
-    };
+    use defguard_client_core::database::models::instance::MfaCapabilities;
     use defguard_client_proto::defguard::client_types::{
-        MfaAdvanced, MfaAwaitingExternal, MfaCompleted,
+        mfa_flow_start_response, mfa_step_started, MfaAdvanced, MfaAwaitingExternal, MfaCompleted,
+        MfaFido2Challenge, MfaFlowStartAccepted, MfaFlowStartResponse, MfaFlowStepStartResponse,
+        MfaStepResult, MfaStepStarted,
     };
     use serde_json::json;
     use wiremock::{
@@ -2902,109 +3131,346 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_fido2_requires_multi_step_contract() {
+        assert!(ensure_fido2_supported(MfaContract::Legacy).is_err());
+        assert!(ensure_fido2_supported(MfaContract::MultiStep).is_ok());
+    }
+
     fn mock_url(server: &MockServer) -> Url {
         Url::parse(&server.uri()).expect("MockServer URI should be valid")
     }
 
-    fn start_request() -> ClientMfaStartRequest {
+    fn start_request() -> mfa::MfaStartRequest {
         start_request_with_method(MfaMethod::Totp)
     }
 
-    fn start_request_with_method(method: MfaMethod) -> ClientMfaStartRequest {
-        ClientMfaStartRequest {
+    fn start_request_with_method(method: MfaMethod) -> mfa::MfaStartRequest {
+        mfa::MfaStartRequest {
             location_id: 1,
             pubkey: "pk".into(),
-            #[allow(deprecated)]
-            method: method as i32,
             posture_data: None,
-            selected_methods: vec![method as i32],
+            selected_methods: vec![method],
         }
     }
 
     fn start_response(
         token: &str,
         challenge: Option<&str>,
-        core_version: Option<&str>,
-        proxy_version: Option<&str>,
+        _core_version: Option<&str>,
+        _proxy_version: Option<&str>,
     ) -> ResponseTemplate {
-        let mut response = ResponseTemplate::new(200).set_body_json(json!({
-            "token": token,
-            "challenge": challenge,
-        }));
-        if let Some(version) = core_version {
-            response = response.insert_header(CORE_VERSION_HEADER, version);
-        }
-        if let Some(version) = proxy_version {
-            response = response.insert_header(PROXY_VERSION_HEADER, version);
-        }
-        response
-    }
-
-    fn step_response(attempt_id: &str, challenge: Option<&str>) -> ResponseTemplate {
         ResponseTemplate::new(200).set_body_json(json!({
-            "step_attempt_id": attempt_id,
+            "token": token,
             "challenge": challenge,
         }))
     }
 
-    fn fido2_start_response(token: &str, challenge: &str) -> ResponseTemplate {
-        ResponseTemplate::new(200).set_body_json(json!({
-            "token": token,
-            "challenge": challenge,
-            "credential_ids": ["credential-1"],
-        }))
+    fn flow_start_response(token: &str, attempt_id: &str, challenge: &str) -> ResponseTemplate {
+        ResponseTemplate::new(200).set_body_json(MfaFlowStartResponse {
+            outcome: Some(mfa_flow_start_response::Outcome::Accepted(
+                MfaFlowStartAccepted {
+                    token: token.into(),
+                    first_step: Some(MfaStepStarted {
+                        step_attempt_id: attempt_id.into(),
+                        challenge: Some(mfa_step_started::Challenge::Signature(
+                            defguard_client_proto::defguard::client_types::MfaSignatureChallenge {
+                                challenge: challenge.into(),
+                            },
+                        )),
+                    }),
+                },
+            )),
+        })
     }
 
-    fn fido2_step_response(
+    fn fido2_flow_start_response(
+        token: &str,
         attempt_id: &str,
         challenge: &str,
         credential_ids: &[&str],
     ) -> ResponseTemplate {
-        ResponseTemplate::new(200).set_body_json(json!({
-            "step_attempt_id": attempt_id,
-            "challenge": challenge,
-            "credential_ids": credential_ids,
-        }))
+        ResponseTemplate::new(200).set_body_json(MfaFlowStartResponse {
+            outcome: Some(mfa_flow_start_response::Outcome::Accepted(
+                MfaFlowStartAccepted {
+                    token: token.into(),
+                    first_step: Some(MfaStepStarted {
+                        step_attempt_id: attempt_id.into(),
+                        challenge: Some(mfa_step_started::Challenge::Fido2(MfaFido2Challenge {
+                            challenge: challenge.into(),
+                            credential_ids: credential_ids
+                                .iter()
+                                .map(|id| (*id).to_string())
+                                .collect(),
+                        })),
+                    }),
+                },
+            )),
+        })
+    }
+
+    fn step_response(attempt_id: &str, challenge: Option<&str>) -> ResponseTemplate {
+        ResponseTemplate::new(200).set_body_json(MfaFlowStepStartResponse {
+            started: Some(MfaStepStarted {
+                step_attempt_id: attempt_id.into(),
+                challenge: challenge.map(|challenge| {
+                    mfa_step_started::Challenge::Signature(
+                        defguard_client_proto::defguard::client_types::MfaSignatureChallenge {
+                            challenge: challenge.into(),
+                        },
+                    )
+                }),
+            }),
+        })
     }
 
     #[test]
-    fn test_reusable_mfa_continuation_token_requires_multi_step_capability() {
-        let state = AppState::new(AppConfig::default(), None);
-
-        assert!(reusable_mfa_continuation_token(&state, 1, Some("token-1".into())).is_none());
-
-        state.set_multi_step_mfa_capable(1, true);
+    fn test_reusable_mfa_continuation_token_requires_multi_step_contract() {
+        assert!(
+            reusable_mfa_continuation_token(MfaContract::Legacy, Some("token-1".into())).is_none()
+        );
         assert_eq!(
-            reusable_mfa_continuation_token(&state, 1, Some("token-1".into())).as_deref(),
+            reusable_mfa_continuation_token(MfaContract::MultiStep, Some("token-1".into()))
+                .as_deref(),
             Some("token-1")
         );
     }
 
+    #[test]
+    fn test_existing_mfa_route_keeps_its_contract_after_instance_update() {
+        let route = MfaAuthSession {
+            contract: MfaContract::Legacy,
+            step_attempt_id: None,
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+        assert_eq!(
+            mfa_contract_for_session(MfaContract::MultiStep, Some(&route)),
+            MfaContract::Legacy
+        );
+        assert_eq!(
+            mfa_contract_for_session(MfaContract::MultiStep, None),
+            MfaContract::MultiStep
+        );
+    }
+
+    #[test]
+    fn test_mfa_route_is_bound_to_its_location_and_original_proxy() {
+        let state = AppState::new(AppConfig::default(), None);
+        let proxy_url = Url::parse("https://original-proxy.example.com").unwrap();
+        remember_mfa_auth_session(
+            &state,
+            "token-1".into(),
+            MfaAuthSession {
+                contract: MfaContract::Legacy,
+                step_attempt_id: None,
+                instance_id: 1,
+                location_id: 2,
+                proxy_url: proxy_url.clone(),
+            },
+        );
+
+        let route = get_mfa_auth_session(&state, "token-1", 1, 2).unwrap();
+        assert_eq!(route.proxy_url, proxy_url);
+        assert!(get_mfa_auth_session(&state, "token-1", 3, 2).is_err());
+        assert!(get_mfa_auth_session(&state, "unknown", 1, 2).is_err());
+    }
+
+    #[test]
+    fn test_mfa_route_cleanup_does_not_remove_replacement() {
+        let state = AppState::new(AppConfig::default(), None);
+        let route = || MfaAuthSession {
+            contract: MfaContract::MultiStep,
+            step_attempt_id: Some("attempt-1".into()),
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+        let first = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let replacement = remember_mfa_auth_session(&state, "token-1".into(), route());
+
+        let completed = Ok(MfaTaskOutcome::Completed {
+            preshared_key: "key".into(),
+        });
+        assert!(!cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &first)),
+            &completed,
+        ));
+        let current = get_mfa_auth_session(&state, "token-1", 1, 2).unwrap();
+        assert!(Arc::ptr_eq(&current, &replacement));
+        assert!(forget_mfa_auth_session_if_current(
+            &state,
+            "token-1",
+            &replacement
+        ));
+        assert!(get_mfa_auth_session(&state, "token-1", 1, 2).is_err());
+    }
+
+    #[test]
+    fn test_mfa_route_cleanup_follows_task_outcome() {
+        let state = AppState::new(AppConfig::default(), None);
+        let route = || MfaAuthSession {
+            contract: MfaContract::MultiStep,
+            step_attempt_id: Some("attempt-1".into()),
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+
+        let cancelled = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let cancelled_result = Err(mfa::MfaError::Cancelled);
+        assert!(cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &cancelled)),
+            &cancelled_result,
+        ));
+
+        let terminal = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let terminal_result = Err(mfa::MfaError::AttemptLimit {
+            message: "attempt limit reached".into(),
+        });
+        assert!(cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &terminal)),
+            &terminal_result,
+        ));
+
+        let retryable = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let retryable_result = Err(mfa::MfaError::Timeout);
+        assert!(!cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &retryable)),
+            &retryable_result,
+        ));
+        assert!(get_mfa_auth_session(&state, "token-1", 1, 2).is_ok());
+
+        let advanced_result = Ok(MfaTaskOutcome::Advanced {
+            next_step: 1,
+            token: Some("token-1".into()),
+        });
+        assert!(!cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &retryable)),
+            &advanced_result,
+        ));
+
+        let completed_result = Ok(MfaTaskOutcome::Completed {
+            preshared_key: "key".into(),
+        });
+        assert!(cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &retryable)),
+            &completed_result,
+        ));
+        assert!(get_mfa_auth_session(&state, "token-1", 1, 2).is_err());
+    }
+
+    #[test]
+    fn test_mfa_error_cleanup_keeps_retryable_errors() {
+        assert!(mfa_error_is_terminal(&mfa::MfaError::Cancelled));
+        assert!(mfa_error_is_terminal(&mfa::MfaError::AttemptLimit {
+            message: "attempt limit reached".into(),
+        }));
+        assert!(mfa_error_is_terminal(&mfa::MfaError::MfaRejected {
+            message: "Unauthorized".into(),
+        }));
+        assert!(!mfa_code_error_is_terminal(&mfa::MfaError::MfaRejected {
+            message: "Unauthorized".into(),
+        }));
+        assert!(!mfa_code_error_is_terminal(&mfa::MfaError::MfaRejected {
+            message: "unauthorized".into(),
+        }));
+        assert!(!mfa_error_is_terminal(&mfa::MfaError::NetworkError {
+            message: "proxy unavailable".into(),
+        }));
+        assert!(!mfa_error_is_terminal(&mfa::MfaError::ProxyError {
+            status: 503,
+            message: "unavailable".into(),
+        }));
+        assert!(!mfa_error_is_terminal(&mfa::MfaError::Timeout));
+    }
+
+    #[test]
+    fn test_mfa_code_rejection_keeps_route_for_retry() {
+        let state = AppState::new(AppConfig::default(), None);
+        let route = MfaAuthSession {
+            contract: MfaContract::MultiStep,
+            step_attempt_id: Some("attempt-1".into()),
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+        let current = remember_mfa_auth_session(&state, "code-token".into(), route);
+
+        for message in [
+            "Unauthorized",
+            " unauthorized ",
+            "invalid code",
+            " Invalid Code ",
+        ] {
+            let rejected = mfa::MfaError::MfaRejected {
+                message: message.into(),
+            };
+            assert!(!mfa_code_error_is_terminal(&rejected));
+            if mfa_code_error_is_terminal(&rejected) {
+                forget_mfa_auth_session_if_current(&state, "code-token", &current);
+            }
+            assert!(get_mfa_auth_session(&state, "code-token", 1, 2).is_ok());
+        }
+
+        let session_expired = mfa::MfaError::MfaRejected {
+            message: "invalid code: session expired".into(),
+        };
+        assert!(mfa_code_error_is_terminal(&session_expired));
+
+        let attempt_limit = mfa::MfaError::AttemptLimit {
+            message: "Too many failed MFA attempts".into(),
+        };
+        assert!(mfa_code_error_is_terminal(&attempt_limit));
+        forget_mfa_auth_session_if_current(&state, "code-token", &current);
+        assert!(get_mfa_auth_session(&state, "code-token", 1, 2).is_err());
+    }
+
+    #[test]
+    fn test_mfa_route_uses_stored_attempt_and_rejects_conflicts() {
+        let route = MfaAuthSession {
+            contract: MfaContract::MultiStep,
+            step_attempt_id: Some("attempt-1".into()),
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+        assert_eq!(
+            mfa_route_step_attempt_id(&route, None).unwrap().as_deref(),
+            Some("attempt-1")
+        );
+        assert_eq!(
+            mfa_route_step_attempt_id(&route, Some("attempt-1".into()))
+                .unwrap()
+                .as_deref(),
+            Some("attempt-1")
+        );
+        assert!(mfa_route_step_attempt_id(&route, Some("stale".into())).is_err());
+    }
+
     #[tokio::test]
-    async fn test_mfa_begin_step_starts_capable_step_zero() {
+    async fn test_mfa_begin_step_starts_multi_step_first_step() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/start"))
-            .respond_with(start_response(
+            .and(path("/api/v1/mfa-flow/start"))
+            .respond_with(flow_start_response(
                 "token-1",
-                Some("start-challenge"),
-                Some("2.2.0"),
-                Some("2.2.0"),
+                "attempt-1",
+                "step-challenge",
             ))
             .expect(1)
             .mount(&server)
             .await;
-        Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/step-start"))
-            .respond_with(step_response("attempt-1", Some("step-challenge")))
-            .expect(1)
-            .mount(&server)
-            .await;
 
-        let state = AppState::new(AppConfig::default(), None);
         let result = begin_mfa_step(
-            &state,
-            1,
+            MfaContract::MultiStep,
             mock_url(&server),
             MfaMethod::Totp,
             MfaBeginStepInput::Start(Box::new(start_request())),
@@ -3015,27 +3481,16 @@ mod tests {
         assert_eq!(result.token, "token-1");
         assert_eq!(result.challenge.as_deref(), Some("step-challenge"));
         assert_eq!(result.step_attempt_id.as_deref(), Some("attempt-1"));
-        assert!(state.is_multi_step_mfa_capable(1));
         server.verify().await;
     }
 
     #[tokio::test]
-    async fn test_mfa_begin_step_starts_capable_fido2_step_with_credentials() {
+    async fn test_mfa_begin_step_starts_multi_step_fido2_with_credentials() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/start"))
-            .respond_with(start_response(
+            .and(path("/api/v1/mfa-flow/start"))
+            .respond_with(fido2_flow_start_response(
                 "token-1",
-                Some("start-challenge"),
-                Some("2.2.0"),
-                Some("2.2.0"),
-            ))
-            .expect(1)
-            .mount(&server)
-            .await;
-        Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/step-start"))
-            .respond_with(fido2_step_response(
                 "attempt-1",
                 "fido2-challenge",
                 &["credential-1"],
@@ -3044,10 +3499,8 @@ mod tests {
             .mount(&server)
             .await;
 
-        let state = AppState::new(AppConfig::default(), None);
         let result = begin_mfa_step(
-            &state,
-            1,
+            MfaContract::MultiStep,
             mock_url(&server),
             MfaMethod::Fido2,
             MfaBeginStepInput::Start(Box::new(start_request_with_method(MfaMethod::Fido2))),
@@ -3063,30 +3516,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_mfa_begin_step_keeps_legacy_fido2_credentials() {
+    async fn test_mfa_begin_step_rejects_legacy_fido2_before_request() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/v1/client-mfa/start"))
-            .respond_with(fido2_start_response("token-1", "fido2-challenge"))
-            .expect(1)
+            .respond_with(ResponseTemplate::new(500))
+            .expect(0)
             .mount(&server)
             .await;
 
-        let state = AppState::new(AppConfig::default(), None);
-        let result = begin_mfa_step(
-            &state,
-            1,
+        let err = begin_mfa_step(
+            MfaContract::Legacy,
             mock_url(&server),
             MfaMethod::Fido2,
             MfaBeginStepInput::Start(Box::new(start_request_with_method(MfaMethod::Fido2))),
         )
         .await
-        .unwrap();
+        .unwrap_err();
 
-        assert_eq!(result.token, "token-1");
-        assert_eq!(result.challenge.as_deref(), Some("fido2-challenge"));
-        assert!(result.step_attempt_id.is_none());
-        assert_eq!(result.credential_ids, vec!["credential-1"]);
+        assert!(err
+            .to_string()
+            .contains("FIDO2 requires the multi-step MFA contract"));
         server.verify().await;
     }
 
@@ -3105,10 +3555,8 @@ mod tests {
             .mount(&server)
             .await;
 
-        let state = AppState::new(AppConfig::default(), None);
         let result = begin_mfa_step(
-            &state,
-            1,
+            MfaContract::Legacy,
             mock_url(&server),
             MfaMethod::Totp,
             MfaBeginStepInput::Start(Box::new(start_request())),
@@ -3119,44 +3567,37 @@ mod tests {
         assert_eq!(result.token, "token-1");
         assert_eq!(result.challenge.as_deref(), Some("start-challenge"));
         assert!(result.step_attempt_id.is_none());
-        assert!(!state.is_multi_step_mfa_capable(1));
         server.verify().await;
     }
 
     #[tokio::test]
-    async fn test_mfa_begin_step_falls_back_to_start_challenge() {
+    async fn test_mfa_begin_step_rejects_missing_multi_step_first_step() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/start"))
-            .respond_with(start_response(
-                "token-1",
-                Some("start-challenge"),
-                Some("2.2.0"),
-                Some("2.2.0"),
-            ))
-            .expect(1)
-            .mount(&server)
-            .await;
-        Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/step-start"))
-            .respond_with(step_response("attempt-1", None))
+            .and(path("/api/v1/mfa-flow/start"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(MfaFlowStartResponse {
+                    outcome: Some(mfa_flow_start_response::Outcome::Accepted(
+                        MfaFlowStartAccepted {
+                            token: "token-1".into(),
+                            first_step: None,
+                        },
+                    )),
+                }),
+            )
             .expect(1)
             .mount(&server)
             .await;
 
-        let state = AppState::new(AppConfig::default(), None);
-        let result = begin_mfa_step(
-            &state,
-            1,
+        let err = begin_mfa_step(
+            MfaContract::MultiStep,
             mock_url(&server),
             MfaMethod::Totp,
             MfaBeginStepInput::Start(Box::new(start_request())),
         )
         .await
-        .unwrap();
-
-        assert_eq!(result.challenge.as_deref(), Some("start-challenge"));
-        assert_eq!(result.step_attempt_id.as_deref(), Some("attempt-1"));
+        .unwrap_err();
+        assert!(err.to_string().contains("first step"));
         server.verify().await;
     }
 
@@ -3164,17 +3605,14 @@ mod tests {
     async fn test_mfa_begin_step_continues_existing_token_without_start() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
-            .and(path("/api/v1/client-mfa/step-start"))
+            .and(path("/api/v1/mfa-flow/step-start"))
             .respond_with(step_response("attempt-2", Some("step-challenge")))
             .expect(1)
             .mount(&server)
             .await;
 
-        let state = AppState::new(AppConfig::default(), None);
-        state.set_multi_step_mfa_capable(1, true);
         let result = begin_mfa_step(
-            &state,
-            1,
+            MfaContract::MultiStep,
             mock_url(&server),
             MfaMethod::Email,
             MfaBeginStepInput::Continue("token-2".into()),
@@ -3188,14 +3626,34 @@ mod tests {
         server.verify().await;
     }
 
-    #[allow(deprecated)]
-    fn finish_response(outcome: Option<mfa_step_result::Outcome>) -> ClientMfaFinishResponse {
-        ClientMfaFinishResponse {
-            preshared_key: "legacy-key".into(),
-            token: None,
-            result: outcome.map(|outcome| MfaStepResult {
-                outcome: Some(outcome),
-            }),
+    #[tokio::test]
+    async fn test_mfa_begin_step_rejects_legacy_continuation() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/v1/mfa-flow/step-start"))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(0)
+            .mount(&server)
+            .await;
+
+        let err = begin_mfa_step(
+            MfaContract::Legacy,
+            mock_url(&server),
+            MfaMethod::Totp,
+            MfaBeginStepInput::Continue("token-1".into()),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("The legacy MFA contract does not support step start"));
+        server.verify().await;
+    }
+
+    fn finish_response(outcome: Option<mfa_step_result::Outcome>) -> mfa::MfaFinishResponse {
+        mfa::MfaFinishResponse::MultiStep {
+            result: MfaStepResult { outcome },
         }
     }
 
@@ -3206,7 +3664,7 @@ mod tests {
         })));
 
         assert!(matches!(
-            classify_mfa_response(response),
+            classify_mfa_response(response, MfaContract::MultiStep),
             Ok(MfaTaskOutcome::Advanced {
                 next_step: 2,
                 token: None,
@@ -3221,7 +3679,7 @@ mod tests {
         })));
 
         assert!(matches!(
-            classify_fido2_response(response, "fido2-token".into()),
+            classify_fido2_response(response, "fido2-token".into(), MfaContract::MultiStep),
             Ok(MfaTaskOutcome::Advanced {
                 next_step: 2,
                 token: Some(token),
@@ -3236,18 +3694,54 @@ mod tests {
         })));
 
         assert!(matches!(
-            classify_mfa_response(response),
+            classify_mfa_response(response, MfaContract::MultiStep),
             Ok(MfaTaskOutcome::Completed { preshared_key }) if preshared_key == "completed-key"
         ));
     }
 
     #[test]
-    fn test_classify_mfa_response_legacy_completion() {
+    fn test_classify_mfa_response_rejects_missing_multi_step_outcome() {
         let response = finish_response(None);
+        assert!(matches!(
+            classify_mfa_response(response, MfaContract::MultiStep),
+            Err(mfa::MfaError::Other { message })
+                if message == "MFA flow response did not include an outcome"
+        ));
+    }
+
+    #[test]
+    fn test_classify_mfa_response_legacy_completion() {
+        let response = mfa::MfaFinishResponse::Legacy {
+            preshared_key: "legacy-key".into(),
+        };
 
         assert!(matches!(
-            classify_mfa_response(response),
+            classify_mfa_response(response, MfaContract::Legacy),
             Ok(MfaTaskOutcome::Completed { preshared_key }) if preshared_key == "legacy-key"
+        ));
+    }
+
+    #[test]
+    fn test_classify_mfa_response_rejects_contract_mismatch() {
+        assert!(matches!(
+            classify_mfa_response(
+                mfa::MfaFinishResponse::Legacy {
+                    preshared_key: "legacy-key".into(),
+                },
+                MfaContract::MultiStep,
+            ),
+            Err(mfa::MfaError::Other { message })
+                if message == "MFA finish response did not match the selected contract"
+        ));
+        assert!(matches!(
+            classify_mfa_response(
+                finish_response(Some(mfa_step_result::Outcome::Advanced(MfaAdvanced {
+                    next_step: 1,
+                }))),
+                MfaContract::Legacy,
+            ),
+            Err(mfa::MfaError::Other { message })
+                if message == "MFA finish response did not match the selected contract"
         ));
     }
 
@@ -3258,7 +3752,7 @@ mod tests {
         )));
 
         assert!(matches!(
-            classify_mfa_response(response),
+            classify_mfa_response(response, MfaContract::MultiStep),
             Err(mfa::MfaError::Other { message })
                 if message == "The server returned an unexpected verification state"
         ));
