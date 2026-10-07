@@ -8,11 +8,9 @@ import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
-import {
-  getInstancesQueryOptions,
-  mfaConfigurableInstances,
-} from '../../../shared/rust-api/query';
+import { getInstancesQueryOptions } from '../../../shared/rust-api/query';
 import { isPresent } from '../../../shared/utils/isPresent';
+import { mfaConfigurableInstances } from '../../../shared/utils/mfa';
 import { useStartMfaConfiguration } from '../AddPage/hooks/useStartMfaConfiguration';
 import { InstanceSelector } from '../ConfigureMfaPage/components/InstanceSelector/InstanceSelector';
 

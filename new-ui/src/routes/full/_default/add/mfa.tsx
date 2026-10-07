@@ -1,9 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { SelectMfaInstancePage } from '../../../../pages/full/SelectMfaInstancePage/SelectMfaInstancePage';
-import {
-  getInstancesQueryOptions,
-  mfaConfigurableInstances,
-} from '../../../../shared/rust-api/query';
+import { getInstancesQueryOptions } from '../../../../shared/rust-api/query';
+import { mfaConfigurableInstances } from '../../../../shared/utils/mfa';
 
 export const Route = createFileRoute('/full/_default/add/mfa')({
   beforeLoad: async ({ context }) => {
