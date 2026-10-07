@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use defguard_client_core::{
     connection::active_connections::ACTIVE_CONNECTIONS, enrollment::EnrollmentSession,
@@ -31,7 +34,7 @@ pub struct Ceremony {
 pub struct AppState {
     pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
     pub mfa_config_sessions: Mutex<HashMap<Uuid, MfaConfigSession>>,
-    pub mfa_auth_sessions: Mutex<HashMap<String, MfaAuthSession>>,
+    pub mfa_auth_sessions: Mutex<HashMap<String, Arc<MfaAuthSession>>>,
     /// Keyed by configuration session, so abandoning one dismisses the prompt it left on screen.
     pub mfa_config_ceremonies: Mutex<HashMap<Uuid, Ceremony>>,
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,

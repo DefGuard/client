@@ -8,6 +8,7 @@ import {
   isConnectFailure,
   isMfaPostureError,
   isServiceUnavailable,
+  isTimeout,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import type {
@@ -110,7 +111,10 @@ export const useMfaFido2Connect = (
           attempt.ownListener(
             listen<MfaErrorPayload>(TauriEvent.MfaFido2Error, (event) => {
               if (!tryFinishAttempt()) return;
-              setMfaToken(null);
+              const retryable =
+                isTimeout(event.payload.error) ||
+                isServiceUnavailable(event.payload.error);
+              if (!retryable) setMfaToken(null);
               void error(
                 `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
               );
@@ -135,7 +139,6 @@ export const useMfaFido2Connect = (
         ]);
       } catch (err) {
         if (!tryFinishAttempt()) return;
-        setMfaToken(null);
         void error(`FIDO2 MFA listener setup failed for location ${location.id}: ${err}`);
         setVerifyError(mfaErrorMessage(err));
         return;
@@ -156,7 +159,6 @@ export const useMfaFido2Connect = (
         taskOutstandingRef.current = true;
       } catch (err) {
         if (!tryFinishAttempt()) return;
-        setMfaToken(null);
         void error(`FIDO2 MFA start failed for location ${location.id}: ${err}`);
         setVerifyError(mfaErrorMessage(err));
       }

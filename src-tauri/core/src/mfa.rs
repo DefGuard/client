@@ -813,7 +813,6 @@ async fn wait_for_mfa_outcome(
                             });
                         }
                         Ok(_) => debug!("Ignoring unrecognized mobile MFA frame"),
-                        // Preserve legacy handling of frames that are not mfa_success.
                         Err(err) => debug!("Ignoring unrecognized mobile MFA frame: {err}"),
                     }
                 }

@@ -9,6 +9,7 @@ import {
   isConnectFailure,
   isMfaPostureError,
   isServiceUnavailable,
+  isTimeout,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
@@ -60,6 +61,7 @@ export const useMfaMobileConnect = (
 
   const taskIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const attemptGenerationRef = useRef(0);
   const onConnectedRef = useRef(onConnected);
   const onStepAdvancedRef = useRef(onStepAdvanced);
   const setMfaTokenRef = useRef(setMfaToken);
@@ -83,6 +85,7 @@ export const useMfaMobileConnect = (
       const taskId = taskIdRef.current;
       if (taskId) {
         void api.cancelMfa(taskId).catch(() => {});
+        setMfaTokenRef.current(null);
       }
     };
   }, [cleanupListeners]);
@@ -92,6 +95,9 @@ export const useMfaMobileConnect = (
     if (!tokenData || instanceId === undefined) return;
 
     let cancelled = false;
+    const attemptGeneration = attemptGenerationRef.current;
+    const isCurrentAttempt = () =>
+      !cancelled && attemptGenerationRef.current === attemptGeneration;
     cleanupListeners();
     setIsConnecting(true);
     setConnectionError(null);
@@ -103,7 +109,7 @@ export const useMfaMobileConnect = (
           location.id,
           tokenData.token,
         );
-        if (cancelled) {
+        if (!isCurrentAttempt()) {
           void api.cancelMfa(taskId).catch(() => {});
           return;
         }
@@ -111,31 +117,48 @@ export const useMfaMobileConnect = (
 
         // The backend brings up the connection itself; completion means connected.
         const completeUnlisten = await listen(TauriEvent.MfaMobileComplete, () => {
+          if (!isCurrentAttempt()) return;
           cleanupListeners();
+          taskIdRef.current = null;
           setIsConnecting(false);
           onConnectedRef.current?.();
         });
+        if (!isCurrentAttempt()) {
+          completeUnlisten();
+          return;
+        }
 
         const stepAdvancedUnlisten = await listen<MfaStepAdvancedPayload>(
           TauriEvent.MfaMobileStepAdvanced,
           (event) => {
+            if (!isCurrentAttempt()) return;
             cleanupListeners();
+            taskIdRef.current = null;
             setIsConnecting(false);
             onStepAdvancedRef.current(event.payload.nextStep);
           },
         );
+        if (!isCurrentAttempt()) {
+          completeUnlisten();
+          stepAdvancedUnlisten();
+          return;
+        }
 
         const errorUnlisten = await listen<MfaErrorPayload>(
           TauriEvent.MfaMobileError,
           (event) => {
+            if (!isCurrentAttempt()) return;
             cleanupListeners();
+            taskIdRef.current = null;
             setIsConnecting(false);
             void error(
               `Mobile MFA failed for location ${location.id}: ${event.payload.error}`,
             );
             const message = mfaErrorMessage(event.payload.error);
+            const retryable =
+              isTimeout(event.payload.error) || isServiceUnavailable(event.payload.error);
             setTokenData(null);
-            setMfaTokenRef.current(null);
+            if (!retryable) setMfaTokenRef.current(null);
             setConnectionError(
               isConnectFailure(message)
                 ? 'Failed to establish VPN connection'
@@ -143,6 +166,12 @@ export const useMfaMobileConnect = (
             );
           },
         );
+        if (!isCurrentAttempt()) {
+          completeUnlisten();
+          stepAdvancedUnlisten();
+          errorUnlisten();
+          return;
+        }
 
         unlistenRef.current = () => {
           completeUnlisten();
@@ -150,10 +179,17 @@ export const useMfaMobileConnect = (
           errorUnlisten();
         };
       } catch (e) {
-        if (!cancelled) {
+        if (isCurrentAttempt()) {
           setIsConnecting(false);
           setTokenData(null);
-          setMfaTokenRef.current(null);
+          const taskId = taskIdRef.current;
+          if (taskId) {
+            taskIdRef.current = null;
+            void api.cancelMfa(taskId).catch(() => {});
+            setMfaTokenRef.current(null);
+          } else if (!isTimeout(e) && !isServiceUnavailable(e)) {
+            setMfaTokenRef.current(null);
+          }
           setConnectionError('Failed to start mobile approval. Please try again.');
           void error(`Mobile MFA connect failed for location ${location.id}: ${e}`);
         }
@@ -186,10 +222,19 @@ export const useMfaMobileConnect = (
       return;
     }
 
+    const replacingAttempt = taskIdRef.current !== null || tokenData !== null;
+    const attemptGeneration = ++attemptGenerationRef.current;
+    const taskId = taskIdRef.current;
+    if (replacingAttempt) cleanupListeners();
+    if (taskId) {
+      taskIdRef.current = null;
+      void api.cancelMfa(taskId).catch(() => {});
+    }
+    if (replacingAttempt) setMfaToken(null);
+
     setIsStarting(true);
     setStartError(null);
     setConnectionError(null);
-    // Clear previous task via effect
     setTokenData(null);
 
     try {
@@ -198,8 +243,9 @@ export const useMfaMobileConnect = (
         location.id,
         MfaMethod.MobileApprove,
         stepPlan,
-        mfaToken,
+        replacingAttempt ? null : mfaToken,
       );
+      if (attemptGenerationRef.current !== attemptGeneration) return;
       setMfaToken(session.token);
 
       if (!isPresent(session.challenge)) {
@@ -213,7 +259,10 @@ export const useMfaMobileConnect = (
         stepAttemptId: session.stepAttemptId,
       });
     } catch (e) {
+      if (attemptGenerationRef.current !== attemptGeneration) return;
       void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
+      const retryable = isTimeout(e) || isServiceUnavailable(e);
+      if (!retryable) setMfaToken(null);
       if (isMfaPostureError(e, location)) {
         onPostureError?.(mfaErrorMessage(e));
         return;
@@ -224,31 +273,35 @@ export const useMfaMobileConnect = (
       }
       setStartError(mfaErrorMessage(e));
     } finally {
-      setIsStarting(false);
+      if (attemptGenerationRef.current === attemptGeneration) setIsStarting(false);
     }
   }, [
     instance,
     location,
     stepPlan,
     mfaToken,
+    tokenData,
+    cleanupListeners,
     setMfaToken,
     onPostureError,
     onServiceUnavailable,
   ]);
 
   const reset = useCallback(() => {
+    attemptGenerationRef.current += 1;
     cleanupListeners();
     const taskId = taskIdRef.current;
     if (taskId) {
       void api.cancelMfa(taskId).catch(() => {});
       taskIdRef.current = null;
+      setMfaToken(null);
     }
     setTokenData(null);
     setIsStarting(false);
     setStartError(null);
     setIsConnecting(false);
     setConnectionError(null);
-  }, [cleanupListeners]);
+  }, [cleanupListeners, setMfaToken]);
 
   return { start, isStarting, startError, qrValue, isConnecting, connectionError, reset };
 };

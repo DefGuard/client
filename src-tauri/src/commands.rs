@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, env, future::Future, str::FromStr};
+use std::{collections::HashMap, env, future::Future, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 #[cfg(not(target_os = "macos"))]
@@ -142,7 +142,7 @@ fn get_mfa_auth_session(
     token: &str,
     instance_id: Id,
     location_id: Id,
-) -> Result<MfaAuthSession, String> {
+) -> Result<Arc<MfaAuthSession>, String> {
     let route = state
         .mfa_auth_sessions
         .lock()
@@ -181,20 +181,53 @@ fn mfa_route_step_attempt_id(
     }
 }
 
-fn remember_mfa_auth_session(state: &AppState, token: String, route: MfaAuthSession) {
+fn remember_mfa_auth_session(
+    state: &AppState,
+    token: String,
+    route: MfaAuthSession,
+) -> Arc<MfaAuthSession> {
+    let route = Arc::new(route);
     state
         .mfa_auth_sessions
         .lock()
         .expect("mfa_auth_sessions mutex poisoned")
-        .insert(token, route);
+        .insert(token, route.clone());
+    route
 }
 
-fn forget_mfa_auth_session(state: &AppState, token: &str) {
-    state
+fn forget_mfa_auth_session_if_current(
+    state: &AppState,
+    token: &str,
+    expected_route: &Arc<MfaAuthSession>,
+) -> bool {
+    let mut sessions = state
         .mfa_auth_sessions
         .lock()
-        .expect("mfa_auth_sessions mutex poisoned")
-        .remove(token);
+        .expect("mfa_auth_sessions mutex poisoned");
+    if matches!(sessions.get(token), Some(current) if Arc::ptr_eq(current, expected_route)) {
+        sessions.remove(token);
+        true
+    } else {
+        false
+    }
+}
+
+fn mfa_error_is_terminal(error: &mfa::MfaError) -> bool {
+    match error {
+        mfa::MfaError::Cancelled
+        | mfa::MfaError::AttemptLimit { .. }
+        | mfa::MfaError::PostureRejected { .. }
+        | mfa::MfaError::MfaRejected { .. }
+        | mfa::MfaError::Other { .. } => true,
+        mfa::MfaError::NetworkError { .. }
+        | mfa::MfaError::ProxyError { .. }
+        | mfa::MfaError::Timeout => false,
+    }
+}
+
+fn mfa_code_error_is_terminal(error: &mfa::MfaError) -> bool {
+    !matches!(error, mfa::MfaError::MfaRejected { message } if message.contains("Unauthorized"))
+        && mfa_error_is_terminal(error)
 }
 
 /// Bring up a location connection with an already-obtained preshared key and
@@ -1667,6 +1700,22 @@ enum MfaTaskOutcome {
     },
 }
 
+fn cleanup_mfa_route_for_outcome(
+    state: &AppState,
+    session_route: Option<(&str, &Arc<MfaAuthSession>)>,
+    outcome: &Result<MfaTaskOutcome, mfa::MfaError>,
+) -> bool {
+    let should_cleanup = match outcome {
+        Ok(MfaTaskOutcome::Completed { .. }) => true,
+        Ok(MfaTaskOutcome::Advanced { .. }) => false,
+        Err(error) => mfa_error_is_terminal(error),
+    };
+    let Some((token, route)) = session_route.filter(|_| should_cleanup) else {
+        return false;
+    };
+    forget_mfa_auth_session_if_current(state, token, route)
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct MfaStepAdvancedPayload {
@@ -1892,7 +1941,7 @@ pub async fn mfa_begin_step(
         .as_deref()
         .map(|token| get_mfa_auth_session(&state, token, instance_id, location_id))
         .transpose()?;
-    let contract = mfa_contract_for_session(instance.mfa_contract, existing.as_ref());
+    let contract = mfa_contract_for_session(instance.mfa_contract, existing.as_deref());
     let proxy_url = match &existing {
         Some(route) => route.proxy_url.clone(),
         None => Url::parse(&instance.proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?,
@@ -1910,11 +1959,19 @@ pub async fn mfa_begin_step(
         MfaBeginStepInput::Start(Box::new(request))
     };
 
-    let response = begin_mfa_step(contract, proxy_url.clone(), method, input)
-        .await
-        .map_err(err_to_json)?;
-    if let Some(token) = token_to_replace {
-        forget_mfa_auth_session(&state, &token);
+    let response = match begin_mfa_step(contract, proxy_url.clone(), method, input).await {
+        Ok(response) => response,
+        Err(error) => {
+            if mfa_error_is_terminal(&error) {
+                if let (Some(token), Some(route)) = (token.as_deref(), existing.as_ref()) {
+                    forget_mfa_auth_session_if_current(&state, token, route);
+                }
+            }
+            return Err(err_to_json(error));
+        }
+    };
+    if let (Some(token), Some(route)) = (token_to_replace.as_deref(), existing.as_ref()) {
+        forget_mfa_auth_session_if_current(&state, token, route);
     }
     remember_mfa_auth_session(
         &state,
@@ -1947,9 +2004,9 @@ pub async fn mfa_finish_code(
         .ok_or_else(|| "Instance not found".to_string())?;
     let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
     let step_attempt_id = mfa_route_step_attempt_id(&route, step_attempt_id)?;
-    let response = mfa::mfa_finish(
+    let response = match mfa::mfa_finish(
         route.contract,
-        route.proxy_url,
+        route.proxy_url.clone(),
         mfa::MfaFinishRequest {
             token: token.clone(),
             step_attempt_id,
@@ -1957,15 +2014,32 @@ pub async fn mfa_finish_code(
         },
     )
     .await
-    .map_err(err_to_json)?;
+    {
+        Ok(response) => response,
+        Err(error) => {
+            if mfa_code_error_is_terminal(&error) {
+                forget_mfa_auth_session_if_current(&state, &token, &route);
+            }
+            return Err(err_to_json(error));
+        }
+    };
 
-    match classify_mfa_response(response, route.contract).map_err(err_to_json)? {
+    let outcome = match classify_mfa_response(response, route.contract) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            if mfa_code_error_is_terminal(&error) {
+                forget_mfa_auth_session_if_current(&state, &token, &route);
+            }
+            return Err(err_to_json(error));
+        }
+    };
+    match outcome {
         MfaTaskOutcome::Advanced { next_step, .. } => {
             debug!("MFA step passed, advancing to step index {next_step}");
             Ok(Some(next_step))
         }
         MfaTaskOutcome::Completed { preshared_key } => {
-            forget_mfa_auth_session(&state, &token);
+            forget_mfa_auth_session_if_current(&state, &token, &route);
             connect_after_mfa(location_id, Some(preshared_key), &handle).await?;
             Ok(None)
         }
@@ -1980,7 +2054,7 @@ fn spawn_mfa_task<F, R>(
     complete_event: EventKey,
     advanced_event: EventKey,
     error_event: EventKey,
-    session_token: Option<String>,
+    session_route: Option<(String, Arc<MfaAuthSession>)>,
     run: R,
 ) -> String
 where
@@ -2006,11 +2080,13 @@ where
             .lock()
             .expect("mfa_tasks mutex poisoned")
             .remove(&task_id_for_task);
-        if matches!(result, Ok(MfaTaskOutcome::Completed { .. })) {
-            if let Some(token) = session_token.as_deref() {
-                forget_mfa_auth_session(&listen_handle.state::<AppState>(), token);
-            }
-        }
+        cleanup_mfa_route_for_outcome(
+            &listen_handle.state::<AppState>(),
+            session_route
+                .as_ref()
+                .map(|(token, route)| (token.as_str(), route)),
+            &result,
+        );
         match result {
             Ok(MfaTaskOutcome::Completed { preshared_key }) => {
                 info!("MFA completed for task {task_id_for_task}");
@@ -2076,7 +2152,7 @@ pub async fn mfa_poll_openid(
         EventKey::MfaOpenIdComplete,
         EventKey::MfaOpenIdStepAdvanced,
         EventKey::MfaOpenIdError,
-        Some(session_token),
+        Some((session_token, route.clone())),
         move |cancel| async move {
             mfa::poll_openid_mfa(contract, proxy_url, token, step_attempt_id, cancel)
                 .await
@@ -2099,14 +2175,27 @@ pub async fn mfa_connect_mobile_approve(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Instance not found".to_string())?;
     let route = get_mfa_auth_session(&state, &token, instance_id, location_id)?;
-    let step_attempt_id = mfa_route_step_attempt_id(&route, None)?;
-    let ws_url = mfa::derive_ws_url(
+    let step_attempt_id = match mfa_route_step_attempt_id(&route, None) {
+        Ok(step_attempt_id) => step_attempt_id,
+        Err(error) => {
+            forget_mfa_auth_session_if_current(&state, &token, &route);
+            return Err(error);
+        }
+    };
+    let ws_url = match mfa::derive_ws_url(
         route.contract,
         &route.proxy_url,
         &token,
         step_attempt_id.as_deref(),
-    )
-    .map_err(err_to_json)?;
+    ) {
+        Ok(ws_url) => ws_url,
+        Err(error) => {
+            if mfa_error_is_terminal(&error) {
+                forget_mfa_auth_session_if_current(&state, &token, &route);
+            }
+            return Err(err_to_json(error));
+        }
+    };
     let contract = route.contract;
     Ok(spawn_mfa_task(
         &handle,
@@ -2114,7 +2203,7 @@ pub async fn mfa_connect_mobile_approve(
         EventKey::MfaMobileComplete,
         EventKey::MfaMobileStepAdvanced,
         EventKey::MfaMobileError,
-        Some(token),
+        Some((token.clone(), route.clone())),
         move |cancel| async move {
             mfa::connect_mobile_approve(contract, &ws_url, cancel)
                 .await
@@ -2361,7 +2450,7 @@ async fn run_fido2_mfa(
     };
     let session_token = challenge.token.clone();
     let step_attempt_id = challenge.step_attempt_id.clone();
-    remember_mfa_auth_session(
+    let route = remember_mfa_auth_session(
         &handle.state::<AppState>(),
         session_token.clone(),
         MfaAuthSession {
@@ -2373,54 +2462,60 @@ async fn run_fido2_mfa(
         },
     );
 
-    // Tell the frontend to ask for a touch.
-    let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
+    let result = async {
+        // Tell the frontend to ask for a touch.
+        let _ = handle.emit(EventKey::MfaFido2Touch.into(), ());
 
-    // The prompt must not open behind the panel that asked for it.
-    let _level = WindowLevelGuard::lower(&window);
-    // Handed to the ceremony rather than raced against here, since only the platform can take
-    // its own modal dialog down.
-    let assertion = fido2_assertion(
-        rp_id,
-        challenge,
-        pin,
-        platform_context(&window),
-        cancel.clone(),
-    )
-    .await?;
+        // The prompt must not open behind the panel that asked for it.
+        let _level = WindowLevelGuard::lower(&window);
+        // Handed to the ceremony rather than raced against here, since only the platform can take
+        // its own modal dialog down.
+        let assertion = fido2_assertion(
+            rp_id,
+            challenge,
+            pin,
+            platform_context(&window),
+            cancel.clone(),
+        )
+        .await?;
 
-    // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
-    // over. Finishing here would bring the tunnel up after the user backed out.
-    if cancel.is_cancelled() {
-        debug!("FIDO2 MFA was cancelled, discarding the assertion");
-        return Err(mfa::MfaError::Cancelled);
+        // A platform that cannot abort a waiting key reports the cancel only once the ceremony is
+        // over. Finishing here would bring the tunnel up after the user backed out.
+        if cancel.is_cancelled() {
+            debug!("FIDO2 MFA was cancelled, discarding the assertion");
+            return Err(mfa::MfaError::Cancelled);
+        }
+
+        let Some(rp_id_hash) = assertion.authenticator_data.get(..32) else {
+            return Err(mfa::MfaError::Other {
+                message: "Security key returned malformed authenticator data".into(),
+            });
+        };
+        let response = mfa::mfa_finish(
+            contract,
+            proxy_url,
+            mfa::MfaFinishRequest {
+                token: session_token.clone(),
+                step_attempt_id,
+                submission: Some(mfa::MfaFinishSubmission::Fido2(MfaFido2Assertion {
+                    rp_id_hash: rp_id_hash.to_vec(),
+                    authenticator_data: assertion.authenticator_data,
+                    signature: assertion.signature,
+                    credential_id: assertion.credential_id,
+                })),
+            },
+        )
+        .await?;
+        classify_fido2_response(response, session_token.clone(), contract)
     }
+    .await;
 
-    let Some(rp_id_hash) = assertion.authenticator_data.get(..32) else {
-        return Err(mfa::MfaError::Other {
-            message: "Security key returned malformed authenticator data".into(),
-        });
-    };
-    let response = mfa::mfa_finish(
-        contract,
-        proxy_url,
-        mfa::MfaFinishRequest {
-            token: session_token.clone(),
-            step_attempt_id,
-            submission: Some(mfa::MfaFinishSubmission::Fido2(MfaFido2Assertion {
-                rp_id_hash: rp_id_hash.to_vec(),
-                authenticator_data: assertion.authenticator_data,
-                signature: assertion.signature,
-                credential_id: assertion.credential_id,
-            })),
-        },
-    )
-    .await?;
-    let outcome = classify_fido2_response(response, session_token.clone(), contract)?;
-    if matches!(&outcome, MfaTaskOutcome::Completed { .. }) {
-        forget_mfa_auth_session(&handle.state::<AppState>(), &session_token);
-    }
-    Ok(outcome)
+    cleanup_mfa_route_for_outcome(
+        &handle.state::<AppState>(),
+        Some((&session_token, &route)),
+        &result,
+    );
+    result
 }
 
 /// Returns the host the security key must use for this instance.
@@ -2476,6 +2571,7 @@ pub async fn mfa_fido2_pin(
         .map_or(instance.mfa_contract, |route| route.contract);
     ensure_fido2_supported(contract).map_err(|error| error.to_string())?;
 
+    let session_route = token.clone().zip(route.clone());
     let start = Fido2Start {
         instance_id,
         location_id,
@@ -2485,14 +2581,13 @@ pub async fn mfa_fido2_pin(
     };
 
     let task_handle = handle.clone();
-    let session_token = start.token.clone();
     Ok(spawn_mfa_task(
         &handle,
         location_id,
         EventKey::MfaFido2Complete,
         EventKey::MfaFido2StepAdvanced,
         EventKey::MfaFido2Error,
-        session_token,
+        session_route,
         move |cancel| run_fido2_mfa(proxy_url, rp_id, start, pin, window, cancel, task_handle),
     ))
 }
@@ -3172,6 +3267,118 @@ mod tests {
         assert_eq!(route.proxy_url, proxy_url);
         assert!(get_mfa_auth_session(&state, "token-1", 3, 2).is_err());
         assert!(get_mfa_auth_session(&state, "unknown", 1, 2).is_err());
+    }
+
+    #[test]
+    fn test_mfa_route_cleanup_does_not_remove_replacement() {
+        let state = AppState::new(AppConfig::default(), None);
+        let route = || MfaAuthSession {
+            contract: MfaContract::MultiStep,
+            step_attempt_id: Some("attempt-1".into()),
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+        let first = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let replacement = remember_mfa_auth_session(&state, "token-1".into(), route());
+
+        let completed = Ok(MfaTaskOutcome::Completed {
+            preshared_key: "key".into(),
+        });
+        assert!(!cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &first)),
+            &completed,
+        ));
+        let current = get_mfa_auth_session(&state, "token-1", 1, 2).unwrap();
+        assert!(Arc::ptr_eq(&current, &replacement));
+        assert!(forget_mfa_auth_session_if_current(
+            &state,
+            "token-1",
+            &replacement
+        ));
+        assert!(get_mfa_auth_session(&state, "token-1", 1, 2).is_err());
+    }
+
+    #[test]
+    fn test_mfa_route_cleanup_follows_task_outcome() {
+        let state = AppState::new(AppConfig::default(), None);
+        let route = || MfaAuthSession {
+            contract: MfaContract::MultiStep,
+            step_attempt_id: Some("attempt-1".into()),
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+
+        let cancelled = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let cancelled_result = Err(mfa::MfaError::Cancelled);
+        assert!(cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &cancelled)),
+            &cancelled_result,
+        ));
+
+        let terminal = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let terminal_result = Err(mfa::MfaError::AttemptLimit {
+            message: "attempt limit reached".into(),
+        });
+        assert!(cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &terminal)),
+            &terminal_result,
+        ));
+
+        let retryable = remember_mfa_auth_session(&state, "token-1".into(), route());
+        let retryable_result = Err(mfa::MfaError::Timeout);
+        assert!(!cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &retryable)),
+            &retryable_result,
+        ));
+        assert!(get_mfa_auth_session(&state, "token-1", 1, 2).is_ok());
+
+        let advanced_result = Ok(MfaTaskOutcome::Advanced {
+            next_step: 1,
+            token: Some("token-1".into()),
+        });
+        assert!(!cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &retryable)),
+            &advanced_result,
+        ));
+
+        let completed_result = Ok(MfaTaskOutcome::Completed {
+            preshared_key: "key".into(),
+        });
+        assert!(cleanup_mfa_route_for_outcome(
+            &state,
+            Some(("token-1", &retryable)),
+            &completed_result,
+        ));
+        assert!(get_mfa_auth_session(&state, "token-1", 1, 2).is_err());
+    }
+
+    #[test]
+    fn test_mfa_error_cleanup_keeps_retryable_errors() {
+        assert!(mfa_error_is_terminal(&mfa::MfaError::Cancelled));
+        assert!(mfa_error_is_terminal(&mfa::MfaError::AttemptLimit {
+            message: "attempt limit reached".into(),
+        }));
+        assert!(mfa_error_is_terminal(&mfa::MfaError::MfaRejected {
+            message: "Unauthorized".into(),
+        }));
+        assert!(!mfa_code_error_is_terminal(&mfa::MfaError::MfaRejected {
+            message: "Unauthorized".into(),
+        }));
+        assert!(!mfa_error_is_terminal(&mfa::MfaError::NetworkError {
+            message: "proxy unavailable".into(),
+        }));
+        assert!(!mfa_error_is_terminal(&mfa::MfaError::ProxyError {
+            status: 503,
+            message: "unavailable".into(),
+        }));
+        assert!(!mfa_error_is_terminal(&mfa::MfaError::Timeout));
     }
 
     #[test]
