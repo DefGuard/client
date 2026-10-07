@@ -226,8 +226,10 @@ fn mfa_error_is_terminal(error: &mfa::MfaError) -> bool {
 }
 
 fn mfa_code_error_is_terminal(error: &mfa::MfaError) -> bool {
-    !matches!(error, mfa::MfaError::MfaRejected { message } if message.contains("Unauthorized"))
-        && mfa_error_is_terminal(error)
+    !matches!(error, mfa::MfaError::MfaRejected { message } if {
+        let message = message.trim();
+        message.eq_ignore_ascii_case("unauthorized") || message.eq_ignore_ascii_case("invalid code")
+    }) && mfa_error_is_terminal(error)
 }
 
 /// Bring up a location connection with an already-obtained preshared key and
@@ -3371,6 +3373,9 @@ mod tests {
         assert!(!mfa_code_error_is_terminal(&mfa::MfaError::MfaRejected {
             message: "Unauthorized".into(),
         }));
+        assert!(!mfa_code_error_is_terminal(&mfa::MfaError::MfaRejected {
+            message: "unauthorized".into(),
+        }));
         assert!(!mfa_error_is_terminal(&mfa::MfaError::NetworkError {
             message: "proxy unavailable".into(),
         }));
@@ -3379,6 +3384,47 @@ mod tests {
             message: "unavailable".into(),
         }));
         assert!(!mfa_error_is_terminal(&mfa::MfaError::Timeout));
+    }
+
+    #[test]
+    fn test_mfa_code_rejection_keeps_route_for_retry() {
+        let state = AppState::new(AppConfig::default(), None);
+        let route = MfaAuthSession {
+            contract: MfaContract::MultiStep,
+            step_attempt_id: Some("attempt-1".into()),
+            instance_id: 1,
+            location_id: 2,
+            proxy_url: Url::parse("https://proxy.example.com").unwrap(),
+        };
+        let current = remember_mfa_auth_session(&state, "code-token".into(), route);
+
+        for message in [
+            "Unauthorized",
+            " unauthorized ",
+            "invalid code",
+            " Invalid Code ",
+        ] {
+            let rejected = mfa::MfaError::MfaRejected {
+                message: message.into(),
+            };
+            assert!(!mfa_code_error_is_terminal(&rejected));
+            if mfa_code_error_is_terminal(&rejected) {
+                forget_mfa_auth_session_if_current(&state, "code-token", &current);
+            }
+            assert!(get_mfa_auth_session(&state, "code-token", 1, 2).is_ok());
+        }
+
+        let session_expired = mfa::MfaError::MfaRejected {
+            message: "invalid code: session expired".into(),
+        };
+        assert!(mfa_code_error_is_terminal(&session_expired));
+
+        let attempt_limit = mfa::MfaError::AttemptLimit {
+            message: "Too many failed MFA attempts".into(),
+        };
+        assert!(mfa_code_error_is_terminal(&attempt_limit));
+        forget_mfa_auth_session_if_current(&state, "code-token", &current);
+        assert!(get_mfa_auth_session(&state, "code-token", 1, 2).is_err());
     }
 
     #[test]
