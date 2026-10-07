@@ -6,10 +6,10 @@ import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPage
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import {
   getInstancesQueryOptions,
-  mfaConfigurableInstances,
   tunnelsDisabled,
 } from '../../../shared/rust-api/query';
 import { ThemeSpacing } from '../../../shared/types';
+import { mfaConfigurableInstances } from '../../../shared/utils/mfa';
 import { AddCard } from './components/AddCard/AddCard';
 import { useStartMfaConfiguration } from './hooks/useStartMfaConfiguration';
 

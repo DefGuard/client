@@ -1,3 +1,4 @@
+import { debug } from '@tauri-apps/plugin-log';
 import { OpenIdProvider } from '../consts';
 import {
   ConnectionType,
@@ -170,6 +171,27 @@ export const canSetUpMfaMethod = (
   instance?: MfaCapabilitiesInstance | null,
 ): method is ClientConfigurableMethod =>
   setupMethodsOf(instance).some((candidate) => candidate === method);
+
+export const supportsMfaConfiguration = (instance: InstanceInfo): boolean => {
+  if (setupMethodsOf(instance).length > 0) return true;
+  const excluded = `Instance (${instance.name}) is excluded from MFA configuration:`;
+  const capabilities = instance.mfa_capabilities;
+  if (!isPresent(capabilities)) {
+    void debug(
+      `${excluded} it did not report MFA capabilities (version predates client MFA configuration)`,
+    );
+  } else if (capabilities.setup_methods.length === 0) {
+    void debug(`${excluded} it allows no MFA methods to be set up`);
+  } else {
+    void debug(
+      `${excluded} it allows setting up only ${capabilities.setup_methods.map(mfaToApi).join(', ')}, none of which this client can configure (${CLIENT_CONFIGURABLE_METHODS.map(mfaToApi).join(', ')})`,
+    );
+  }
+  return false;
+};
+
+export const mfaConfigurableInstances = (instances: InstanceInfo[]): InstanceInfo[] =>
+  instances.filter(supportsMfaConfiguration);
 
 /** How far the user can get connecting this location with the factors they hold. */
 export const ConnectionAbility = {
