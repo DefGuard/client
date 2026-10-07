@@ -7,6 +7,11 @@ import { Fragment, type PropsWithChildren, useEffect } from 'react';
 import { runConfigureFactorsRequest } from '../../pages/full/ConfigureMfaPage/hooks/runConfigureFactorsRequest';
 import { mfaMethodToConnectModalView } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
+import {
+  handleFullViewConnectError,
+  openRouteConflictModal,
+  type RouteConflictPayload,
+} from '../components/LocationCard/api/connectError';
 import { WindowId } from '../consts';
 import { useAppData } from '../providers/AppDataContext';
 import { api } from '../rust-api/api';
@@ -91,6 +96,24 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         );
         if (getCurrentWindow().label !== WindowId.FullView) return;
         void runConfigureFactorsRequest(event.payload, { navigate });
+      }),
+
+      listen<RouteConflictPayload>(TauriEvent.RouteConflict, (event) => {
+        if (getCurrentWindow().label !== WindowId.FullView) return;
+        const { location, conflicts } = event.payload;
+        // The connect is not awaited, so the confirm modal closes before a new error can reopen it.
+        const connect = () => {
+          void api
+            .connect({
+              connectionType: location.connection_type,
+              locationId: location.id,
+            })
+            .catch(async (err: unknown) => {
+              await navigate({ to: '/full/overview' });
+              handleFullViewConnectError(location, err, connect);
+            });
+        };
+        openRouteConflictModal(location, conflicts, connect);
       }),
 
       listen(TauriEvent.ConnectionChanged, (event) => {

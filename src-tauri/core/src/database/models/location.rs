@@ -2,8 +2,9 @@ use std::fmt;
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
 
+use defguard_wireguard_rs::net::IpAddrMask;
 #[cfg(not(target_os = "macos"))]
-use defguard_wireguard_rs::{key::Key, net::IpAddrMask, peer::Peer, InterfaceConfiguration};
+use defguard_wireguard_rs::{key::Key, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
 
@@ -11,7 +12,6 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExec
 use super::wireguard_keys::WireguardKeys;
 use super::{Id, NoId};
 use crate::{
-    contains_default_route,
     database::{
         models::instance::{ClientTrafficPolicy, Instance},
         DbPool,
@@ -447,15 +447,17 @@ impl Location<Id> {
         })
     }
 
-    pub async fn holds_default_route(
+    pub async fn routed_networks(
         &self,
         pool: &DbPool,
         route_all_traffic: Option<bool>,
-    ) -> Result<bool, Error> {
-        Ok(self
-            .effective_route_all_traffic(pool, route_all_traffic)
-            .await?
-            || contains_default_route(&self.allowed_ips))
+    ) -> Result<Vec<IpAddrMask>, Error> {
+        Ok(crate::routed_networks(
+            &self.address,
+            &self.allowed_ips,
+            self.effective_route_all_traffic(pool, route_all_traffic)
+                .await?,
+        ))
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -926,27 +928,24 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../migrations")]
-    async fn test_holds_default_route_detects_default_route_in_allowed_ips(pool: SqlitePool) {
+    async fn test_routed_networks(pool: SqlitePool) {
         let instance = new_instance().save(&pool).await.unwrap();
         let mut location = new_location(instance.id);
-        location.allowed_ips = "10.0.0.0/8, 0.0.0.0/0".into();
+        location.address = "10.6.0.2/24, fd00::2/64".into();
+        location.allowed_ips = "10.0.0.0/8, bad-entry, 192.168.1.0/24".into();
         let location = location.save(&pool).await.unwrap();
 
-        assert!(!location
-            .effective_route_all_traffic(&pool, None)
-            .await
-            .unwrap());
-        assert!(location.holds_default_route(&pool, None).await.unwrap());
-
-        let mut location = new_location(instance.id);
-        location.allowed_ips = "10.0.0.0/8, 192.168.1.0/24".into();
-        let location = location.save(&pool).await.unwrap();
-
-        assert!(!location.holds_default_route(&pool, None).await.unwrap());
-        assert!(location
-            .holds_default_route(&pool, Some(true))
-            .await
-            .unwrap());
+        let networks = |list: &[&str]| -> Vec<IpAddrMask> {
+            list.iter().map(|entry| entry.parse().unwrap()).collect()
+        };
+        assert_eq!(
+            location.routed_networks(&pool, None).await.unwrap(),
+            networks(&["10.6.0.2/24", "fd00::2/64", "10.0.0.0/8", "192.168.1.0/24"])
+        );
+        assert_eq!(
+            location.routed_networks(&pool, Some(true)).await.unwrap(),
+            networks(&["10.6.0.2/24", "fd00::2/64", "0.0.0.0/0", "::/0"])
+        );
     }
 
     #[test]

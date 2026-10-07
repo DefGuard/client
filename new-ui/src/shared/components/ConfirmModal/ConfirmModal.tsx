@@ -48,7 +48,7 @@ const ModalContent = () => {
 
   return (
     <>
-      <RenderMarkdown content={content} />
+      {typeof content === 'string' ? <RenderMarkdown content={content} /> : content}
       <Controls>
         <div className="right">
           <Button

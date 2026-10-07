@@ -191,6 +191,8 @@ export const TauriEvent = {
   MfaConfigFido2Touch: 'mfa-config-fido2-touch',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
   TunnelsEnabled: 'tunnel-enabled-by-policy',
+  // The compact view emits this event to the full view.
+  RouteConflict: 'route-conflict',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];

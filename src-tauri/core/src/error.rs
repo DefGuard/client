@@ -2,6 +2,8 @@ use std::net::AddrParseError;
 
 use defguard_wireguard_rs::{error::WireguardInterfaceError, net::IpAddrParseError};
 
+use crate::connection::ConflictingConnection;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
@@ -58,8 +60,15 @@ pub enum Error {
     PostureCheckFailed(String),
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
-    #[error("{0}")]
-    AllTrafficConflict(String),
+    #[error(
+        "Can't connect to \"{name}\": its routes conflict with active connections: {}. \
+        Disconnect them first.",
+        .conflicts.iter().map(|c| format!("\"{}\"", c.name)).collect::<Vec<_>>().join(", ")
+    )]
+    RouteConflict {
+        name: String,
+        conflicts: Vec<ConflictingConnection>,
+    },
 }
 
 // we must manually implement serde::Serialize

@@ -1,10 +1,11 @@
+import type { ReactNode } from 'react';
 import { create } from 'zustand';
 import type { ButtonProps } from '../../components/Button/types';
 
 type StoreValues = {
   visible: boolean;
   title: string;
-  content?: string | null;
+  content?: ReactNode;
   cancelProps: ButtonProps | null;
   submitProps: ButtonProps | null;
   onSubmit: () => Promise<void>;

@@ -13,6 +13,8 @@ use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
 pub use apple::sync_locations_and_tunnels;
 use chrono::Utc;
+use defguard_wireguard_rs::net::IpAddrMask;
+use serde::Serialize;
 pub use setup::{disconnect_interface, execute_command};
 #[cfg(not(target_os = "macos"))]
 pub use setup::{setup_interface, setup_interface_tunnel};
@@ -26,7 +28,7 @@ use crate::{
         DbPool,
     },
     error::Error,
-    ConnectionType,
+    networks_conflict, ConnectionType,
 };
 
 #[cfg(target_os = "macos")]
@@ -38,78 +40,80 @@ pub enum ConnectionTarget {
     Tunnel(Tunnel<Id>),
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct ConflictingConnection {
+    pub id: Id,
+    pub connection_type: ConnectionType,
+    pub name: String,
+}
+
 impl ConnectionTarget {
-    pub async fn ensure_single_all_traffic_connection(
+    fn as_conflict(&self) -> ConflictingConnection {
+        let (id, connection_type, name) = match self {
+            Self::Location(location) => (location.id, ConnectionType::Location, &location.name),
+            Self::Tunnel(tunnel) => (tunnel.id, ConnectionType::Tunnel, &tunnel.name),
+        };
+        ConflictingConnection {
+            id,
+            connection_type,
+            name: name.clone(),
+        }
+    }
+
+    async fn routed_networks(
+        &self,
+        pool: &DbPool,
+        route_all_traffic: Option<bool>,
+    ) -> Result<Vec<IpAddrMask>, Error> {
+        match self {
+            Self::Location(location) => location.routed_networks(pool, route_all_traffic).await,
+            Self::Tunnel(tunnel) => Ok(tunnel.routed_networks(route_all_traffic)),
+        }
+    }
+
+    pub async fn ensure_no_route_conflict(
         &self,
         pool: &DbPool,
         route_all_traffic: Option<bool>,
     ) -> Result<(), Error> {
-        let (id, connection_type, name, holds_default_route) = match self {
-            Self::Location(location) => (
-                location.id,
-                ConnectionType::Location,
-                &location.name,
-                location
-                    .holds_default_route(pool, route_all_traffic)
-                    .await?,
-            ),
-            Self::Tunnel(tunnel) => (
-                tunnel.id,
-                ConnectionType::Tunnel,
-                &tunnel.name,
-                tunnel.holds_default_route(route_all_traffic),
-            ),
-        };
+        let ConflictingConnection {
+            id,
+            connection_type,
+            name,
+        } = self.as_conflict();
+        let networks = self.routed_networks(pool, route_all_traffic).await?;
 
-        if !holds_default_route {
+        let mut conflicts = Vec::new();
+        for (active_id, active_type) in active_connection_ids().await {
+            if (active_id, active_type) == (id, connection_type) {
+                continue;
+            }
+            let active = match active_type {
+                ConnectionType::Location => Location::find_by_id(pool, active_id)
+                    .await?
+                    .map(Self::Location),
+                ConnectionType::Tunnel => {
+                    Tunnel::find_by_id(pool, active_id).await?.map(Self::Tunnel)
+                }
+            };
+            let Some(active) = active else { continue };
+            let active_networks = active.routed_networks(pool, None).await?;
+            if networks.iter().any(|network| {
+                active_networks
+                    .iter()
+                    .any(|active| networks_conflict(network, active))
+            }) {
+                conflicts.push(active.as_conflict());
+            }
+        }
+
+        if conflicts.is_empty() {
             return Ok(());
         }
-
-        if let Some((active_type, active_name)) =
-            find_default_route_owner(pool, (id, connection_type)).await?
-        {
-            error!(
-                "Refusing to connect {connection_type} \"{name}\" (ID {id}): it routes all \
-                traffic, but {active_type} \"{active_name}\" already holds the default route."
-            );
-            return Err(Error::AllTrafficConflict(format!(
-                "Can't connect to {connection_type} \"{name}\": {active_type} \"{active_name}\" \
-                is already routing all traffic. Only one connection can route all traffic at a \
-                time, so disconnect it first or turn off \"route all traffic\" for one of them."
-            )));
-        }
-
-        Ok(())
+        let error = Error::RouteConflict { name, conflicts };
+        error!("Refusing to connect {connection_type} {id}: {error}");
+        Err(error)
     }
-}
-
-async fn find_default_route_owner(
-    pool: &DbPool,
-    exclude: (Id, ConnectionType),
-) -> Result<Option<(ConnectionType, String)>, Error> {
-    for (id, connection_type) in active_connection_ids().await {
-        if (id, connection_type) == exclude {
-            continue;
-        }
-        let owner = match connection_type {
-            ConnectionType::Location => match Location::find_by_id(pool, id).await? {
-                Some(location) => location
-                    .holds_default_route(pool, None)
-                    .await?
-                    .then_some(location.name),
-                None => None,
-            },
-            ConnectionType::Tunnel => match Tunnel::find_by_id(pool, id).await? {
-                Some(tunnel) => tunnel.holds_default_route(None).then_some(tunnel.name),
-                None => None,
-            },
-        };
-        if let Some(name) = owner {
-            return Ok(Some((connection_type, name)));
-        }
-    }
-
-    Ok(None)
 }
 
 /// Bring a WireGuard interface up for the given target.
@@ -121,7 +125,7 @@ pub async fn bring_up(
     route_all_traffic: Option<bool>,
 ) -> Result<String, Error> {
     target
-        .ensure_single_all_traffic_connection(pool, route_all_traffic)
+        .ensure_no_route_conflict(pool, route_all_traffic)
         .await?;
 
     #[cfg(not(target_os = "macos"))]
