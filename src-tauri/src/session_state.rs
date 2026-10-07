@@ -261,6 +261,7 @@ mod tests {
             openid_display_name: None,
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: defguard_client_core::mfa_contract::MfaContract::Legacy,
             mfa_capabilities: None,
         }
         .save(pool)

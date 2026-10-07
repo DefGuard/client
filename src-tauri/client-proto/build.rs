@@ -32,18 +32,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "#[serde(default)]",
         )
         .field_attribute(
-            ".defguard.client_types.ClientMfaStartResponse.rejections",
-            "#[serde(default)]",
-        )
-        .field_attribute(
-            ".defguard.client_types.ClientMfaStartResponse.credential_ids",
-            "#[serde(default)]",
-        )
-        .field_attribute(
-            ".defguard.client_types.ClientMfaStepStartResponse.credential_ids",
-            "#[serde(default)]",
-        )
-        .field_attribute(
             ".defguard.client_types.MfaConfigStartResponse.available_methods",
             "#[serde(default)]",
         )

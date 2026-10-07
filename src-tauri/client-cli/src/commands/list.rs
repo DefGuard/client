@@ -196,11 +196,14 @@ fn format_list_table(
 
 #[cfg(test)]
 mod tests {
-    use defguard_core::database::models::{
-        instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
-        location::{Location, LocationMfaMode, ServiceLocationMode},
-        tunnel::Tunnel,
-        Id,
+    use defguard_core::{
+        database::models::{
+            instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
+            location::{Location, LocationMfaMode, ServiceLocationMode},
+            tunnel::Tunnel,
+            Id,
+        },
+        mfa_contract::MfaContract,
     };
     use sqlx::types::Json;
 
@@ -221,6 +224,7 @@ mod tests {
             openid_display_name: None,
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
         }
     }

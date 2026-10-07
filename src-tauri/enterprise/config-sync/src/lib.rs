@@ -7,7 +7,10 @@ pub mod commands;
 
 use defguard_client_core::{
     database::{
-        models::{instance::Instance, Id},
+        models::{
+            instance::{mfa_contract_from_instance_info, Instance},
+            Id,
+        },
         DbPool,
     },
     error::Error,
@@ -186,13 +189,25 @@ async fn apply_fetched_config(
         }
         fetched => fetched?,
     };
-    let version_mismatch = fetched.version_mismatch;
-
-    let device_config =
-        fetched.response.device_config.as_ref().ok_or_else(|| {
-            Error::InternalError("Device config not present in response".to_string())
-        })?;
+    let FetchedConfig {
+        response,
+        version_mismatch,
+    } = fetched;
+    let device_config = response
+        .device_config
+        .as_ref()
+        .ok_or_else(|| Error::InternalError("Device config not present in response".to_string()))?;
+    let instance_info = device_config
+        .instance
+        .as_ref()
+        .ok_or_else(|| Error::InternalError("Instance info not present in response".to_string()))?;
+    let mfa_contract = mfa_contract_from_instance_info(instance_info);
+    let mfa_contract_changed = instance.mfa_contract != mfa_contract;
     if !config_changed(transaction, instance, device_config).await? {
+        if mfa_contract_changed {
+            Instance::update_mfa_contract(transaction.as_mut(), instance.id, mfa_contract).await?;
+            instance.mfa_contract = mfa_contract;
+        }
         debug!(
             "Config for instance {}({}) didn't change",
             instance.name, instance.id
@@ -207,31 +222,33 @@ async fn apply_fetched_config(
 
     if has_active_connections {
         let mut instance_updated = false;
-        if let Some(ref info) = device_config.instance {
-            // add dedicated override to disable tunnels without waiting for a disconnect
-            let new_tunnels_disabled = info.disable_tunnels.unwrap_or(false);
-            if new_tunnels_disabled && !instance.disable_tunnels {
-                debug!(
-                    "Tunnels were disabled for instance {}({}) while a connection is active, \
-                    persisting the flag immediately.",
-                    instance.name, instance.id
-                );
-                instance.disable_tunnels = true;
-                instance_updated = true;
-            }
-            // Says nothing about the tunnel, and deferring it would keep the instance unable to
-            // configure MFA for as long as the VPN stayed up.
-            if instance.sync_mfa_state(info) {
-                debug!(
-                    "MFA state changed for instance {}({}) while a connection is active, \
-                    persisting the snapshot immediately.",
-                    instance.name, instance.id
-                );
-                instance_updated = true;
-            }
-            if instance_updated {
-                instance.save(transaction.as_mut()).await?;
-            }
+        // add dedicated override to disable tunnels without waiting for a disconnect
+        let new_tunnels_disabled = instance_info.disable_tunnels.unwrap_or(false);
+        if new_tunnels_disabled && !instance.disable_tunnels {
+            debug!(
+                "Tunnels were disabled for instance {}({}) while a connection is active, \
+                persisting the flag immediately.",
+                instance.name, instance.id
+            );
+            instance.disable_tunnels = true;
+            instance_updated = true;
+        }
+        // Says nothing about the tunnel, and deferring it would keep the instance unable to
+        // configure MFA for as long as the VPN stayed up.
+        if instance.sync_mfa_state(instance_info) {
+            debug!(
+                "MFA state changed for instance {}({}) while a connection is active, \
+                persisting the snapshot immediately.",
+                instance.name, instance.id
+            );
+            instance_updated = true;
+        }
+        if instance_updated {
+            instance.mfa_contract = mfa_contract;
+            instance.save(transaction.as_mut()).await?;
+        } else if mfa_contract_changed {
+            Instance::update_mfa_contract(transaction.as_mut(), instance.id, mfa_contract).await?;
+            instance.mfa_contract = mfa_contract;
         }
         return Ok(PollInstanceResult::ChangedWhileActive {
             version_mismatch,
@@ -243,6 +260,7 @@ async fn apply_fetched_config(
         "Updating instance {}({}) configuration: {device_config:?}",
         instance.name, instance.id,
     );
+    instance.mfa_contract = mfa_contract;
     let locations_changed =
         do_update_instance(transaction, instance, device_config.clone()).await?;
     info!(

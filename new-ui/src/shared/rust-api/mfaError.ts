@@ -42,8 +42,10 @@ export const isTimeout = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'timeout';
 
 /** A submitted one-time code was rejected. */
-export const isInvalidCode = (message: string): boolean =>
-  message.includes('Unauthorized');
+export const isInvalidCode = (message: string): boolean => {
+  const normalized = message.trim().toLowerCase();
+  return normalized === 'unauthorized' || normalized === 'invalid code';
+};
 
 /** Returns true when the Edge service is unavailable. */
 export const isServiceUnavailable = (err: unknown): boolean => {

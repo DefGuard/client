@@ -126,6 +126,32 @@ describe('useMfaFido2Connect', () => {
     expect(onConnected).not.toHaveBeenCalled();
   });
 
+  it('retains the session token after a retryable FIDO2 transport error', async () => {
+    const { result } = renderHook(() =>
+      useMfaFido2Connect(location, {
+        stepPlan: ['fido2'],
+        mfaToken: 'preserved-token',
+        setMfaToken: mocks.setMfaToken,
+      }),
+    );
+
+    await act(async () => result.current.verify('1234'));
+    const errorListener = mocks.listen.mock.calls.find(
+      ([event]) => event === TauriEvent.MfaFido2Error,
+    )?.[1] as ((event: { payload: { error: string } }) => void) | undefined;
+    expect(errorListener).toBeDefined();
+
+    await act(async () => {
+      errorListener?.({
+        payload: {
+          error: JSON.stringify({ type: 'network_error', message: 'proxy unavailable' }),
+        },
+      });
+    });
+
+    expect(mocks.setMfaToken).not.toHaveBeenCalledWith(null);
+  });
+
   it('stores the token and advances on a non-final FIDO2 step', async () => {
     const onConnected = vi.fn();
     const onStepAdvanced = vi.fn();

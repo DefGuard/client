@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TauriEvent } from '../../../rust-api/types';
 import { useMfaOidcConnect } from './useMfaOidcConnect';
 
 const mocks = vi.hoisted(() => ({
@@ -79,6 +80,69 @@ describe('useMfaOidcConnect', () => {
     });
 
     expect(mocks.mfaBeginStep).not.toHaveBeenCalled();
+  });
+
+  it('clears the session token after a terminal poll error', async () => {
+    const { result } = renderHook(() => useMfaOidcConnect());
+
+    await act(async () => result.current.start());
+    const listener = mocks.listen.mock.calls.find(
+      ([event]) => event === TauriEvent.MfaOpenIdError,
+    )?.[1] as (event: { payload: { error: string } }) => void;
+
+    await act(async () => {
+      listener({
+        payload: {
+          error: JSON.stringify({
+            type: 'attempt_limit',
+            message: 'Attempt limit reached',
+          }),
+        },
+      });
+    });
+
+    expect(mocks.setMfaToken).toHaveBeenLastCalledWith(null);
+  });
+
+  it('retains and reuses the session token after a retryable poll timeout', async () => {
+    mocks.useLocationCardContext.mockReturnValue({
+      goToStep: mocks.goToStep,
+      location: { id: 7, instance_id: 42 },
+      mfaToken: 'mfa-token',
+      setMfaToken: mocks.setMfaToken,
+      setPostureError: mocks.setPostureError,
+      setView: mocks.setView,
+      stepPlan: ['oidc'],
+    });
+    const { result, rerender } = renderHook(() => useMfaOidcConnect());
+
+    await act(async () => result.current.start());
+    const listener = mocks.listen.mock.calls.find(
+      ([event]) => event === TauriEvent.MfaOpenIdError,
+    )?.[1] as (event: { payload: { error: string } }) => void;
+    await act(async () => {
+      listener({ payload: { error: JSON.stringify({ type: 'timeout' }) } });
+    });
+
+    expect(mocks.setMfaToken).not.toHaveBeenCalledWith(null);
+    rerender();
+    await act(async () => result.current.start());
+    expect(mocks.mfaBeginStep).toHaveBeenLastCalledWith(
+      42,
+      7,
+      'oidc',
+      ['oidc'],
+      'mfa-token',
+    );
+  });
+
+  it('clears the token when unmount cancels active polling', async () => {
+    const { result, unmount } = renderHook(() => useMfaOidcConnect());
+
+    await act(async () => result.current.start());
+    unmount();
+
+    expect(mocks.setMfaToken).toHaveBeenLastCalledWith(null);
   });
 
   it('opens OIDC with the raw token and step attempt ID as separate parameters', async () => {

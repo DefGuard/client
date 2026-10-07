@@ -10,6 +10,7 @@ import {
   isServiceUnavailable,
   isSessionExpired,
   isStaleAttempt,
+  isTimeout,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
@@ -22,7 +23,7 @@ type UseMfaConnectOptions = {
   debounceMs?: number;
   stepPlan: MfaMethodValue[];
   mfaToken: string | null;
-  setMfaToken: (token: string) => void;
+  setMfaToken: (token: string | null) => void;
   onStepAdvanced: (nextStepIndex: number) => void;
   onConnected?: () => void;
   onSessionExpired?: () => void;
@@ -92,6 +93,10 @@ export const useMfaConnect = (
       } catch (err) {
         void error(`MFA start failed: ${err}`);
         await waitForMinimumDuration(startedAt, debounceMs);
+        if (!isServiceUnavailable(err) && !isTimeout(err)) {
+          setToken(null);
+          setMfaToken(null);
+        }
         if (isMfaPostureError(err, location)) {
           onPostureError?.(mfaErrorMessage(err));
           return;
@@ -131,6 +136,10 @@ export const useMfaConnect = (
       } catch (err) {
         void error(`MFA verification failed: ${err}`);
         const message = mfaErrorMessage(err);
+        if (!isInvalidCode(message) && !isServiceUnavailable(err) && !isTimeout(err)) {
+          setToken(null);
+          setMfaToken(null);
+        }
         if (isAttemptLimit(err)) {
           setVerifyError(message);
         } else if (isStaleAttempt(message)) {
@@ -160,6 +169,7 @@ export const useMfaConnect = (
       onStepAdvanced,
       onConnected,
       onSessionExpired,
+      setMfaToken,
     ],
   );
 

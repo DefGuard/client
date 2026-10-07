@@ -240,9 +240,12 @@ mod tests {
     use sqlx::SqlitePool;
 
     use super::*;
-    use crate::database::models::{
-        instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
-        location::{LocationMfaMode, ServiceLocationMode},
+    use crate::{
+        database::models::{
+            instance::{ClientTrafficPolicy, Instance, OpenIdProviderKind},
+            location::{LocationMfaMode, ServiceLocationMode},
+        },
+        mfa_contract::MfaContract,
     };
 
     async fn seed_location(pool: &SqlitePool) -> Id {
@@ -260,6 +263,7 @@ mod tests {
             openid_display_name: None,
             openid_provider_kind: OpenIdProviderKind::Custom,
             mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
             mfa_capabilities: None,
         }
         .save(pool)
