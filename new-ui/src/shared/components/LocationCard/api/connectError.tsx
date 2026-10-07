@@ -88,7 +88,7 @@ export const openRouteConflictModal = (
     ),
     submitProps: {
       variant: ButtonVariant.Primary,
-      text: 'Disconnect others & connect',
+      text: 'Disconnect others and connect',
     },
     onSubmit: async () => {
       await Promise.allSettled(
