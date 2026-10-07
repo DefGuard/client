@@ -20,7 +20,7 @@ import { isPresent } from '../../utils/isPresent';
 import { ConnectionAbility, resolveMfaStepPlan, shouldStartMfa } from '../../utils/mfa';
 import { Divider } from '../Divider/Divider';
 import { IconKind } from '../Icon';
-import { parseConnectError } from '../LocationCard/api/connectError';
+import { handleFullViewConnectError } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
 import { LocationCardConnectionInfo } from '../LocationCard/components/LocationCardConnectionInfo/LocationCardConnectionInfo';
 import { LocationCardConnectionTiles } from '../LocationCard/components/LocationCardConnectionTiles/LocationCardConnectionTiles';
@@ -46,28 +46,9 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
   const { mutate: connect, isPending: isConnecting } = useMutation({
     mutationFn: api.connect,
     onError: (err) => {
-      const connectError = parseConnectError(err);
-      if (
-        location.posture_check_required &&
-        connectError?.kind === 'postureCheckFailed'
-      ) {
-        useConnectModal.getState().open({
-          location,
-          view: ConnectModalView.PostureCheckFail,
-          postureError: connectError.message,
-        });
-      } else if (connectError?.kind === 'routeConflict') {
-        useConnectModal.getState().open({
-          location,
-          view: ConnectModalView.ConnectionError,
-          connectionError: connectError.message,
-        });
-      } else if (connectError?.kind === 'serviceUnavailable') {
-        useConnectModal.getState().open({
-          location,
-          view: ConnectModalView.ConnectionError,
-        });
-      }
+      handleFullViewConnectError(location, err, () =>
+        connect({ connectionType: location.connection_type, locationId: location.id }),
+      );
     },
     meta: {
       invalidate: ['locations'],

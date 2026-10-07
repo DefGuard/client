@@ -4,7 +4,7 @@ import { api } from '../../../rust-api/api';
 import { connectConfigureFactorsSource } from '../../../utils/configureFactorsSource';
 import { ConnectionAbility, shouldStartMfa } from '../../../utils/mfa';
 import { IconKind } from '../../Icon';
-import { parseConnectError } from '../api/connectError';
+import { openRouteConflictInFullView, parseConnectError } from '../api/connectError';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 import { ConnectButton } from './ConnectButton/ConnectButton';
@@ -30,7 +30,7 @@ export const LocationCardConnectButton = () => {
         setPostureError(connectError.message);
         setView(LocationCardViews.PostureCheckFail);
       } else if (connectError?.kind === 'routeConflict') {
-        setView(LocationCardViews.ConnectionError, connectError.message);
+        void openRouteConflictInFullView({ location, conflicts: connectError.conflicts });
       } else if (connectError?.kind === 'serviceUnavailable') {
         setView(LocationCardViews.ConnectionError);
       }

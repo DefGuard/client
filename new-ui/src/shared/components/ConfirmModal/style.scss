@@ -1,6 +1,21 @@
 #confirm-modal .markdown-render {
-  p {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+
+  p,
+  li {
+    margin: 0;
     font: var(--t-body-sm-400);
     color: var(--fg-white-100);
+  }
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding-left: 21px;
+    margin-bottom: var(--spacing-sm);
+    list-style: disc;
   }
 }

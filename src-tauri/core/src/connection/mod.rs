@@ -13,6 +13,7 @@ use active_state::ActiveConnectionInfo;
 #[cfg(target_os = "macos")]
 pub use apple::sync_locations_and_tunnels;
 use chrono::Utc;
+use defguard_wireguard_rs::net::IpAddrMask;
 use serde::Serialize;
 pub use setup::{disconnect_interface, execute_command};
 #[cfg(not(target_os = "macos"))]
@@ -47,67 +48,69 @@ pub struct ConflictingConnection {
 }
 
 impl ConnectionTarget {
+    fn as_conflict(&self) -> ConflictingConnection {
+        let (id, connection_type, name) = match self {
+            Self::Location(location) => (location.id, ConnectionType::Location, &location.name),
+            Self::Tunnel(tunnel) => (tunnel.id, ConnectionType::Tunnel, &tunnel.name),
+        };
+        ConflictingConnection {
+            id,
+            connection_type,
+            name: name.clone(),
+        }
+    }
+
+    async fn routed_networks(
+        &self,
+        pool: &DbPool,
+        route_all_traffic: Option<bool>,
+    ) -> Result<Vec<IpAddrMask>, Error> {
+        match self {
+            Self::Location(location) => location.routed_networks(pool, route_all_traffic).await,
+            Self::Tunnel(tunnel) => Ok(tunnel.routed_networks(route_all_traffic)),
+        }
+    }
+
     pub async fn ensure_no_route_conflict(
         &self,
         pool: &DbPool,
         route_all_traffic: Option<bool>,
     ) -> Result<(), Error> {
-        let (id, connection_type, name, networks) = match self {
-            Self::Location(location) => (
-                location.id,
-                ConnectionType::Location,
-                &location.name,
-                location.routed_networks(pool, route_all_traffic).await?,
-            ),
-            Self::Tunnel(tunnel) => (
-                tunnel.id,
-                ConnectionType::Tunnel,
-                &tunnel.name,
-                tunnel.routed_networks(route_all_traffic),
-            ),
-        };
+        let ConflictingConnection {
+            id,
+            connection_type,
+            name,
+        } = self.as_conflict();
+        let networks = self.routed_networks(pool, route_all_traffic).await?;
 
         let mut conflicts = Vec::new();
         for (active_id, active_type) in active_connection_ids().await {
             if (active_id, active_type) == (id, connection_type) {
                 continue;
             }
-            let (active_name, active_networks) = match active_type {
-                ConnectionType::Location => match Location::find_by_id(pool, active_id).await? {
-                    Some(location) => {
-                        let networks = location.routed_networks(pool, None).await?;
-                        (location.name, networks)
-                    }
-                    None => continue,
-                },
-                ConnectionType::Tunnel => match Tunnel::find_by_id(pool, active_id).await? {
-                    Some(tunnel) => {
-                        let networks = tunnel.routed_networks(None);
-                        (tunnel.name, networks)
-                    }
-                    None => continue,
-                },
+            let active = match active_type {
+                ConnectionType::Location => Location::find_by_id(pool, active_id)
+                    .await?
+                    .map(Self::Location),
+                ConnectionType::Tunnel => {
+                    Tunnel::find_by_id(pool, active_id).await?.map(Self::Tunnel)
+                }
             };
+            let Some(active) = active else { continue };
+            let active_networks = active.routed_networks(pool, None).await?;
             if networks.iter().any(|network| {
                 active_networks
                     .iter()
                     .any(|active| networks_conflict(network, active))
             }) {
-                conflicts.push(ConflictingConnection {
-                    id: active_id,
-                    connection_type: active_type,
-                    name: active_name,
-                });
+                conflicts.push(active.as_conflict());
             }
         }
 
         if conflicts.is_empty() {
             return Ok(());
         }
-        let error = Error::RouteConflict {
-            name: name.clone(),
-            conflicts,
-        };
+        let error = Error::RouteConflict { name, conflicts };
         error!("Refusing to connect {connection_type} {id}: {error}");
         Err(error)
     }
