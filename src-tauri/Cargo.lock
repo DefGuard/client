@@ -1538,6 +1538,7 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "objc2-network-extension",
+ "objc2-service-management",
  "objc2-system-extensions",
  "prost",
  "regex",
@@ -4597,6 +4598,18 @@ dependencies = [
  "bitflags 2.13.2",
  "objc2",
  "objc2-core-foundation",
+]
+
+[[package]]
+name = "objc2-service-management"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b213642d6959cc6023ceb1217aa595eaaf09b8094ce95127c103cab611fe65e8"
+dependencies = [
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "objc2-security",
 ]
 
 [[package]]

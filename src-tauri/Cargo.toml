@@ -185,6 +185,7 @@ objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 objc2-network-extension = "0.3"
 objc2-system-extensions = { version = "0.3", optional = true }
+objc2-service-management = { version = "0.3.2", default-features = false, features = ["std", "objc2", "objc2-foundation", "SMAppService"] }
 
 [target.'cfg(unix)'.dependencies]
 nix.workspace = true
