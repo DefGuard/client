@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { debug } from '@tauri-apps/plugin-log';
+import { debug, error as logError } from '@tauri-apps/plugin-log';
 import { Fragment, type PropsWithChildren, useEffect } from 'react';
 import { runConfigureFactorsRequest } from '../../pages/full/ConfigureMfaPage/hooks/runConfigureFactorsRequest';
 import { mfaMethodToConnectModalView } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
@@ -17,6 +17,7 @@ import {
   ConnectionType,
   type DeadConnectionDroppedPayload,
   type DeadConnectionReconnectedPayload,
+  type InstanceInfo,
   type LocationInfo,
   TauriEvent,
   type TunnelsDisabledPayload,
@@ -71,8 +72,15 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             };
             void (async () => {
               const appConfig = await api.getAppConfig();
-              const instances = await queryClient.fetchQuery(getInstancesQueryOptions);
-              const instance = instances.find(({ id }) => id === location.instance_id);
+              // Without the instance the plan falls back to the steps' own flags,
+              // which beats dropping the prompt.
+              let instance: InstanceInfo | undefined;
+              try {
+                const instances = await queryClient.fetchQuery(getInstancesQueryOptions);
+                instance = instances.find(({ id }) => id === location.instance_id);
+              } catch (err) {
+                void logError(`MfaTrigger: failed to load instances: ${err}`);
+              }
               const stepPlan = resolveMfaStepPlan(location, [], instance);
 
               await navigate({ to: '/full/overview' });
@@ -83,7 +91,9 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
                 autoStartOpenId: appConfig.auto_start_openid_mfa,
                 mfaMethod: stepPlan[0],
               });
-            })();
+            })().catch((err) => {
+              void logError(`MfaTrigger: failed to open the MFA prompt: ${err}`);
+            });
           }
         },
       ),

@@ -168,7 +168,10 @@ export const useConfigureMfaStore = create<Store>()(
         ];
         set({
           ...defaults,
-          instance,
+          // The fallback just mailed a code, so SMTP works whatever the snapshot says.
+          instance: response.email_fallback
+            ? { ...instance, smtp_configured: true }
+            : instance,
           sessionId: response.session_id,
           configuredMethods,
           verificationMethods: sessionVerificationMethodsOf(response),

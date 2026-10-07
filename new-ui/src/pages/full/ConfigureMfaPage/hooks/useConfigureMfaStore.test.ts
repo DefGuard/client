@@ -5,6 +5,7 @@ import {
   type InstanceInfo,
   MfaMethod,
 } from '../../../../shared/rust-api/types';
+import { isMfaMethodAvailable } from '../../../../shared/utils/mfa';
 import { ConfigureMfaStep } from '../types';
 import { NoVerificationMethodError } from './noVerificationMethodError';
 import {
@@ -172,6 +173,34 @@ describe('startMfaConfiguration', () => {
     expect(useConfigureMfaStore.getState().verificationMethods).toEqual([
       MfaMethod.Email,
     ]);
+  });
+
+  it('reads email as available after the fallback, without offering it', async () => {
+    Object.assign(api, {
+      mfaConfigStart: vi.fn().mockResolvedValue({
+        ...startResult,
+        available_methods: [],
+        configured_methods: [],
+        email_fallback: true,
+      }),
+    });
+
+    await startMfaConfiguration(
+      {
+        ...instance,
+        smtp_configured: false,
+        mfa_capabilities: {
+          setup_methods: [MfaMethod.Totp, MfaMethod.Email],
+          authorize_methods: [MfaMethod.Totp],
+        },
+      },
+      { preselectedMethods: [MfaMethod.Email] },
+    );
+
+    const state = useConfigureMfaStore.getState();
+    expect(isMfaMethodAvailable(MfaMethod.Email, state.instance)).toBe(true);
+    expect(state.configuredMethods).toContain(MfaMethod.Email);
+    expect(state.initialSelection).toEqual([]);
   });
 
   it('refuses a session nothing can verify', async () => {
