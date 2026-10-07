@@ -154,7 +154,7 @@ describe("conflicting locations", () => {
 
 		await clickConnect();
 		await expectConflictModal(first.name);
-		await closeConflictModal("Disconnect others & connect");
+		await closeConflictModal("Disconnect others and connect");
 		await waitForActiveTunnels([second.name]);
 		await waitForGatewayPing();
 
@@ -172,7 +172,7 @@ describe("conflicting locations", () => {
 
 		await switchToWindowLabel("full-view");
 		await expectConflictModal(first.name);
-		await closeConflictModal("Disconnect others & connect");
+		await closeConflictModal("Disconnect others and connect");
 		await waitForActiveTunnels([second.name]);
 		await waitForGatewayPing();
 
