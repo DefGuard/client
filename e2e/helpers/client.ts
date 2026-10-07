@@ -21,3 +21,11 @@ export const resetInstances = async () => {
 		);
 	});
 };
+
+export const invoke = async <T>(cmd: string, args?: unknown): Promise<T> =>
+	(await browser.execute(
+		(cmd: string, args: unknown) =>
+			(window as unknown as TauriWindow).__TAURI_INTERNALS__.invoke(cmd, args),
+		cmd,
+		args,
+	)) as T;

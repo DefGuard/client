@@ -10,7 +10,11 @@ import {
 	type LocationMfaMode,
 	loggedInCoreApi,
 } from "../helpers/coreApi.js";
-import { switchToFullView, switchToTrayView } from "../helpers/windows.js";
+import {
+	selectTunnel,
+	switchToFullView,
+	switchToTrayView,
+} from "../helpers/windows.js";
 import { provisionTunnel, type TunnelConfig } from "../helpers/wireguard.js";
 
 const field = (name: string) => $(`[data-testid="field-${name}"]`);
@@ -34,17 +38,6 @@ const continueStep = async (stepId: string) => {
 	const button = $(stepId).$("button=Continue");
 	await button.waitForClickable();
 	await button.click();
-};
-
-const selectTunnel = async (name: string) => {
-	await switchToFullView();
-	const overviewLink = $('a[href="/full/overview"]');
-	await overviewLink.waitForClickable();
-	await overviewLink.click();
-	await $("#overview-page").waitForDisplayed();
-	const item = $(".overview-selection").$(`button=${name}`);
-	await item.waitForClickable();
-	await item.click();
 };
 
 const openTunnelAction = async (action: string) => {

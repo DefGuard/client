@@ -25,12 +25,15 @@ export const connectAndPing = async (mfaView: string, totpSecret?: string) => {
 		);
 	}
 
-	await browser.waitUntil(() => canPingGateway(), {
+	await waitForGatewayPing();
+};
+
+export const waitForGatewayPing = () =>
+	browser.waitUntil(() => canPingGateway(), {
 		timeout: 30_000,
 		interval: 2_000,
 		timeoutMsg: "Could not ping the gateway through the VPN",
 	});
-};
 
 export const disconnect = async () => {
 	const button = $(".connect-button.connected");
