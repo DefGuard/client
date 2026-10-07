@@ -17,7 +17,6 @@ import {
   ConnectionType,
   type DeadConnectionDroppedPayload,
   type DeadConnectionReconnectedPayload,
-  type InstanceInfo,
   type LocationInfo,
   TauriEvent,
   type TunnelsDisabledPayload,
@@ -72,15 +71,15 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
             };
             void (async () => {
               const appConfig = await api.getAppConfig();
-              // Without the instance the plan falls back to the steps' own flags,
-              // which beats dropping the prompt.
-              let instance: InstanceInfo | undefined;
+              // A failed refresh keeps the cached instances. With none, the plan uses
+              // the steps' own flags, which beats dropping the prompt.
+              let instances = queryClient.getQueryData(getInstancesQueryOptions.queryKey);
               try {
-                const instances = await queryClient.fetchQuery(getInstancesQueryOptions);
-                instance = instances.find(({ id }) => id === location.instance_id);
+                instances = await queryClient.fetchQuery(getInstancesQueryOptions);
               } catch (err) {
                 void logError(`MfaTrigger: failed to load instances: ${err}`);
               }
+              const instance = instances?.find(({ id }) => id === location.instance_id);
               const stepPlan = resolveMfaStepPlan(location, [], instance);
 
               await navigate({ to: '/full/overview' });
