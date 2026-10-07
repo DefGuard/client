@@ -57,6 +57,7 @@ pub struct AppConfig {
     /// Maximal transmission unit. 0 means default value.
     mtu: u32,
     pub auto_start_openid_mfa: bool,
+    pub start_minimized: bool,
 }
 
 // Important: keep in sync with client store default in frontend
@@ -69,6 +70,7 @@ impl Default for AppConfig {
             peer_alive_period: 300,
             mtu: 0,
             auto_start_openid_mfa: false,
+            start_minimized: false,
         }
     }
 }
@@ -149,6 +151,7 @@ mod tests {
         assert_eq!(config.log_level, default.log_level);
         assert_eq!(config.peer_alive_period, default.peer_alive_period);
         assert_eq!(config.mtu(), default.mtu());
+        assert!(!config.start_minimized);
         // The config file is written out on first load.
         assert!(dir.path().join(APP_CONFIG_FILE_NAME).exists());
     }
@@ -185,6 +188,7 @@ mod tests {
             config.check_for_updates,
             AppConfig::default().check_for_updates
         );
+        assert!(!config.start_minimized);
     }
 
     #[test]
@@ -192,12 +196,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = AppConfig {
             theme: AppTheme::Dark,
+            start_minimized: true,
             ..AppConfig::default()
         };
         config.save(dir.path());
 
         let reloaded = AppConfig::new(dir.path());
         assert_eq!(reloaded.theme, AppTheme::Dark);
+        assert!(reloaded.start_minimized);
     }
 
     #[test]

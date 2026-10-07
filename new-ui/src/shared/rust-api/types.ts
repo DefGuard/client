@@ -271,6 +271,7 @@ export type AppConfig = {
   /** Maximum transmission unit; 0 means system default. */
   mtu: number;
   auto_start_openid_mfa: boolean;
+  start_minimized: boolean;
 };
 
 export type AppConfigPatch = Partial<AppConfig>;
