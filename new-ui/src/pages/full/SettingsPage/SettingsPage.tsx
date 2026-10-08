@@ -1,6 +1,5 @@
 import './style.scss';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import clsx from 'clsx';
 import { type ReactNode, useMemo, useState } from 'react';
@@ -43,7 +42,7 @@ export const SettingsPage = () => {
     isPending: isAutostartStatusPending,
   } = useQuery({
     queryKey: AUTOSTART_QUERY_KEY,
-    queryFn: isEnabled,
+    queryFn: api.getAutostartEnabled,
   });
 
   const { mutate: patchConfig } = useMutation({
@@ -57,13 +56,7 @@ export const SettingsPage = () => {
   });
 
   const { mutate: setAutostart, isPending: isAutostartUpdating } = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      if (enabled) {
-        await enable();
-      } else {
-        await disable();
-      }
-    },
+    mutationFn: api.setAutostartEnabled,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: AUTOSTART_QUERY_KEY }),
     onError: (error) => {
       console.error(error);
