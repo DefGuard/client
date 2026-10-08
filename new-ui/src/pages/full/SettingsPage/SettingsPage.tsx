@@ -1,9 +1,9 @@
 import './style.scss';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import clsx from 'clsx';
 import { type ReactNode, useMemo, useState } from 'react';
+import { getAutostartStatus, setAutostartEnabled } from '../../../shared/autostart';
 import { Divider } from '../../../shared/components/Divider/Divider';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
 import { Icon, IconKind } from '../../../shared/components/Icon';
@@ -38,12 +38,12 @@ export const SettingsPage = () => {
   const queryClient = useQueryClient();
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
   const {
-    data: autostartEnabled,
+    data: autostartStatus,
     isError: isAutostartStatusError,
     isPending: isAutostartStatusPending,
   } = useQuery({
     queryKey: AUTOSTART_QUERY_KEY,
-    queryFn: isEnabled,
+    queryFn: getAutostartStatus,
   });
 
   const { mutate: patchConfig } = useMutation({
@@ -56,15 +56,13 @@ export const SettingsPage = () => {
     },
   });
 
-  const { mutate: setAutostart, isPending: isAutostartUpdating } = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      if (enabled) {
-        await enable();
-      } else {
-        await disable();
-      }
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: AUTOSTART_QUERY_KEY }),
+  const {
+    mutate: setAutostart,
+    isPending: isAutostartUpdating,
+    isError: isAutostartUpdateError,
+  } = useMutation({
+    mutationFn: setAutostartEnabled,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: AUTOSTART_QUERY_KEY }),
     onError: (error) => {
       console.error(error);
     },
@@ -172,14 +170,28 @@ export const SettingsPage = () => {
         <div className="sections startup-settings">
           <SettingRow
             title="Start Defguard automatically when your operating system starts"
+            description={
+              autostartStatus === 'requiresApproval'
+                ? 'Approve Defguard in System Settings > General > Login Items to start it at login.'
+                : isAutostartStatusError ||
+                    isAutostartUpdateError ||
+                    autostartStatus === 'notFound'
+                  ? 'Could not update or check login startup. Please try again.'
+                  : undefined
+            }
             inline
           >
             <Toggle
-              active={autostartEnabled ?? false}
-              disabled={
-                isAutostartStatusPending || isAutostartStatusError || isAutostartUpdating
+              active={
+                autostartStatus === 'enabled' || autostartStatus === 'requiresApproval'
               }
-              onClick={() => setAutostart(!autostartEnabled)}
+              disabled={
+                isAutostartStatusPending ||
+                isAutostartStatusError ||
+                isAutostartUpdating ||
+                autostartStatus === 'notFound'
+              }
+              onClick={() => setAutostart(autostartStatus === 'disabled')}
             />
           </SettingRow>
           <SettingRow title="Start the app minimized to the system tray" inline>

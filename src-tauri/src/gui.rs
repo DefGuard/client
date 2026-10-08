@@ -26,6 +26,7 @@ use crate::utils::sync_connections;
 use crate::{
     app_config::AppConfig,
     appstate::AppState,
+    autostart,
     commands::*,
     database::{
         handle_db_migrations,
@@ -162,7 +163,7 @@ async fn startup(app_handle: &AppHandle) {
 pub fn run_app() {
     info!("Starting Defguard client version {VERSION}");
 
-    let app = Builder::default()
+    let builder = Builder::default()
         .invoke_handler(tauri::generate_handler![
             all_locations,
             has_any_visible_locations,
@@ -190,6 +191,8 @@ pub fn run_app() {
             stop_global_logwatcher,
             command_get_app_config,
             command_set_app_config,
+            autostart::get_autostart_status,
+            autostart::set_autostart_enabled,
             get_provisioning_config,
             get_platform_header,
             get_posture_data,
@@ -255,11 +258,12 @@ pub fn run_app() {
             if !is_deep_link {
                 show_tray_or_full_view(app);
             }
-        }))
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
-        ))
+        }));
+
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
+
+    let app = builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
