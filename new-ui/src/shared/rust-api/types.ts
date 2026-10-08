@@ -137,6 +137,9 @@ export const TauriCommand = {
   // App config
   GetAppConfig: 'command_get_app_config',
   SetAppConfig: 'command_set_app_config',
+  // Autostart
+  GetAutostartEnabled: 'get_autostart_enabled',
+  SetAutostartEnabled: 'set_autostart_enabled',
   // Misc
   GetProvisioningConfig: 'get_provisioning_config',
   GetPlatformHeader: 'get_platform_header',

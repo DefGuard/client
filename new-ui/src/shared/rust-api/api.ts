@@ -106,6 +106,12 @@ const setAppConfig = (
   emitEvent: boolean,
 ): Promise<AppConfig> => invoke(TauriCommand.SetAppConfig, { configPatch, emitEvent });
 
+const getAutostartEnabled = (): Promise<boolean> =>
+  invoke(TauriCommand.GetAutostartEnabled);
+
+const setAutostartEnabled = (enabled: boolean): Promise<void> =>
+  invoke(TauriCommand.SetAutostartEnabled, { enabled });
+
 const getProvisioningConfig = (): Promise<ProvisioningConfig | null> =>
   invoke(TauriCommand.GetProvisioningConfig);
 
@@ -354,6 +360,9 @@ export const api = {
   // App config
   getAppConfig,
   setAppConfig,
+  // Autostart
+  getAutostartEnabled,
+  setAutostartEnabled,
   // Misc
   getProvisioningConfig,
   getPlatformHeader,

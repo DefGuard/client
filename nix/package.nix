@@ -92,7 +92,7 @@
     inherit version pnpm;
     src = ../new-ui;
     fetcherVersion = 4;
-    hash = "sha256-1QT7roUnUCSqcTa9LWRirHA7pwGLrdbQQTS7CMoEpFA=";
+    hash = "sha256-J0TiPTNLr1+KW1j/rYWeQL0Bn+msgHemGUD9OkxVdjA=";
   };
 
   # Pre-build the new UI frontend so Tauri can serve it as WebviewUrl::App("compact/") and "full/".

@@ -155,12 +155,11 @@ tauri = { version = "2", features = [
     "image-png",
     "tray-icon",
 ] }
-tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-http = { version = "=2.6.1", features = ["unsafe-headers", "native-tls"] }
+tauri-plugin-http = { version = "2", features = ["unsafe-headers", "native-tls"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
@@ -178,6 +177,7 @@ uuid.workspace = true
 webbrowser.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
+auto-launch = "0.6"
 block2 = "0.6"
 dispatch2 = { version = "0.3", optional = true }
 objc2 = "0.6"
@@ -185,6 +185,9 @@ objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 objc2-network-extension = "0.3"
 objc2-system-extensions = { version = "0.3", optional = true }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+tauri-plugin-autostart = "2"
 
 [target.'cfg(unix)'.dependencies]
 nix.workspace = true

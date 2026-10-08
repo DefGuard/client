@@ -4,6 +4,7 @@
 #[cfg(target_os = "macos")]
 pub mod apple;
 pub mod appstate;
+pub mod autostart;
 pub mod commands;
 pub mod events;
 pub mod fido2_window;
