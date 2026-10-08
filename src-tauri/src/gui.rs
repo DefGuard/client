@@ -26,6 +26,7 @@ use crate::utils::sync_connections;
 use crate::{
     app_config::AppConfig,
     appstate::AppState,
+    autostart,
     commands::*,
     database::{
         handle_db_migrations,
@@ -229,6 +230,8 @@ pub fn run_app() {
             mfa_config_cancel,
             session_state::get_session_state,
             session_state::patch_session_state,
+            autostart::get_autostart_enabled,
+            autostart::set_autostart_enabled,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::ThemeChanged(_theme) = event {
@@ -256,10 +259,6 @@ pub fn run_app() {
                 show_tray_or_full_view(app);
             }
         }))
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
-        ))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -311,6 +310,13 @@ pub fn run_app() {
 
                 app.set_dock_visibility(false);
             }
+
+            // macOS: see `autostart` module.
+            #[cfg(not(target_os = "macos"))]
+            app.handle().plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))?;
 
             // Register for Linux and debug Windows builds.
             #[cfg(any(target_os = "linux", windows))]
