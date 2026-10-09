@@ -3,6 +3,7 @@
   --shadow: 0 4px 5px 0 rgb(53 84 179 / 7%);
   --color: var(--fg-action);
   --border: transparent;
+  --loader-bg: transparent;
 
   background: var(--bg);
   border: 1px solid var(--border);
@@ -13,6 +14,7 @@
   transition-timing-function: ease-in-out;
   cursor: pointer;
   display: inline-flex;
+  position: relative;
   width: 100%;
   align-items: center;
   justify-content: center;
@@ -21,8 +23,15 @@
   box-sizing: border-box;
   padding: 0 var(--spacing-lg);
 
-  &:not(.connected, .disabled):hover {
+  &:not(.connected, .disabled, .loading):hover {
     --bg: var(--bg-white-80);
+  }
+
+  &:not(.disabled).loading {
+    --bg: var(--c-white-10);
+    --loader-bg: var(--bg-white-10);
+
+    cursor: default;
   }
 
   &.connected {
@@ -30,9 +39,14 @@
     --color: var(--fg-white-100);
     --border: var(--border-default);
 
-    &:not(.disabled):hover {
+    &:not(.disabled, .loading):hover {
       --border: var(--border-default);
       --bg: var(--bg-white-10);
+    }
+
+    &:not(.disabled).loading {
+      --bg: transparent;
+      --border: var(--border-disabled);
     }
   }
 
@@ -44,14 +58,35 @@
     cursor: not-allowed;
   }
 
-  .icon {
-    --icon-color: var(--color);
+  & > .content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
 
-    margin-right: var(--spacing-sm);
+    & > .icon {
+      --icon-color: var(--color);
+
+      margin-right: var(--spacing-sm);
+    }
+
+    & > p {
+      font: var(--t-body-sm-600);
+      color: inherit;
+    }
   }
 
-  p {
-    font: var(--t-body-sm-600);
-    color: inherit;
+  & > .loader-overlay {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background-color: var(--loader-bg);
+    pointer-events: none;
   }
 }

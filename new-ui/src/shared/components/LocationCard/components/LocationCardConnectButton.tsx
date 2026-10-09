@@ -56,7 +56,7 @@ export const LocationCardConnectButton = () => {
     },
   });
 
-  const isBusy = isConnecting || isDisconnecting || isOpeningConfiguration;
+  const isBusy = isConnecting || isOpeningConfiguration;
 
   const handleClick = () => {
     if (location.active) {
@@ -89,6 +89,7 @@ export const LocationCardConnectButton = () => {
       active={location.active}
       onClick={handleClick}
       disabled={isBusy || isBlocked}
+      loading={isDisconnecting}
       tooltip={isBlocked ? connectBlockedTooltip : null}
     />
   );

@@ -71,7 +71,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
   const { mutate: configureMfa, isPending: isOpeningConfiguration } =
     useConfigureFactorsScreen();
 
-  const isBusy = isConnecting || isDisconnecting || isOpeningConfiguration;
+  const isBusy = isConnecting || isOpeningConfiguration;
 
   const connectionAbility = useConnectionAbility(location, instance);
 
@@ -143,6 +143,7 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
             active={location.active}
             onClick={handleConnectClick}
             disabled={isBusy || isBlocked}
+            loading={isDisconnecting}
             tooltip={isBlocked ? connectBlockedTooltip : null}
           />
         </div>
