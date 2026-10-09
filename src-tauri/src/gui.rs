@@ -187,6 +187,7 @@ pub fn run_app() {
             update_tunnel,
             delete_tunnel,
             get_latest_app_version,
+            get_client_build_version,
             start_global_logwatcher,
             stop_global_logwatcher,
             command_get_app_config,
