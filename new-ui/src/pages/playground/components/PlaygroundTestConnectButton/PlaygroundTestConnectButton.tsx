@@ -27,6 +27,10 @@ export const PlaygroundTestConnectButton = () => {
         <div className="track">
           <ConnectButton active disabled onClick={noop} />
         </div>
+        <h3>Connected (loading)</h3>
+        <div className="track">
+          <ConnectButton active loading onClick={noop} />
+        </div>
         <h3>Interactive (active: {active ? 'true' : 'false'})</h3>
         <div className="track">
           <ConnectButton active={active} onClick={() => setActive((v) => !v)} />
