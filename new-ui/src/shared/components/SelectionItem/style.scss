@@ -3,12 +3,15 @@
   --bg: transparent;
   --text-color: var(--fg-white-100);
   --icon-color: var(--fg-white-70);
+  --focus-color: transparent;
 
-  height: 40px;
+  height: var(--size-3xl);
   padding: 0 var(--spacing-md);
   box-sizing: border-box;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border: var(--border-1) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  outline: var(--border-2) solid var(--focus-color);
+  outline-offset: calc(var(--border-2) * -1);
   background-color: var(--bg);
   user-select: none;
 
@@ -24,6 +27,10 @@
     &.selected {
       --border-color: var(--border-emphasis);
     }
+
+    &:focus-visible {
+      --focus-color: var(--border-action);
+    }
   }
 
   &.disabled {
@@ -36,6 +43,7 @@
   & > .track {
     display: grid;
     grid-template-columns: 20px minmax(0, 1fr) 24px;
+    grid-template-rows: 1fr;
     column-gap: var(--spacing-lg);
     align-items: center;
     justify-content: start;

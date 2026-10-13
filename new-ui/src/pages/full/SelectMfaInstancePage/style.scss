@@ -2,17 +2,13 @@
   & > .label {
     display: flex;
     flex-flow: row;
-    column-gap: var(--spacing-sm);
     align-items: center;
-    padding-bottom: var(--spacing-md);
+    justify-content: flex-start;
+    column-gap: var(--spacing-sm);
 
     & > p {
       font: var(--t-body-xs-500);
       color: var(--fg-white-60);
-    }
-
-    &.incompatible {
-      padding-top: var(--spacing-4xl);
     }
   }
 
@@ -21,9 +17,5 @@
     flex-flow: column;
     row-gap: var(--spacing-md);
     width: 100%;
-  }
-
-  & > .controls {
-    padding-top: var(--spacing-xl);
   }
 }

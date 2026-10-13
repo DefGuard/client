@@ -14,6 +14,7 @@ export const SelectionItem = ({
   badge,
   testId,
   onClick,
+  onKeyDown,
   variant = SelectionItemVariant.Radio,
   disabled = false,
   className,
@@ -36,6 +37,7 @@ export const SelectionItem = ({
         if (!disabled) onClick?.();
       }}
       onKeyDown={(e) => {
+        onKeyDown?.(e);
         if (disabled || (e.key !== 'Enter' && e.key !== ' ')) return;
         e.preventDefault();
         onClick?.();
@@ -50,9 +52,10 @@ export const SelectionItem = ({
           {isPresent(badge) && <Badge text={badge} disabled={disabled} />}
         </div>
         <div className="side-col">
-          {variant === SelectionItemVariant.Checkbox ? (
+          {variant === SelectionItemVariant.Checkbox && (
             <CheckboxIndicator active={selected} disabled={disabled} size="sm" />
-          ) : (
+          )}
+          {variant === SelectionItemVariant.Radio && (
             <RadioIndicator active={selected} disabled={disabled} />
           )}
         </div>

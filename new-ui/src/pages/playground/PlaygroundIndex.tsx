@@ -75,7 +75,7 @@ const usePlaygroundStore = create<Store>()(
 export const PlaygroundIndex = () => {
   const activeTab = usePlaygroundStore((s) => s.activeTab);
   const setActiveTab = usePlaygroundStore((s) => s.setActiveTab);
-  // A tab key stored before the tabs were renamed falls back to the first tab.
+  // sessionStorage can hold a key from an older build that matches no tab
   const active = tabs.find((tab) => tab.key === activeTab) ?? tabs[0];
 
   return (
