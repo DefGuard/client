@@ -6,7 +6,16 @@ export type LaunchConfig = {
 	args?: string[];
 };
 
-export const launchConfigs: Record<string, LaunchConfig> = {};
+export const launchConfigs: Record<string, LaunchConfig> = {
+	"provisioning.spec.ts": {
+		files: {
+			"provisioning.json": JSON.stringify({
+				enrollment_url: "https://enroll.example",
+				enrollment_token: "e2e-provisioning-token",
+			}),
+		},
+	},
+};
 
 export const getLaunchConfig = (specs: string[]): LaunchConfig | undefined => {
 	for (const spec of specs) {
