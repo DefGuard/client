@@ -55,7 +55,7 @@ use tracing::{debug, error, info, info_span, Instrument};
 use crate::{config::Config, VERSION};
 #[cfg(windows)]
 use crate::{
-    ipv6_block::Ipv6Block,
+    ip_block::IpBlock,
     named_pipe::{get_named_pipe_server_stream, PIPE_NAME},
 };
 
@@ -103,7 +103,7 @@ pub(crate) struct DaemonService {
     stats_period: Duration,
     stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
     #[cfg(windows)]
-    ipv6_blocks: Arc<Mutex<HashMap<IfName, Ipv6Block>>>,
+    ip_blocks: Arc<Mutex<HashMap<IfName, IpBlock>>>,
     #[cfg(any(windows, target_os = "linux"))]
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 }
@@ -121,7 +121,7 @@ impl DaemonService {
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
             #[cfg(windows)]
-            ipv6_blocks: Arc::new(Mutex::new(HashMap::new())),
+            ip_blocks: Arc::new(Mutex::new(HashMap::new())),
             #[cfg(any(windows, target_os = "linux"))]
             service_location_manager,
         }
@@ -357,18 +357,23 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
-        // Windows has no reject route, and the gateway drops link-local IPv6 from a tunnel
-        // without an IPv6 address, so connections hang until the SYN retries run out.
+        // Windows has no reject route, and the gateway drops link-local sources from a tunnel
+        // without an address of that family, so block that family to fail connections at once.
         #[cfg(windows)]
-        if let Ok(mut blocks) = self.ipv6_blocks.lock() {
+        if let Ok(mut blocks) = self.ip_blocks.lock() {
             blocks.remove(&ifname);
-            if !config.addresses.iter().any(|addr| addr.address.is_ipv6()) {
-                match Ipv6Block::new(&ifname) {
+            let has_ipv4 = config.addresses.iter().any(|addr| addr.address.is_ipv4());
+            let has_ipv6 = config.addresses.iter().any(|addr| addr.address.is_ipv6());
+            if !has_ipv4 || !has_ipv6 {
+                match IpBlock::new(&ifname, !has_ipv4, !has_ipv6) {
                     Ok(block) => {
                         blocks.insert(ifname.clone(), block);
-                        debug!("Blocked IPv6 connections through interface {ifname}");
+                        debug!(
+                            "Blocked connections through interface {ifname}: IPv4 {}, IPv6 {}",
+                            !has_ipv4, !has_ipv6
+                        );
                     }
-                    Err(err) => error!("Failed to block IPv6 on interface {ifname}: {err}"),
+                    Err(err) => error!("Failed to block IP on interface {ifname}: {err}"),
                 }
             }
         }
@@ -410,7 +415,7 @@ impl DesktopDaemonService for DaemonService {
         };
 
         #[cfg(windows)]
-        if let Ok(mut blocks) = self.ipv6_blocks.lock() {
+        if let Ok(mut blocks) = self.ip_blocks.lock() {
             blocks.remove(&ifname);
         }
 
