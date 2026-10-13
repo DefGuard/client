@@ -58,6 +58,26 @@ describe('useConfigureVerifyOidc', () => {
     expect(mocks.mfaConfigAuthorizeOidc).toHaveBeenCalledWith(sessionId);
   });
 
+  it('reopens the browser while polling without starting a second poll', async () => {
+    const polling = deferred<typeof authorizeResult>();
+    mocks.mfaConfigAuthorizeOidc.mockReturnValue(polling.promise);
+    const { result } = renderOidc();
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(mocks.openLink).toHaveBeenCalledTimes(2);
+    expect(mocks.mfaConfigAuthorizeOidc).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      polling.resolve(authorizeResult);
+    });
+  });
+
   it('opens the browser on mount when auto-starting', async () => {
     renderOidc(true);
 

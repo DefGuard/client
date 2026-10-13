@@ -31,10 +31,11 @@ export const SelectMfaInstancePage = () => {
     [instances],
   );
 
-  // Derived so a poll dropping the picked instance also clears the selection.
+  // Derived so a poll dropping the pick clears it, or falls back to the only one left.
   const selectedInstance = useMemo(() => {
-    const id = selectedId ?? (available.length === 1 ? available[0].id : undefined);
-    return available.find((instance) => instance.id === id);
+    const picked = available.find((instance) => instance.id === selectedId);
+    if (isPresent(picked)) return picked;
+    return available.length === 1 ? available[0] : undefined;
   }, [available, selectedId]);
 
   const { mutate: startConfigureMfa, isPending } = useStartMfaConfiguration();

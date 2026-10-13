@@ -48,7 +48,7 @@ export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
         <ExternalProviderButton
           text={`Authenticate with ${providerName}`}
           provider={findOpenIdProvider(instance) ?? 'custom'}
-          loading={isOpening || isPolling}
+          loading={isOpening}
           onClick={() => {
             void start();
           }}
