@@ -29,7 +29,7 @@ use defguard_client_proto::defguard::{
     },
     enterprise::posture::v2::DevicePostureData,
 };
-use defguard_client_provisioning::ProvisioningConfig;
+use defguard_client_provisioning::{clear_provisioning_config, ProvisioningConfig};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
@@ -612,6 +612,31 @@ pub async fn save_device_config(
         );
     }
     transaction.commit().await?;
+
+    let state = handle.state::<AppState>();
+    let has_provisioning_config = match state.provisioning_config.lock() {
+        Ok(mut provisioning_config) => provisioning_config.take().is_some(),
+        Err(_) => {
+            warn!("Failed to clear in-memory provisioning config");
+            false
+        }
+    };
+    if has_provisioning_config {
+        match handle.path().app_data_dir() {
+            Ok(app_data_dir) => {
+                if let Err(err) = clear_provisioning_config(&app_data_dir) {
+                    warn!(
+                        "Failed to remove provisioning config from {}: {err}",
+                        app_data_dir.display()
+                    );
+                }
+            }
+            Err(err) => {
+                warn!("Failed to resolve app data directory for provisioning cleanup: {err}");
+            }
+        }
+    }
+
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
