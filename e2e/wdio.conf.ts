@@ -115,7 +115,9 @@ export const config: WebdriverIO.Config = {
 				| { args?: string[] }
 				| undefined;
 			if (!tauriOptions) {
-				throw new Error("Missing tauri:options capability for launch arguments");
+				throw new Error(
+					"Missing tauri:options capability for launch arguments",
+				);
 			}
 			tauriOptions.args = launchConfig.args;
 		}
