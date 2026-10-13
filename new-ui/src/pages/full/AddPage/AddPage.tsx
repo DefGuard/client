@@ -11,7 +11,6 @@ import {
 import { ThemeSpacing } from '../../../shared/types';
 import { mfaConfigurableInstances } from '../../../shared/utils/mfa';
 import { AddCard } from './components/AddCard/AddCard';
-import { useStartMfaConfiguration } from './hooks/useStartMfaConfiguration';
 
 export const AddPage = () => {
   const navigate = useNavigate();
@@ -21,9 +20,6 @@ export const AddPage = () => {
     () => mfaConfigurableInstances(instances ?? []),
     [instances],
   );
-
-  const { mutate: startConfigureMfa, isPending: configureMfaPending } =
-    useStartMfaConfiguration();
 
   return (
     <FullPage id="add-page-view" hideScrollContainer>
@@ -60,16 +56,10 @@ export const AddPage = () => {
             description={`Add new MFA methods to securely authenticate when connecting to a location, with flexible options to match your security requirements.`}
             actionText="Add MFA"
             onClick={() => {
-              // Below two instances there is nothing to pick, so the flow starts here.
-              if (mfaInstances.length > 1) {
-                navigate({
-                  to: '/full/add/mfa',
-                });
-                return;
-              }
-              startConfigureMfa(mfaInstances[0]);
+              navigate({
+                to: '/full/add/mfa',
+              });
             }}
-            loading={configureMfaPending}
           />
         )}
       </div>

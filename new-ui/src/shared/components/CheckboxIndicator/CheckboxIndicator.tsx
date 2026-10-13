@@ -5,20 +5,28 @@ import { ThemeVariable } from '../../types';
 
 type Props = {
   active: boolean;
+  size?: 'primary' | 'sm';
   disabled?: boolean;
   error?: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
   ref?: Ref<HTMLDivElement>;
 };
 
-export const CheckboxIndicator = ({ error, active, disabled, ref, onClick }: Props) => {
+export const CheckboxIndicator = ({
+  error,
+  active,
+  disabled,
+  ref,
+  onClick,
+  size = 'primary',
+}: Props) => {
   return (
     <div
       ref={ref}
       data-value={active}
       aria-disabled={disabled}
       onClick={onClick}
-      className="checkbox-indicator"
+      className={clsx('checkbox-indicator', `size-${size}`)}
     >
       <div className="box-positioner">
         <div

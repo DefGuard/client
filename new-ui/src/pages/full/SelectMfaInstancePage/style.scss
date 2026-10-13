@@ -1,15 +1,29 @@
 #select-mfa-instance-page {
-  > .label {
-    font: var(--t-body-xs-500);
-    color: var(--fg-white-60);
+  & > .label {
+    display: flex;
+    flex-flow: row;
+    column-gap: var(--spacing-sm);
+    align-items: center;
     padding-bottom: var(--spacing-md);
+
+    & > p {
+      font: var(--t-body-xs-500);
+      color: var(--fg-white-60);
+    }
+
+    &.incompatible {
+      padding-top: var(--spacing-4xl);
+    }
   }
 
-  .instances {
+  & > .instances {
     display: flex;
     flex-flow: column;
     row-gap: var(--spacing-md);
     width: 100%;
-    padding-bottom: var(--spacing-xl);
+  }
+
+  & > .controls {
+    padding-top: var(--spacing-xl);
   }
 }

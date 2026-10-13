@@ -1,5 +1,15 @@
 /* stylelint-disable no-descending-specificity */
 .checkbox-indicator {
+  --box-size: 20px;
+  --check-width: 12px;
+  --check-height: 8px;
+
+  &.size-sm {
+    --box-size: 16px;
+    --check-width: 10px;
+    --check-height: 7px;
+  }
+
   & > .box-positioner {
     display: grid;
     grid-template-columns: 24px;
@@ -10,6 +20,8 @@
 
     svg {
       z-index: 0;
+      width: var(--check-width);
+      height: var(--check-height);
 
       path {
         @include animate(fill);
@@ -31,8 +43,8 @@
 
   content: ' ';
   display: block;
-  width: 20px;
-  height: 20px;
+  width: var(--box-size);
+  height: var(--box-size);
   box-sizing: border-box;
   border-radius: var(--radius-sm);
   background-color: var(--bg);

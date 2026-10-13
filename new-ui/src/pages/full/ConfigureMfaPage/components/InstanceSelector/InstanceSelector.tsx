@@ -1,14 +1,12 @@
-import clsx from 'clsx';
-import './style.scss';
-import { Icon, IconKind } from '../../../../../shared/components/Icon';
-import { RadioIndicator } from '../../../../../shared/components/RadioIndicator/RadioIndicator';
-import { ThemeVariable } from '../../../../../shared/types';
+import { IconKind } from '../../../../../shared/components/Icon';
+import { SelectionItem } from '../../../../../shared/components/SelectionItem/SelectionItem';
 
 interface Props {
   instanceId: number;
   instanceName: string;
   selected: boolean;
-  onClick: () => void;
+  disabled?: boolean;
+  onClick?: () => void;
 }
 
 export const InstanceSelector = ({
@@ -16,24 +14,17 @@ export const InstanceSelector = ({
   instanceName,
   selected,
   onClick,
+  disabled = false,
 }: Props) => {
   return (
-    <div
-      className={clsx('instance-selector', { selected })}
+    <SelectionItem
+      className="instance-selector"
       data-instance-id={instanceId}
+      text={instanceName}
+      icon={IconKind.Globe}
+      selected={selected}
+      disabled={disabled}
       onClick={onClick}
-    >
-      <div className="track">
-        <div className="icon-col side-col">
-          <Icon icon={IconKind.Globe} size={20} staticColor={ThemeVariable.FgWhite70} />
-        </div>
-        <div className="content-col">
-          <p className="name">{instanceName}</p>
-        </div>
-        <div className="selection side-col">
-          <RadioIndicator active={selected} />
-        </div>
-      </div>
-    </div>
+    />
   );
 };

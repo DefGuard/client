@@ -10,10 +10,11 @@ import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
 
 type Options = {
   onSessionExpired: () => void;
+  autoStart: boolean;
 };
 
 /** reopening the page starts a new attempt on Core, and the running poll picks it up */
-export const useConfigureVerifyOidc = ({ onSessionExpired }: Options) => {
+export const useConfigureVerifyOidc = ({ onSessionExpired, autoStart }: Options) => {
   const [isOpening, setIsOpening] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +82,18 @@ export const useConfigureVerifyOidc = ({ onSessionExpired }: Options) => {
       void abort();
     };
   }, []);
+
+  // deferred a tick so a StrictMode replay or an instant unmount clears it before it runs
+  // biome-ignore lint/correctness/useExhaustiveDependencies: auto-start only on mount
+  useEffect(() => {
+    if (!autoStart) return;
+    const timer = window.setTimeout(() => {
+      void start();
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [autoStart]);
 
   return { start, abort, isOpening, isPolling, error };
 };

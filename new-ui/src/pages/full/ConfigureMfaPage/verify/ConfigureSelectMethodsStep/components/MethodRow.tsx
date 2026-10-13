@@ -1,3 +1,4 @@
+import { Badge } from '../../../../../../shared/components/Badge/Badge';
 import { Checkbox } from '../../../../../../shared/components/Checkbox/Checkbox';
 import { Icon } from '../../../../../../shared/components/Icon';
 import { TooltipContent } from '../../../../../../shared/providers/tooltip/TooltipContent';
@@ -44,11 +45,7 @@ export const MethodRow = ({
     />
     {(configured || isPresent(hint)) && (
       <div className="right">
-        {configured && (
-          <div className="configured-badge">
-            <p>{`Configured`}</p>
-          </div>
-        )}
+        {configured && <Badge text="Configured" disabled={disabled} />}
         {isPresent(hint) && (
           <TooltipProvider>
             <TooltipTrigger>
