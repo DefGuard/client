@@ -1,8 +1,8 @@
 import clsx from 'clsx';
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
-import { getVersion } from '@tauri-apps/api/app';
 import { useId } from 'react';
+import { api } from '../../rust-api/api';
 import { isPresent } from '../../utils/isPresent';
 import { ConnectionWatcher } from './components/ConnectionWatcher/ConnectionsWatcher';
 
@@ -12,8 +12,8 @@ interface Props {
 
 export const WindowHeader = ({ variant }: Props) => {
   const { data: appVersion } = useQuery({
-    queryFn: getVersion,
-    queryKey: ['app-version'],
+    queryFn: api.getClientBuildVersion,
+    queryKey: ['client-build-version'],
   });
 
   const version = () => {

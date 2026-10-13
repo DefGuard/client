@@ -120,6 +120,9 @@ const getPlatformHeader = (): Promise<string> => invoke(TauriCommand.GetPlatform
 const getLatestAppVersion = (): Promise<NewAppVersionInfo> =>
   invoke(TauriCommand.GetLatestAppVersion);
 
+const getClientBuildVersion = (): Promise<string> =>
+  invoke(TauriCommand.GetClientBuildVersion);
+
 const openLink = (link: string): Promise<void> => invoke(TauriCommand.OpenLink, { link });
 
 const startGlobalLogWatcher = (): Promise<void> =>
@@ -367,6 +370,7 @@ export const api = {
   getProvisioningConfig,
   getPlatformHeader,
   getLatestAppVersion,
+  getClientBuildVersion,
   openLink,
   startGlobalLogWatcher,
   stopGlobalLogWatcher,
