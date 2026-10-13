@@ -37,7 +37,7 @@ describe("provisioning", () => {
 					},
 					configs: [],
 					instance: {
-						id: "e2e-provisioning-instance",
+						id: "00000000-0000-4000-8000-000000000001",
 						name: "e2e-instance",
 						url: "https://core.example",
 						proxy_url: "https://edge.example",
