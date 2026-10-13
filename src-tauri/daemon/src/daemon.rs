@@ -52,9 +52,12 @@ use tonic::{
 use tracing::warn;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(windows)]
-use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
 use crate::{config::Config, VERSION};
+#[cfg(windows)]
+use crate::{
+    ip_block::IpBlock,
+    named_pipe::{get_named_pipe_server_stream, PIPE_NAME},
+};
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -99,6 +102,8 @@ pub(crate) struct DaemonService {
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
     stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
+    #[cfg(windows)]
+    ip_blocks: Arc<Mutex<HashMap<IfName, IpBlock>>>,
     #[cfg(any(windows, target_os = "linux"))]
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
 }
@@ -115,6 +120,8 @@ impl DaemonService {
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(windows)]
+            ip_blocks: Arc::new(Mutex::new(HashMap::new())),
             #[cfg(any(windows, target_os = "linux"))]
             service_location_manager,
         }
@@ -350,6 +357,27 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
+        // Windows has no reject route, and the gateway drops link-local sources from a tunnel
+        // without an address of that family, so block that family to fail connections at once.
+        #[cfg(windows)]
+        if let Ok(mut blocks) = self.ip_blocks.lock() {
+            blocks.remove(&ifname);
+            let has_ipv4 = config.addresses.iter().any(|addr| addr.address.is_ipv4());
+            let has_ipv6 = config.addresses.iter().any(|addr| addr.address.is_ipv6());
+            if !has_ipv4 || !has_ipv6 {
+                match IpBlock::new(&ifname, !has_ipv4, !has_ipv6) {
+                    Ok(block) => {
+                        blocks.insert(ifname.clone(), block);
+                        debug!(
+                            "Blocked connections through interface {ifname}: IPv4 {}, IPv6 {}",
+                            !has_ipv4, !has_ipv6
+                        );
+                    }
+                    Err(err) => error!("Failed to block IP on interface {ifname}: {err}"),
+                }
+            }
+        }
+
         debug!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
     }
@@ -385,6 +413,11 @@ impl DesktopDaemonService for DaemonService {
             };
             wgapi
         };
+
+        #[cfg(windows)]
+        if let Ok(mut blocks) = self.ip_blocks.lock() {
+            blocks.remove(&ifname);
+        }
 
         #[cfg(not(windows))]
         {
