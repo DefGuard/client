@@ -7,6 +7,11 @@ export type LaunchConfig = {
 };
 
 export const launchConfigs: Record<string, LaunchConfig> = {
+	"deep_link_cold_start.spec.ts": {
+		args: [
+			"defguard://addinstance?token=e2e-cold-start-token&url=https%3A%2F%2Fcold-start.example",
+		],
+	},
 	"provisioning.spec.ts": {
 		files: {
 			"provisioning.json": JSON.stringify({
