@@ -1,6 +1,17 @@
 #playground-index {
   overflow: hidden;
 
+  #playground-nav {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    backdrop-filter: blur(10px);
+
+    & > .track {
+      width: 100%;
+    }
+  }
+
   .main-track {
     box-sizing: border-box;
     padding: var(--spacing-xl);

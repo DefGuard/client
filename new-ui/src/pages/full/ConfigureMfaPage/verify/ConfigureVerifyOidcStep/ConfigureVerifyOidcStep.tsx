@@ -1,9 +1,11 @@
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
+import { ExternalProviderButton } from '../../../../../shared/components/ExternalProviderButton/ExternalProviderButton';
 import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/FullPageTitle';
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { isPresent } from '../../../../../shared/utils/isPresent';
+import { findOpenIdProvider, openIdProviderName } from '../../../../../shared/utils/mfa';
 import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { useConfigureVerifyOidc } from './useConfigureVerifyOidc';
 import '../style.scss';
@@ -13,8 +15,11 @@ interface Props {
 }
 
 export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
+  const instance = useConfigureMfaStore((s) => s.instance) ?? undefined;
+  const providerName = openIdProviderName(instance);
   const { start, abort, isOpening, isPolling, error } = useConfigureVerifyOidc({
     onSessionExpired,
+    autoStart: true,
   });
 
   const handleBack = async () => {
@@ -35,14 +40,14 @@ export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
         <span>
           {isPolling
             ? 'Complete the sign-in in your browser. This page will update automatically.'
-            : 'Authenticate via your OpenID provider. A browser window will open for you to sign in.'}
+            : `A browser window will open for you to sign in with ${providerName}.`}
         </span>
       </p>
       {isPresent(error) && <p className="error">{error}</p>}
       <div className="oidc-action">
-        <Button
-          text={isPolling ? 'Open again' : 'Auth with OpenID'}
-          variant={ButtonVariant.Primary}
+        <ExternalProviderButton
+          text={`Authenticate with ${providerName}`}
+          provider={findOpenIdProvider(instance) ?? 'custom'}
           loading={isOpening}
           onClick={() => {
             void start();

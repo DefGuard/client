@@ -20,7 +20,10 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Fido2]: 'Security key',
 };
 
-type OpenIdInstance = Pick<InstanceInfo, 'openid_display_name' | 'openid_provider_kind'>;
+export type OpenIdInstance = Pick<
+  InstanceInfo,
+  'openid_display_name' | 'openid_provider_kind'
+>;
 
 export const openIdProviderName = (instance?: OpenIdInstance): string =>
   instance?.openid_display_name || mfaMethodLabels[MfaMethod.Oidc];
