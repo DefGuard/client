@@ -161,6 +161,8 @@ pub struct Stats {
     pub tx_bytes: u64,
     pub rx_bytes: u64,
     pub last_handshake: u64,
+    pub listen_port: Option<u16>,
+    pub persistent_keep_alive: Option<u16>,
 }
 
 /// Retrieve VPN tunnel statistics from VPNExtension.
@@ -440,4 +442,29 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
     debug!("Removed unknown configurations from system settings.");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Stats;
+
+    #[test]
+    fn test_stats_deserialize_listen_port_and_keepalive() {
+        let stats: Stats = serde_json::from_str(
+            r#"{"txBytes":1,"rxBytes":2,"lastHandshake":3,"locationId":7,
+                "listenPort":51820,"persistentKeepAlive":25}"#,
+        )
+        .unwrap();
+        assert_eq!(stats.location_id, Some(7));
+        assert_eq!(stats.listen_port, Some(51820));
+        assert_eq!(stats.persistent_keep_alive, Some(25));
+
+        // VPNExtension builds without these fields still send stats.
+        let stats: Stats =
+            serde_json::from_str(r#"{"txBytes":1,"rxBytes":2,"lastHandshake":3,"tunnelId":4}"#)
+                .unwrap();
+        assert_eq!(stats.tunnel_id, Some(4));
+        assert_eq!(stats.listen_port, None);
+        assert_eq!(stats.persistent_keep_alive, None);
+    }
 }
