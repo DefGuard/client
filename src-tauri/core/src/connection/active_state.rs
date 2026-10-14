@@ -59,7 +59,7 @@ pub struct InterfaceStats {
 impl From<super::apple::Stats> for InterfaceStats {
     fn from(stats: super::apple::Stats) -> Self {
         Self {
-            listen_port: 0,
+            listen_port: stats.listen_port.unwrap_or_default().into(),
             tx_bytes: stats.tx_bytes,
             rx_bytes: stats.rx_bytes,
             last_handshake: (stats.last_handshake != 0).then_some(stats.last_handshake),

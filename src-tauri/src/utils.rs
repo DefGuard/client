@@ -165,8 +165,8 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 stats.tx_bytes.cast_signed(),
                 stats.rx_bytes.cast_signed(),
                 stats.last_handshake.cast_signed(),
-                0,
-                None,
+                stats.listen_port.unwrap_or_default().into(),
+                stats.persistent_keep_alive,
             )
             .with_diffs(upload_diff, download_diff);
             match location_stats.save(&mut *transaction).await {
@@ -185,8 +185,8 @@ pub(crate) async fn stats_handler(id: Id, connection_type: ConnectionType) {
                 stats.rx_bytes.cast_signed(),
                 stats.last_handshake.cast_signed(),
                 chrono::Utc::now().naive_utc(),
-                0,
-                0,
+                stats.listen_port.unwrap_or_default().into(),
+                stats.persistent_keep_alive.unwrap_or_default(),
             )
             .with_diffs(upload_diff, download_diff);
             match tunnel_stats.save(&mut *transaction).await {
