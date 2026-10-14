@@ -1,25 +1,38 @@
 #configure-select-methods-step {
-  .steps {
+  & .steps {
     display: flex;
     flex-flow: column;
+    row-gap: var(--spacing-2xl);
     width: 100%;
     padding-bottom: var(--spacing-xl);
-  }
 
-  .step {
-    display: flex;
-    flex-flow: column;
-    row-gap: var(--spacing-md);
-
-    .step-label {
-      font: var(--t-body-xs-400);
-      color: var(--fg-white-70);
+    &.sections {
+      row-gap: var(--spacing-4xl);
     }
 
-    .methods {
+    & > .step {
       display: flex;
       flex-flow: column;
       row-gap: var(--spacing-md);
+
+      & > .label {
+        display: flex;
+        flex-flow: row;
+        align-items: center;
+        justify-content: flex-start;
+        column-gap: var(--spacing-sm);
+
+        & > p {
+          font: var(--t-body-xs-500);
+          color: var(--fg-white-100);
+        }
+      }
+
+      & > .methods {
+        display: flex;
+        flex-flow: column;
+        row-gap: var(--spacing-md);
+      }
     }
   }
 }

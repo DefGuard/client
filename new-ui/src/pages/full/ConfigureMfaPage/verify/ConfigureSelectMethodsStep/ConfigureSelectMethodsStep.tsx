@@ -1,18 +1,25 @@
 import { useMutation } from '@tanstack/react-query';
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import clsx from 'clsx';
+import { fork } from 'radashi';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
-import { Divider } from '../../../../../shared/components/Divider/Divider';
+import { FactorSelector } from '../../../../../shared/components/FactorSelector/FactorSelector';
 import { FieldError } from '../../../../../shared/components/FieldError/FieldError';
 import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/FullPageTitle';
+import { Icon, IconKind } from '../../../../../shared/components/Icon';
+import { SelectionItemVariant } from '../../../../../shared/components/SelectionItem/types';
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
+import { TooltipContent } from '../../../../../shared/providers/tooltip/TooltipContent';
+import { TooltipProvider } from '../../../../../shared/providers/tooltip/TooltipContext';
+import { TooltipTrigger } from '../../../../../shared/providers/tooltip/TooltipTrigger';
 import {
   MfaMethod,
   type MfaMethodValue,
   type MfaStep,
 } from '../../../../../shared/rust-api/types';
-import { ThemeSpacing } from '../../../../../shared/types';
+import { ThemeVariable } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import {
   CLIENT_CONFIGURABLE_METHODS,
@@ -30,7 +37,16 @@ import {
 import { isMfaFactorOfferable } from '../../utils';
 import '../style.scss';
 import './style.scss';
-import { MethodRow, type MethodRowState } from './components/MethodRow';
+
+/** What one row has to say, resolved by the step so the markup only reads it. */
+type MethodRowState = {
+  checked: boolean;
+  /** Nothing left for the user to decide here, the badge and the hint say why. */
+  disabled: boolean;
+  badge?: string;
+  /** Why the row is disabled, shown on hover when the badge alone is too terse. */
+  hint: string | null;
+};
 
 interface Props {
   onCancel: () => void;
@@ -77,24 +93,18 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     [configuredMethods, instance],
   );
 
-  const groups = useMemo(() => {
-    let result: MfaMethodValue[][] = [[...CLIENT_CONFIGURABLE_METHODS]];
-    if (isLocationAware) {
-      result = locationSteps.map((step) => step.methods.map((entry) => entry.method));
-    }
-    // With a single list there is no step order to preserve, so park what can't be
-    // picked at the bottom. Sort is stable, keeping the listing order within a bucket.
-    if (result.length === 1) {
-      return [
-        [...result[0]].sort(
-          (a, b) =>
-            Number(!isMfaFactorOfferable(a, configuredMethods, setupMethods)) -
-            Number(!isMfaFactorOfferable(b, configuredMethods, setupMethods)),
-        ),
-      ];
-    }
-    return result;
-  }, [isLocationAware, locationSteps, configuredMethods, setupMethods]);
+  const groups = useMemo(
+    () => locationSteps.map((step) => step.methods.map((entry) => entry.method)),
+    [locationSteps],
+  );
+
+  const [availableMethods, lockedMethods] = useMemo(
+    () =>
+      fork(CLIENT_CONFIGURABLE_METHODS, (method) =>
+        isMfaFactorOfferable(method, configuredMethods, setupMethods),
+      ),
+    [configuredMethods, setupMethods],
+  );
 
   const describeMethod = useCallback(
     (method: MfaMethodValue): MethodRowState => {
@@ -105,28 +115,35 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       const satisfied = configuredMethods.includes(method) && available;
 
       let hint: string | null = null;
+      let badge: string | undefined;
       if (!available) {
         hint = `${mfaToText(method, instance ?? undefined)} is not available on this Defguard instance.`;
+        badge = 'Unavailable';
       } else if (disabled && !configured) {
         if (satisfied) {
           // Reached only via the email fallback, which registers the factor as it verifies.
           hint = `${mfaToText(method)} is required to continue.`;
+          badge = 'Required';
         } else if (isClientConfigurableMethod(method)) {
           hint = `This Defguard instance does not support configuring ${mfaToText(method)} from the desktop client.`;
+          badge = 'Not configurable';
         } else {
           hint = `${mfaToText(method)} cannot be configured in the desktop client.`;
+          badge = 'Not configurable';
         }
+      }
+      if (configured) {
+        badge = 'Configured';
       }
 
       return {
-        method,
         // Pre-ticked only for a factor that answers a step on its own; a mobile-only one does
         // not, however configured it is.
         checked:
           selected.includes(method) ||
           (disabled && satisfied && isDesktopDrivableMethod(method)),
         disabled,
-        configured,
+        badge,
         hint,
       };
     },
@@ -184,9 +201,33 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     useConfigureMfaStore.getState().selectMethods(selected);
   }, [selected, emailFallback, isLocationAware, locationSteps, isStepSatisfied]);
 
-  const renderMethod = (method: MfaMethodValue) => (
-    <MethodRow key={method} {...describeMethod(method)} onToggle={toggle} />
-  );
+  /** Without `explained` the row drops its badge and hint, leaving the reason to its section. */
+  const renderMethod = (method: MfaMethodValue, explained: boolean) => {
+    const { checked, disabled, badge, hint } = describeMethod(method);
+    const row = (
+      <FactorSelector
+        key={method}
+        method={method}
+        instance={instance ?? undefined}
+        variant={SelectionItemVariant.Checkbox}
+        selected={checked}
+        disabled={disabled}
+        badge={explained ? badge : undefined}
+        onClick={() => {
+          toggle(method);
+        }}
+      />
+    );
+    if (!explained || !isPresent(hint)) return row;
+    return (
+      <TooltipProvider key={method}>
+        <TooltipTrigger>{row}</TooltipTrigger>
+        <TooltipContent>
+          <p>{hint}</p>
+        </TooltipContent>
+      </TooltipProvider>
+    );
+  };
 
   return (
     <FullPage
@@ -196,7 +237,9 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       withControls
     >
       <FullPageTitle
-        title={isLocationAware ? 'Configure MFA' : 'Choose the methods to configure'}
+        title={
+          isLocationAware ? 'Configure MFA' : 'Select the MFA method(s) to configure'
+        }
       />
       <p className="description">
         {isLocationAware && isPresent(location) ? (
@@ -205,23 +248,60 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
             <span>{`If multiple authentication options are available, you can choose your preferred method below. Otherwise, simply start the setup process to get access to the location.`}</span>
           </>
         ) : (
-          <>
-            <span>{`Pick the multi-factor authentication methods you want to set up.`}</span>
-            <span>{`Methods already configured on your account are listed for reference.`}</span>
-          </>
+          <span>{`Pick the multi-factor authentication methods you want to set up.`}</span>
         )}
       </p>
-      <div className="steps">
-        {groups.map((methods, index) => (
-          // Index as key: Core owns the order and it never reorders here.
-          <Fragment key={index}>
-            {index > 0 && <Divider spacing={ThemeSpacing.Lg} />}
-            <div className="step">
-              {groups.length > 1 && <p className="step-label">{`Step ${index + 1}:`}</p>}
-              <div className="methods">{methods.map(renderMethod)}</div>
+      <div className={clsx('steps', { sections: !isLocationAware })}>
+        {isLocationAware ? (
+          groups.map((methods, index) => (
+            // Index as key: Core owns the order and it never reorders here.
+            <div className="step" key={index}>
+              {groups.length > 1 && (
+                <div className="label">
+                  <p>{`Step ${index + 1}:`}</p>
+                </div>
+              )}
+              <div className="methods">
+                {methods.map((method) => renderMethod(method, true))}
+              </div>
             </div>
-          </Fragment>
-        ))}
+          ))
+        ) : (
+          <>
+            {availableMethods.length > 0 && (
+              <div className="step">
+                <div className="label">
+                  <p>Available methods</p>
+                </div>
+                <div className="methods">
+                  {availableMethods.map((method) => renderMethod(method, false))}
+                </div>
+              </div>
+            )}
+            {lockedMethods.length > 0 && (
+              <div className="step">
+                <div className="label">
+                  <p>Not configurable</p>
+                  <TooltipProvider>
+                    <TooltipTrigger>
+                      <Icon
+                        icon={IconKind.Question}
+                        size={16}
+                        staticColor={ThemeVariable.FgWhite100}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{`Some MFA methods are already configured or unavailable due to version incompatibility.`}</p>
+                    </TooltipContent>
+                  </TooltipProvider>
+                </div>
+                <div className="methods">
+                  {lockedMethods.map((method) => renderMethod(method, false))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
       <FieldError error={error} />
       <Controls>
