@@ -20,7 +20,11 @@ import { isPresent } from '../../utils/isPresent';
 import { ConnectionAbility, resolveMfaStepPlan, shouldStartMfa } from '../../utils/mfa';
 import { Divider } from '../Divider/Divider';
 import { IconKind } from '../Icon';
-import { handleFullViewConnectError } from '../LocationCard/api/connectError';
+import {
+  findRouteConflicts,
+  handleFullViewConnectError,
+  openRouteConflictModal,
+} from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
 import { connectBlockedTooltip } from '../LocationCard/components/ConnectButton/consts';
 import { LocationCardConnectionInfo } from '../LocationCard/components/LocationCardConnectionInfo/LocationCardConnectionInfo';
@@ -95,13 +99,19 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
 
     if (shouldStartMfa(location)) {
       const stepPlan = resolveMfaStepPlan(location, [], instance);
-      useConnectModal.getState().open({
-        view: mfaMethodToConnectModalView(stepPlan[0]),
-        location,
-        stepPlan,
-        autoStartOpenId: appConfig.auto_start_openid_mfa,
-        mfaMethod: stepPlan[0],
-      });
+      const openMfa = () =>
+        useConnectModal.getState().open({
+          view: mfaMethodToConnectModalView(stepPlan[0]),
+          location,
+          stepPlan,
+          autoStartOpenId: appConfig.auto_start_openid_mfa,
+          mfaMethod: stepPlan[0],
+        });
+      void findRouteConflicts(location).then((conflicts) =>
+        conflicts.length > 0
+          ? openRouteConflictModal(location, conflicts, openMfa)
+          : openMfa(),
+      );
       return;
     }
 
