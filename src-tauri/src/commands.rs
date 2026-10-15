@@ -586,16 +586,11 @@ fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uui
 
     match handle.path().app_data_dir() {
         Ok(app_data_dir) => {
-            let provisioning_file = app_data_dir.join("provisioning.json");
-            match clear_provisioning_config(&app_data_dir) {
-                Ok(()) => debug!(
-                    "Removed provisioning config file at {}",
-                    provisioning_file.display()
-                ),
-                Err(err) => warn!(
-                    "Failed to remove provisioning config file at {}: {err}",
-                    provisioning_file.display()
-                ),
+            if let Err(err) = clear_provisioning_config(&app_data_dir) {
+                warn!(
+                    "Failed to remove provisioning config file from {}: {err}",
+                    app_data_dir.display()
+                );
             }
         }
         Err(err) => warn!("Failed to resolve app data directory for provisioning cleanup: {err}"),

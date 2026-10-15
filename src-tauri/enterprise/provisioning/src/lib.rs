@@ -68,8 +68,15 @@ pub fn try_get_provisioning_config(app_data_dir: &Path) -> Option<ProvisioningCo
 
 /// Remove the one-time provisioning configuration after the client is initialized.
 pub fn clear_provisioning_config(app_data_dir: &Path) -> io::Result<()> {
-    match fs::remove_file(app_data_dir.join(CONFIG_FILE_NAME)) {
-        Ok(()) => Ok(()),
+    let config_file_path = app_data_dir.join(CONFIG_FILE_NAME);
+    match fs::remove_file(&config_file_path) {
+        Ok(()) => {
+            debug!(
+                "Removed provisioning config file at {}",
+                config_file_path.display()
+            );
+            Ok(())
+        }
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(err),
     }
