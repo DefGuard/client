@@ -555,6 +555,54 @@ pub struct SaveDeviceConfigResponse {
     instance: Instance<Id>,
 }
 
+fn should_remove_provisioning_file(
+    saved_instance_uuid: &str,
+    provisioning_instance_id: Option<&str>,
+) -> bool {
+    provisioning_instance_id == Some(saved_instance_uuid)
+}
+
+fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uuid: &str) {
+    let app_state = handle.state::<AppState>();
+    match app_state.provisioning_config.lock() {
+        Ok(mut provisioning_config) => {
+            if provisioning_config.take().is_some() {
+                debug!("Cleared in-memory provisioning config after saving an instance");
+            }
+        }
+        Err(_) => warn!("Failed to clear in-memory provisioning config"),
+    }
+
+    let mut provisioning_instance_id = match app_state.provisioning_instance_id.lock() {
+        Ok(provisioning_instance_id) => provisioning_instance_id,
+        Err(_) => {
+            warn!("Failed to check provisioning instance id");
+            return;
+        }
+    };
+    if !should_remove_provisioning_file(saved_instance_uuid, provisioning_instance_id.as_deref()) {
+        return;
+    }
+
+    match handle.path().app_data_dir() {
+        Ok(app_data_dir) => {
+            let provisioning_file = app_data_dir.join("provisioning.json");
+            match clear_provisioning_config(&app_data_dir) {
+                Ok(()) => debug!(
+                    "Removed provisioning config file at {}",
+                    provisioning_file.display()
+                ),
+                Err(err) => warn!(
+                    "Failed to remove provisioning config file at {}: {err}",
+                    provisioning_file.display()
+                ),
+            }
+        }
+        Err(err) => warn!("Failed to resolve app data directory for provisioning cleanup: {err}"),
+    }
+    *provisioning_instance_id = None;
+}
+
 #[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
@@ -613,29 +661,7 @@ pub async fn save_device_config(
     }
     transaction.commit().await?;
 
-    let state = handle.state::<AppState>();
-    let has_provisioning_config = match state.provisioning_config.lock() {
-        Ok(mut provisioning_config) => provisioning_config.take().is_some(),
-        Err(_) => {
-            warn!("Failed to clear in-memory provisioning config");
-            false
-        }
-    };
-    if has_provisioning_config {
-        match handle.path().app_data_dir() {
-            Ok(app_data_dir) => {
-                if let Err(err) = clear_provisioning_config(&app_data_dir) {
-                    warn!(
-                        "Failed to remove provisioning config from {}: {err}",
-                        app_data_dir.display()
-                    );
-                }
-            }
-            Err(err) => {
-                warn!("Failed to resolve app data directory for provisioning cleanup: {err}");
-            }
-        }
-    }
+    clear_provisioning_after_instance_save(&handle, &instance.uuid);
 
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
@@ -1614,6 +1640,15 @@ pub async fn enrollment_start(
     state: State<'_, AppState>,
 ) -> Result<EnrollmentStartResult, String> {
     debug!("Starting enrollment at {proxy_url}");
+    let uses_provisioning_token = match state.provisioning_config.lock() {
+        Ok(provisioning_config) => provisioning_config
+            .as_ref()
+            .is_some_and(|config| config.enrollment_token == token),
+        Err(_) => {
+            warn!("Failed to read in-memory provisioning config");
+            false
+        }
+    };
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let (session, response) = enrollment::enrollment_start(url, token)
         .await
@@ -1630,20 +1665,36 @@ pub async fn enrollment_start(
         .as_ref()
         .map_or("<unknown>", |u| u.login.as_str());
     info!("Enrollment started for user {login}, session {session_id}");
+    let provisioning_instance_id = response
+        .instance
+        .as_ref()
+        .map(|instance| instance.id.clone());
+    let user = response
+        .user
+        .ok_or_else(|| "Proxy did not return user info".to_string())?;
+    let admin = response
+        .admin
+        .ok_or_else(|| "Proxy did not return admin info".to_string())?;
+    let settings = response
+        .settings
+        .ok_or_else(|| "Proxy did not return enrollment settings".to_string())?;
+    let instance = response
+        .instance
+        .ok_or_else(|| "Proxy did not return instance info".to_string())?;
+    if uses_provisioning_token {
+        if let Some(instance_id) = provisioning_instance_id {
+            match state.provisioning_instance_id.lock() {
+                Ok(mut provisioning_instance_id) => *provisioning_instance_id = Some(instance_id),
+                Err(_) => warn!("Failed to remember provisioning instance id"),
+            }
+        }
+    }
     Ok(EnrollmentStartResult {
         session_id,
-        user: response
-            .user
-            .ok_or_else(|| "Proxy did not return user info".to_string())?,
-        admin: response
-            .admin
-            .ok_or_else(|| "Proxy did not return admin info".to_string())?,
-        settings: response
-            .settings
-            .ok_or_else(|| "Proxy did not return enrollment settings".to_string())?,
-        instance: response
-            .instance
-            .ok_or_else(|| "Proxy did not return instance info".to_string())?,
+        user,
+        admin,
+        settings,
+        instance,
         deadline_timestamp: response.deadline_timestamp,
         final_page_content: response.final_page_content,
     })
@@ -3188,6 +3239,19 @@ mod tests {
 
     fn mock_url(server: &MockServer) -> Url {
         Url::parse(&server.uri()).expect("MockServer URI should be valid")
+    }
+
+    #[test]
+    fn test_provisioning_file_is_removed_only_for_matching_instance() {
+        assert!(should_remove_provisioning_file(
+            "core-instance",
+            Some("core-instance")
+        ));
+        assert!(!should_remove_provisioning_file(
+            "saved-instance",
+            Some("core-instance")
+        ));
+        assert!(!should_remove_provisioning_file("saved-instance", None));
     }
 
     fn start_request() -> mfa::MfaStartRequest {

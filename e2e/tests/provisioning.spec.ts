@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { $, browser, expect } from "@wdio/globals";
 import { invoke } from "../helpers/client.js";
 import { switchToWindowLabel } from "../helpers/windows.js";
@@ -46,8 +48,21 @@ describe("provisioning", () => {
 				},
 			},
 		);
-		await invoke("delete_instance", { instanceId: saved.instance.id });
+		const dataDir = process.env.E2E_DATA_DIR;
+		if (!dataDir) throw new Error("E2E_DATA_DIR is required");
+		expect(
+			fs.existsSync(
+				path.join(dataDir, "share", "net.defguard", "provisioning.json"),
+			),
+		).toBe(true);
 
+		await browser.url("tauri://localhost/full/");
+		await browser.waitUntil(
+			async () => new URL(await browser.getUrl()).pathname === "/full/overview",
+			{ timeout: 10_000, timeoutMsg: "Expected the saved-instance overview" },
+		);
+
+		await invoke("delete_instance", { instanceId: saved.instance.id });
 		await browser.url("tauri://localhost/full/");
 		await browser.waitUntil(
 			async () => new URL(await browser.getUrl()).pathname === "/full/add",
