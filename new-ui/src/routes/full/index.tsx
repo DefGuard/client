@@ -1,5 +1,6 @@
 import { createFileRoute, Navigate, redirect } from '@tanstack/react-router';
 import { error as logError } from '@tauri-apps/plugin-log';
+import { api } from '../../shared/rust-api/api';
 import {
   getInstancesQueryOptions,
   getProvisioningConfigQueryOptions,
@@ -9,6 +10,14 @@ import { resolveFullIndexRedirect } from './-utils/resolveFullIndexRedirect';
 
 export const Route = createFileRoute('/full/')({
   beforeLoad: async ({ context }) => {
+    const pendingAddInstance = await api.takePendingAddInstance().catch(() => {
+      void logError('Failed to fetch pending add-instance deep link.');
+      return null;
+    });
+    if (pendingAddInstance) {
+      throw redirect(resolveFullIndexRedirect({ pendingAddInstance }));
+    }
+
     const [instances, tunnels, provisioningConfig] = await Promise.all([
       context.queryClient.fetchQuery(getInstancesQueryOptions),
       context.queryClient.fetchQuery(getTunnelsQueryOptions),
@@ -25,6 +34,7 @@ export const Route = createFileRoute('/full/')({
         instanceCount: instances.length,
         tunnelCount: tunnels.length,
         provisioningConfig,
+        pendingAddInstance: null,
       }),
     );
   },

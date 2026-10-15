@@ -192,6 +192,7 @@ pub fn run_app() {
             command_get_app_config,
             command_set_app_config,
             get_provisioning_config,
+            take_pending_add_instance,
             get_platform_header,
             get_posture_data,
             set_location_mfa_step_plan,

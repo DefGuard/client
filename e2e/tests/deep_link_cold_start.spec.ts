@@ -5,7 +5,7 @@ const token = "e2e-cold-start-token";
 const url = "https://cold-start.example";
 
 describe("cold-start deep link", () => {
-	it("opens the prefilled instance form", async () => {
+	it("prioritizes the deep link over provisioning config", async () => {
 		await switchToWindowLabel("full-view");
 		await browser.waitUntil(
 			async () =>

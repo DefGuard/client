@@ -55,7 +55,7 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    events::{EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
+    events::{AddInstancePayload, EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
     fido2_window::{platform_context, WindowLevelGuard},
     into_location,
     log_watcher::{
@@ -1534,6 +1534,22 @@ pub fn get_provisioning_config(
         .clone();
     trace!("Returning config: {res:?}");
     Ok(res)
+}
+
+#[tauri::command]
+pub fn take_pending_add_instance(
+    app_state: State<'_, AppState>,
+) -> Result<Option<AddInstancePayload>, Error> {
+    debug!("Running command take_pending_add_instance.");
+    let pending = app_state
+        .pending_add_instance
+        .lock()
+        .map_err(|_err| {
+            error!("Failed to acquire lock on pending add-instance deep link");
+            Error::StateLockFail
+        })?
+        .take();
+    Ok(pending)
 }
 
 #[tauri::command]

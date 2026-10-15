@@ -36,18 +36,22 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     const unlisteners = Promise.all([
-      listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
-        void debug(`UI Received event AddInstance (${event.payload.url})`);
-        const windowLabel = getCurrentWindow().label;
-        if (windowLabel === WindowId.FullView) {
-          const { token, url } = event.payload;
-          navigate({
+      listen<AddInstanceEventPayload>(TauriEvent.AddInstance, async () => {
+        if (getCurrentWindow().label !== WindowId.FullView) return;
+
+        try {
+          const pendingAddInstance = await api.takePendingAddInstance();
+          if (!pendingAddInstance) return;
+          void debug(`UI Received event AddInstance (${pendingAddInstance.url})`);
+          void navigate({
             to: '/full/add/instance',
             search: {
-              token,
-              url,
+              token: pendingAddInstance.token,
+              url: pendingAddInstance.url,
             },
           });
+        } catch (err) {
+          void logError(`Failed to retrieve pending add-instance deep link: ${err}`);
         }
       }),
       // Backend requests the MFA flow (e.g. connecting to an MFA location from the
