@@ -36,6 +36,31 @@ pub enum UserVerification {
     Required,
 }
 
+/// Whether the server wants the key's own attestation statement. Core asks for it when it only
+/// accepts certified hardware keys, and the statement is the only proof of that it can check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttestationConveyance {
+    None,
+    Direct,
+}
+
+/// The attestation statement a key returned, by format. Other formats are not used by
+/// removable security keys.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttestationStatement {
+    None,
+    Packed {
+        algorithm: i64,
+        signature: Vec<u8>,
+        /// Empty for self attestation.
+        certificates: Vec<Vec<u8>>,
+    },
+    FidoU2f {
+        signature: Vec<u8>,
+        certificates: Vec<Vec<u8>>,
+    },
+}
+
 /// Which kind of authenticator may answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Attachment {
@@ -68,6 +93,7 @@ pub struct RegisterRequest {
     pub exclude_credentials: Vec<Vec<u8>>,
     pub resident_key: ResidentKey,
     pub user_verification: UserVerification,
+    pub attestation: AttestationConveyance,
     pub attachment: Attachment,
     pub timeout: Duration,
 }
@@ -85,12 +111,11 @@ pub struct AssertRequest {
     pub timeout: Duration,
 }
 
-/// The authenticator data rather than a finished attestation object, since platforms differ on
-/// what they put in the statement. See [`attestation_object`].
 #[derive(Debug, Clone)]
 pub struct Registration {
     pub credential_id: Vec<u8>,
-    pub authenticator_data: Vec<u8>,
+    /// CBOR with the text keys WebAuthn uses, see [`attestation_object`].
+    pub attestation_object: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -145,6 +170,8 @@ struct CreationOptions {
     exclude_credentials: Vec<CredentialDescriptor>,
     #[serde(default)]
     authenticator_selection: Option<AuthenticatorSelection>,
+    #[serde(default)]
+    attestation: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -292,6 +319,11 @@ pub fn prepare_registration(
         Some("preferred") => UserVerification::Preferred,
         _ => UserVerification::Required,
     };
+    // An older Core asks for none and accepts the rebuilt object it always got.
+    let attestation = match options.attestation.as_deref() {
+        Some("direct" | "indirect" | "enterprise") => AttestationConveyance::Direct,
+        _ => AttestationConveyance::None,
+    };
 
     let client_data = serde_json::to_vec(&ClientData {
         ceremony_type: "webauthn.create",
@@ -311,6 +343,7 @@ pub fn prepare_registration(
             exclude_credentials,
             resident_key,
             user_verification,
+            attestation,
             // Keeps built-in authenticators out. Removable-key-only is not expressible here, so
             // a backend that can also reach a phone enforces the rest on the way back.
             attachment: Attachment::CrossPlatform,
@@ -343,22 +376,51 @@ pub fn prepare_assertion(
     })
 }
 
-/// Pack the authenticator data into the CBOR object WebAuthn carries an attestation in. The
-/// server asks for none, so rebuilding it keeps every backend submitting the same thing.
-pub fn attestation_object(authenticator_data: Vec<u8>) -> Result<Vec<u8>, Fido2Error> {
+fn text(value: &str) -> CborValue {
+    CborValue::Text(value.into())
+}
+
+fn certificate_chain(certificates: Vec<Vec<u8>>) -> CborValue {
+    CborValue::Array(certificates.into_iter().map(CborValue::Bytes).collect())
+}
+
+/// The attestation signature covers only the authenticator data and client data hash, so
+/// re-encoding the statement keeps it valid while the authenticator data is untouched.
+pub fn attestation_object(
+    authenticator_data: Vec<u8>,
+    statement: AttestationStatement,
+) -> Result<Vec<u8>, Fido2Error> {
+    let (format, statement) = match statement {
+        AttestationStatement::None => ("none", Vec::new()),
+        AttestationStatement::Packed {
+            algorithm,
+            signature,
+            certificates,
+        } => {
+            let mut fields = vec![
+                (text("alg"), CborValue::Integer(algorithm.into())),
+                (text("sig"), CborValue::Bytes(signature)),
+            ];
+            if !certificates.is_empty() {
+                fields.push((text("x5c"), certificate_chain(certificates)));
+            }
+            ("packed", fields)
+        }
+        AttestationStatement::FidoU2f {
+            signature,
+            certificates,
+        } => (
+            "fido-u2f",
+            vec![
+                (text("sig"), CborValue::Bytes(signature)),
+                (text("x5c"), certificate_chain(certificates)),
+            ],
+        ),
+    };
     let object = CborValue::Map(vec![
-        (
-            CborValue::Text("fmt".into()),
-            CborValue::Text("none".into()),
-        ),
-        (
-            CborValue::Text("attStmt".into()),
-            CborValue::Map(Vec::new()),
-        ),
-        (
-            CborValue::Text("authData".into()),
-            CborValue::Bytes(authenticator_data),
-        ),
+        (text("fmt"), text(format)),
+        (text("attStmt"), CborValue::Map(statement)),
+        (text("authData"), CborValue::Bytes(authenticator_data)),
     ]);
     let mut encoded = Vec::new();
     ciborium::into_writer(&object, &mut encoded)
@@ -376,8 +438,7 @@ pub fn credential_json(
         id: credential_id.clone(),
         raw_id: credential_id,
         response: AttestationResponse {
-            attestation_object: BASE64_URL_SAFE_NO_PAD
-                .encode(attestation_object(registration.authenticator_data.clone())?),
+            attestation_object: BASE64_URL_SAFE_NO_PAD.encode(&registration.attestation_object),
             client_data_json: BASE64_URL_SAFE_NO_PAD.encode(client_data),
         },
         credential_type: "public-key",
