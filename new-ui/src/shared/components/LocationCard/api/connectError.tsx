@@ -32,6 +32,17 @@ export const parseConnectError = (err: unknown): ConnectError | null => {
   return result.success ? result.data : null;
 };
 
+export const findRouteConflicts = (
+  location: LocationInfo,
+): Promise<ConflictingConnection[]> =>
+  api.checkRouteConflict(location.id).then(
+    () => [],
+    (err: unknown) => {
+      const connectError = parseConnectError(err);
+      return connectError?.kind === 'routeConflict' ? connectError.conflicts : [];
+    },
+  );
+
 export const handleFullViewConnectError = (
   location: LocationInfo,
   err: unknown,

@@ -122,6 +122,7 @@ export const TauriCommand = {
   SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
   // Connections
   Connect: 'connect',
+  CheckRouteConflict: 'check_route_conflict',
   Disconnect: 'disconnect',
   LastConnection: 'last_connection',
   AllConnections: 'all_connections',
