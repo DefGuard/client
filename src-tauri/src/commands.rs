@@ -555,13 +555,9 @@ pub struct SaveDeviceConfigResponse {
     instance: Instance<Id>,
 }
 
-fn should_remove_provisioning_file(
-    saved_instance_uuid: &str,
-    provisioning_instance_id: Option<&str>,
-) -> bool {
-    provisioning_instance_id == Some(saved_instance_uuid)
-}
-
+/// Drops the in-memory provisioning config after any instance is saved, and removes
+/// `provisioning.json` only when the saved instance was enrolled with its token.
+/// Errors are logged, never returned, because the instance is already committed.
 fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uuid: &str) {
     let app_state = handle.state::<AppState>();
     match app_state.provisioning_config.lock() {
@@ -580,22 +576,22 @@ fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uui
             return;
         }
     };
-    if !should_remove_provisioning_file(saved_instance_uuid, provisioning_instance_id.as_deref()) {
-        return;
-    }
-
-    match handle.path().app_data_dir() {
-        Ok(app_data_dir) => {
-            if let Err(err) = clear_provisioning_config(&app_data_dir) {
-                warn!(
-                    "Failed to remove provisioning config file from {}: {err}",
-                    app_data_dir.display()
-                );
+    if provisioning_instance_id.as_deref() == Some(saved_instance_uuid) {
+        match handle.path().app_data_dir() {
+            Ok(app_data_dir) => {
+                if let Err(err) = clear_provisioning_config(&app_data_dir) {
+                    warn!(
+                        "Failed to remove provisioning config file from {}: {err}",
+                        app_data_dir.display()
+                    );
+                }
+            }
+            Err(err) => {
+                warn!("Failed to resolve app data directory for provisioning cleanup: {err}");
             }
         }
-        Err(err) => warn!("Failed to resolve app data directory for provisioning cleanup: {err}"),
+        *provisioning_instance_id = None;
     }
-    *provisioning_instance_id = None;
 }
 
 #[tauri::command(async)]
@@ -3234,19 +3230,6 @@ mod tests {
 
     fn mock_url(server: &MockServer) -> Url {
         Url::parse(&server.uri()).expect("MockServer URI should be valid")
-    }
-
-    #[test]
-    fn test_provisioning_file_is_removed_only_for_matching_instance() {
-        assert!(should_remove_provisioning_file(
-            "core-instance",
-            Some("core-instance")
-        ));
-        assert!(!should_remove_provisioning_file(
-            "saved-instance",
-            Some("core-instance")
-        ));
-        assert!(!should_remove_provisioning_file("saved-instance", None));
     }
 
     fn start_request() -> mfa::MfaStartRequest {
