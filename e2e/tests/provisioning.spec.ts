@@ -2,10 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { $, browser, expect } from "@wdio/globals";
 import { invoke } from "../helpers/client.js";
+import { provisioningFixture } from "../helpers/launchConfig.js";
 import { switchToWindowLabel } from "../helpers/windows.js";
 
-const enrollmentToken = "e2e-provisioning-token";
-const enrollmentUrl = "https://enroll.example";
+const { enrollmentToken, enrollmentUrl } = provisioningFixture;
 
 describe("provisioning", () => {
 	it("opens the prefilled instance form from launch config", async () => {

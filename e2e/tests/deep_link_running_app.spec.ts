@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { $, browser, expect } from "@wdio/globals";
+import { deepLinkArg } from "../helpers/launchConfig.js";
 import { switchToWindowLabel } from "../helpers/windows.js";
 
 const token = "e2e-running-app-token";
@@ -24,7 +25,7 @@ describe("running-app deep link", () => {
 
 		const secondInstance = spawnSync(
 			clientBinary,
-			[`defguard://addinstance?token=${token}&url=${encodeURIComponent(url)}`],
+			[deepLinkArg({ token, url })],
 			{ env: { ...process.env }, stdio: "ignore", timeout: 15_000 },
 		);
 		if (secondInstance.error) throw secondInstance.error;

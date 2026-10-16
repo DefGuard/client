@@ -1,8 +1,8 @@
 import { $, browser, expect } from "@wdio/globals";
+import { coldStartFixture } from "../helpers/launchConfig.js";
 import { switchToWindowLabel } from "../helpers/windows.js";
 
-const token = "e2e-cold-start-token";
-const url = "https://cold-start.example";
+const { token, url } = coldStartFixture.deepLink;
 
 describe("cold-start deep link", () => {
 	it("prioritizes the deep link over provisioning config", async () => {

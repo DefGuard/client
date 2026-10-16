@@ -15,7 +15,10 @@ export const Route = createFileRoute('/full/')({
       return null;
     });
     if (pendingAddInstance) {
-      throw redirect(resolveFullIndexRedirect({ pendingAddInstance }));
+      throw redirect({
+        to: '/full/add/instance',
+        search: { url: pendingAddInstance.url, token: pendingAddInstance.token },
+      });
     }
 
     const [instances, tunnels, provisioningConfig] = await Promise.all([
@@ -34,7 +37,6 @@ export const Route = createFileRoute('/full/')({
         instanceCount: instances.length,
         tunnelCount: tunnels.length,
         provisioningConfig,
-        pendingAddInstance: null,
       }),
     );
   },
