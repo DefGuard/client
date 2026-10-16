@@ -2,6 +2,7 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { getLaunchConfig, writeLaunchFiles } from "./helpers/launchConfig.js";
 
 const here = import.meta.dirname;
 
@@ -87,23 +88,41 @@ export const config: WebdriverIO.Config = {
 		}
 	},
 
-	beforeSession: () => {
+	beforeSession: (_config, caps, specs) => {
 		killLeftoverClients();
 		cleanupWireguardInterfaces();
 		dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "defguard-e2e-"));
+		const launchConfig = getLaunchConfig(specs);
+		const sessionEnv = {
+			CLIENT_BINARY: clientBinary,
+			DEFGUARD_CLIENT_WELCOME_SKIP: "1",
+			E2E_DATA_DIR: dataDir,
+			XDG_DATA_HOME: path.join(dataDir, "share"),
+			XDG_CONFIG_HOME: path.join(dataDir, "config"),
+			XDG_CACHE_HOME: path.join(dataDir, "cache"),
+		};
+		Object.assign(process.env, sessionEnv);
+
+		if (launchConfig?.files) {
+			writeLaunchFiles(dataDir, launchConfig.files);
+		}
+
+		if (launchConfig?.args) {
+			const tauriOptions = caps["tauri:options"] as
+				| { args?: string[] }
+				| undefined;
+			if (!tauriOptions) {
+				throw new Error(
+					"Missing tauri:options capability for launch arguments",
+				);
+			}
+			tauriOptions.args = launchConfig.args;
+		}
+
 		tauriDriver = spawn(
 			tauriDriverBinary,
 			nativeDriver ? ["--native-driver", nativeDriver] : [],
-			{
-				stdio: ["ignore", "inherit", "inherit"],
-				env: {
-					...process.env,
-					DEFGUARD_CLIENT_WELCOME_SKIP: "1",
-					XDG_DATA_HOME: path.join(dataDir, "share"),
-					XDG_CONFIG_HOME: path.join(dataDir, "config"),
-					XDG_CACHE_HOME: path.join(dataDir, "cache"),
-				},
-			},
+			{ stdio: ["ignore", "inherit", "inherit"] },
 		);
 		tauriDriver.on("error", (error) => {
 			console.error("tauri-driver failed to start:", error);

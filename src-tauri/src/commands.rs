@@ -29,7 +29,7 @@ use defguard_client_proto::defguard::{
     },
     enterprise::posture::v2::DevicePostureData,
 };
-use defguard_client_provisioning::ProvisioningConfig;
+use defguard_client_provisioning::{clear_provisioning_config, ProvisioningConfig};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
@@ -55,7 +55,7 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    events::{EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
+    events::{AddInstancePayload, EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
     fido2_window::{platform_context, WindowLevelGuard},
     into_location,
     log_watcher::{
@@ -555,6 +555,45 @@ pub struct SaveDeviceConfigResponse {
     instance: Instance<Id>,
 }
 
+/// Drops the in-memory provisioning config after any instance is saved, and removes
+/// `provisioning.json` only when the saved instance was enrolled with its token.
+/// Errors are logged, never returned, because the instance is already committed.
+fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uuid: &str) {
+    let app_state = handle.state::<AppState>();
+    match app_state.provisioning_config.lock() {
+        Ok(mut provisioning_config) => {
+            if provisioning_config.take().is_some() {
+                debug!("Cleared in-memory provisioning config after saving an instance");
+            }
+        }
+        Err(_) => warn!("Failed to clear in-memory provisioning config"),
+    }
+
+    let mut provisioning_instance_id = match app_state.provisioning_instance_id.lock() {
+        Ok(provisioning_instance_id) => provisioning_instance_id,
+        Err(_) => {
+            warn!("Failed to check provisioning instance id");
+            return;
+        }
+    };
+    if provisioning_instance_id.as_deref() == Some(saved_instance_uuid) {
+        match handle.path().app_data_dir() {
+            Ok(app_data_dir) => {
+                if let Err(err) = clear_provisioning_config(&app_data_dir) {
+                    warn!(
+                        "Failed to remove provisioning config file from {}: {err}",
+                        app_data_dir.display()
+                    );
+                }
+            }
+            Err(err) => {
+                warn!("Failed to resolve app data directory for provisioning cleanup: {err}");
+            }
+        }
+        *provisioning_instance_id = None;
+    }
+}
+
 #[tauri::command(async)]
 pub async fn save_device_config(
     private_key: String,
@@ -612,6 +651,9 @@ pub async fn save_device_config(
         );
     }
     transaction.commit().await?;
+
+    clear_provisioning_after_instance_save(&handle, &instance.uuid);
+
     info!("New instance {instance} created.");
     trace!("Created following instance: {instance:#?}");
 
@@ -1517,6 +1559,22 @@ pub fn get_provisioning_config(
 }
 
 #[tauri::command]
+pub fn take_pending_add_instance(
+    app_state: State<'_, AppState>,
+) -> Result<Option<AddInstancePayload>, Error> {
+    debug!("Running command take_pending_add_instance.");
+    let pending = app_state
+        .pending_add_instance
+        .lock()
+        .map_err(|_err| {
+            error!("Failed to acquire lock on pending add-instance deep link");
+            Error::StateLockFail
+        })?
+        .take();
+    Ok(pending)
+}
+
+#[tauri::command]
 #[must_use]
 pub fn get_platform_header() -> String {
     construct_platform_header()
@@ -1578,6 +1636,15 @@ pub async fn enrollment_start(
     state: State<'_, AppState>,
 ) -> Result<EnrollmentStartResult, String> {
     debug!("Starting enrollment at {proxy_url}");
+    let uses_provisioning_token = match state.provisioning_config.lock() {
+        Ok(provisioning_config) => provisioning_config
+            .as_ref()
+            .is_some_and(|config| config.enrollment_token == token),
+        Err(_) => {
+            warn!("Failed to read in-memory provisioning config");
+            false
+        }
+    };
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let (session, response) = enrollment::enrollment_start(url, token)
         .await
@@ -1594,20 +1661,36 @@ pub async fn enrollment_start(
         .as_ref()
         .map_or("<unknown>", |u| u.login.as_str());
     info!("Enrollment started for user {login}, session {session_id}");
+    let provisioning_instance_id = response
+        .instance
+        .as_ref()
+        .map(|instance| instance.id.clone());
+    let user = response
+        .user
+        .ok_or_else(|| "Proxy did not return user info".to_string())?;
+    let admin = response
+        .admin
+        .ok_or_else(|| "Proxy did not return admin info".to_string())?;
+    let settings = response
+        .settings
+        .ok_or_else(|| "Proxy did not return enrollment settings".to_string())?;
+    let instance = response
+        .instance
+        .ok_or_else(|| "Proxy did not return instance info".to_string())?;
+    if uses_provisioning_token {
+        if let Some(instance_id) = provisioning_instance_id {
+            match state.provisioning_instance_id.lock() {
+                Ok(mut provisioning_instance_id) => *provisioning_instance_id = Some(instance_id),
+                Err(_) => warn!("Failed to remember provisioning instance id"),
+            }
+        }
+    }
     Ok(EnrollmentStartResult {
         session_id,
-        user: response
-            .user
-            .ok_or_else(|| "Proxy did not return user info".to_string())?,
-        admin: response
-            .admin
-            .ok_or_else(|| "Proxy did not return admin info".to_string())?,
-        settings: response
-            .settings
-            .ok_or_else(|| "Proxy did not return enrollment settings".to_string())?,
-        instance: response
-            .instance
-            .ok_or_else(|| "Proxy did not return instance info".to_string())?,
+        user,
+        admin,
+        settings,
+        instance,
         deadline_timestamp: response.deadline_timestamp,
         final_page_content: response.final_page_content,
     })

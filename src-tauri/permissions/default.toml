@@ -56,6 +56,7 @@ commands.allow = [
   "get_autostart_enabled",
   "set_autostart_enabled",
   "get_provisioning_config",
+  "take_pending_add_instance",
   "get_platform_header",
   "set_location_mfa_step_plan",
   "open_tray_window",
