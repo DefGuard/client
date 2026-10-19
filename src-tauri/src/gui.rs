@@ -170,6 +170,7 @@ pub fn run_app() {
             save_device_config,
             all_instances,
             connect,
+            check_route_conflict,
             disconnect,
             update_instance,
             location_stats,
