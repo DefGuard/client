@@ -71,6 +71,10 @@ export const isMfaConfigInvalidCode = (err: unknown): boolean =>
 export const isMfaConfigMissingToken = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'no_token';
 
+/** The account has MFA, but none of it can verify a configuration session from the client. */
+export const isMfaConfigMfaNotUsable = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'mfa_not_usable';
+
 /** The backend's message names what went wrong (no key, wrong PIN, no touch), so show it as is. */
 export const isMfaConfigSecurityKeyError = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'security_key';
