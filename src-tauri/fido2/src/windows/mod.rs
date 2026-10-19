@@ -25,6 +25,7 @@ use windows::{
         },
         Networking::WindowsWebServices::{
             WEBAUTHN_ASSERTION, WEBAUTHN_ASSERTION_VERSION_4,
+            WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_DIRECT,
             WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_NONE, WEBAUTHN_AUTHENTICATOR_ATTACHMENT_ANY,
             WEBAUTHN_AUTHENTICATOR_ATTACHMENT_CROSS_PLATFORM,
             WEBAUTHN_AUTHENTICATOR_GET_ASSERTION_OPTIONS,
@@ -52,8 +53,8 @@ use self::{
 };
 use crate::{
     protocol::{
-        AssertRequest, Assertion, Attachment, RegisterRequest, Registration, ResidentKey,
-        UserVerification,
+        attestation_object, AssertRequest, Assertion, Attachment, AttestationConveyance,
+        AttestationStatement, RegisterRequest, Registration, ResidentKey, UserVerification,
     },
     Fido2Error, PinPolicy, PlatformContext,
 };
@@ -80,6 +81,13 @@ fn attachment(attachment: Attachment) -> u32 {
     match attachment {
         Attachment::CrossPlatform => WEBAUTHN_AUTHENTICATOR_ATTACHMENT_CROSS_PLATFORM,
         Attachment::Any => WEBAUTHN_AUTHENTICATOR_ATTACHMENT_ANY,
+    }
+}
+
+fn attestation_conveyance(conveyance: AttestationConveyance) -> u32 {
+    match conveyance {
+        AttestationConveyance::None => WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
+        AttestationConveyance::Direct => WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_DIRECT,
     }
 }
 
@@ -406,8 +414,7 @@ pub(crate) async fn register(
                 bRequireResidentKey: BOOL::from(request.resident_key == ResidentKey::Required),
                 bPreferResidentKey: BOOL::from(request.resident_key == ResidentKey::Preferred),
                 dwUserVerificationRequirement: user_verification(request.user_verification),
-                // the statement is discarded anyway, see protocol::attestation_object
-                dwAttestationConveyancePreference: WEBAUTHN_ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
+                dwAttestationConveyancePreference: attestation_conveyance(request.attestation),
                 pCancellationId: &raw mut cancellation_id,
                 pExcludeCredentialList: exclude.as_mut_ptr(),
                 ..Default::default()
@@ -467,27 +474,44 @@ pub(crate) async fn register(
 
         // SAFETY: non-null, and `dwUsedTransport` is read only from version 3, which is where
         // the field was added - see the module docs.
-        let (registration, used_transport) = unsafe {
+        let (credential_id, authenticator_data, platform_object, used_transport) = unsafe {
             let raw = &*attestation.1;
             let used_transport = (raw.dwVersion >= WEBAUTHN_CREDENTIAL_ATTESTATION_VERSION_3)
                 .then_some(raw.dwUsedTransport);
             (
-                Registration {
-                    credential_id: copy_out(raw.pbCredentialId, raw.cbCredentialId),
-                    authenticator_data: copy_out(raw.pbAuthenticatorData, raw.cbAuthenticatorData),
-                },
+                copy_out(raw.pbCredentialId, raw.cbCredentialId),
+                copy_out(raw.pbAuthenticatorData, raw.cbAuthenticatorData),
+                copy_out(raw.pbAttestationObject, raw.cbAttestationObject),
                 used_transport,
             )
         };
         // Before anything is handed back, so a phone's passkey is never submitted to Core. The
         // credential does exist on whatever answered by now, we just refuse to register it.
         enforce_hardware_key(used_transport)?;
-        if registration.credential_id.is_empty() || registration.authenticator_data.is_empty() {
+        if credential_id.is_empty() || authenticator_data.is_empty() {
             return Err(Fido2Error::Backend {
                 message: "Windows returned an incomplete attestation".to_string(),
                 code: None,
             });
         }
+        // The platform object is already text keyed CBOR, so forwarding it keeps the key's own
+        // statement byte for byte.
+        let attestation_object = match request.attestation {
+            AttestationConveyance::None => {
+                attestation_object(authenticator_data, AttestationStatement::None)?
+            }
+            AttestationConveyance::Direct if platform_object.is_empty() => {
+                return Err(Fido2Error::Backend {
+                    message: "Windows returned no attestation object".to_string(),
+                    code: None,
+                });
+            }
+            AttestationConveyance::Direct => platform_object,
+        };
+        let registration = Registration {
+            credential_id,
+            attestation_object,
+        };
         tracing::debug!(
             "Windows WebAuthn registered a credential for {} in {:?}",
             request.rp_id,

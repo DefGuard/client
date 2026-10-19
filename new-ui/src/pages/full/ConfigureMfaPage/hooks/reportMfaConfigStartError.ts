@@ -1,6 +1,7 @@
 import { error as logError } from '@tauri-apps/plugin-log';
 import { Snackbar } from '../../../../shared/providers/snackbar/snackbar';
 import {
+  isMfaConfigMfaNotUsable,
   isMfaConfigMissingToken,
   isMfaConfigNetworkError,
   isMfaConfigUnsupported,
@@ -14,6 +15,12 @@ export const reportMfaConfigStartError = (err: unknown): void => {
   if (err instanceof NoVerificationMethodError) {
     Snackbar.error(
       'There is no method available to verify your identity on this Defguard instance. Contact your administrator.',
+    );
+    return;
+  }
+  if (isMfaConfigMfaNotUsable(err)) {
+    Snackbar.error(
+      "Your account's MFA, such as a passkey added in the browser, can't be used in the desktop client. Add an authenticator app, email codes or a certified security key in your Defguard profile.",
     );
     return;
   }
