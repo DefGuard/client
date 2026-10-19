@@ -55,6 +55,7 @@
     font: var(--btn-font);
     color: inherit;
     user-select: none;
+    white-space: nowrap;
 
     @include animate(color);
   }

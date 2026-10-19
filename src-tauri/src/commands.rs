@@ -317,6 +317,17 @@ pub async fn connect(
 }
 
 #[tauri::command(async)]
+pub async fn check_route_conflict(location_id: Id) -> Result<(), ConnectError> {
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    ConnectionTarget::Location(location)
+        .ensure_no_route_conflict(&DB_POOL, None)
+        .await?;
+    Ok(())
+}
+
+#[tauri::command(async)]
 pub async fn start_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
     let result = spawn_global_log_watcher_task(&handle, tracing::Level::DEBUG).await;
     if let Err(err) = result {
@@ -1451,16 +1462,21 @@ pub struct AppVersionInfo {
 
 const PRODUCT_NAME: &str = "defguard-client";
 
-fn reported_app_version(handle: &AppHandle) -> String {
+fn reported_app_version(package_version: &str) -> String {
     defguard_client_core::version::select_reported_app_version(
-        &handle.package_info().version.to_string(),
+        package_version,
         option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
     )
 }
 
+#[tauri::command]
+pub fn get_client_build_version() -> String {
+    reported_app_version(defguard_client_core::version::PKG_VERSION)
+}
+
 #[tauri::command(async)]
 pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo, Error> {
-    let app_version = reported_app_version(&handle);
+    let app_version = reported_app_version(&handle.package_info().version.to_string());
     let operating_system = env::consts::OS;
 
     let mut request_data = HashMap::new();

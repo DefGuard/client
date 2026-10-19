@@ -73,6 +73,10 @@ ignore = [
     { id = "RUSTSEC-2024-0436", reason = "Unmaintained netlink dependency" },
     { id = "RUSTSEC-2026-0194", reason = "quick-xml <0.41 pulled by Tauri/plist; no compatible upstream update yet" },
     { id = "RUSTSEC-2026-0195", reason = "quick-xml <0.41 pulled by Tauri/plist; no compatible upstream update yet" },
+    { id = "RUSTSEC-2026-0346", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; client session store Debug leak, not used" },
+    { id = "RUSTSEC-2026-0347", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; ECH not used" },
+    { id = "RUSTSEC-2026-0348", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; brotli cert compression feature not enabled" },
+    { id = "RUSTSEC-2026-0349", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; PQ key exchange downgrade, no key compromise" },
     # The "unmaintained" advisories below stem from our use of Tauri v2, which
     # depends on GTK3 bindings that are no longer maintained.
     { id = "RUSTSEC-2024-0370", reason = "Tauri v2 GTK3 dependency (unmaintained)" },

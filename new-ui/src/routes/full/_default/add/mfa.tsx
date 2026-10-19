@@ -6,8 +6,7 @@ import { mfaConfigurableInstances } from '../../../../shared/utils/mfa';
 export const Route = createFileRoute('/full/_default/add/mfa')({
   beforeLoad: async ({ context }) => {
     const instances = await context.queryClient.ensureQueryData(getInstancesQueryOptions);
-    // Nothing to pick between, the Add page starts the flow itself.
-    if (mfaConfigurableInstances(instances).length < 2) {
+    if (mfaConfigurableInstances(instances).length === 0) {
       throw redirect({ to: '/full/add' });
     }
   },

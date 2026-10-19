@@ -23,6 +23,7 @@ import {
   shouldStartMfa,
   usableMfaMethods,
 } from '../../../utils/mfa';
+import { findRouteConflicts, openRouteConflictInFullView } from '../api/connectError';
 import {
   LocationCardViews,
   type LocationCardViewsValue,
@@ -136,6 +137,11 @@ export const LocationCardProvider = ({
   );
 
   const startMfa = useCallback(async () => {
+    const conflicts = await findRouteConflicts(location);
+    if (conflicts.length > 0) {
+      await openRouteConflictInFullView({ location, conflicts });
+      return;
+    }
     mfaStarted.current = true;
     const appConfig = await api.getAppConfig();
     setAutoConnectOpenid(appConfig.auto_start_openid_mfa);

@@ -1,15 +1,21 @@
 #select-mfa-instance-page {
-  > .label {
-    font: var(--t-body-xs-500);
-    color: var(--fg-white-60);
-    padding-bottom: var(--spacing-md);
+  & > .label {
+    display: flex;
+    flex-flow: row;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--spacing-sm);
+
+    & > p {
+      font: var(--t-body-xs-500);
+      color: var(--fg-white-60);
+    }
   }
 
-  .instances {
+  & > .instances {
     display: flex;
     flex-flow: column;
     row-gap: var(--spacing-md);
     width: 100%;
-    padding-bottom: var(--spacing-xl);
   }
 }

@@ -122,6 +122,7 @@ export const TauriCommand = {
   SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
   // Connections
   Connect: 'connect',
+  CheckRouteConflict: 'check_route_conflict',
   Disconnect: 'disconnect',
   LastConnection: 'last_connection',
   AllConnections: 'all_connections',
@@ -145,6 +146,7 @@ export const TauriCommand = {
   TakePendingAddInstance: 'take_pending_add_instance',
   GetPlatformHeader: 'get_platform_header',
   GetLatestAppVersion: 'get_latest_app_version',
+  GetClientBuildVersion: 'get_client_build_version',
   OpenLink: 'open_link',
   StartGlobalLogWatcher: 'start_global_logwatcher',
   StopGlobalLogWatcher: 'stop_global_logwatcher',

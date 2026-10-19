@@ -66,6 +66,9 @@ const setLocationMfaStepPlan = (args: SetLocationMfaStepPlanArgs): Promise<void>
 const connect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Connect, args);
 
+const checkRouteConflict = (locationId: number): Promise<void> =>
+  invoke(TauriCommand.CheckRouteConflict, { locationId });
+
 const disconnect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Disconnect, args);
 
@@ -123,6 +126,9 @@ const getPlatformHeader = (): Promise<string> => invoke(TauriCommand.GetPlatform
 
 const getLatestAppVersion = (): Promise<NewAppVersionInfo> =>
   invoke(TauriCommand.GetLatestAppVersion);
+
+const getClientBuildVersion = (): Promise<string> =>
+  invoke(TauriCommand.GetClientBuildVersion);
 
 const openLink = (link: string): Promise<void> => invoke(TauriCommand.OpenLink, { link });
 
@@ -349,6 +355,7 @@ export const api = {
   setLocationMfaStepPlan,
   // Connections
   connect,
+  checkRouteConflict,
   disconnect,
   getLastConnection,
   getConnectionHistory,
@@ -372,6 +379,7 @@ export const api = {
   takePendingAddInstance,
   getPlatformHeader,
   getLatestAppVersion,
+  getClientBuildVersion,
   openLink,
   startGlobalLogWatcher,
   stopGlobalLogWatcher,

@@ -9,7 +9,7 @@ pub(crate) mod windows;
 
 use std::env::consts::OS;
 
-use defguard_client_core::version::PKG_VERSION;
+use defguard_client_core::version::{select_reported_app_version, PKG_VERSION};
 use defguard_client_proto::defguard::enterprise::posture::v2::{
     BoolCheck, DevicePostureData, Int32Check, StringCheck, UnavailableReason,
 };
@@ -140,7 +140,10 @@ fn security_update_age_days() -> Result<i32, UnavailableReason> {
 #[must_use]
 pub fn device_posture_data(disk_target: DiskEncryptionTarget) -> DevicePostureData {
     DevicePostureData {
-        defguard_client_version: PKG_VERSION.to_owned(),
+        defguard_client_version: select_reported_app_version(
+            PKG_VERSION,
+            option_env!("DEFGUARD_CLIENT_BUILD_VERSION"),
+        ),
         os_type: OS.to_string(),
         os_name: Some(StringCheck::from(os_name())),
         os_version: Some(StringCheck::from(os_version())),

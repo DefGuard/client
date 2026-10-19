@@ -2,34 +2,41 @@ import '../ConfigureMfaPage/verify/style.scss';
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { fork } from 'radashi';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../shared/components/FullPageTitle/FullPageTitle';
+import { Icon, IconKind } from '../../../shared/components/Icon';
+import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
+import { TooltipContent } from '../../../shared/providers/tooltip/TooltipContent';
+import { TooltipProvider } from '../../../shared/providers/tooltip/TooltipContext';
+import { TooltipTrigger } from '../../../shared/providers/tooltip/TooltipTrigger';
 import { getInstancesQueryOptions } from '../../../shared/rust-api/query';
+import { ThemeSpacing, ThemeVariable } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
-import { mfaConfigurableInstances } from '../../../shared/utils/mfa';
-import { useStartMfaConfiguration } from '../AddPage/hooks/useStartMfaConfiguration';
+import { supportsMfaConfiguration } from '../../../shared/utils/mfa';
 import { InstanceSelector } from '../ConfigureMfaPage/components/InstanceSelector/InstanceSelector';
+import { useStartMfaConfiguration } from './hooks/useStartMfaConfiguration';
 
-/** Shown when the client is enrolled into more than one instance, to pick which to configure. */
 export const SelectMfaInstancePage = () => {
   const navigate = useNavigate();
   const { data: instances } = useQuery(getInstancesQueryOptions);
   const [selectedId, setSelectedId] = useState<number>();
 
-  const mfaInstances = useMemo(
-    () => mfaConfigurableInstances(instances ?? []),
+  const [available, incompatible] = useMemo(
+    () => fork(instances ?? [], supportsMfaConfiguration),
     [instances],
   );
 
-  // Derived so a poll dropping the picked instance also clears the selection.
-  const selectedInstance = useMemo(
-    () => mfaInstances.find((instance) => instance.id === selectedId),
-    [mfaInstances, selectedId],
-  );
+  // Derived so a poll dropping the pick clears it, or falls back to the only one left.
+  const selectedInstance = useMemo(() => {
+    const picked = available.find((instance) => instance.id === selectedId);
+    if (isPresent(picked)) return picked;
+    return available.length === 1 ? available[0] : undefined;
+  }, [available, selectedId]);
 
   const { mutate: startConfigureMfa, isPending } = useStartMfaConfiguration();
 
@@ -39,10 +46,10 @@ export const SelectMfaInstancePage = () => {
 
   // The route guard only runs on entry, so a poll leaving nothing to pick sends the user back.
   useEffect(() => {
-    if (isPresent(instances) && mfaInstances.length < 2) {
+    if (isPresent(instances) && available.length === 0) {
       leave();
     }
-  }, [instances, mfaInstances.length, leave]);
+  }, [instances, available.length, leave]);
 
   return (
     <FullPage
@@ -55,9 +62,12 @@ export const SelectMfaInstancePage = () => {
       <p className="description">
         <span>{`To configure a new MFA method, first select the instance you want to configure it for.`}</span>
       </p>
-      <p className="label">Your instances</p>
+      <div className="label">
+        <p>Available instances</p>
+      </div>
+      <SizedBox height={ThemeSpacing.Md} />
       <div className="instances">
-        {mfaInstances.map((instance) => (
+        {available.map((instance) => (
           <InstanceSelector
             key={instance.id}
             instanceId={instance.id}
@@ -72,6 +82,39 @@ export const SelectMfaInstancePage = () => {
           />
         ))}
       </div>
+      {incompatible.length > 0 && (
+        <>
+          <SizedBox height={ThemeSpacing.Xl4} />
+          <div className="label">
+            <p>Incompatible instances</p>
+            <TooltipProvider>
+              <TooltipTrigger>
+                <Icon
+                  icon={IconKind.Question}
+                  size={16}
+                  staticColor={ThemeVariable.FgWhite60}
+                />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{`Some instances may be running an older version and may not be compatible with the MFA configuration feature.`}</p>
+              </TooltipContent>
+            </TooltipProvider>
+          </div>
+          <SizedBox height={ThemeSpacing.Md} />
+          <div className="instances">
+            {incompatible.map((instance) => (
+              <InstanceSelector
+                key={instance.id}
+                instanceId={instance.id}
+                instanceName={instance.name}
+                selected={false}
+                disabled
+              />
+            ))}
+          </div>
+        </>
+      )}
+      <SizedBox height={ThemeSpacing.Xl} />
       <Controls>
         <Button text="Cancel" variant={ButtonVariant.Secondary} onClick={leave} />
         <div className="right">

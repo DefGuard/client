@@ -72,6 +72,7 @@ private struct PathSignature: Equatable {
     /// For statistics returned to Rust code.
     var locationId: UInt64?
     var tunnelId: UInt64?
+    var persistentKeepAlive: UInt16?
 
     private let notificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
 
@@ -109,12 +110,18 @@ private struct PathSignature: Equatable {
     func stats() -> Stats? {
         syncOnQueue {
             guard let stats = tunnel?.stats() else { return nil }
+            var listenPort: UInt16?
+            if case .hostPort(_, let port)? = connection?.currentPath?.localEndpoint {
+                listenPort = port.rawValue
+            }
             return Stats(
                 txBytes: stats.txBytes,
                 rxBytes: stats.rxBytes,
                 lastHandshake: stats.lastHandshake,
                 locationId: locationId,
-                tunnelId: tunnelId
+                tunnelId: tunnelId,
+                listenPort: listenPort,
+                persistentKeepAlive: persistentKeepAlive
             )
         }
     }
@@ -154,6 +161,7 @@ private struct PathSignature: Equatable {
         )
         locationId = tunnelConfiguration.locationId
         tunnelId = tunnelConfiguration.tunnelId
+        persistentKeepAlive = peer.persistentKeepAlive
         state = .running
         reconnectAttempts = 0
         lastPathSignature = nil
