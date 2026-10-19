@@ -53,10 +53,15 @@ export const launchConfigs: Record<string, LaunchConfig> = {
 };
 
 export const getLaunchConfig = (specs: string[]): LaunchConfig | undefined => {
-	for (const spec of specs) {
-		const specName = path.basename(spec);
-		if (Object.hasOwn(launchConfigs, specName)) return launchConfigs[specName];
+	const configured = specs
+		.map((spec) => path.basename(spec))
+		.filter((specName) => Object.hasOwn(launchConfigs, specName));
+	if (configured.length > 0 && specs.length > 1) {
+		throw new Error(
+			`Specs with a launch config must run in their own session: ${configured.join(", ")}`,
+		);
 	}
+	return configured.length > 0 ? launchConfigs[configured[0]] : undefined;
 };
 
 export const assertLaunchConfigSpecsExist = (testsDir: string): void => {

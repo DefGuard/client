@@ -456,14 +456,11 @@ pub fn run_app() {
             // Decide which window to show based on available locations.
             // If the app was cold-launched by a deep-link, the full view must open, not the
             // tray.
-            let launched_by_deep_link = app_handle
-                .deep_link()
-                .get_current()
-                .ok()
-                .flatten()
-                .is_some();
-            if launched_by_deep_link {
+            let startup_deep_link = app_handle.deep_link().get_current().ok().flatten();
+            if let Some(urls) = startup_deep_link {
                 info!("App launched via deep link, opening full view directly.");
+                // Store the link before the full view loads, so its first route load takes it.
+                handle_deep_link(app_handle, &urls);
                 let _ = WindowManager::open_full_view(app_handle);
             } else if open_welcome_view {
                 info!("Opening welcome view.");
@@ -512,11 +509,6 @@ pub fn run_app() {
                 DEFAULT_SERVICE_LOG_DIR
             );
             async_runtime::block_on(startup(app_handle));
-
-            // Handle a deep link that launched the app (startup case).
-            if let Ok(Some(urls)) = app_handle.deep_link().get_current() {
-                handle_deep_link(app_handle, &urls);
-            }
 
             // Handle Ctrl-C.
             debug!("Setting up Ctrl-C handler.");
