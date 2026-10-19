@@ -317,6 +317,17 @@ pub async fn connect(
 }
 
 #[tauri::command(async)]
+pub async fn check_route_conflict(location_id: Id) -> Result<(), ConnectError> {
+    let location = Location::find_by_id(&*DB_POOL, location_id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    ConnectionTarget::Location(location)
+        .ensure_no_route_conflict(&DB_POOL, None)
+        .await?;
+    Ok(())
+}
+
+#[tauri::command(async)]
 pub async fn start_global_logwatcher(handle: AppHandle) -> Result<(), Error> {
     let result = spawn_global_log_watcher_task(&handle, tracing::Level::DEBUG).await;
     if let Err(err) = result {

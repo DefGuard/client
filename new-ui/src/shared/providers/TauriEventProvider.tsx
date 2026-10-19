@@ -8,6 +8,7 @@ import { runConfigureFactorsRequest } from '../../pages/full/ConfigureMfaPage/ho
 import { mfaMethodToConnectModalView } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import {
+  findRouteConflicts,
   handleFullViewConnectError,
   openRouteConflictModal,
   type RouteConflictPayload,
@@ -27,7 +28,7 @@ import {
   type TunnelsDisabledPayload,
 } from '../rust-api/types';
 import { useAppStore } from '../store/useAppStore';
-import { resolveMfaStepPlan } from '../utils/mfa';
+import { resolveMfaStepPlan, shouldStartMfa } from '../utils/mfa';
 
 export const TauriEventProvider = ({ children }: PropsWithChildren) => {
   const navigate = useNavigate();
@@ -35,6 +36,34 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
   const { setViewSelection } = useAppData();
 
   useEffect(() => {
+    const openMfaModal = async (location: LocationInfo) => {
+      const appConfig = await api.getAppConfig();
+      // A failed refresh keeps the cached instances. With none, the plan uses
+      // the steps' own flags, which beats dropping the prompt.
+      let instances = queryClient.getQueryData(getInstancesQueryOptions.queryKey);
+      try {
+        instances = await queryClient.fetchQuery(getInstancesQueryOptions);
+      } catch (err) {
+        void logError(`MFA prompt: failed to load instances: ${err}`);
+      }
+      const instance = instances?.find(({ id }) => id === location.instance_id);
+      const stepPlan = resolveMfaStepPlan(location, [], instance);
+
+      await navigate({ to: '/full/overview' });
+      useConnectModal.getState().open({
+        view: mfaMethodToConnectModalView(stepPlan[0]),
+        location,
+        stepPlan,
+        autoStartOpenId: appConfig.auto_start_openid_mfa,
+        mfaMethod: stepPlan[0],
+      });
+    };
+    const openMfaModalOrLog = (location: LocationInfo) => {
+      void openMfaModal(location).catch((err) => {
+        void logError(`Failed to open the MFA prompt: ${err}`);
+      });
+    };
+
     const unlisteners = Promise.all([
       listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
         void debug(`UI Received event AddInstance (${event.payload.url})`);
@@ -74,30 +103,13 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
               connection_type: ConnectionType.Location,
               active: false,
             };
-            void (async () => {
-              const appConfig = await api.getAppConfig();
-              // A failed refresh keeps the cached instances. With none, the plan uses
-              // the steps' own flags, which beats dropping the prompt.
-              let instances = queryClient.getQueryData(getInstancesQueryOptions.queryKey);
-              try {
-                instances = await queryClient.fetchQuery(getInstancesQueryOptions);
-              } catch (err) {
-                void logError(`MfaTrigger: failed to load instances: ${err}`);
-              }
-              const instance = instances?.find(({ id }) => id === location.instance_id);
-              const stepPlan = resolveMfaStepPlan(location, [], instance);
-
-              await navigate({ to: '/full/overview' });
-              useConnectModal.getState().open({
-                view: mfaMethodToConnectModalView(stepPlan[0]),
-                location,
-                stepPlan,
-                autoStartOpenId: appConfig.auto_start_openid_mfa,
-                mfaMethod: stepPlan[0],
-              });
-            })().catch((err) => {
-              void logError(`MfaTrigger: failed to open the MFA prompt: ${err}`);
-            });
+            void findRouteConflicts(location).then((conflicts) =>
+              conflicts.length > 0
+                ? openRouteConflictModal(location, conflicts, () =>
+                    openMfaModalOrLog(location),
+                  )
+                : openMfaModalOrLog(location),
+            );
           }
         },
       ),
@@ -114,6 +126,10 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
       listen<RouteConflictPayload>(TauriEvent.RouteConflict, (event) => {
         if (getCurrentWindow().label !== WindowId.FullView) return;
         const { location, conflicts } = event.payload;
+        if (shouldStartMfa(location)) {
+          openRouteConflictModal(location, conflicts, () => openMfaModalOrLog(location));
+          return;
+        }
         // The connect is not awaited, so the confirm modal closes before a new error can reopen it.
         const connect = () => {
           void api
