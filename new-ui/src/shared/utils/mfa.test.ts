@@ -15,6 +15,7 @@ import {
   connectionAbilityOf,
   hasMfaMethodChoice,
   isMfaMethodAvailable,
+  isMfaMethodLicenseLocked,
   mfaConfigurableInstances,
   resolveMfaStepPlan,
   setupMethodsOf,
@@ -119,6 +120,27 @@ describe('setupMethodsOf', () => {
       mfa_capabilities: capabilitiesOf([MfaMethod.Totp, MfaMethod.Email]),
     };
     expect(setupMethodsOf(instance)).toEqual([MfaMethod.Totp]);
+  });
+});
+
+describe('isMfaMethodLicenseLocked', () => {
+  it('locks FIDO2 when Core leaves it out of the setup methods', () => {
+    const instance = {
+      mfa_capabilities: capabilitiesOf([MfaMethod.Totp, MfaMethod.Email]),
+    };
+    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, instance)).toBe(true);
+    expect(isMfaMethodLicenseLocked(MfaMethod.Totp, instance)).toBe(false);
+  });
+
+  it('does not lock FIDO2 when Core offers it or cannot configure from the client', () => {
+    const offered = {
+      mfa_capabilities: capabilitiesOf([MfaMethod.Totp, MfaMethod.Fido2]),
+    };
+    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, offered)).toBe(false);
+    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, { mfa_capabilities: null })).toBe(
+      false,
+    );
+    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, undefined)).toBe(false);
   });
 });
 

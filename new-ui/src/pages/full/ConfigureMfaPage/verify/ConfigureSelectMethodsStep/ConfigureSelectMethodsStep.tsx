@@ -19,6 +19,7 @@ import {
   isClientConfigurableMethod,
   isDesktopDrivableMethod,
   isMfaMethodAvailable,
+  isMfaMethodLicenseLocked,
   mfaStepsOf as locationMfaSteps,
   mfaToText,
   setupMethodsOf,
@@ -103,10 +104,13 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       const configured = accountConfigured.includes(method);
       const available = isMfaMethodAvailable(method, instance);
       const satisfied = configuredMethods.includes(method) && available;
+      const locked = isMfaMethodLicenseLocked(method, instance);
 
       let hint: string | null = null;
       if (!available) {
         hint = `${mfaToText(method, instance ?? undefined)} is not available on this Defguard instance.`;
+      } else if (locked) {
+        hint = `${mfaToText(method)} requires an Enterprise license on this Defguard instance.`;
       } else if (disabled && !configured) {
         if (satisfied) {
           // Reached only via the email fallback, which registers the factor as it verifies.
@@ -128,6 +132,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         disabled,
         configured,
         hint,
+        locked,
       };
     },
     [accountConfigured, configuredMethods, setupMethods, selected, instance],

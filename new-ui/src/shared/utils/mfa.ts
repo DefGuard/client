@@ -208,6 +208,19 @@ export const canSetUpMfaMethod = (
 ): method is ClientConfigurableMethod =>
   setupMethodsOf(instance).some((candidate) => candidate === method);
 
+/** Core leaves FIDO2 out of the setup methods when its license lacks the Enterprise tier. */
+export const isMfaMethodLicenseLocked = (
+  method: MfaMethodValue,
+  instance?: Pick<InstanceInfo, 'mfa_capabilities'> | null,
+): boolean => {
+  const coreSetupMethods = instance?.mfa_capabilities?.setup_methods;
+  return (
+    method === MfaMethod.Fido2 &&
+    isPresent(coreSetupMethods) &&
+    !coreSetupMethods.includes(method)
+  );
+};
+
 /** What this client can authorize an MFA configuration session with. Mirrors
  *  AUTHORIZING_METHODS in core mfa_config.rs. */
 const clientAuthorizingMethods: MfaMethodValue[] = [

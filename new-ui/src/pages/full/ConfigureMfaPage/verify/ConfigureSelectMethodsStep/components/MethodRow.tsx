@@ -19,6 +19,8 @@ export type MethodRowState = {
   configured: boolean;
   /** Why the row is disabled, when a badge does not already say it. */
   hint: string | null;
+  /** The instance license does not allow the factor, so the hint shows a lock. */
+  locked: boolean;
 };
 
 interface Props extends MethodRowState {
@@ -31,6 +33,7 @@ export const MethodRow = ({
   disabled,
   configured,
   hint,
+  locked,
   onToggle,
 }: Props) => (
   <div className="method-row">
@@ -52,7 +55,11 @@ export const MethodRow = ({
         {isPresent(hint) && (
           <TooltipProvider>
             <TooltipTrigger>
-              <Icon icon="question" size={20} staticColor={ThemeVariable.BgWhite50} />
+              <Icon
+                icon={locked ? 'lock-closed' : 'question'}
+                size={20}
+                staticColor={ThemeVariable.BgWhite50}
+              />
             </TooltipTrigger>
             <TooltipContent>
               <p>{hint}</p>
