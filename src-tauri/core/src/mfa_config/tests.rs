@@ -496,6 +496,60 @@ async fn test_bad_request_carries_the_proxy_message() {
 }
 
 #[tokio::test]
+async fn test_untrusted_security_key_is_a_security_key_error() {
+    let server = MockServer::start().await;
+    mount(
+        &server,
+        SETUP_FINISH,
+        ResponseTemplate::new(400).set_body_json(json!({
+            "error": "security key is not a trusted hardware authenticator, update the client or \
+                      use a certified security key"
+        })),
+    )
+    .await;
+
+    let err = mfa_config_setup_finish(
+        mock_url(&server),
+        SESSION_TOKEN.into(),
+        MfaMethod::Fido2,
+        SetupProof::Fido2 {
+            name: "key".into(),
+            attestation: ATTESTATION.into(),
+        },
+        &ALL_CAPABILITIES,
+    )
+    .await
+    .unwrap_err();
+
+    match err {
+        MfaConfigError::SecurityKey { message } => assert!(!message.contains("update the client")),
+        other => panic!("expected SecurityKey, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn test_start_without_a_session_means_mfa_not_usable() {
+    let server = MockServer::start().await;
+    mount(
+        &server,
+        START,
+        ResponseTemplate::new(200).set_body_json(json!({
+            "session_token": "",
+            "available_methods": [],
+            "email_fallback": false,
+            "deadline_timestamp": 0,
+        })),
+    )
+    .await;
+
+    let err = mfa_config_start(mock_url(&server), "t".into(), "pk".into())
+        .await
+        .unwrap_err();
+
+    assert!(matches!(err, MfaConfigError::MfaNotUsable));
+}
+
+#[tokio::test]
 async fn test_server_error_is_a_proxy_error() {
     let server = MockServer::start().await;
     mount(&server, START, ResponseTemplate::new(500)).await;

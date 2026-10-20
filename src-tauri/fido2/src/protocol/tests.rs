@@ -123,11 +123,104 @@ fn test_unparseable_challenge_is_reported_as_malformed() {
     assert!(matches!(err, Fido2Error::MalformedChallenge(_)));
 }
 
+fn decode_object(encoded: &[u8]) -> Vec<(CborValue, CborValue)> {
+    let object: CborValue = ciborium::from_reader(encoded).unwrap();
+    object.into_map().unwrap()
+}
+
+fn field(entries: &[(CborValue, CborValue)], name: &str) -> CborValue {
+    entries
+        .iter()
+        .find(|(key, _)| key.as_text() == Some(name))
+        .map(|(_, value)| value.clone())
+        .unwrap_or_else(|| panic!("missing {name}"))
+}
+
+#[test]
+fn test_attestation_follows_what_core_asked_for() {
+    let none = prepare_registration(&challenge_json(), &origin())
+        .unwrap()
+        .request;
+    assert_eq!(none.attestation, AttestationConveyance::None);
+
+    let direct = challenge_json().replace(r#""attestation":"none""#, r#""attestation":"direct""#);
+    let request = prepare_registration(&direct, &origin()).unwrap().request;
+    assert_eq!(request.attestation, AttestationConveyance::Direct);
+}
+
+#[test]
+fn test_packed_statement_keeps_the_keys_signature_and_chain() {
+    let encoded = attestation_object(
+        vec![1, 2, 3],
+        AttestationStatement::Packed {
+            algorithm: COSE_ES256,
+            signature: vec![4, 5],
+            certificates: vec![vec![6], vec![7]],
+        },
+    )
+    .unwrap();
+
+    let object = decode_object(&encoded);
+    assert_eq!(field(&object, "fmt").as_text(), Some("packed"));
+    assert_eq!(field(&object, "authData").as_bytes(), Some(&vec![1, 2, 3]));
+    let statement = field(&object, "attStmt").into_map().unwrap();
+    assert_eq!(
+        field(&statement, "alg").as_integer(),
+        Some(COSE_ES256.into())
+    );
+    assert_eq!(field(&statement, "sig").as_bytes(), Some(&vec![4, 5]));
+    let chain = field(&statement, "x5c").into_array().unwrap();
+    assert_eq!(
+        chain,
+        vec![CborValue::Bytes(vec![6]), CborValue::Bytes(vec![7])]
+    );
+}
+
+/// Self attestation has no chain, and an empty x5c would be rejected as malformed.
+#[test]
+fn test_self_attestation_omits_the_chain() {
+    let encoded = attestation_object(
+        vec![1],
+        AttestationStatement::Packed {
+            algorithm: COSE_ES256,
+            signature: vec![2],
+            certificates: Vec::new(),
+        },
+    )
+    .unwrap();
+
+    let statement = field(&decode_object(&encoded), "attStmt")
+        .into_map()
+        .unwrap();
+    assert!(statement
+        .iter()
+        .all(|(key, _)| key.as_text() != Some("x5c")));
+}
+
+#[test]
+fn test_fido_u2f_statement_has_no_algorithm() {
+    let encoded = attestation_object(
+        vec![1],
+        AttestationStatement::FidoU2f {
+            signature: vec![2],
+            certificates: vec![vec![3]],
+        },
+    )
+    .unwrap();
+
+    let object = decode_object(&encoded);
+    assert_eq!(field(&object, "fmt").as_text(), Some("fido-u2f"));
+    let statement = field(&object, "attStmt").into_map().unwrap();
+    assert!(statement
+        .iter()
+        .all(|(key, _)| key.as_text() != Some("alg")));
+}
+
 #[test]
 fn test_credential_is_serialized_the_way_webauthn_parses_it() {
     let registration = Registration {
         credential_id: b"credential-id".to_vec(),
-        authenticator_data: vec![1, 2, 3],
+        attestation_object: attestation_object(vec![1, 2, 3], AttestationStatement::None).unwrap(),
     };
 
     let credential: Value =
@@ -151,18 +244,10 @@ fn test_credential_is_serialized_the_way_webauthn_parses_it() {
                 .unwrap(),
         )
         .unwrap();
-    let object: CborValue = ciborium::from_reader(decoded.as_slice()).unwrap();
-    let entries = object.as_map().unwrap();
-    let field = |name: &str| {
-        entries
-            .iter()
-            .find(|(key, _)| key.as_text() == Some(name))
-            .map(|(_, value)| value.clone())
-            .unwrap()
-    };
-    assert_eq!(field("fmt").as_text(), Some("none"));
-    assert!(field("attStmt").as_map().unwrap().is_empty());
-    assert_eq!(field("authData").as_bytes(), Some(&vec![1, 2, 3]));
+    let object = decode_object(&decoded);
+    assert_eq!(field(&object, "fmt").as_text(), Some("none"));
+    assert!(field(&object, "attStmt").as_map().unwrap().is_empty());
+    assert_eq!(field(&object, "authData").as_bytes(), Some(&vec![1, 2, 3]));
 }
 
 #[test]

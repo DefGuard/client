@@ -45,8 +45,10 @@ pub const AUTHORIZING_METHODS: &[MfaMethod] = &[
 // FIDO2 sends an assertion and OIDC completes in the browser, so only these send a code
 const CODE_METHODS: &[MfaMethod] = &[MfaMethod::Totp, MfaMethod::Email];
 
-// Core reuses 401, 403 and 428 for several errors, only the message tells these apart
+// Core reuses 400, 401, 403 and 428 for several errors, only the message tells these apart
 const INVALID_CODE_MESSAGE: &str = "invalid code";
+// a prefix, Core appends advice meant for older clients that cannot send an attestation
+const UNTRUSTED_KEY_MESSAGE: &str = "security key is not a trusted hardware authenticator";
 const METHOD_NOT_CONFIGURED_MESSAGE: &str = "method not configured";
 const ALREADY_AUTHORIZED_MESSAGE: &str = "session already authorized";
 // a prefix, Core's login flow words it "OIDC authentication not completed yet"
@@ -131,6 +133,10 @@ pub enum MfaConfigError {
 
     #[error("This device has no polling token; update the instance and try again")]
     NoToken,
+
+    /// e.g. only a passkey added in the browser, which Core does not accept from the client
+    #[error("The MFA set up on this account cannot be used from the desktop client")]
+    MfaNotUsable,
 
     #[error("{message}")]
     UnsupportedMethod { message: String },
@@ -301,6 +307,13 @@ async fn check_response(response: Response, endpoint: &str) -> Result<Response, 
             Err(MfaConfigError::InvalidCode { message })
         }
         StatusCode::UNAUTHORIZED => Err(MfaConfigError::SessionExpired),
+        StatusCode::BAD_REQUEST if message.starts_with(UNTRUSTED_KEY_MESSAGE) => {
+            Err(MfaConfigError::SecurityKey {
+                message: "This security key is not a certified hardware key. Use a FIDO \
+                          certified security key."
+                    .to_string(),
+            })
+        }
         StatusCode::BAD_REQUEST => Err(MfaConfigError::InvalidCode { message }),
         StatusCode::FORBIDDEN if message == METHOD_NOT_CONFIGURED_MESSAGE => {
             Err(MfaConfigError::MethodNotConfigured { message })
@@ -349,7 +362,12 @@ pub async fn mfa_config_start(
 ) -> Result<MfaConfigStartResponse, MfaConfigError> {
     debug!("Starting MFA configuration session");
     let request = MfaConfigStartRequest { token, pubkey };
-    parse(post(&proxy_url, START, &request).await?).await
+    let response: MfaConfigStartResponse = parse(post(&proxy_url, START, &request).await?).await?;
+    // Core opens no session when the user has MFA but none of it can authorize from here
+    if response.session_token.is_empty() {
+        return Err(MfaConfigError::MfaNotUsable);
+    }
+    Ok(response)
 }
 
 /// The proxy answers with an empty 200, so the body is discarded rather than parsed.

@@ -6,7 +6,12 @@
 //! than returned, so nothing a cancelled ceremony produced can reach the caller.
 
 use ctap_hid_fido2::{
-    fidokey::make_credential::{CredentialSupportedKeyType, MakeCredentialArgsBuilder},
+    fidokey::{
+        credential_management::credential_management_params::CredentialProtectionPolicy,
+        make_credential::{
+            Attestation, CredentialSupportedKeyType, Extension, MakeCredentialArgsBuilder,
+        },
+    },
     public_key_credential_user_entity::PublicKeyCredentialUserEntity,
     FidoKeyHid, FidoKeyHidFactory, HidInfo, HidParam, LibCfg,
 };
@@ -14,8 +19,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     protocol::{
-        AssertRequest, Assertion, RegisterRequest, Registration, ResidentKey, COSE_EDDSA,
-        COSE_ES256,
+        attestation_object, AssertRequest, Assertion, AttestationConveyance, AttestationStatement,
+        RegisterRequest, Registration, ResidentKey, COSE_EDDSA, COSE_ES256,
     },
     Fido2Error, PinPolicy, PlatformContext,
 };
@@ -141,14 +146,23 @@ pub(crate) async fn register(
         for credential_id in &request.exclude_credentials {
             builder = builder.exclude_authenticator(credential_id);
         }
+        // Keys that do not know the extension ignore it, so this never blocks registration.
+        let extensions = [Extension::CredProtect(Some(
+            CredentialProtectionPolicy::UserVerificationRequired,
+        ))];
+        builder = builder.extensions(&extensions);
 
         let attestation = device
             .make_credential_with_args(&builder.build())
             .map_err(|err| ceremony_error(&err))?;
 
+        let statement = match request.attestation {
+            AttestationConveyance::None => AttestationStatement::None,
+            AttestationConveyance::Direct => attestation_statement(&attestation)?,
+        };
         Ok(Registration {
             credential_id: attestation.credential_descriptor.id,
-            authenticator_data: attestation.auth_data,
+            attestation_object: attestation_object(attestation.auth_data, statement)?,
         })
     })
     .await
@@ -164,6 +178,24 @@ pub(crate) async fn register(
     }
 
     result
+}
+
+fn attestation_statement(attestation: &Attestation) -> Result<AttestationStatement, Fido2Error> {
+    match attestation.fmt.as_str() {
+        "none" => Ok(AttestationStatement::None),
+        "packed" => Ok(AttestationStatement::Packed {
+            algorithm: attestation.attstmt_alg.into(),
+            signature: attestation.attstmt_sig.clone(),
+            certificates: attestation.attstmt_x5c.clone(),
+        }),
+        "fido-u2f" => Ok(AttestationStatement::FidoU2f {
+            signature: attestation.attstmt_sig.clone(),
+            certificates: attestation.attstmt_x5c.clone(),
+        }),
+        other => Err(Fido2Error::Encoding(format!(
+            "unsupported attestation format {other}"
+        ))),
+    }
 }
 
 pub(crate) async fn assert(

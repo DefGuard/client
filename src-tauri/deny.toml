@@ -96,11 +96,9 @@ ignore = [
     { id = "RUSTSEC-2025-0081", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0098", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2025-0100", reason = "Tauri v2 dependency (unmaintained)" },
-    # zbus 5 support crates, merged into zbus 6; pulled by tauri-plugin-notification
-    # (notify-rust), tauri-plugin-opener and tauri-plugin-single-instance.
-    { id = "RUSTSEC-2026-0370", reason = "zvariant via zbus 5 (Tauri plugins); no zbus 6 upstream yet" },
-    { id = "RUSTSEC-2026-0371", reason = "zbus_names via zbus 5 (Tauri plugins); no zbus 6 upstream yet" },
-    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive via zbus 5 (Tauri plugins); no zbus 6 upstream yet" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
