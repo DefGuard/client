@@ -12,7 +12,7 @@ Defguard services to be running separately.
 - An administrator account whose login does not require MFA. The password is supplied through `e2e/.env`.
 - A dedicated deployment with exactly one test network named `e2e`. The connection checks use the first visible connect button.
 - Root `defguard-service` running with `/var/run/defguard.socket` available.
-- Rust/Cargo with the Tauri CLI, Node.js, `pnpm`, `just`, `WebKitWebDriver`, and `xvfb-run` available.
+- Rust/Cargo with the Tauri CLI, Node.js, `pnpm`, `just`, `WebKitWebDriver`, `xvfb-run`, and `dbus-run-session` available.
 - `tauri-driver` available at `~/.cargo/bin/tauri-driver`, or at the path set by `TAURI_DRIVER`.
 
 ## Configure the test environment
@@ -58,6 +58,6 @@ To run one spec directly:
 ```bash
 cd e2e
 NATIVE_DRIVER="$(command -v WebKitWebDriver)" \
-  xvfb-run -a pnpm exec wdio run ./wdio.conf.ts \
+  dbus-run-session -- xvfb-run -a pnpm exec wdio run ./wdio.conf.ts \
   --spec=./tests/enrollment.spec.ts
 ```

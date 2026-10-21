@@ -34,9 +34,10 @@ e2e-test:
     test "$(uname -s)" = "Linux" || { echo "Client E2E tests require Linux." >&2; exit 1; }
     test -f e2e/.env || { echo "Missing e2e/.env; copy e2e/.env.example and fill it locally." >&2; exit 1; }
     test -S /var/run/defguard.socket || { echo "defguard-service is not running at /var/run/defguard.socket." >&2; exit 1; }
-    test -x "${TAURI_DRIVER:-$HOME/.cargo/bin/tauri-driver}" || { echo "tauri-driver is missing; install it with: cargo install tauri-driver --locked" >&2; exit 1; }
+    test -x "${TAURI_DRIVER:-$HOME/.cargo/bin/tauri-driver}" || { echo "tauri-driver is missing; set TAURI_DRIVER to its location." >&2; exit 1; }
     command -v WebKitWebDriver >/dev/null || { echo "WebKitWebDriver is missing; enter nix develop." >&2; exit 1; }
     command -v xvfb-run >/dev/null || { echo "xvfb-run is missing; enter nix develop." >&2; exit 1; }
-    cd e2e && NATIVE_DRIVER="${NATIVE_DRIVER:-$(command -v WebKitWebDriver)}" xvfb-run -a pnpm test
+    command -v dbus-run-session >/dev/null || { echo "dbus-run-session is missing; enter nix develop." >&2; exit 1; }
+    cd e2e && NATIVE_DRIVER="${NATIVE_DRIVER:-$(command -v WebKitWebDriver)}" dbus-run-session -- xvfb-run -a pnpm test
 
 e2e: e2e-build e2e-provision e2e-test

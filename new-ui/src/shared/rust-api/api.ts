@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { mfaToApi } from '../utils/mfa';
 import type {
   ActiveConnectionSummary,
+  AddInstanceEventPayload,
   AppConfig,
   AppConfigPatch,
   Connection,
@@ -117,6 +118,9 @@ const setAutostartEnabled = (enabled: boolean): Promise<void> =>
 
 const getProvisioningConfig = (): Promise<ProvisioningConfig | null> =>
   invoke(TauriCommand.GetProvisioningConfig);
+
+const takePendingAddInstance = (): Promise<AddInstanceEventPayload | null> =>
+  invoke(TauriCommand.TakePendingAddInstance);
 
 const getPlatformHeader = (): Promise<string> => invoke(TauriCommand.GetPlatformHeader);
 
@@ -372,6 +376,7 @@ export const api = {
   setAutostartEnabled,
   // Misc
   getProvisioningConfig,
+  takePendingAddInstance,
   getPlatformHeader,
   getLatestAppVersion,
   getClientBuildVersion,

@@ -1,4 +1,4 @@
-use std::{fmt, fs, path::Path};
+use std::{fmt, fs, io, path::Path};
 
 use log::{debug, warn};
 use serde::{Deserialize, Serialize};
@@ -66,6 +66,22 @@ pub fn try_get_provisioning_config(app_data_dir: &Path) -> Option<ProvisioningCo
     ProvisioningConfig::load(&config_file_path)
 }
 
+/// Remove the one-time provisioning configuration after the client is initialized.
+pub fn clear_provisioning_config(app_data_dir: &Path) -> io::Result<()> {
+    let config_file_path = app_data_dir.join(CONFIG_FILE_NAME);
+    match fs::remove_file(&config_file_path) {
+        Ok(()) => {
+            debug!(
+                "Removed provisioning config file at {}",
+                config_file_path.display()
+            );
+            Ok(())
+        }
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -92,6 +108,17 @@ mod tests {
     fn test_missing_file_returns_none() {
         let dir = tempdir().unwrap();
         assert!(try_get_provisioning_config(dir.path()).is_none());
+    }
+
+    #[test]
+    fn test_clear_provisioning_config_removes_file_and_is_idempotent() {
+        let dir = tempdir().unwrap();
+        let config_file = dir.path().join(CONFIG_FILE_NAME);
+        fs::write(&config_file, "{}").unwrap();
+
+        clear_provisioning_config(dir.path()).expect("config file should be removed");
+        assert!(!config_file.exists());
+        clear_provisioning_config(dir.path()).expect("missing config file should be ignored");
     }
 
     #[test]

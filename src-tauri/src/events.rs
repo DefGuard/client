@@ -4,6 +4,7 @@ use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::{
+    appstate::AppState,
     commands::LocationInfo,
     database::models::{instance::InstanceInfo, location::LocationMfaMethod, Id},
     window_manager::{WindowManager, COMPACT_WINDOW_ID},
@@ -65,9 +66,9 @@ impl DeadConnReconnected {
 }
 
 #[derive(Clone, Serialize)]
-pub struct AddInstancePayload<'a> {
-    pub token: &'a str,
-    pub url: &'a str,
+pub struct AddInstancePayload {
+    pub token: String,
+    pub url: String,
 }
 
 /// Payload for the `configure-factors-trigger` event. Mirrors `ConfigureFactorsPayload` in
@@ -129,28 +130,30 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
             let mut token = None;
             let mut url = None;
             for (key, value) in link.query_pairs() {
-                if key == "token" {
-                    token = Some(value.clone());
-                }
-                if key == "url" {
-                    url = Some(value.clone());
+                match key.as_ref() {
+                    "token" => token = Some(value.into_owned()),
+                    "url" => url = Some(value.into_owned()),
+                    _ => {}
                 }
             }
             if let (Some(token), Some(url)) = (token, url) {
                 info!("Valid Deep link received.");
+                let payload = AddInstancePayload { token, url };
+                let app_state = app_handle.state::<AppState>();
+                if let Ok(mut pending) = app_state.pending_add_instance.lock() {
+                    *pending = Some(payload.clone());
+                } else {
+                    error!("Failed to store pending add-instance deep link.");
+                }
                 if let Some(tray_win) = app_handle.get_webview_window(COMPACT_WINDOW_ID) {
                     let _ = tray_win.hide();
                 }
                 if let Err(e) = WindowManager::open_full_view(app_handle) {
                     warn!("Deep link: failed to open main window: {e}");
                 }
-                let _ = app_handle.emit(
-                    EventKey::AddInstance.into(),
-                    AddInstancePayload {
-                        token: &token,
-                        url: &url,
-                    },
-                );
+                if let Err(err) = app_handle.emit(EventKey::AddInstance.into(), payload) {
+                    error!("Event AddInstance was not emitted. Reason: {err}");
+                }
             }
         }
     }

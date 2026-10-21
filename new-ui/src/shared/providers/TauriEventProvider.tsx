@@ -18,7 +18,6 @@ import { useAppData } from '../providers/AppDataContext';
 import { api } from '../rust-api/api';
 import { getInstancesQueryOptions } from '../rust-api/query';
 import {
-  type AddInstanceEventPayload,
   type ConfigureFactorsPayload,
   ConnectionType,
   type DeadConnectionDroppedPayload,
@@ -30,12 +29,41 @@ import {
 import { useAppStore } from '../store/useAppStore';
 import { resolveMfaStepPlan, shouldStartMfa } from '../utils/mfa';
 
+const urlOrigin = (url: string): string => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return '<invalid url>';
+  }
+};
+
 export const TauriEventProvider = ({ children }: PropsWithChildren) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { setViewSelection } = useAppData();
 
   useEffect(() => {
+    const openPendingAddInstance = async () => {
+      if (getCurrentWindow().label !== WindowId.FullView) return;
+
+      try {
+        const pendingAddInstance = await api.takePendingAddInstance();
+        if (!pendingAddInstance) return;
+        void debug(
+          `Opening pending add-instance deep link (${urlOrigin(pendingAddInstance.url)})`,
+        );
+        void navigate({
+          to: '/full/add/instance',
+          search: {
+            token: pendingAddInstance.token,
+            url: pendingAddInstance.url,
+          },
+        });
+      } catch (err) {
+        void logError(`Failed to retrieve pending add-instance deep link: ${err}`);
+      }
+    };
+
     const openMfaModal = async (location: LocationInfo) => {
       const appConfig = await api.getAppConfig();
       // A failed refresh keeps the cached instances. With none, the plan uses
@@ -65,20 +93,7 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
     };
 
     const unlisteners = Promise.all([
-      listen<AddInstanceEventPayload>(TauriEvent.AddInstance, (event) => {
-        void debug(`UI Received event AddInstance (${event.payload.url})`);
-        const windowLabel = getCurrentWindow().label;
-        if (windowLabel === WindowId.FullView) {
-          const { token, url } = event.payload;
-          navigate({
-            to: '/full/add/instance',
-            search: {
-              token,
-              url,
-            },
-          });
-        }
-      }),
+      listen(TauriEvent.AddInstance, () => void openPendingAddInstance()),
       // Backend requests the MFA flow (e.g. connecting to an MFA location from the
       // tray or system settings). The location is emitted as the payload directly.
       listen<Omit<LocationInfo, 'connection_type' | 'active'>>(
@@ -239,6 +254,8 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         void queryClient.invalidateQueries({ queryKey: ['tunnels'] });
       }),
     ]);
+    // A link stored before the listener existed sent its event to nobody.
+    void unlisteners.then(() => openPendingAddInstance());
 
     return () => {
       void unlisteners.then((fns) => fns.forEach((fn) => void fn()));

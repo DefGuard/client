@@ -18,6 +18,7 @@ use uuid::Uuid;
 use crate::{
     app_config::AppConfig,
     database::models::{connection::ActiveConnection, Id},
+    events::AddInstancePayload,
     session_state::SessionState,
     utils::stats_handler,
     ConnectionType,
@@ -43,6 +44,8 @@ pub struct AppState {
     pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
     pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
+    pub provisioning_instance_id: Mutex<Option<String>>,
+    pub pending_add_instance: Mutex<Option<AddInstancePayload>>,
     pub session_state: Mutex<SessionState>,
 }
 
@@ -60,6 +63,8 @@ impl AppState {
             tray_click_position: Mutex::new(None),
             stat_threads: Mutex::new(HashMap::new()),
             provisioning_config: Mutex::new(provisioning_config),
+            provisioning_instance_id: Mutex::new(None),
+            pending_add_instance: Mutex::new(None),
             session_state: Mutex::new(SessionState::default()),
         }
     }
