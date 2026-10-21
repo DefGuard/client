@@ -328,6 +328,7 @@ impl WindowManager {
         info!("open_full_view: Position set, showing window");
         window.show()?;
         info!("open_full_view: Window shown successfully");
+        window.set_focus()?;
         Ok(window)
     }
 
