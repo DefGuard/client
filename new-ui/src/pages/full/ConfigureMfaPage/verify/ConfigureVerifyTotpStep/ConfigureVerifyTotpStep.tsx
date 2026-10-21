@@ -1,18 +1,13 @@
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
-import { Button } from '../../../../../shared/components/Button/Button';
-import { ButtonVariant } from '../../../../../shared/components/Button/types';
-import { CodeInput } from '../../../../../shared/components/CodeInput/CodeInput';
-import { Controls } from '../../../../../shared/components/Controls/Controls';
-import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/FullPageTitle';
-import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
+import { IconKind } from '../../../../../shared/components/Icon';
 import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
+import { MfaCodeVerification } from '../../components/MfaCodeVerification/MfaCodeVerification';
 import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
-import '../style.scss';
 
 const CODE_LENGTH = 6;
 
@@ -68,47 +63,22 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
   }, []);
 
   return (
-    <FullPage
+    <MfaCodeVerification
       id="configure-verify-totp-step"
-      className="configure-mfa-verify-page"
-      hideScrollContainer
-      withControls
-    >
-      <FullPageTitle title="Verification code from your authentication app" />
-      <p className="description">
-        <span>{`Open the authentication app you use with Defguard.`}</span>
-        <span>{`Enter the 6-digit code it currently displays to continue.`}</span>
-      </p>
-      <div className="code-track">
-        <CodeInput
-          length={CODE_LENGTH}
-          value={code}
-          onChange={handleCodeChange}
-          error={error}
-          onSubmit={handleSubmit}
-          loading={isSubmitting}
-        />
-      </div>
-      <Controls>
-        <Button
-          text={leaveText}
-          variant={ButtonVariant.Secondary}
-          loading={isLeaving}
-          disabled={isSubmitting}
-          onClick={leave}
-        />
-        <div className="right">
-          <Button
-            text="Verify"
-            variant={ButtonVariant.Primary}
-            loading={isSubmitting}
-            disabled={isLeaving}
-            onClick={() => {
-              handleSubmit();
-            }}
-          />
-        </div>
-      </Controls>
-    </FullPage>
+      icon={IconKind.MobileLock}
+      title="Security code from your authenticator app."
+      description={[`Enter the 6-digit code from your Authenticator app to continue.`]}
+      code={code}
+      error={error}
+      onCodeChange={handleCodeChange}
+      onSubmit={handleSubmit}
+      codeLoading={isSubmitting}
+      leaveText={leaveText}
+      onLeave={leave}
+      isLeaving={isLeaving}
+      leaveDisabled={isSubmitting}
+      submitLoading={isSubmitting}
+      submitDisabled={isLeaving}
+    />
   );
 };

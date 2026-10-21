@@ -108,6 +108,7 @@ import { IconReport } from './icons/IconReport';
 import { IconRequest } from './icons/IconRequest';
 import { IconRules } from './icons/IconRules';
 import { IconSearch } from './icons/IconSearch';
+import { IconSent } from './icons/IconSent';
 import { IconServers } from './icons/IconServers';
 import { IconServiceUnavailable } from './icons/IconServiceUnavailable';
 import { IconSettings } from './icons/IconSettings';
@@ -465,6 +466,8 @@ export const Icon = <T extends IconKindValue>({
         return IconDisconnectAll;
       case 'report':
         return IconReport;
+      case 'sent':
+        return IconSent;
     }
   }, [iconKind]);
 

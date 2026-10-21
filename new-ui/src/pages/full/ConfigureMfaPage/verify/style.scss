@@ -41,13 +41,4 @@
     padding: var(--spacing-2xl) 0 var(--spacing-3xl);
     box-sizing: border-box;
   }
-
-  .code-track {
-    padding-bottom: var(--spacing-3xl);
-
-    .code-input > .inputs-grid {
-      width: fit-content;
-      justify-content: flex-start;
-    }
-  }
 }

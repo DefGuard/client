@@ -8,7 +8,9 @@ import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { CopyField } from '../../../../../shared/components/CopyField/CopyField';
 import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { QrCard } from '../../../../../shared/components/QrCard/QrCard';
+import { ResendEmailButton } from '../../../../../shared/components/ResendEmailButton/ResendEmailButton';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
+import { useResendCooldown } from '../../../../../shared/hooks/useResendCooldown';
 import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
@@ -40,6 +42,11 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const {
+    sent,
+    restart: restartCooldown,
+    reset: resetCooldown,
+  } = useResendCooldown(false);
 
   const handleApiError = useMfaConfigErrorHandler({
     context: `MFA configuration of ${method} failed`,
@@ -55,9 +62,13 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
       }
       return api.mfaConfigSetupStart(sessionId, method);
     },
-    onError: (err) => handleApiError(err, () => startSetup()),
+    onError: (err) => {
+      resetCooldown();
+      handleApiError(err, () => startSetup());
+    },
     onSuccess: (result) => {
       setTotpSecret(result.totp_secret);
+      if (method === MfaMethod.Email) restartCooldown();
     },
   });
 
@@ -72,8 +83,9 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
     setTotpSecret(null);
     setCode(null);
     setError(null);
+    if (method === MfaMethod.Email) restartCooldown();
     startSetup();
-  }, [sessionId, method, startSetup]);
+  }, [sessionId, method, startSetup, restartCooldown]);
 
   const { mutate: finishSetup, isPending: isFinishingSetup } = useMutation({
     mutationFn: async (value: string) => {
@@ -110,6 +122,13 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
     },
     [code, finishSetup, isBusy],
   );
+
+  const handleResend = useCallback(() => {
+    if (isBusy) return;
+    setCode(null);
+    setError(null);
+    startSetup();
+  }, [isBusy, startSetup]);
 
   // Only real input clears the error, CodeInput's own reset passes ''.
   const handleCodeChange = useCallback((value: string) => {
@@ -159,6 +178,14 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
           }}
         />
         <div className="right">
+          {!isTotp && (
+            <ResendEmailButton
+              sent={sent}
+              loading={isStartingSetup}
+              disabled={isFinishingSetup || isCancelling}
+              onClick={handleResend}
+            />
+          )}
           <Button
             text="Configure"
             variant={ButtonVariant.Primary}

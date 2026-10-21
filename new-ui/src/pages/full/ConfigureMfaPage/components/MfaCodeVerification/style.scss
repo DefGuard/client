@@ -1,0 +1,33 @@
+.mfa-code-verification {
+  padding: var(--spacing-md) var(--spacing-lg);
+
+  & > .content {
+    --icon-color: var(--fg-white-50);
+
+    display: flex;
+    flex: 1;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+
+    & > .title {
+      padding-top: var(--spacing-2xl);
+      color: var(--fg-white-100);
+      font: var(--t-h4);
+    }
+
+    & > .description {
+      display: flex;
+      flex-flow: column;
+      padding: var(--spacing-sm) 0 var(--spacing-2xl);
+      color: var(--fg-white-70);
+      font: var(--t-body-sm-400);
+
+      span {
+        color: inherit;
+        font: inherit;
+      }
+    }
+  }
+}
