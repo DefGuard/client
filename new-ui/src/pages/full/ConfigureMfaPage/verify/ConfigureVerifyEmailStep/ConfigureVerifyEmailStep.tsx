@@ -10,19 +10,22 @@ import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
+import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
 import '../style.scss';
 
 const CODE_LENGTH = 6;
 
 interface Props {
+  onCancel: () => void;
   /** The session outlived its deadline, so the whole flow has to start over. */
   onSessionExpired: () => void;
 }
 
 /** The fallback when no factor exists, or email picked from the configured code factors. */
-export const ConfigureVerifyEmailStep = ({ onSessionExpired }: Props) => {
+export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) => {
   const sessionId = useConfigureMfaStore((s) => s.sessionId);
+  const { leaveText, leave, isLeaving } = useLeaveVerification(onCancel);
 
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -124,26 +127,25 @@ export const ConfigureVerifyEmailStep = ({ onSessionExpired }: Props) => {
       </div>
       <Controls>
         <Button
-          text="Back"
+          text={leaveText}
           variant={ButtonVariant.Secondary}
+          loading={isLeaving}
           disabled={isSubmitting}
-          onClick={() => {
-            useConfigureMfaStore.getState().backFromVerification();
-          }}
+          onClick={leave}
         />
         <div className="right">
           <Button
             text="Resend code"
             variant={ButtonVariant.Secondary}
             loading={isRequestingCode}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLeaving}
             onClick={handleResend}
           />
           <Button
             text="Verify"
             variant={ButtonVariant.Primary}
             loading={isSubmitting}
-            disabled={isRequestingCode}
+            disabled={isRequestingCode || isLeaving}
             onClick={() => {
               handleSubmit();
             }}

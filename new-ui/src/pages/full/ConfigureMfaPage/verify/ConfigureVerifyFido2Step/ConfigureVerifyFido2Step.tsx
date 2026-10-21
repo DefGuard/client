@@ -9,15 +9,17 @@ import { Fido2TouchPrompt } from '../../../../../shared/components/LocationCard/
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { fido2CollectsPinInApp } from '../../../../../shared/rust-api/fido2';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
+import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useConfigureVerifyFido2 } from './useConfigureVerifyFido2';
 import '../style.scss';
 
 interface Props {
+  onCancel: () => void;
   onSessionExpired: () => void;
 }
 
-export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
+export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) => {
+  const { leaveText, leave, isLeaving } = useLeaveVerification(onCancel);
   const collectsPin = fido2CollectsPinInApp();
   const [pin, setPin] = useState<string | null>(null);
   const { verify, abort, isVerifying, isAwaitingTouch, error, setError } =
@@ -36,10 +38,10 @@ export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
     void verify(pin);
   };
 
-  const handleBack = async () => {
+  const handleLeave = async () => {
     // Core holds one pending attempt per session, so abort it before another method starts
     await abort();
-    useConfigureMfaStore.getState().backFromVerification();
+    leave();
   };
 
   return (
@@ -84,10 +86,11 @@ export const ConfigureVerifyFido2Step = ({ onSessionExpired }: Props) => {
       )}
       <Controls>
         <Button
-          text="Back"
+          text={leaveText}
           variant={ButtonVariant.Secondary}
+          loading={isLeaving}
           onClick={() => {
-            void handleBack();
+            void handleLeave();
           }}
         />
         <div className="right">

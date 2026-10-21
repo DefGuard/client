@@ -27,12 +27,10 @@ export const useConfigureMfaSessionExpired = (): (() => void) => {
 export const ConfigureMfaTimeoutProvider = ({ children }: PropsWithChildren) => {
   const [expired, setExpired] = useState(false);
   const deadline = useConfigureMfaStore((s) => s.deadline);
-  // Picking only the email fallback opens on Finish before verification, hence the auth check.
   const settled = useConfigureMfaStore(
     (s) =>
-      s.authorized &&
-      (s.activeStep === ConfigureMfaStep.RecoveryCodes ||
-        s.activeStep === ConfigureMfaStep.Finish),
+      s.activeStep === ConfigureMfaStep.RecoveryCodes ||
+      s.activeStep === ConfigureMfaStep.Finish,
   );
 
   const expire = useCallback(() => setExpired(true), []);

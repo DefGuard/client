@@ -39,10 +39,10 @@ type StoreValues = {
   configuredMethods: MfaMethodValue[];
   /** Factors this run has set up, which is what the wizard steps through. */
   completedMethods: MfaMethodValue[];
-  /** Null until the selection step is done. Empty is valid, the email fallback configures
-   *  a factor on its own. */
+  /** Null until the selection step, which follows authorization, is done. Empty is valid,
+   *  the email fallback configures a factor on its own. */
   selectedMethods: MfaMethodValue[] | null;
-  /** Pre-ticked in the selection step, from the entry point or an earlier pass. */
+  /** Pre-ticked in the selection step, from the entry point. */
   initialSelection: MfaMethodValue[];
   /** most preferred first, from the session since an older Core rejects some factors */
   verificationMethods: MfaVerificationMethod[];
@@ -137,8 +137,6 @@ interface Store extends StoreValues {
   ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
   selectVerificationMethod: (method: MfaVerificationMethod) => void;
-  /** Keeps the current picks ticked and the session alive. */
-  backToSelection: () => void;
   backFromVerification: () => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
@@ -186,46 +184,22 @@ export const useConfigureMfaStore = create<Store>()(
           return {
             selectedMethods: methods,
             activeStep: firstStep(next),
-            // picked after a late authorization, so the deadline was kept for it
-            ...(current.authorized && {
-              deadline: sessionDeadline(next, current.deadline),
-            }),
+            deadline: sessionDeadline(next, current.deadline),
           };
         });
       },
       selectVerificationMethod: (method) => {
         set({ verificationMethod: method });
       },
-      backToSelection: () => {
-        set((current) => ({
-          initialSelection: current.selectedMethods ?? current.initialSelection,
-          selectedMethods: null,
-          verificationMethod: null,
-          activeStep: defaults.activeStep,
-        }));
-      },
       backFromVerification: () => {
-        if (isPresent(get().verificationMethod)) {
-          set({ verificationMethod: null });
-          return;
-        }
-        get().backToSelection();
+        set({ verificationMethod: null });
       },
       authorize: (response) => {
-        set((current) => {
-          const deadline = dayjs.unix(response.deadline_timestamp).toISOString();
-          // a late answer can land after Back, the steps wait for its Continue
-          if (!isPresent(current.selectedMethods)) {
-            return { authorized: true, recoveryCodes: response.recovery_codes, deadline };
-          }
-          // The fallback enables email as it verifies, so only this authorization issues codes.
-          const next = { ...current, recoveryCodes: response.recovery_codes };
-          return {
-            authorized: true,
-            recoveryCodes: response.recovery_codes,
-            deadline: sessionDeadline(next, deadline),
-            activeStep: firstStep(next),
-          };
+        // The fallback enables email as it verifies, so only this authorization issues codes.
+        set({
+          authorized: true,
+          recoveryCodes: response.recovery_codes,
+          deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
         });
       },
       factorConfigured: (method, recoveryCodes) => {
@@ -263,7 +237,7 @@ export const useConfigureMfaStore = create<Store>()(
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
       // Bumped on every shape change: a stored session is never resumable across one.
-      version: 13,
+      version: 14,
     },
   ),
 );

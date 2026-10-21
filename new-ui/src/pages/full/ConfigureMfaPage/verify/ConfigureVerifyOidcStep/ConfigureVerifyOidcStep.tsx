@@ -7,14 +7,17 @@ import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { findOpenIdProvider, openIdProviderName } from '../../../../../shared/utils/mfa';
 import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
+import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useConfigureVerifyOidc } from './useConfigureVerifyOidc';
 import '../style.scss';
 
 interface Props {
+  onCancel: () => void;
   onSessionExpired: () => void;
 }
 
-export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
+export const ConfigureVerifyOidcStep = ({ onCancel, onSessionExpired }: Props) => {
+  const { leaveText, leave, isLeaving } = useLeaveVerification(onCancel);
   const instance = useConfigureMfaStore((s) => s.instance) ?? undefined;
   const providerName = openIdProviderName(instance);
   const { start, abort, isOpening, isPolling, error } = useConfigureVerifyOidc({
@@ -22,10 +25,10 @@ export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
     autoStart: false,
   });
 
-  const handleBack = async () => {
+  const handleLeave = async () => {
     // Core holds one pending attempt per session, so abort it before another method starts
     await abort();
-    useConfigureMfaStore.getState().backFromVerification();
+    leave();
   };
 
   return (
@@ -56,10 +59,11 @@ export const ConfigureVerifyOidcStep = ({ onSessionExpired }: Props) => {
       </div>
       <Controls>
         <Button
-          text="Back"
+          text={leaveText}
           variant={ButtonVariant.Secondary}
+          loading={isLeaving}
           onClick={() => {
-            void handleBack();
+            void handleLeave();
           }}
         />
       </Controls>
