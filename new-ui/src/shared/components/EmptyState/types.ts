@@ -17,6 +17,7 @@ export type EmptyStateProps = {
 export const EmptyIcon = {
   SessionTimeout: 'session-timeout',
   ServiceUnavailable: 'service-unavailable',
+  Locations: 'locations',
 } as const;
 
 export type EmptyIconValue = (typeof EmptyIcon)[keyof typeof EmptyIcon];

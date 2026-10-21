@@ -7,6 +7,7 @@ import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Controls } from '../../../shared/components/Controls/Controls';
 import { Divider } from '../../../shared/components/Divider/Divider';
 import { LocationCard } from '../../../shared/components/LocationCard/LocationCard';
+import { LocationsEmptyState } from '../../../shared/components/LocationsEmptyState/LocationsEmptyState';
 import { ScrollContainer } from '../../../shared/components/ScrollContainer/ScrollContainer';
 import { WindowHeader } from '../../../shared/components/WindowHeader/WindowHeader';
 import { useAppData } from '../../../shared/providers/AppDataContext';
@@ -60,6 +61,9 @@ export const CompactLocationsPage = () => {
     return tunnel ? [tunnel] : [];
   }, [selection, locations, routeData.locations, allTunnels]);
 
+  const showEmptyLocations =
+    selection?.kind !== 'tunnel' && displayedLocations.length === 0;
+
   useEffect(() => {
     if (selection?.kind === 'tunnel') return;
     if (selection === null || instanceInfo === undefined) {
@@ -78,28 +82,31 @@ export const CompactLocationsPage = () => {
       <WindowHeader variant="compact" />
       <InstanceSwitcher />
       <ScrollContainer>
-        <div className="locations">
-          {displayedLocations.map((location) => {
-            const isOpen =
-              location.id === openLocation || displayedLocations.length === 1;
-            return (
-              <LocationCard
-                instance={instanceInfo}
-                disableOpen={displayedLocations.length <= 1}
-                location={location}
-                key={`${location.connection_type}-${location.id}`}
-                isOpen={isOpen}
-                onOpen={() => {
-                  if (isOpen) {
-                    useAppStore.setState({ expandedLocation: null });
-                  } else {
-                    useAppStore.setState({ expandedLocation: location.id });
-                  }
-                }}
-              />
-            );
-          })}
-        </div>
+        {showEmptyLocations && <LocationsEmptyState />}
+        {!showEmptyLocations && (
+          <div className="locations">
+            {displayedLocations.map((location) => {
+              const isOpen =
+                location.id === openLocation || displayedLocations.length === 1;
+              return (
+                <LocationCard
+                  instance={instanceInfo}
+                  disableOpen={displayedLocations.length <= 1}
+                  location={location}
+                  key={`${location.connection_type}-${location.id}`}
+                  isOpen={isOpen}
+                  onOpen={() => {
+                    if (isOpen) {
+                      useAppStore.setState({ expandedLocation: null });
+                    } else {
+                      useAppStore.setState({ expandedLocation: location.id });
+                    }
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
       </ScrollContainer>
       <div className="compact-footer">
         <Divider spacing={ThemeSpacing.Md} />

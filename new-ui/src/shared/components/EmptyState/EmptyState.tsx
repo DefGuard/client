@@ -4,6 +4,7 @@ import { ThemeSpacing } from '../../types';
 import { isPresent } from '../../utils/isPresent';
 import { Button } from '../Button/Button';
 import { SizedBox } from '../SizedBox/SizedBox';
+import { EmptyStateLocations } from './components/EmptyStateIcon/icons/EmptyStateLocations';
 import { EmptyStateServiceUnavailable } from './components/EmptyStateIcon/icons/EmptyStateServiceUnavailable';
 import { EmptyStateSessionTimeout } from './components/EmptyStateIcon/icons/EmptyStateSessionTimeout';
 import type { EmptyStateProps } from './types';
@@ -27,6 +28,8 @@ export const EmptyState = ({
         return <EmptyStateSessionTimeout />;
       case 'service-unavailable':
         return <EmptyStateServiceUnavailable />;
+      case 'locations':
+        return <EmptyStateLocations />;
     }
   };
 

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { platform } from '@tauri-apps/plugin-os';
 import clsx from 'clsx';
 import { Fragment, useMemo } from 'react';
+import { LocationsEmptyState } from '../../../shared/components/LocationsEmptyState/LocationsEmptyState';
 import { OverviewLocationCard } from '../../../shared/components/OverviewLocationCard/OverviewLocationCard';
 import { ScrollContainer } from '../../../shared/components/ScrollContainer/ScrollContainer';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
@@ -58,6 +59,9 @@ export const OverviewPage = () => {
     return selectedTunnel ? [selectedTunnel] : [];
   }, [selection, locations, selectedTunnel]);
 
+  const showEmptyLocations =
+    selection?.kind !== 'tunnel' && isPresent(locations) && locations.length === 0;
+
   return (
     <Fragment>
       <FullPage id="overview-page" hideScrollContainer>
@@ -84,19 +88,22 @@ export const OverviewPage = () => {
             </div>
             <SizedBox height={ThemeSpacing.Lg} />
             <ScrollContainer>
-              <div className="locations">
-                {displayedLocations.map((location) => {
-                  const instance: InstanceInfo | undefined =
-                    selection?.kind === 'instance' ? selectedInstance : undefined;
-                  return (
-                    <OverviewLocationCard
-                      location={location}
-                      instance={instance}
-                      key={location.id}
-                    />
-                  );
-                })}
-              </div>
+              {showEmptyLocations && <LocationsEmptyState />}
+              {!showEmptyLocations && (
+                <div className="locations">
+                  {displayedLocations.map((location) => {
+                    const instance: InstanceInfo | undefined =
+                      selection?.kind === 'instance' ? selectedInstance : undefined;
+                    return (
+                      <OverviewLocationCard
+                        location={location}
+                        instance={instance}
+                        key={location.id}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </ScrollContainer>
           </div>
         </div>
