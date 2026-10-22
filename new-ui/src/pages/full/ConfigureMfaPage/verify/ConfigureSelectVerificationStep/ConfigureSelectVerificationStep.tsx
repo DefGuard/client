@@ -4,9 +4,9 @@ import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
 import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/FullPageTitle';
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
+import type { ClientAuthorizingMethod } from '../../../../../shared/utils/mfa';
 import { ConfigureMfaVerificatorFactorSelector } from '../../components/ConfigureMfaVerificatorFactorSelector/ConfigureMfaVerificatorFactorSelector';
 import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
-import type { MfaVerificationMethod } from '../../types';
 import '../style.scss';
 import './style.scss';
 
@@ -14,7 +14,9 @@ import './style.scss';
 export const ConfigureSelectVerificationStep = () => {
   const methods = useConfigureMfaStore((s) => s.verificationMethods);
 
-  const [selected, setSelected] = useState<MfaVerificationMethod | undefined>(methods[0]);
+  const [selected, setSelected] = useState<ClientAuthorizingMethod | undefined>(
+    methods[0],
+  );
 
   return (
     <FullPage

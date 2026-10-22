@@ -224,14 +224,16 @@ export const isMfaMethodLocked = (
   );
 };
 
-/** What this client can authorize an MFA configuration session with. Mirrors
- *  AUTHORIZING_METHODS in core mfa_config.rs. */
-const clientAuthorizingMethods: MfaMethodValue[] = [
+/** What this client can authorize an MFA configuration session with, most preferred first.
+ *  Mirrors AUTHORIZING_METHODS in core mfa_config.rs. */
+export const CLIENT_AUTHORIZING_METHODS = [
   MfaMethod.Totp,
   MfaMethod.Email,
   MfaMethod.Fido2,
   MfaMethod.Oidc,
-];
+] as const;
+
+export type ClientAuthorizingMethod = (typeof CLIENT_AUTHORIZING_METHODS)[number];
 
 export type MfaConfigInstance = Pick<InstanceInfo, 'mfa_configured_methods'> &
   MfaCapabilitiesInstance;
@@ -243,7 +245,7 @@ export type MfaConfigInstance = Pick<InstanceInfo, 'mfa_configured_methods'> &
 export const canAuthorizeMfaConfig = (instance?: MfaConfigInstance | null): boolean => {
   const authorizeMethods = instance?.mfa_capabilities?.authorize_methods ?? [];
   const configuredMethods = instance?.mfa_configured_methods ?? [];
-  const holdsAuthorizer = clientAuthorizingMethods.some(
+  const holdsAuthorizer = CLIENT_AUTHORIZING_METHODS.some(
     (method) =>
       authorizeMethods.includes(method) &&
       configuredMethods.includes(method) &&

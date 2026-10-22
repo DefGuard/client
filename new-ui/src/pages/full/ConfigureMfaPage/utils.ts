@@ -4,7 +4,9 @@ import {
   type MfaMethodValue,
 } from '../../../shared/rust-api/types';
 import {
+  CLIENT_AUTHORIZING_METHODS,
   CLIENT_CONFIGURABLE_METHODS,
+  type ClientAuthorizingMethod,
   type ClientConfigurableMethod,
 } from '../../../shared/utils/mfa';
 import {
@@ -12,8 +14,6 @@ import {
   type ConfigureMfaStepValue,
   MFA_WIZARD_STEPS,
   type MfaFactor,
-  type MfaVerificationMethod,
-  mfaVerificationMethods,
 } from './types';
 
 /** Keyed on the shared list, so a new factor fails to compile until mapped here. */
@@ -64,13 +64,13 @@ export const isCodeMfaMethod = (method: MfaMethodValue): boolean =>
 /** ordered by preference, not by the input */
 export const verificationMethodsOf = (
   availableMethods: MfaMethodValue[],
-): MfaVerificationMethod[] =>
-  mfaVerificationMethods.filter((method) => availableMethods.includes(method));
+): ClientAuthorizingMethod[] =>
+  CLIENT_AUTHORIZING_METHODS.filter((method) => availableMethods.includes(method));
 
 /** The fallback mails a code to the address on file, so email is the only way in. */
 export const sessionVerificationMethodsOf = (
   response: Pick<MfaConfigStartResult, 'email_fallback' | 'available_methods'>,
-): MfaVerificationMethod[] =>
+): ClientAuthorizingMethod[] =>
   verificationMethodsOf(
     response.email_fallback ? [MfaMethod.Email] : response.available_methods,
   );
