@@ -77,6 +77,9 @@ ignore = [
     { id = "RUSTSEC-2026-0347", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; ECH not used" },
     { id = "RUSTSEC-2026-0348", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; brotli cert compression feature not enabled" },
     { id = "RUSTSEC-2026-0349", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; PQ key exchange downgrade, no key compromise" },
+    { id = "RUSTSEC-2026-0381", reason = "webpki-roots <1.0.10 pulled by reqwest/hyper-rustls; distrusted emSign root, fixed by lockfile update" },
+    { id = "RUSTSEC-2026-0382", reason = "rustls-webpki <0.103.16 pulled by rustls; distrusted emSign intermediates, fixed by lockfile update" },
+    { id = "RUSTSEC-2026-0383", reason = "webpki-root-certs <1.0.10 pulled by rustls-platform-verifier; distrusted emSign root, fixed by lockfile update" },
     # The "unmaintained" advisories below stem from our use of Tauri v2, which
     # depends on GTK3 bindings that are no longer maintained.
     { id = "RUSTSEC-2024-0370", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
