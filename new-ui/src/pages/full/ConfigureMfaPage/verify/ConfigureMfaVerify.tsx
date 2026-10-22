@@ -2,6 +2,7 @@ import { MfaMethod } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
 import { useConfigureMfaStore } from '../hooks/useConfigureMfaStore';
 import type { MfaVerificationMethod } from '../types';
+import { showsVerificationPicker } from '../utils';
 import { ConfigureSelectVerificationStep } from './ConfigureSelectVerificationStep/ConfigureSelectVerificationStep';
 import { ConfigureVerifyEmailStep } from './ConfigureVerifyEmailStep/ConfigureVerifyEmailStep';
 import { ConfigureVerifyFido2Step } from './ConfigureVerifyFido2Step/ConfigureVerifyFido2Step';
@@ -18,7 +19,7 @@ export const ConfigureMfaVerify = ({ onCancel, onSessionExpired }: Props) => {
   const candidates = useConfigureMfaStore((s) => s.verificationMethods);
   const verificationMethod = useConfigureMfaStore((s) => s.verificationMethod);
 
-  if (candidates.length > 1 && !isPresent(verificationMethod)) {
+  if (showsVerificationPicker(candidates) && !isPresent(verificationMethod)) {
     return <ConfigureSelectVerificationStep onCancel={onCancel} />;
   }
 

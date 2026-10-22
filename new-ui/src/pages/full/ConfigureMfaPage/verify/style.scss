@@ -32,13 +32,4 @@
     padding-top: var(--spacing-xl);
     box-sizing: border-box;
   }
-
-  & > .oidc-action {
-    display: flex;
-    flex-flow: row nowrap;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-2xl) 0 var(--spacing-3xl);
-    box-sizing: border-box;
-  }
 }

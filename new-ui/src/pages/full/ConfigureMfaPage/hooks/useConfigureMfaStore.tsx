@@ -48,6 +48,8 @@ type StoreValues = {
   verificationMethods: MfaVerificationMethod[];
   /** null until picked, asked only when the session offers more than one method */
   verificationMethod: MfaVerificationMethod | null;
+  /** set when a method fails after the picker handed off to it, shown back on the picker */
+  verificationError: string | null;
   /** No factor was configured, so an emailed code was the only way in. */
   emailFallback: boolean;
   /** ISO timestamp the session dies at, null once nothing in the flow needs it. */
@@ -118,6 +120,7 @@ const defaults: StoreValues = {
   initialSelection: [],
   verificationMethods: [],
   verificationMethod: null,
+  verificationError: null,
   emailFallback: false,
   deadline: null,
   authorized: false,
@@ -137,7 +140,7 @@ interface Store extends StoreValues {
   ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
   selectVerificationMethod: (method: MfaVerificationMethod) => void;
-  backFromVerification: () => void;
+  backFromVerification: (error?: string) => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
   factorConfigured: (method: MfaMethodValue, recoveryCodes: string[]) => void;
@@ -189,10 +192,10 @@ export const useConfigureMfaStore = create<Store>()(
         });
       },
       selectVerificationMethod: (method) => {
-        set({ verificationMethod: method });
+        set({ verificationMethod: method, verificationError: null });
       },
-      backFromVerification: () => {
-        set({ verificationMethod: null });
+      backFromVerification: (error) => {
+        set({ verificationMethod: null, verificationError: error ?? null });
       },
       authorize: (response) => {
         // The fallback enables email as it verifies, so only this authorization issues codes.
@@ -237,7 +240,7 @@ export const useConfigureMfaStore = create<Store>()(
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
       // Bumped on every shape change: a stored session is never resumable across one.
-      version: 14,
+      version: 15,
     },
   ),
 );

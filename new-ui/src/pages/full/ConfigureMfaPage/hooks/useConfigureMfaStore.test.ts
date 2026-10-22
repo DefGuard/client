@@ -89,6 +89,19 @@ describe('applyAuthorization', () => {
     expect(useConfigureMfaStore.getState().verificationMethod).toBeNull();
   });
 
+  it('keeps a failed method error for the picker until the next pick', () => {
+    useConfigureMfaStore.getState().selectVerificationMethod(MfaMethod.Oidc);
+    useConfigureMfaStore.getState().backFromVerification('Sign-in timed out, try again.');
+
+    let state = useConfigureMfaStore.getState();
+    expect(state.verificationMethod).toBeNull();
+    expect(state.verificationError).toBe('Sign-in timed out, try again.');
+
+    useConfigureMfaStore.getState().selectVerificationMethod(MfaMethod.Email);
+    state = useConfigureMfaStore.getState();
+    expect(state.verificationError).toBeNull();
+  });
+
   it('drops an answer for another session', () => {
     applyAuthorization('session-2', authorizeResult);
 
