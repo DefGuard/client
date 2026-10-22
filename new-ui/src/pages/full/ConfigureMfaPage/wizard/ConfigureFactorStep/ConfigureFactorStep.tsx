@@ -15,6 +15,7 @@ import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
+import { mfaToText } from '../../../../../shared/utils/mfa';
 import {
   discardMfaConfiguration,
   selectPendingMethod,
@@ -144,7 +145,7 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
   return (
     <div id="configure-factor-step" className="step-content">
       <header>
-        <h1>Configure MFA</h1>
+        <h1>Configure {mfaToText(method)}</h1>
         <p>
           {isTotp
             ? `Scan this QR code using an authenticator app (Google Auth, Microsoft Auth etc)`

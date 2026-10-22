@@ -1,6 +1,8 @@
 import { type ReactNode, useMemo } from 'react';
 import type { WizardPageStep } from '../../../../shared/components/wizard/types';
 import { WizardPage } from '../../../../shared/components/wizard/WizardPage/WizardPage';
+import { MfaMethod } from '../../../../shared/rust-api/types';
+import { mfaToText } from '../../../../shared/utils/mfa';
 import { useConfigureMfaStore } from '../hooks/useConfigureMfaStore';
 import { ConfigureMfaStep, type ConfigureMfaStepValue } from '../types';
 import { mfaStepsOf } from '../utils';
@@ -30,7 +32,9 @@ export const ConfigureMfaWizard = ({ onCancel, onSessionExpired }: Props) => {
       [ConfigureMfaStep.Configuration]: {
         id: ConfigureMfaStep.Configuration,
         order: 1,
-        label: 'MFA Configuration',
+        label: mfaToText(
+          selectedMethods?.includes(MfaMethod.Totp) ? MfaMethod.Totp : MfaMethod.Email,
+        ),
         hidden: !selectedSteps.includes(ConfigureMfaStep.Configuration),
       },
       [ConfigureMfaStep.Fido2]: {
@@ -51,7 +55,7 @@ export const ConfigureMfaWizard = ({ onCancel, onSessionExpired }: Props) => {
         label: 'Finish',
       },
     }),
-    [hasRecoveryCodes, selectedSteps],
+    [hasRecoveryCodes, selectedMethods, selectedSteps],
   );
 
   const stepComponents = useMemo(
