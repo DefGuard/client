@@ -13,14 +13,12 @@ import {
   type MfaMethodValue,
 } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
-import { setupMethodsOf } from '../../../../shared/utils/mfa';
-import { dismissEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
 import {
-  ConfigureMfaStep,
-  type ConfigureMfaStepValue,
-  MFA_WIZARD_STEPS,
-  type MfaVerificationMethod,
-} from '../types';
+  type ClientAuthorizingMethod,
+  setupMethodsOf,
+} from '../../../../shared/utils/mfa';
+import { dismissEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
+import { ConfigureMfaStep, type ConfigureMfaStepValue, MFA_WIZARD_STEPS } from '../types';
 import {
   isCodeMfaMethod,
   isMfaFactorOfferable,
@@ -45,9 +43,9 @@ type StoreValues = {
   /** Pre-ticked in the selection step, from the entry point or an earlier pass. */
   initialSelection: MfaMethodValue[];
   /** most preferred first, from the session since an older Core rejects some factors */
-  verificationMethods: MfaVerificationMethod[];
+  verificationMethods: ClientAuthorizingMethod[];
   /** null until picked, asked only when the session offers more than one method */
-  verificationMethod: MfaVerificationMethod | null;
+  verificationMethod: ClientAuthorizingMethod | null;
   /** No factor was configured, so an emailed code was the only way in. */
   emailFallback: boolean;
   /** ISO timestamp the session dies at, null once nothing in the flow needs it. */
@@ -136,7 +134,7 @@ interface Store extends StoreValues {
     origin: ConfigureMfaOrigin,
   ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
-  selectVerificationMethod: (method: MfaVerificationMethod) => void;
+  selectVerificationMethod: (method: ClientAuthorizingMethod) => void;
   /** Keeps the current picks ticked and the session alive. */
   backToSelection: () => void;
   backFromVerification: () => void;

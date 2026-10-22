@@ -153,9 +153,6 @@ exceptions = [
     ], crate = "defguard-client-core" },
     { allow = [
         "AGPL-3.0-or-later",
-    ], crate = "defguard-client-fido2" },
-    { allow = [
-        "AGPL-3.0-or-later",
     ], crate = "defguard-client-service" },
     { allow = [
         "AGPL-3.0-or-later",
@@ -175,6 +172,9 @@ exceptions = [
     { allow = [
         "LicenseRef-Proprietary",
     ], crate = "defguard-client-service-locations" },
+    { allow = [
+        "LicenseRef-Proprietary",
+    ], crate = "defguard-client-fido2" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

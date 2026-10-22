@@ -26,6 +26,7 @@ import {
   isClientConfigurableMethod,
   isDesktopDrivableMethod,
   isMfaMethodAvailable,
+  isMfaMethodLocked,
   mfaStepsOf as locationMfaSteps,
   mfaToText,
   setupMethodsOf,
@@ -46,6 +47,8 @@ type MethodRowState = {
   badge?: string;
   /** Why the row is disabled, shown on hover when the badge alone is too terse. */
   hint: string | null;
+  /** The instance withholds the factor. */
+  locked: boolean;
 };
 
 interface Props {
@@ -113,10 +116,11 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       const configured = accountConfigured.includes(method);
       const available = isMfaMethodAvailable(method, instance);
       const satisfied = configuredMethods.includes(method) && available;
+      const locked = isMfaMethodLocked(method, instance);
 
       let hint: string | null = null;
       let badge: string | undefined;
-      if (!available) {
+      if (!available || locked) {
         hint = `${mfaToText(method, instance ?? undefined)} is not available on this Defguard instance.`;
         badge = 'Unavailable';
       } else if (disabled && !configured) {
@@ -145,6 +149,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         disabled,
         badge,
         hint,
+        locked,
       };
     },
     [accountConfigured, configuredMethods, setupMethods, selected, instance],
@@ -201,9 +206,11 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     useConfigureMfaStore.getState().selectMethods(selected);
   }, [selected, emailFallback, isLocationAware, locationSteps, isStepSatisfied]);
 
-  /** Without `explained` the row drops its badge and hint, leaving the reason to its section. */
-  const renderMethod = (method: MfaMethodValue, explained: boolean) => {
-    const { checked, disabled, badge, hint } = describeMethod(method);
+  /** Without `sectionExplained` the row drops its badge and hint, leaving the reason to its section. */
+  const renderMethod = (method: MfaMethodValue, sectionExplained: boolean) => {
+    const { checked, disabled, badge, hint, locked } = describeMethod(method);
+    // The "Not configurable" section text blames version incompatibility, so a withheld row says it.
+    const explained = sectionExplained || locked;
     const row = (
       <FactorSelector
         key={method}
