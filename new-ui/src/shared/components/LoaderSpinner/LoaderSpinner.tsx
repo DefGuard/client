@@ -1,24 +1,54 @@
-import clsx from 'clsx';
-import { Icon } from '../Icon';
 import './style.scss';
-import { useMemo } from 'react';
+import clsx from 'clsx';
 
 type Props = {
   size?: number;
+  thickness?: number;
   variant?: 'empty' | 'primary';
 };
 
-export const LoaderSpinner = ({ size = 20, variant }: Props) => {
-  const variantClass = useMemo(() => (variant ? `variant-${variant}` : null), [variant]);
+const outerRadiusRatio = 0.4;
+const indicatorArcRatio = 0.265;
+const indicatorStartDeg = 62;
+
+export const LoaderSpinner = ({ size = 20, thickness = 2, variant }: Props) => {
+  const center = size / 2;
+  const radius = size * outerRadiusRatio - thickness / 2;
+  const circumference = 2 * Math.PI * radius;
+  const arc = circumference * indicatorArcRatio;
+
   return (
     <div
-      className={clsx('loader-spinner', variantClass)}
+      className={clsx('loader-spinner', variant && `variant-${variant}`)}
       style={{
         height: size,
         width: size,
       }}
     >
-      <Icon icon="loader" size={size} />
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        fill="none"
+      >
+        <circle
+          className="track"
+          cx={center}
+          cy={center}
+          r={radius}
+          strokeWidth={thickness}
+        />
+        <circle
+          className="indicator"
+          cx={center}
+          cy={center}
+          r={radius}
+          strokeWidth={thickness}
+          strokeDasharray={`${arc} ${circumference}`}
+          transform={`rotate(${indicatorStartDeg} ${center} ${center})`}
+        />
+      </svg>
     </div>
   );
 };

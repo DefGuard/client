@@ -95,7 +95,7 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
         />
         <div className="right">
           <Button
-            text={collectsPin ? 'Verify' : 'Use security key'}
+            text="Verify"
             variant={ButtonVariant.Primary}
             loading={isVerifying}
             onClick={handleVerify}

@@ -100,7 +100,7 @@ export const ConnectModalMfaFido2 = () => {
         )}
         <div className="right">
           <Button
-            text={collectsPin ? 'Verify' : 'Use security key'}
+            text="Verify"
             variant={ButtonVariant.Primary}
             onClick={handleVerify}
             loading={isVerifying}

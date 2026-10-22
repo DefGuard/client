@@ -1,0 +1,28 @@
+.playground-test-loader-spinner {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  gap: var(--spacing-xl);
+
+  h3 {
+    margin: 0;
+    font: var(--t-body-sm-600);
+  }
+
+  .row {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: flex-end;
+    justify-content: center;
+    gap: var(--spacing-3xl);
+  }
+
+  .item {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font: var(--t-body-xs-400);
+    color: var(--fg-muted);
+  }
+}
