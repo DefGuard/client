@@ -316,9 +316,7 @@ pub async fn initiate_configure_factor_screen(
             error!("initiate_configure_factor_screen: Failed to hide new-ui window: {err:?}");
         }
     }
-    let window = WindowManager::open_full_view(&app).map_err(tauri_err_to_app_err)?;
-    // The Windows `open_full_view` positions and shows the window, but never focuses it.
-    let _ = window.set_focus();
+    WindowManager::open_full_view(&app).map_err(tauri_err_to_app_err)?;
     app.emit_to(
         FULL_VIEW_WINDOW_ID,
         EventKey::ConfigureFactorsTrigger.into(),
