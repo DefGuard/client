@@ -19,6 +19,7 @@ import {
   isClientConfigurableMethod,
   isDesktopDrivableMethod,
   isMfaMethodAvailable,
+  isMfaMethodLocked,
   mfaStepsOf as locationMfaSteps,
   mfaToText,
   setupMethodsOf,
@@ -103,9 +104,10 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       const configured = accountConfigured.includes(method);
       const available = isMfaMethodAvailable(method, instance);
       const satisfied = configuredMethods.includes(method) && available;
+      const locked = isMfaMethodLocked(method, instance);
 
       let hint: string | null = null;
-      if (!available) {
+      if (!available || locked) {
         hint = `${mfaToText(method, instance ?? undefined)} is not available on this Defguard instance.`;
       } else if (disabled && !configured) {
         if (satisfied) {
@@ -128,6 +130,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         disabled,
         configured,
         hint,
+        locked,
       };
     },
     [accountConfigured, configuredMethods, setupMethods, selected, instance],

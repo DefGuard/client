@@ -1,4 +1,4 @@
-import { MfaMethod, type MfaMethodValue } from '../../../shared/rust-api/types';
+import type { MfaMethodValue } from '../../../shared/rust-api/types';
 
 /** Wizard steps, in the order they run. Setup steps are the ones a factor can claim. */
 export const ConfigureMfaStep = {
@@ -25,13 +25,3 @@ export type MfaFactor = {
   /** Whether the account can hold several of these, so it stays offerable once configured. */
   repeatable: boolean;
 };
-
-/** most preferred first */
-export const mfaVerificationMethods = [
-  MfaMethod.Totp,
-  MfaMethod.Email,
-  MfaMethod.Fido2,
-  MfaMethod.Oidc,
-] as const;
-
-export type MfaVerificationMethod = (typeof mfaVerificationMethods)[number];
