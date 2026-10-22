@@ -41,6 +41,10 @@ export const isSessionExpired = (message: string): boolean =>
 export const isTimeout = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'timeout';
 
+/** The user dismissed the prompt, which is not worth showing as an error. */
+export const isCancelled = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'cancelled';
+
 /** A submitted one-time code was rejected. */
 export const isInvalidCode = (message: string): boolean => {
   const normalized = message.trim().toLowerCase();

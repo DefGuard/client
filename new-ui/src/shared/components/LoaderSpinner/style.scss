@@ -7,20 +7,18 @@
     --spinner-indicator: var(--c-white-100);
   }
 
-  & > .icon {
+  & > svg {
+    display: block;
     animation: spin 1s ease-in-out infinite;
-  }
 
-  svg {
-    & > path {
-      stroke: var(--spinner-indicator);
-      fill: unset !important;
+    & > .track {
+      stroke: var(--spinner-track);
 
       @include animate(stroke);
     }
 
-    & > circle {
-      stroke: var(--spinner-track);
+    & > .indicator {
+      stroke: var(--spinner-indicator);
 
       @include animate(stroke);
     }

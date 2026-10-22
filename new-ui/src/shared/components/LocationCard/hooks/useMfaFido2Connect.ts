@@ -5,6 +5,7 @@ import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
 import { fido2ShowsTouchPrompt } from '../../../rust-api/fido2';
 import {
+  isCancelled,
   isConnectFailure,
   isMfaPostureError,
   isServiceUnavailable,
@@ -115,6 +116,7 @@ export const useMfaFido2Connect = (
                 isTimeout(event.payload.error) ||
                 isServiceUnavailable(event.payload.error);
               if (!retryable) setMfaToken(null);
+              if (isCancelled(event.payload.error)) return;
               void error(
                 `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
               );
