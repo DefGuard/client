@@ -22,7 +22,7 @@
   .subtitle {
     color: var(--fg-white-60);
     font: var(--t-body-xs-400);
-    max-width: 424px;
+    max-width: var(--subtitle-max-width, 424px);
   }
 
   .secondary-action {
