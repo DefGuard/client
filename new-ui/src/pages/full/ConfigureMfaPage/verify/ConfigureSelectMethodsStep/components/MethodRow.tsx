@@ -19,7 +19,7 @@ export type MethodRowState = {
   configured: boolean;
   /** Why the row is disabled, when a badge does not already say it. */
   hint: string | null;
-  /** The instance license does not allow the factor, so the hint shows a lock. */
+  /** The instance withholds the factor, so the hint shows a lock. */
   locked: boolean;
 };
 

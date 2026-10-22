@@ -15,7 +15,7 @@ import {
   connectionAbilityOf,
   hasMfaMethodChoice,
   isMfaMethodAvailable,
-  isMfaMethodLicenseLocked,
+  isMfaMethodLocked,
   mfaConfigurableInstances,
   resolveMfaStepPlan,
   setupMethodsOf,
@@ -123,24 +123,30 @@ describe('setupMethodsOf', () => {
   });
 });
 
-describe('isMfaMethodLicenseLocked', () => {
-  it('locks FIDO2 when Core leaves it out of the setup methods', () => {
+describe('isMfaMethodLocked', () => {
+  it('locks a client-configurable method Core leaves out of the setup methods', () => {
     const instance = {
       mfa_capabilities: capabilitiesOf([MfaMethod.Totp, MfaMethod.Email]),
     };
-    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, instance)).toBe(true);
-    expect(isMfaMethodLicenseLocked(MfaMethod.Totp, instance)).toBe(false);
+    expect(isMfaMethodLocked(MfaMethod.Fido2, instance)).toBe(true);
+    expect(isMfaMethodLocked(MfaMethod.Totp, instance)).toBe(false);
+    expect(isMfaMethodLocked(MfaMethod.Oidc, instance)).toBe(false);
+
+    const withoutTotp = {
+      mfa_capabilities: capabilitiesOf([MfaMethod.Email, MfaMethod.Fido2]),
+    };
+    expect(isMfaMethodLocked(MfaMethod.Totp, withoutTotp)).toBe(true);
   });
 
   it('does not lock FIDO2 when Core offers it or cannot configure from the client', () => {
     const offered = {
       mfa_capabilities: capabilitiesOf([MfaMethod.Totp, MfaMethod.Fido2]),
     };
-    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, offered)).toBe(false);
-    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, { mfa_capabilities: null })).toBe(
+    expect(isMfaMethodLocked(MfaMethod.Fido2, offered)).toBe(false);
+    expect(isMfaMethodLocked(MfaMethod.Fido2, { mfa_capabilities: null })).toBe(
       false,
     );
-    expect(isMfaMethodLicenseLocked(MfaMethod.Fido2, undefined)).toBe(false);
+    expect(isMfaMethodLocked(MfaMethod.Fido2, undefined)).toBe(false);
   });
 });
 
