@@ -4,6 +4,7 @@ import { Icon } from '../../../../../shared/components/Icon';
 import { RadioIndicator } from '../../../../../shared/components/RadioIndicator/RadioIndicator';
 import { mfaMethodIcon } from '../../../../../shared/consts';
 import { MfaMethod, type MfaMethodValue } from '../../../../../shared/rust-api/types';
+import { mfaToText } from '../../../../../shared/utils/mfa';
 
 type FactorText = {
   title: string;
@@ -24,7 +25,7 @@ const factorText = (method: MfaMethodValue): FactorText => {
       };
     case MfaMethod.Oidc:
       return {
-        title: 'OpenID sign-in',
+        title: mfaToText(MfaMethod.Oidc),
         description: `Sign in with your identity provider in the browser to confirm it's you.`,
       };
     case MfaMethod.Biometric:

@@ -7,6 +7,7 @@ import {
 } from './components/ConfigureMfaTimeoutProvider';
 import { useConfigureMfaStore } from './hooks/useConfigureMfaStore';
 import { ConfigureMfaVerify } from './verify/ConfigureMfaVerify';
+import { ConfigureSelectMethodsStep } from './verify/ConfigureSelectMethodsStep/ConfigureSelectMethodsStep';
 import { ConfigureMfaWizard } from './wizard/ConfigureMfaWizard';
 
 export const ConfigureMfaPage = () => {
@@ -19,10 +20,8 @@ export const ConfigureMfaPage = () => {
 
 const ConfigureMfaContent = () => {
   const navigate = useNavigate();
-  // a late authorization on the selection screen waits for the picks
-  const inWizard = useConfigureMfaStore(
-    (s) => s.authorized && isPresent(s.selectedMethods),
-  );
+  const authorized = useConfigureMfaStore((s) => s.authorized);
+  const methodsSelected = useConfigureMfaStore((s) => isPresent(s.selectedMethods));
   const handleSessionExpired = useConfigureMfaSessionExpired();
 
   const leave = useCallback(() => {
@@ -31,11 +30,12 @@ const ConfigureMfaContent = () => {
 
   return (
     <>
-      {inWizard && (
-        <ConfigureMfaWizard onCancel={leave} onSessionExpired={handleSessionExpired} />
-      )}
-      {!inWizard && (
+      {!authorized && (
         <ConfigureMfaVerify onCancel={leave} onSessionExpired={handleSessionExpired} />
+      )}
+      {authorized && !methodsSelected && <ConfigureSelectMethodsStep onCancel={leave} />}
+      {authorized && methodsSelected && (
+        <ConfigureMfaWizard onCancel={leave} onSessionExpired={handleSessionExpired} />
       )}
     </>
   );

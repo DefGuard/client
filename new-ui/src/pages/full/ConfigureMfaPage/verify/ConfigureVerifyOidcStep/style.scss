@@ -1,0 +1,28 @@
+#configure-verify-oidc-step {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100dvh - var(--window-decorations-height));
+  padding: var(--spacing-md) var(--spacing-lg);
+  box-sizing: border-box;
+
+  & > .content {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: flex-start;
+
+    & > .title {
+      text-align: center;
+      font: var(--t-h4);
+      color: var(--fg-white-100);
+    }
+
+    & > .subtitle {
+      text-align: center;
+      font: var(--t-body-sm-400);
+      color: var(--fg-white-70);
+    }
+  }
+}
