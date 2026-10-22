@@ -142,6 +142,7 @@ export const IconKind = {
   PlayFilled: 'play-filled',
   Question: 'question',
   Report: 'report',
+  Sent: 'sent',
 } as const;
 
 export type IconKindValue = (typeof IconKind)[keyof typeof IconKind];

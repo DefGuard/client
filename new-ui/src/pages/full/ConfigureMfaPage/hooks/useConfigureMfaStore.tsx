@@ -39,15 +39,17 @@ type StoreValues = {
   configuredMethods: MfaMethodValue[];
   /** Factors this run has set up, which is what the wizard steps through. */
   completedMethods: MfaMethodValue[];
-  /** Null until the selection step is done. Empty is valid, the email fallback configures
-   *  a factor on its own. */
+  /** Null until the selection step, which follows authorization, is done. Empty is valid,
+   *  the email fallback configures a factor on its own. */
   selectedMethods: MfaMethodValue[] | null;
-  /** Pre-ticked in the selection step, from the entry point or an earlier pass. */
+  /** Pre-ticked in the selection step, from the entry point. */
   initialSelection: MfaMethodValue[];
   /** most preferred first, from the session since an older Core rejects some factors */
   verificationMethods: MfaVerificationMethod[];
   /** null until picked, asked only when the session offers more than one method */
   verificationMethod: MfaVerificationMethod | null;
+  /** set when a method fails after the picker handed off to it, shown back on the picker */
+  verificationError: string | null;
   /** No factor was configured, so an emailed code was the only way in. */
   emailFallback: boolean;
   /** ISO timestamp the session dies at, null once nothing in the flow needs it. */
@@ -118,6 +120,7 @@ const defaults: StoreValues = {
   initialSelection: [],
   verificationMethods: [],
   verificationMethod: null,
+  verificationError: null,
   emailFallback: false,
   deadline: null,
   authorized: false,
@@ -137,9 +140,7 @@ interface Store extends StoreValues {
   ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
   selectVerificationMethod: (method: MfaVerificationMethod) => void;
-  /** Keeps the current picks ticked and the session alive. */
-  backToSelection: () => void;
-  backFromVerification: () => void;
+  backFromVerification: (error?: string) => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;
   factorConfigured: (method: MfaMethodValue, recoveryCodes: string[]) => void;
@@ -186,46 +187,22 @@ export const useConfigureMfaStore = create<Store>()(
           return {
             selectedMethods: methods,
             activeStep: firstStep(next),
-            // picked after a late authorization, so the deadline was kept for it
-            ...(current.authorized && {
-              deadline: sessionDeadline(next, current.deadline),
-            }),
+            deadline: sessionDeadline(next, current.deadline),
           };
         });
       },
       selectVerificationMethod: (method) => {
-        set({ verificationMethod: method });
+        set({ verificationMethod: method, verificationError: null });
       },
-      backToSelection: () => {
-        set((current) => ({
-          initialSelection: current.selectedMethods ?? current.initialSelection,
-          selectedMethods: null,
-          verificationMethod: null,
-          activeStep: defaults.activeStep,
-        }));
-      },
-      backFromVerification: () => {
-        if (isPresent(get().verificationMethod)) {
-          set({ verificationMethod: null });
-          return;
-        }
-        get().backToSelection();
+      backFromVerification: (error) => {
+        set({ verificationMethod: null, verificationError: error ?? null });
       },
       authorize: (response) => {
-        set((current) => {
-          const deadline = dayjs.unix(response.deadline_timestamp).toISOString();
-          // a late answer can land after Back, the steps wait for its Continue
-          if (!isPresent(current.selectedMethods)) {
-            return { authorized: true, recoveryCodes: response.recovery_codes, deadline };
-          }
-          // The fallback enables email as it verifies, so only this authorization issues codes.
-          const next = { ...current, recoveryCodes: response.recovery_codes };
-          return {
-            authorized: true,
-            recoveryCodes: response.recovery_codes,
-            deadline: sessionDeadline(next, deadline),
-            activeStep: firstStep(next),
-          };
+        // The fallback enables email as it verifies, so only this authorization issues codes.
+        set({
+          authorized: true,
+          recoveryCodes: response.recovery_codes,
+          deadline: dayjs.unix(response.deadline_timestamp).toISOString(),
         });
       },
       factorConfigured: (method, recoveryCodes) => {
@@ -263,7 +240,7 @@ export const useConfigureMfaStore = create<Store>()(
       name: 'configure-mfa-store',
       storage: createJSONStorage(() => sessionStorage),
       // Bumped on every shape change: a stored session is never resumable across one.
-      version: 13,
+      version: 15,
     },
   ),
 );

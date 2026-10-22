@@ -54,9 +54,7 @@ describe('applyAuthorization', () => {
     });
   });
 
-  it('waits on the selection when the answer lands after Back', () => {
-    useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
-    useConfigureMfaStore.getState().backFromVerification();
+  it('authorizes before any factor is picked', () => {
     applyAuthorization(sessionId, authorizeResult);
 
     const state = useConfigureMfaStore.getState();
@@ -66,9 +64,7 @@ describe('applyAuthorization', () => {
     expect(state.deadline).not.toBeNull();
   });
 
-  it('sets up the picks confirmed after a late answer', () => {
-    useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
-    useConfigureMfaStore.getState().backFromVerification();
+  it('sets up the picks made after authorization', () => {
     applyAuthorization(sessionId, authorizeResult);
     useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
 
@@ -77,9 +73,7 @@ describe('applyAuthorization', () => {
     expect(state.deadline).not.toBeNull();
   });
 
-  it('finishes when the pick confirmed after a late answer is empty', () => {
-    useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
-    useConfigureMfaStore.getState().backFromVerification();
+  it('finishes when the pick made after authorization is empty', () => {
     applyAuthorization(sessionId, authorizeResult);
     useConfigureMfaStore.getState().selectMethods([]);
 
@@ -88,15 +82,27 @@ describe('applyAuthorization', () => {
     expect(state.deadline).toBeNull();
   });
 
-  it('keeps the deadline of an unauthorized session with an empty pick', () => {
-    useConfigureMfaStore.setState({ deadline: '2030-01-01T00:00:00.000Z' });
-    useConfigureMfaStore.getState().selectMethods([]);
+  it('returns to the verification picker on Back', () => {
+    useConfigureMfaStore.getState().selectVerificationMethod(MfaMethod.Email);
+    useConfigureMfaStore.getState().backFromVerification();
 
-    expect(useConfigureMfaStore.getState().deadline).toBe('2030-01-01T00:00:00.000Z');
+    expect(useConfigureMfaStore.getState().verificationMethod).toBeNull();
+  });
+
+  it('keeps a failed method error for the picker until the next pick', () => {
+    useConfigureMfaStore.getState().selectVerificationMethod(MfaMethod.Oidc);
+    useConfigureMfaStore.getState().backFromVerification('Sign-in timed out, try again.');
+
+    let state = useConfigureMfaStore.getState();
+    expect(state.verificationMethod).toBeNull();
+    expect(state.verificationError).toBe('Sign-in timed out, try again.');
+
+    useConfigureMfaStore.getState().selectVerificationMethod(MfaMethod.Email);
+    state = useConfigureMfaStore.getState();
+    expect(state.verificationError).toBeNull();
   });
 
   it('drops an answer for another session', () => {
-    useConfigureMfaStore.getState().selectMethods([MfaMethod.Fido2]);
     applyAuthorization('session-2', authorizeResult);
 
     expect(useConfigureMfaStore.getState().authorized).toBe(false);

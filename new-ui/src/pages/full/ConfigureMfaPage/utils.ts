@@ -67,6 +67,10 @@ export const verificationMethodsOf = (
 ): MfaVerificationMethod[] =>
   mfaVerificationMethods.filter((method) => availableMethods.includes(method));
 
+/** OpenID opens the browser, so even as the only method it waits for a click on the picker. */
+export const showsVerificationPicker = (methods: MfaVerificationMethod[]): boolean =>
+  methods.length > 1 || methods[0] === MfaMethod.Oidc;
+
 /** The fallback mails a code to the address on file, so email is the only way in. */
 export const sessionVerificationMethodsOf = (
   response: Pick<MfaConfigStartResult, 'email_fallback' | 'available_methods'>,
