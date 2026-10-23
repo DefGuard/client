@@ -96,6 +96,7 @@ export const LocationCardMfaFido2View = () => {
             <Input
               type="password"
               label="PIN"
+              autoFocus
               value={pin}
               onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
               error={error}
