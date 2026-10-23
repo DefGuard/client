@@ -72,6 +72,7 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
               <Input
                 type="password"
                 label="PIN"
+                autoFocus
                 value={pin}
                 onChange={(value) => {
                   setPin(isPresent(value) ? String(value) : null);

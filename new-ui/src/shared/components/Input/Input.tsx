@@ -42,6 +42,7 @@ export const Input = ({
   onBlur,
   onFocus,
   notNull,
+  autoFocus,
   size = 'default',
   type = 'text',
   required = false,
@@ -128,6 +129,7 @@ export const Input = ({
             aria-labelledby={id}
             ref={mergeRefs([ref, innerRef])}
             autoComplete={autocomplete}
+            autoFocus={autoFocus}
             data-testid={testId}
             value={externalValueToInput(value)}
             name={name}

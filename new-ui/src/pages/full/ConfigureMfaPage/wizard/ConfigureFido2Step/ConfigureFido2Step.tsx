@@ -115,6 +115,7 @@ export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
         <Fragment>
           <Input
             label="Security key name"
+            autoFocus
             value={name}
             onChange={(value) => setName(isPresent(value) ? String(value) : null)}
             error={collectsPin ? undefined : error}

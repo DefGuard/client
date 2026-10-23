@@ -22,6 +22,7 @@ export type InputProps = {
   autocomplete?: HTMLInputAutoCompleteAttribute;
   testId?: string;
   notNull?: boolean;
+  autoFocus?: boolean;
 } & Pick<HTMLAttributes<HTMLInputElement>, 'onBlur' | 'onFocus'>;
 
 export type FormInputProps = Pick<
