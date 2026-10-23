@@ -13,14 +13,12 @@ import {
   type MfaMethodValue,
 } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
-import { setupMethodsOf } from '../../../../shared/utils/mfa';
-import { dismissEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
 import {
-  ConfigureMfaStep,
-  type ConfigureMfaStepValue,
-  MFA_WIZARD_STEPS,
-  type MfaVerificationMethod,
-} from '../types';
+  type ClientAuthorizingMethod,
+  setupMethodsOf,
+} from '../../../../shared/utils/mfa';
+import { dismissEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
+import { ConfigureMfaStep, type ConfigureMfaStepValue, MFA_WIZARD_STEPS } from '../types';
 import {
   isCodeMfaMethod,
   isMfaFactorOfferable,
@@ -45,9 +43,9 @@ type StoreValues = {
   /** Pre-ticked in the selection step, from the entry point. */
   initialSelection: MfaMethodValue[];
   /** most preferred first, from the session since an older Core rejects some factors */
-  verificationMethods: MfaVerificationMethod[];
+  verificationMethods: ClientAuthorizingMethod[];
   /** null until picked, asked only when the session offers more than one method */
-  verificationMethod: MfaVerificationMethod | null;
+  verificationMethod: ClientAuthorizingMethod | null;
   /** set when a method fails after the picker handed off to it, shown back on the picker */
   verificationError: string | null;
   /** No factor was configured, so an emailed code was the only way in. */
@@ -139,7 +137,7 @@ interface Store extends StoreValues {
     origin: ConfigureMfaOrigin,
   ) => void;
   selectMethods: (methods: MfaMethodValue[]) => void;
-  selectVerificationMethod: (method: MfaVerificationMethod) => void;
+  selectVerificationMethod: (method: ClientAuthorizingMethod) => void;
   backFromVerification: (error?: string) => void;
   /** The fresh deadline bounds every setup still to come, not just the next one. */
   authorize: (response: MfaConfigAuthorizeResult) => void;

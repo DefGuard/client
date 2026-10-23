@@ -1,7 +1,7 @@
 import { MfaMethod } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
+import type { ClientAuthorizingMethod } from '../../../../shared/utils/mfa';
 import { useConfigureMfaStore } from '../hooks/useConfigureMfaStore';
-import type { MfaVerificationMethod } from '../types';
 import { showsVerificationPicker } from '../utils';
 import { ConfigureSelectVerificationStep } from './ConfigureSelectVerificationStep/ConfigureSelectVerificationStep';
 import { ConfigureVerifyEmailStep } from './ConfigureVerifyEmailStep/ConfigureVerifyEmailStep';
@@ -24,7 +24,7 @@ export const ConfigureMfaVerify = ({ onCancel, onSessionExpired }: Props) => {
   }
 
   // for the type only, a session with nothing to verify with is refused at start
-  const method: MfaVerificationMethod =
+  const method: ClientAuthorizingMethod =
     verificationMethod ?? candidates[0] ?? MfaMethod.Email;
 
   switch (method) {

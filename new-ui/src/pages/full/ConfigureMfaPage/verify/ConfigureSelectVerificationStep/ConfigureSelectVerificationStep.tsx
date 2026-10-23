@@ -9,13 +9,16 @@ import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/Fu
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { ConfigureFactorsSource, MfaMethod } from '../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import { findOpenIdProvider, openIdProviderName } from '../../../../../shared/utils/mfa';
+import {
+  type ClientAuthorizingMethod,
+  findOpenIdProvider,
+  openIdProviderName,
+} from '../../../../../shared/utils/mfa';
 import { ConfigureMfaVerificatorFactorSelector } from '../../components/ConfigureMfaVerificatorFactorSelector/ConfigureMfaVerificatorFactorSelector';
 import {
   discardMfaConfiguration,
   useConfigureMfaStore,
 } from '../../hooks/useConfigureMfaStore';
-import type { MfaVerificationMethod } from '../../types';
 import '../style.scss';
 import './style.scss';
 
@@ -33,7 +36,9 @@ export const ConfigureSelectVerificationStep = ({ onCancel }: Props) => {
   );
   const instance = useConfigureMfaStore((s) => s.instance) ?? undefined;
 
-  const [selected, setSelected] = useState<MfaVerificationMethod | undefined>(methods[0]);
+  const [selected, setSelected] = useState<ClientAuthorizingMethod | undefined>(
+    methods[0],
+  );
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
     // the source is read before the discard resets the store
