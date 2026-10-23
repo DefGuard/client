@@ -94,6 +94,10 @@ ignore = [
     { id = "RUSTSEC-2025-0100", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2026-0194", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2026-0195", reason = "Tauri v2 dependency (unmaintained)" },
+    # zbus 5 pulls these split crates; Tauri plugins and dark-light do not support zbus 6 yet.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant merged into zbus 6; pulled by zbus 5" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names merged into zbus 6; pulled by zbus 5" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive merged into zbus 6; pulled by zbus 5" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
