@@ -1,15 +1,12 @@
 import './style.scss';
 import { Enter } from '@fluentui/keyboard-keys';
 import { useState } from 'react';
-import { Button } from '../../../../../shared/components/Button/Button';
-import { ButtonVariant } from '../../../../../shared/components/Button/types';
-import { Controls } from '../../../../../shared/components/Controls/Controls';
-import { Icon, IconKind } from '../../../../../shared/components/Icon';
+import { IconKind } from '../../../../../shared/components/Icon';
 import { Input } from '../../../../../shared/components/Input/Input';
 import { Fido2TouchPrompt } from '../../../../../shared/components/LocationCard/components/Fido2TouchPrompt/Fido2TouchPrompt';
-import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
 import { fido2CollectsPinInApp } from '../../../../../shared/rust-api/fido2';
 import { isPresent } from '../../../../../shared/utils/isPresent';
+import { MfaCodeVerification } from '../../components/MfaCodeVerification/MfaCodeVerification';
 import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useConfigureVerifyFido2 } from './useConfigureVerifyFido2';
 
@@ -45,59 +42,47 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
   };
 
   return (
-    <FullPage id="configure-verify-fido2-step" hideScrollContainer withControls>
-      <div className="content">
-        {isAwaitingTouch && <Fido2TouchPrompt />}
-        {!isAwaitingTouch && (
-          <>
-            <Icon icon={IconKind.SoftwareKey} size={28} />
-            <p className="title">Verify with your security key</p>
-            <p className="description">
-              {collectsPin
-                ? 'Insert your key and enter its PIN to continue.'
-                : 'Insert your security key and continue in the prompt your system shows.'}
-            </p>
-            {collectsPin && (
-              <div
-                className="pin-track"
-                onKeyDown={(e) => {
-                  if (e.key === Enter) handleVerify();
-                }}
-              >
-                <Input
-                  type="password"
-                  autoFocus
-                  value={pin}
-                  onChange={(value) => {
-                    setPin(isPresent(value) ? String(value) : null);
-                    setError(null);
-                  }}
-                  error={error}
-                />
-              </div>
-            )}
-            {!collectsPin && isPresent(error) && <p className="error">{error}</p>}
-          </>
-        )}
-      </div>
-      <Controls>
-        <Button
-          text={leaveText}
-          variant={ButtonVariant.Secondary}
-          loading={isLeaving}
-          onClick={() => {
-            void handleLeave();
+    <MfaCodeVerification
+      id="configure-verify-fido2-step"
+      icon={IconKind.SoftwareKey}
+      title="Verify with your security key"
+      description={[
+        collectsPin
+          ? 'Insert your key and enter its PIN to continue.'
+          : 'Insert your security key and continue in the prompt your system shows.',
+      ]}
+      onSubmit={handleVerify}
+      submitText="Verify"
+      leaveText={leaveText}
+      onLeave={() => {
+        void handleLeave();
+      }}
+      isLeaving={isLeaving}
+      submitLoading={isVerifying}
+    >
+      {isAwaitingTouch && <Fido2TouchPrompt />}
+      {!isAwaitingTouch && collectsPin && (
+        <div
+          className="pin-track"
+          onKeyDown={(e) => {
+            if (e.key === Enter) handleVerify();
           }}
-        />
-        <div className="right">
-          <Button
-            text="Verify"
-            variant={ButtonVariant.Primary}
-            loading={isVerifying}
-            onClick={handleVerify}
+        >
+          <Input
+            type="password"
+            autoFocus
+            value={pin}
+            onChange={(value) => {
+              setPin(isPresent(value) ? String(value) : null);
+              setError(null);
+            }}
+            error={error}
           />
         </div>
-      </Controls>
-    </FullPage>
+      )}
+      {!isAwaitingTouch && !collectsPin && isPresent(error) && (
+        <p className="error">{error}</p>
+      )}
+    </MfaCodeVerification>
   );
 };

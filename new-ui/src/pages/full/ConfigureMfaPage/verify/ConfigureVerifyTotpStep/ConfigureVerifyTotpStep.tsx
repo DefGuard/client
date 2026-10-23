@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
+import { CodeInput } from '../../../../../shared/components/CodeInput/CodeInput';
 import { IconKind } from '../../../../../shared/components/Icon';
 import { api } from '../../../../../shared/rust-api/api';
 import { MfaMethod } from '../../../../../shared/rust-api/types';
@@ -68,17 +69,22 @@ export const ConfigureVerifyTotpStep = ({ onCancel, onSessionExpired }: Props) =
       icon={IconKind.MobileLock}
       title="Security code from your authenticator app."
       description={[`Enter the 6-digit code from your Authenticator app to continue.`]}
-      code={code}
-      error={error}
-      onCodeChange={handleCodeChange}
       onSubmit={handleSubmit}
-      codeLoading={isSubmitting}
       leaveText={leaveText}
       onLeave={leave}
       isLeaving={isLeaving}
       leaveDisabled={isSubmitting}
       submitLoading={isSubmitting}
       submitDisabled={isLeaving}
-    />
+    >
+      <CodeInput
+        length={CODE_LENGTH}
+        value={code}
+        onChange={handleCodeChange}
+        error={error}
+        onSubmit={handleSubmit}
+        loading={isSubmitting}
+      />
+    </MfaCodeVerification>
   );
 };

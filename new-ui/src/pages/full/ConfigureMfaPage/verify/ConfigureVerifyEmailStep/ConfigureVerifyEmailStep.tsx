@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CodeInput } from '../../../../../shared/components/CodeInput/CodeInput';
 import { IconKind } from '../../../../../shared/components/Icon';
 import { ResendEmailButton } from '../../../../../shared/components/ResendEmailButton/ResendEmailButton';
 import { useResendCooldown } from '../../../../../shared/hooks/useResendCooldown';
@@ -114,11 +115,7 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
         `We've sent a verification code to your email address.`,
         `Enter the 6-digit code to continue setting up MFA.`,
       ]}
-      code={code}
-      error={error}
-      onCodeChange={handleCodeChange}
       onSubmit={handleSubmit}
-      codeLoading={isBusy}
       leaveText={leaveText}
       onLeave={leave}
       isLeaving={isLeaving}
@@ -133,6 +130,15 @@ export const ConfigureVerifyEmailStep = ({ onCancel, onSessionExpired }: Props) 
           onClick={handleResend}
         />
       }
-    />
+    >
+      <CodeInput
+        length={CODE_LENGTH}
+        value={code}
+        onChange={handleCodeChange}
+        error={error}
+        onSubmit={handleSubmit}
+        loading={isBusy}
+      />
+    </MfaCodeVerification>
   );
 };
