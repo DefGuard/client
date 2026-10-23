@@ -38,17 +38,22 @@ const CTAP2_ERR_PIN_REQUIRED: u8 = 0x36;
 const CTAP2_ERR_PIN_AUTH_BLOCKED: u8 = 0x34;
 const CTAP2_ERR_ACTION_TIMEOUT: u8 = 0x3A;
 
-/// The crate surfaces the status only inside its error text, as `"0x31 CTAP2_ERR_PIN_INVALID ..."`.
-/// Read back the leading byte, matching on the name conflates a rejected PIN with a missing one.
-fn ctap_status(err: &impl std::fmt::Display) -> Option<u8> {
-    let text = err.to_string();
-    let code = text.strip_prefix("0x")?.get(..2)?;
+/// The crate surfaces the status only inside its error text, as
+/// `"response_status err = 0x31 CTAP2_ERR_PIN_INVALID ..."`. Drop the prefix it adds.
+fn ctap_text(text: &str) -> &str {
+    text.strip_prefix("response_status err = ").unwrap_or(text)
+}
+
+/// Read back the status byte, matching on the name conflates a rejected PIN with a missing one.
+fn ctap_status(text: &str) -> Option<u8> {
+    let code = ctap_text(text).strip_prefix("0x")?.get(..2)?;
     u8::from_str_radix(code, 16).ok()
 }
 
 /// Classify a CTAP failure. Everything recognised here is user-fixable.
 fn ceremony_error(err: &impl std::fmt::Display) -> Fido2Error {
-    match ctap_status(err) {
+    let text = err.to_string();
+    match ctap_status(&text) {
         Some(CTAP2_ERR_USER_ACTION_TIMEOUT | CTAP2_ERR_ACTION_TIMEOUT) => Fido2Error::Timeout,
         Some(CTAP2_ERR_CREDENTIAL_EXCLUDED) => Fido2Error::CredentialExcluded,
         Some(CTAP2_ERR_NO_CREDENTIALS) => Fido2Error::NoCredentials,
@@ -56,7 +61,7 @@ fn ceremony_error(err: &impl std::fmt::Display) -> Fido2Error {
         Some(CTAP2_ERR_PIN_INVALID) => Fido2Error::PinInvalid,
         Some(CTAP2_ERR_PIN_BLOCKED | CTAP2_ERR_PIN_AUTH_BLOCKED) => Fido2Error::PinBlocked,
         code => Fido2Error::Backend {
-            message: err.to_string(),
+            message: ctap_text(&text).to_string(),
             code: code.map(i32::from),
         },
     }
@@ -258,18 +263,18 @@ mod tests {
     /// The crate renders the status byte into its message and nowhere else.
     #[test]
     fn test_ctap_status_is_read_back_from_the_error_text() {
-        struct Rendered(&'static str);
-        impl std::fmt::Display for Rendered {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(self.0)
-            }
-        }
-
         assert_eq!(
-            ctap_status(&Rendered("0x31 CTAP2_ERR_PIN_INVALID   PIN Invalid.")),
+            ctap_status("0x31 CTAP2_ERR_PIN_INVALID   PIN Invalid."),
             Some(CTAP2_ERR_PIN_INVALID)
         );
-        assert_eq!(ctap_status(&Rendered("device not found")), None);
+        assert_eq!(
+            ctap_status(
+                "response_status err = 0x19 CTAP2_ERR_CREDENTIAL_EXCLUDED Valid credential found \
+                 in the exclude list."
+            ),
+            Some(CTAP2_ERR_CREDENTIAL_EXCLUDED)
+        );
+        assert_eq!(ctap_status("device not found"), None);
     }
 
     #[test]
@@ -304,7 +309,7 @@ mod tests {
                 f.write_str(&self.0)
             }
         }
-        let rendered = |code: u8| Rendered(format!("0x{code:02X} something"));
+        let rendered = |code: u8| Rendered(format!("response_status err = 0x{code:02X} something"));
 
         assert!(matches!(
             ceremony_error(&rendered(CTAP2_ERR_CREDENTIAL_EXCLUDED)),
@@ -327,8 +332,8 @@ mod tests {
             ceremony_error(&rendered(0x7F)),
             Fido2Error::Backend {
                 code: Some(0x7F),
-                ..
-            }
+                message,
+            } if message == "0x7F something"
         ));
     }
 }

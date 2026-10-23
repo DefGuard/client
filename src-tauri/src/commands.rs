@@ -2419,7 +2419,7 @@ fn fido2_message(err: &Fido2Error, ceremony: &str) -> String {
             "Security key did not respond. Check that it is plugged in and try again".to_string()
         }
         Fido2Error::CredentialExcluded => {
-            "This security key is already registered for your account".to_string()
+            "This security key is already registered. Use a different key".to_string()
         }
         // Windows offers a phone and Windows Hello alongside the key, and only says which one
         // answered afterwards, so this is where that choice is turned back. Name the option.

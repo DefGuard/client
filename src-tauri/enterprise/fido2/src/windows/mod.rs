@@ -20,8 +20,8 @@ use windows::{
     core::{BOOL, GUID, HRESULT},
     Win32::{
         Foundation::{
-            ERROR_CANCELLED, ERROR_TIMEOUT, HWND, NTE_DEVICE_NOT_FOUND, NTE_INVALID_PARAMETER,
-            NTE_NOT_FOUND, NTE_USER_CANCELLED,
+            ERROR_CANCELLED, ERROR_TIMEOUT, HWND, NTE_DEVICE_NOT_FOUND, NTE_EXISTS,
+            NTE_INVALID_PARAMETER, NTE_NOT_FOUND, NTE_USER_CANCELLED,
         },
         Networking::WindowsWebServices::{
             WEBAUTHN_ASSERTION, WEBAUTHN_ASSERTION_VERSION_4,
@@ -158,6 +158,9 @@ fn classify(name: &str, hr: HRESULT, cancelled: bool, timed_out: bool) -> Fido2E
     }
     if hr == NTE_NOT_FOUND {
         return Fido2Error::NoCredentials;
+    }
+    if hr == NTE_EXISTS {
+        return Fido2Error::CredentialExcluded;
     }
     if hr == ERROR_TIMEOUT_HR {
         return Fido2Error::Timeout;
@@ -787,6 +790,10 @@ mod tests {
     fn test_an_excluded_credential_is_recognised() {
         assert!(matches!(
             classify("InvalidStateError", E_FAIL, false, false),
+            Fido2Error::CredentialExcluded
+        ));
+        assert!(matches!(
+            classify("", NTE_EXISTS, false, false),
             Fido2Error::CredentialExcluded
         ));
     }
