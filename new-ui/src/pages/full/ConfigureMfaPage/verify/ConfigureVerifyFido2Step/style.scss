@@ -1,6 +1,7 @@
 #configure-verify-fido2-step > .content {
   & > .pin-track {
-    width: 321px;
+    width: 100%;
+    max-width: 321px;
     text-align: left;
   }
 
