@@ -4,6 +4,8 @@ pub mod error;
 pub mod utils;
 
 #[cfg(windows)]
+mod ipv6_block;
+#[cfg(windows)]
 pub mod named_pipe;
 #[cfg(windows)]
 pub mod windows;
