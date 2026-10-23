@@ -21,15 +21,4 @@
     font: var(--t-body-sm-400);
     color: var(--fg-critical);
   }
-
-  & > .pin-track {
-    padding-bottom: var(--spacing-3xl);
-    box-sizing: border-box;
-  }
-
-  & > .fido2-touch-prompt {
-    width: 100%;
-    padding-top: var(--spacing-xl);
-    box-sizing: border-box;
-  }
 }
