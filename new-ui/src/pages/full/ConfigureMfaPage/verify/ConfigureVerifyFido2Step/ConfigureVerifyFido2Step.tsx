@@ -3,7 +3,6 @@ import { Enter } from '@fluentui/keyboard-keys';
 import { useState } from 'react';
 import { IconKind } from '../../../../../shared/components/Icon';
 import { Input } from '../../../../../shared/components/Input/Input';
-import { Fido2TouchPrompt } from '../../../../../shared/components/LocationCard/components/Fido2TouchPrompt/Fido2TouchPrompt';
 import { fido2CollectsPinInApp } from '../../../../../shared/rust-api/fido2';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { MfaCodeVerification } from '../../components/MfaCodeVerification/MfaCodeVerification';
@@ -41,16 +40,17 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
     leave();
   };
 
+  let description = collectsPin
+    ? 'Insert your key and enter its PIN to continue.'
+    : 'Insert your security key and continue in the prompt your system shows.';
+  if (isAwaitingTouch) description = 'The key is blinking. Tap it to confirm.';
+
   return (
     <MfaCodeVerification
       id="configure-verify-fido2-step"
       icon={IconKind.SoftwareKey}
       title="Verify with your security key"
-      description={[
-        collectsPin
-          ? 'Insert your key and enter its PIN to continue.'
-          : 'Insert your security key and continue in the prompt your system shows.',
-      ]}
+      description={[description]}
       onSubmit={handleVerify}
       submitText="Verify"
       leaveText={leaveText}
@@ -60,7 +60,6 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
       isLeaving={isLeaving}
       submitLoading={isVerifying}
     >
-      {isAwaitingTouch && <Fido2TouchPrompt />}
       {!isAwaitingTouch && collectsPin && (
         <div
           className="pin-track"
