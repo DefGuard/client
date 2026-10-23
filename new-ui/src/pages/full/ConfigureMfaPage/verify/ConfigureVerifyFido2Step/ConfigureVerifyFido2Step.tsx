@@ -1,9 +1,10 @@
+import './style.scss';
 import { Enter } from '@fluentui/keyboard-keys';
 import { useState } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
-import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/FullPageTitle';
+import { Icon, IconKind } from '../../../../../shared/components/Icon';
 import { Input } from '../../../../../shared/components/Input/Input';
 import { Fido2TouchPrompt } from '../../../../../shared/components/LocationCard/components/Fido2TouchPrompt/Fido2TouchPrompt';
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
@@ -11,7 +12,6 @@ import { fido2CollectsPinInApp } from '../../../../../shared/rust-api/fido2';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useConfigureVerifyFido2 } from './useConfigureVerifyFido2';
-import '../style.scss';
 
 interface Props {
   onCancel: () => void;
@@ -45,46 +45,41 @@ export const ConfigureVerifyFido2Step = ({ onCancel, onSessionExpired }: Props) 
   };
 
   return (
-    <FullPage
-      id="configure-verify-fido2-step"
-      className="configure-mfa-verify-page"
-      hideScrollContainer
-      withControls
-    >
-      <FullPageTitle title="Verify with your security key" />
-      {isAwaitingTouch && <Fido2TouchPrompt />}
-      {!isAwaitingTouch && (
-        <>
-          <p className="description">
-            <span>
+    <FullPage id="configure-verify-fido2-step" hideScrollContainer withControls>
+      <div className="content">
+        {isAwaitingTouch && <Fido2TouchPrompt />}
+        {!isAwaitingTouch && (
+          <>
+            <Icon icon={IconKind.SoftwareKey} size={28} />
+            <p className="title">Verify with your security key</p>
+            <p className="description">
               {collectsPin
-                ? 'Insert your security key and enter its PIN to continue.'
+                ? 'Insert your key and enter its PIN to continue.'
                 : 'Insert your security key and continue in the prompt your system shows.'}
-            </span>
-          </p>
-          {collectsPin && (
-            <div
-              className="pin-track"
-              onKeyDown={(e) => {
-                if (e.key === Enter) handleVerify();
-              }}
-            >
-              <Input
-                type="password"
-                label="PIN"
-                autoFocus
-                value={pin}
-                onChange={(value) => {
-                  setPin(isPresent(value) ? String(value) : null);
-                  setError(null);
+            </p>
+            {collectsPin && (
+              <div
+                className="pin-track"
+                onKeyDown={(e) => {
+                  if (e.key === Enter) handleVerify();
                 }}
-                error={error}
-              />
-            </div>
-          )}
-          {!collectsPin && isPresent(error) && <p className="error">{error}</p>}
-        </>
-      )}
+              >
+                <Input
+                  type="password"
+                  autoFocus
+                  value={pin}
+                  onChange={(value) => {
+                    setPin(isPresent(value) ? String(value) : null);
+                    setError(null);
+                  }}
+                  error={error}
+                />
+              </div>
+            )}
+            {!collectsPin && isPresent(error) && <p className="error">{error}</p>}
+          </>
+        )}
+      </div>
       <Controls>
         <Button
           text={leaveText}
