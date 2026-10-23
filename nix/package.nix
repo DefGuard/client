@@ -90,7 +90,7 @@
     inherit pname version pnpm;
     src = ../.;
     fetcherVersion = 3;
-    hash = "sha256-s9exoyIlT++5TWqDstD21h3YQ1cuDF/0cyZnI/3CZ3A=";
+    hash = "sha256-d/zkO8E6Q7N+6UNvq6/OiK2ZvDZjDpdOsi+TwJQq33k=";
   };
 in
   craneLib.mkCargoDerivation {
