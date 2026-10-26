@@ -50,7 +50,7 @@
     "remark-gfm": "^4.0.1",
     "rxjs": "^7.8.2",
     "sass": "^1.105.1",
-    "zod": "^4.6.5",
+    "zod": "^4.6.7",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
