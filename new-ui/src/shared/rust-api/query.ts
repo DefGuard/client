@@ -94,6 +94,11 @@ export const getAppConfigQueryOptions = queryOptions({
   queryFn: () => api.getAppConfig(),
 });
 
+export const getAutostartEnabledQueryOptions = queryOptions({
+  queryKey: ['autostart-enabled'] as const,
+  queryFn: () => api.getAutostartEnabled(),
+});
+
 export const getLatestAppVersionQueryOptions = queryOptions({
   queryKey: ['latest-app-version'] as const,
   queryFn: () => api.getLatestAppVersion(),

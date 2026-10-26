@@ -18,6 +18,7 @@ import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { ConnectModal } from './components/ConnectModal/ConnectModal';
 import { OverviewActionsButton } from './components/OverviewActionsButton/OverviewActionsButton';
+import { OverviewInstanceName } from './components/OverviewInstanceName/OverviewInstanceName';
 import { OverviewSelection } from './components/OverviewSelection/OverviewSelection';
 import { UpdateInstanceModal } from './components/UpdateInstanceModal/UpdateInstanceModal';
 import { UpdateTunnelModal } from './components/UpdateTunnelModal/UpdateTunnelModal';
@@ -76,8 +77,8 @@ export const OverviewPage = () => {
             })}
           >
             <div className="header">
-              {selection?.kind === 'instance' && (
-                <p>{`Locations (${displayedLocations.length})`}</p>
+              {isPresent(selectedInstance) && (
+                <OverviewInstanceName name={selectedInstance.name} />
               )}
               <div className="right">
                 <OverviewActionsButton
