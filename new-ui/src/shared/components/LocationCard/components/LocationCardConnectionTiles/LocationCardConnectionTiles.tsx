@@ -8,12 +8,7 @@ import {
   type LocationInfo,
 } from '../../../../rust-api/types';
 import { isPresent } from '../../../../utils/isPresent';
-import {
-  mfaStepCount,
-  mfaStepsToText,
-  mfaToText,
-  shouldStartMfa,
-} from '../../../../utils/mfa';
+import { mfaStepsOf, mfaStepsToText, mfaToText } from '../../../../utils/mfa';
 import { BoxIcon } from '../../../BoxIcon/BoxIcon';
 import { Icon, IconKind } from '../../../Icon';
 
@@ -30,21 +25,19 @@ export const LocationCardConnectionTiles = ({ location, instance, variant }: Pro
     location.route_all_traffic ||
     instance?.client_traffic_policy === ClientTrafficPolicy.ForceAllTraffic;
 
-  const stepCount = mfaStepCount(location);
-  const isMultiStep = stepCount > 1;
-
   const mfaLabel = useMemo(() => {
-    if (isMultiStep) return mfaStepsToText(stepCount);
+    const steps = mfaStepsOf(location);
+    if (steps.length === 0) return 'Not required';
+    if (steps.length > 1) return mfaStepsToText(steps.length);
+
+    const { methods } = steps[0];
+    if (methods.length === 1) return mfaToText(methods[0].method, instance);
+
     const key = `${location.connection_type.toLowerCase()}-${location.id}`;
-    const method = connectionMfaMethod[key];
-    return isPresent(method) ? mfaToText(method) : null;
-  }, [
-    connectionMfaMethod,
-    location.connection_type,
-    location.id,
-    stepCount,
-    isMultiStep,
-  ]);
+    const pickedMethod = connectionMfaMethod[key];
+    if (isPresent(pickedMethod)) return mfaToText(pickedMethod, instance);
+    return mfaStepsToText(1);
+  }, [connectionMfaMethod, location, instance]);
 
   return (
     <div className={clsx('location-card-connection-tiles', `variant-${variant}`)}>
@@ -57,15 +50,13 @@ export const LocationCardConnectionTiles = ({ location, instance, variant }: Pro
           {routeAllTraffic ? 'All traffic' : 'Predefined traffic'}
         </p>
       </div>
-      {shouldStartMfa(location) && isPresent(mfaLabel) && (
-        <div className="tile">
-          <BoxIcon>
-            <Icon icon={IconKind.LockClosed} />
-          </BoxIcon>
-          <p className="label">Active MFA</p>
-          <p className="label-value">{mfaLabel}</p>
-        </div>
-      )}
+      <div className="tile">
+        <BoxIcon>
+          <Icon icon={IconKind.LockClosed} />
+        </BoxIcon>
+        <p className="label">Active MFA</p>
+        <p className="label-value">{mfaLabel}</p>
+      </div>
     </div>
   );
 };
