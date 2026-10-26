@@ -11,9 +11,10 @@ use defguard_client_proto::defguard::{
         mfa_flow_step_finish_request::Submission as MfaFlowFinishSubmission, mfa_step_result,
         mfa_step_started, ClientMfaFinishRequest, ClientMfaFinishResponse, ClientMfaStartRequest,
         ClientMfaStartResponse, MfaAdvanced, MfaCodeCredential, MfaCompleted, MfaFido2Assertion,
-        MfaFlowStartRequest, MfaFlowStartResponse, MfaFlowStepFinishRequest,
+        MfaFlowRemoteRejected, MfaFlowStartRequest, MfaFlowStartResponse, MfaFlowStepFinishRequest,
         MfaFlowStepFinishResponse, MfaFlowStepStartRequest, MfaFlowStepStartResponse, MfaMethod,
-        MfaStartRejectionReason, MfaStepRejection, MfaStepResult, MfaStepStarted,
+        MfaRemoteRejectionReason, MfaStartRejectionReason, MfaStepRejection, MfaStepResult,
+        MfaStepStarted,
     },
     enterprise::posture::v2::DevicePostureData,
 };
@@ -70,6 +71,9 @@ pub enum MfaError {
 
     #[error("{message}")]
     AttemptLimit { message: String },
+
+    #[error("The Defguard mobile app must be updated to approve this connection")]
+    MobileClientOutdated,
 
     #[error("MFA operation timed out")]
     Timeout,
@@ -135,10 +139,10 @@ struct LegacyMobileMfaResponse {
 }
 
 #[derive(Deserialize)]
-struct MultiStepMobileMfaResponse {
-    #[serde(rename = "type")]
-    kind: String,
-    result: MultiStepMobileMfaResult,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum MultiStepMobileMfaResponse {
+    MfaResult { result: MultiStepMobileMfaResult },
+    MfaRejected { rejected: MfaFlowRemoteRejected },
 }
 
 #[derive(Deserialize)]
@@ -157,12 +161,20 @@ fn decode_multi_step_mobile_mfa_frame(text: &str) -> Result<MfaFinishResponse, M
         serde_json::from_str(text).map_err(|_| MfaError::Other {
             message: "Invalid multi-step mobile MFA response".into(),
         })?;
-    if response.kind != "mfa_result" {
-        return Err(MfaError::Other {
-            message: "Invalid multi-step mobile MFA response".into(),
-        });
-    }
-    let outcome = match response.result.outcome {
+    let result = match response {
+        MultiStepMobileMfaResponse::MfaResult { result } => result,
+        MultiStepMobileMfaResponse::MfaRejected { rejected } => {
+            return Err(match rejected.reason() {
+                MfaRemoteRejectionReason::MfaRemoteRejectionMobileClientOutdated => {
+                    MfaError::MobileClientOutdated
+                }
+                _ => MfaError::MfaRejected {
+                    message: "Mobile approval rejected".into(),
+                },
+            });
+        }
+    };
+    let outcome = match result.outcome {
         MultiStepMobileMfaOutcome::Advanced(advanced) => {
             mfa_step_result::Outcome::Advanced(advanced)
         }

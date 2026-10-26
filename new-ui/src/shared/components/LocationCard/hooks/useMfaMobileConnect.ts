@@ -11,6 +11,7 @@ import {
   isServiceUnavailable,
   isTimeout,
   mfaErrorMessage,
+  parseMfaError,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type {
@@ -159,6 +160,10 @@ export const useMfaMobileConnect = (
               isTimeout(event.payload.error) || isServiceUnavailable(event.payload.error);
             setTokenData(null);
             if (!retryable) setMfaTokenRef.current(null);
+            if (parseMfaError(event.payload.error)?.type === 'mobile_client_outdated') {
+              setConnectionError(message);
+              return;
+            }
             setConnectionError(
               isConnectFailure(message)
                 ? 'Failed to establish VPN connection'

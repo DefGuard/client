@@ -226,6 +226,7 @@ fn mfa_error_is_terminal(error: &mfa::MfaError) -> bool {
         | mfa::MfaError::AttemptLimit { .. }
         | mfa::MfaError::PostureRejected { .. }
         | mfa::MfaError::MfaRejected { .. }
+        | mfa::MfaError::MobileClientOutdated
         | mfa::MfaError::Other { .. } => true,
         mfa::MfaError::NetworkError { .. }
         | mfa::MfaError::ProxyError { .. }
@@ -3476,6 +3477,7 @@ mod tests {
 
     #[test]
     fn test_mfa_error_cleanup_keeps_retryable_errors() {
+        assert!(mfa_error_is_terminal(&mfa::MfaError::MobileClientOutdated));
         assert!(mfa_error_is_terminal(&mfa::MfaError::Cancelled));
         assert!(mfa_error_is_terminal(&mfa::MfaError::AttemptLimit {
             message: "attempt limit reached".into(),
