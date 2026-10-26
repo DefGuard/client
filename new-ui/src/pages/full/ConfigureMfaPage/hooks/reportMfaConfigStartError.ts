@@ -20,7 +20,7 @@ export const reportMfaConfigStartError = (err: unknown): void => {
   }
   if (isMfaConfigMfaNotUsable(err)) {
     Snackbar.error(
-      "Your account's MFA, such as a passkey added in the browser, can't be used in the desktop client. Add an authenticator app, email codes or a certified security key in your Defguard profile.",
+      "Browser passkeys don't work in the client. Add another MFA method in your Defguard profile.",
     );
     return;
   }
