@@ -8,6 +8,7 @@ export interface TooltipOptions {
   disabled?: boolean;
   initialOpen?: boolean;
   placement?: Placement;
+  openDelayMs?: number;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }

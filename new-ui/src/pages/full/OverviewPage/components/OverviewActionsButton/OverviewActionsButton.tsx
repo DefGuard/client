@@ -156,16 +156,17 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
   }, [selection, handleDelete]);
 
   const menuConfig = useMemo(() => {
+    const isInstance = selection?.kind === 'instance';
     const config: MenuItemsGroup[] = [
       {
         items: [
           {
-            text: selection?.kind === 'instance' ? 'Update' : 'Edit',
+            text: isInstance ? 'Refresh configuration' : 'Edit',
             icon: 'refresh',
             onClick: handleUpdate,
           },
           {
-            text: 'Delete',
+            text: isInstance ? 'Delete instance' : 'Delete',
             icon: 'delete',
             onClick: handleDeleteIntent,
           },

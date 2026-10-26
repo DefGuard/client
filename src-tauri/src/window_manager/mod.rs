@@ -91,6 +91,10 @@ impl WindowManager {
         let window = WebviewWindowBuilder::new(app, COMPACT_WINDOW_ID, compact_view_ui_url())
             .title(WINDOW_TITLE)
             .inner_size(COMPACT_WINDOW_WIDTH, COMPACT_WINDOW_HEIGHT)
+            // tao on Linux applies resizable(false) only after the first configure event,
+            // pinned size hints keep the window manager from resizing it before that
+            .min_inner_size(COMPACT_WINDOW_WIDTH, COMPACT_WINDOW_HEIGHT)
+            .max_inner_size(COMPACT_WINDOW_WIDTH, COMPACT_WINDOW_HEIGHT)
             .resizable(false)
             .decorations(false)
             .visible(false)
