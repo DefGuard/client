@@ -54,6 +54,7 @@ fn into_cli(err: mfa::MfaError) -> CliError {
         mfa::MfaError::MfaRejected { .. }
         | mfa::MfaError::PostureRejected { .. }
         | mfa::MfaError::AttemptLimit { .. }
+        | mfa::MfaError::MobileClientOutdated
         | mfa::MfaError::Timeout => CliError::MfaFailed(msg),
         mfa::MfaError::Cancelled => CliError::Cancelled(msg),
     }
@@ -909,6 +910,13 @@ mod tests {
     use sqlx::types::Json;
 
     use super::*;
+
+    #[test]
+    fn test_outdated_mobile_client_is_mfa_failure() {
+        let error = mfa::MfaError::MobileClientOutdated;
+        let message = error.to_string();
+        assert!(matches!(into_cli(error), CliError::MfaFailed(msg) if msg == message));
+    }
 
     #[test]
     fn test_finish_psk_uses_contract_for_completion() {

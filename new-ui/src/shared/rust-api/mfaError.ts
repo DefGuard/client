@@ -17,9 +17,13 @@ export const parseMfaError = (err: unknown): ParsedMfaError | null => {
   }
 };
 
-/** Returns the error message, or the original error text. */
-export const mfaErrorMessage = (err: unknown): string =>
-  parseMfaError(err)?.message ?? String(err);
+export const mfaErrorMessage = (err: unknown): string => {
+  const parsed = parseMfaError(err);
+  if (parsed?.type === 'mobile_client_outdated') {
+    return 'Your Defguard mobile app is out of date. Update it to approve this connection.';
+  }
+  return parsed?.message ?? String(err);
+};
 
 /** Returns true when MFA was rejected by the device posture check. */
 export const isMfaPostureError = (err: unknown, location: LocationInfo): boolean =>
