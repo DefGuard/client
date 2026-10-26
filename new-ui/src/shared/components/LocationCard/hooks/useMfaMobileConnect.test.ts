@@ -262,6 +262,43 @@ describe('useMfaMobileConnect', () => {
     expect(mocks.mfaConnectMobileApprove).toHaveBeenCalledTimes(1);
   });
 
+  it('shows an upgrade message when the mobile client is outdated', async () => {
+    mocks.mfaBeginStep.mockResolvedValue({
+      challenge: 'challenge-1',
+      token: 'token-1',
+      stepAttemptId: 'attempt-1',
+    });
+    mocks.mfaConnectMobileApprove.mockResolvedValue('task-1');
+    const onConnected = vi.fn();
+    const onStepAdvanced = vi.fn();
+    const { result } = renderMobileHook({ onConnected, onStepAdvanced, mfaToken: null });
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(3));
+    expect(result.current.qrValue).not.toBeNull();
+
+    const errorListener = mocks.listen.mock.calls.find(
+      ([event]) => event === TauriEvent.MfaMobileError,
+    )?.[1] as (event: { payload: { error: string } }) => void;
+
+    await act(async () => {
+      errorListener({
+        payload: { error: JSON.stringify({ type: 'mobile_client_outdated' }) },
+      });
+    });
+
+    expect(result.current.connectionError).toBe(
+      'Your Defguard mobile app is out of date. Update it to approve this connection.',
+    );
+    expect(result.current.qrValue).toBeNull();
+    expect(result.current.isConnecting).toBe(false);
+    expect(mocks.setMfaToken).toHaveBeenLastCalledWith(null);
+    expect(onConnected).not.toHaveBeenCalled();
+    expect(onStepAdvanced).not.toHaveBeenCalled();
+  });
+
   it('retains and reuses the token after a retryable mobile timeout', async () => {
     mocks.mfaBeginStep
       .mockResolvedValueOnce({ challenge: 'challenge-1', token: 'token-1' })

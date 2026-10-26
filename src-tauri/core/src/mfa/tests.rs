@@ -1134,6 +1134,31 @@ async fn test_mobile_approve_multi_step_rejects_wrong_discriminator() {
 }
 
 #[tokio::test]
+async fn test_mobile_approve_outdated_client_rejection() {
+    let error = multi_step_mobile_approve_error(WsStubCommand::SendMessage(
+        r#"{"type":"mfa_rejected","rejected":{"reason":1}}"#.into(),
+    ))
+    .await;
+
+    assert!(matches!(error, MfaError::MobileClientOutdated));
+    assert_eq!(
+        serde_json::to_value(error).unwrap(),
+        json!({"type": "mobile_client_outdated"})
+    );
+}
+
+#[tokio::test]
+async fn test_mobile_approve_unknown_rejection_reason() {
+    assert!(matches!(
+        multi_step_mobile_approve_error(WsStubCommand::SendMessage(
+            r#"{"type":"mfa_rejected","rejected":{"reason":99}}"#.into()
+        ))
+        .await,
+        MfaError::MfaRejected { .. }
+    ));
+}
+
+#[tokio::test]
 async fn test_mobile_approve_multi_step_rejects_missing_outcome() {
     assert!(matches!(
         multi_step_mobile_approve_error(WsStubCommand::SendMessage(
