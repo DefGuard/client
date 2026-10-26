@@ -8,3 +8,7 @@ minimumReleaseAgeExclude:
   - vite@8.0.16
   - fast-uri@3.1.4 || 3.1.5
   - js-yaml@4.3.1
+  - '@tanstack/query-core@5.105.0'
+  - '@tanstack/react-query@5.105.0'
+  - radashi@12.9.7
+  - stylelint-scss@7.4.0
