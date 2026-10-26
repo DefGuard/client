@@ -18,7 +18,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 90
     container:
-      image: ubuntu:24.04
+      image: ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
       options: --privileged
     env:
       DEBIAN_FRONTEND: noninteractive
@@ -40,25 +40,25 @@ jobs:
             librsvg2-dev libssl-dev libudev-dev libwebkit2gtk-4.1-dev libxdo-dev patchelf procps \
             protobuf-compiler webkit2gtk-driver xvfb wireguard-tools xclip xdg-utils
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: new-ui/.nvmrc
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           run_install: false
-          version: 11.11
+          version: 11.28
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
@@ -117,7 +117,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-logs
           path: e2e-logs
@@ -128,17 +128,17 @@ jobs:
     runs-on:
       - codebuild-defguard-client-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: new-ui/.nvmrc
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           run_install: false
-          version: 11.11
+          version: 11.28
 
       - name: Install e2e dependencies
         run: pnpm install --no-frozen-lockfile

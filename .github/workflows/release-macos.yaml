@@ -27,7 +27,7 @@ jobs:
       - macOS
       - native
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
 
@@ -40,14 +40,14 @@ jobs:
             echo "DEFGUARD_CLIENT_BUILD_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
           fi
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: new-ui/.nvmrc
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           run_install: false
-          version: 11.11
+          version: 11.28
 
       - name: Get pnpm store directory
         run: |
@@ -56,7 +56,7 @@ jobs:
           echo "STORE_PATH=$STORE_PATH" >> ${GITHUB_ENV}
 
       - name: Restore pnpm store cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ${{ env.STORE_PATH }}
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('new-ui/pnpm-lock.yaml') }}
@@ -69,12 +69,12 @@ jobs:
           pnpm install --no-frozen-lockfile
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
       - name: Install tauri-cli
         run: cargo install tauri-cli --locked
@@ -100,7 +100,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" build.keychain > /dev/null
 
       - name: Build app
-        uses: tauri-apps/tauri-action@v1
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -114,7 +114,7 @@ jobs:
 
       - name: Upload DMG
         if: inputs.upload_url != ''
-        uses: shogo82148/actions-upload-release-asset@v1
+        uses: shogo82148/actions-upload-release-asset@9ee13965a8a51926f330b424693f25fcff8f2ef6 # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -125,7 +125,7 @@ jobs:
 
       - name: Upload DMG artifact
         if: inputs.upload_url == ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: defguard-client-macos-dmg-${{ github.run_number }}
           path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
