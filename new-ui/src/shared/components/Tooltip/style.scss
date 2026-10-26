@@ -14,6 +14,7 @@
   span,
   p,
   a {
+    overflow-wrap: anywhere;
     font: var(--t-body-xs-400);
     color: var(--fg-black);
   }

@@ -27,15 +27,12 @@
       flex-flow: row nowrap;
       align-items: center;
       justify-content: flex-start;
+      column-gap: var(--spacing-md);
       user-select: none;
       min-height: 28px;
 
-      > p {
-        font: var(--t-h5);
-        color: var(--fg-white-100);
-      }
-
       > .right {
+        flex-shrink: 0;
         margin-left: auto;
       }
     }

@@ -1,0 +1,21 @@
+.setting-row {
+  .head {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+
+    .title {
+      font: var(--t-body-sm-500);
+      color: var(--fg-white-100);
+    }
+  }
+
+  .description {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-70);
+  }
+
+  .control {
+    max-width: 321px;
+  }
+}
