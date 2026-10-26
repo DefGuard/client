@@ -263,6 +263,18 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    pub fn remove_interfaces(&mut self) {
+        let ifnames = self.wgapis.keys().cloned().collect::<Vec<_>>();
+        for ifname in ifnames {
+            if let Err(err) = self.remove_tracked_interface(&ifname) {
+                error!(
+                    "Failed to remove Linux service location interface {ifname} during shutdown: \
+                    {err}"
+                );
+            }
+        }
+    }
+
     pub fn disconnect_service_locations_by_instance(
         &mut self,
         instance_id: &str,
@@ -687,6 +699,34 @@ impl ServiceLocationManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated network namespace, CAP_NET_ADMIN and a DNS backend"]
+    fn test_remove_interfaces_continues_after_failure_and_preserves_unmanaged_interface() {
+        let mut manager = ServiceLocationManager::default();
+        let mut unmanaged: WGApi = WGApi::new("dgl-other").unwrap();
+        unmanaged.create_interface().unwrap();
+        let ifnames = ["dgl-test0", "dgl-test1", "dgl-test2"];
+        for ifname in ifnames {
+            manager.wgapis.insert(ifname.into(), WGApi::new(ifname).unwrap());
+        }
+        let missing = manager.wgapis.keys().next().unwrap().clone();
+        // leave the first interface absent to exercise failure before successful removals
+        for (_, wgapi) in manager.wgapis.iter_mut().skip(1) {
+            wgapi.create_interface().unwrap();
+        }
+
+        manager.remove_interfaces();
+
+        assert_eq!(manager.wgapis.len(), 1);
+        assert!(manager.wgapis.contains_key(&missing));
+        for ifname in ifnames {
+            let wgapi: WGApi = WGApi::new(ifname).unwrap();
+            assert!(wgapi.read_interface_data().is_err());
+        }
+        assert!(unmanaged.read_interface_data().is_ok());
+        unmanaged.remove_interface().unwrap();
+    }
 
     #[test]
     fn test_removing_a_preshared_key_emits_an_explicit_zero_key() {
