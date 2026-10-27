@@ -1,5 +1,5 @@
-import { $, browser, expect } from "@wdio/globals";
-import { invoke, resetInstances } from "../helpers/client.js";
+import { $, expect } from "@wdio/globals";
+import { resetInstances } from "../helpers/client.js";
 import {
 	connectAndPing,
 	disconnect,
@@ -19,6 +19,23 @@ import {
 	setPassword,
 } from "../helpers/enrollment.js";
 import { switchToTrayView } from "../helpers/windows.js";
+
+const refreshInstanceConfiguration = async (url: string, token: string) => {
+	const actions = $(".overview-header-actions");
+	await actions.waitForClickable();
+	await actions.click();
+	const refresh = $(".menu-item*=Refresh configuration");
+	await refresh.waitForClickable();
+	await refresh.click();
+	const modal = $("#update-instance-modal");
+	await modal.waitForDisplayed();
+	await modal.$('[data-testid="field-url"]').setValue(url);
+	await modal.$('[data-testid="field-token"]').setValue(token);
+	const update = modal.$("button=Update");
+	await update.waitForClickable();
+	await update.click();
+	await modal.waitForDisplayed({ reverse: true });
+};
 
 describe("enrollment", () => {
 	let core: CoreApi;
@@ -76,19 +93,9 @@ describe("enrollment", () => {
 		await selectTotpIfNeeded();
 		const secret = await configureTotp();
 		await finishEnrollment();
-		await browser.waitUntil(
-			async () =>
-				(
-					await invoke<Array<{ mfa_configured_methods: string[] | null }>>(
-						"all_instances",
-					)
-				).some((instance) => instance.mfa_configured_methods?.includes("totp")),
-			{
-				timeout: 60_000,
-				interval: 2_000,
-				timeoutMsg:
-					"Config polling did not report TOTP as configured - Core needs an enterprise license",
-			},
+		await refreshInstanceConfiguration(
+			fixture.enrollmentUrl,
+			await core.startDesktopConfiguration(fixture.username),
 		);
 
 		await connectAndPing(FULL_MFA_VIEW, secret);

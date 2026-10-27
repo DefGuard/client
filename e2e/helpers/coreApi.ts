@@ -252,6 +252,17 @@ export class CoreApi {
 		};
 	}
 
+	async startDesktopConfiguration(username: string): Promise<string> {
+		const data = await this.requestJson<{ enrollment_token: string }>(
+			"POST",
+			`/api/v1/user/${username}/start_desktop`,
+			{
+				send_enrollment_notification: false,
+			},
+		);
+		return data.enrollment_token;
+	}
+
 	// A user with a pending enrollment, always (re)created so it has not enrolled.
 	async createEnrollmentFixture(): Promise<EnrollmentFixture> {
 		const pinned = process.env.TEST_USERNAME;
