@@ -28,6 +28,17 @@ export interface AddedUserDevice {
 	configs: DeviceConfig[];
 }
 
+export interface MfaFlowAssignment {
+	flow_id: number;
+	is_default: boolean;
+	group_ids: number[];
+}
+
+export interface LocationMfa {
+	enabled: boolean;
+	flows: MfaFlowAssignment[];
+}
+
 export interface EnrollmentFixture {
 	username: string;
 	enrollmentToken: string;
@@ -147,18 +158,23 @@ export class CoreApi {
 		);
 	}
 
-	async setLocationMfaEnabled(
+	async setLocationMfa(
 		networkId: number,
-		enabled: boolean,
-	): Promise<boolean> {
+		changes: Partial<LocationMfa>,
+	): Promise<LocationMfa> {
 		const current = await this.getNetworkDetails(networkId);
-		const previous = current.mfa_enabled === true;
-		if (previous === enabled) {
-			return previous;
-		}
-		const mfaFlows = await this.requestJson<
+		const assignedFlows = await this.requestJson<
 			Array<{ id: number; is_default: boolean; groups: Array<{ id: number }> }>
 		>("GET", `/api/v1/location/${networkId}/mfa-flows`);
+		const previous: LocationMfa = {
+			enabled: current.mfa_enabled === true,
+			flows: assignedFlows.map((flow) => ({
+				flow_id: flow.id,
+				is_default: flow.is_default,
+				group_ids: flow.groups.map((group) => group.id),
+			})),
+		};
+		const enabled = changes.enabled ?? previous.enabled;
 		const joinList = (value: unknown): string =>
 			Array.isArray(value)
 				? value.join(",")
@@ -200,36 +216,50 @@ export class CoreApi {
 			posture_checks: Array.isArray(current.posture_checks)
 				? current.posture_checks
 				: [],
-			mfa_flows: mfaFlows.map((flow) => ({
-				flow_id: flow.id,
-				is_default: flow.is_default,
-				group_ids: flow.groups.map((group) => group.id),
-			})),
+			mfa_flows: changes.flows ?? previous.flows,
 		});
 		return previous;
 	}
 
+	async totpMfaFlowId(): Promise<number> {
+		const title = "e2e TOTP";
+		const flows = await this.requestJson<Array<{ id: number; title: string }>>(
+			"GET",
+			"/api/v1/mfa-flow",
+		);
+		const existing = flows.find((flow) => flow.title === title);
+		if (existing) {
+			return existing.id;
+		}
+		const created = await this.requestJson<{ id: number }>(
+			"POST",
+			"/api/v1/mfa-flow",
+			{ title, steps: [{ methods: ["totp"] }] },
+		);
+		return created.id;
+	}
+
 	// Core reports `mfa_required` during enrollment when any location on the instance enforces
 	// MFA, so a test that expects no MFA has to clear every location, not just its own.
-	async disableAllLocationMfa(): Promise<Map<number, boolean>> {
-		const previous = new Map<number, boolean>();
+	async disableAllLocationMfa(): Promise<Map<number, LocationMfa>> {
+		const previous = new Map<number, LocationMfa>();
 		try {
 			for (const network of await this.listNetworks()) {
 				previous.set(
 					network.id,
-					await this.setLocationMfaEnabled(network.id, false),
+					await this.setLocationMfa(network.id, { enabled: false }),
 				);
 			}
 		} catch (error) {
-			await this.restoreLocationMfaEnabled(previous).catch(() => undefined);
+			await this.restoreLocationMfa(previous).catch(() => undefined);
 			throw error;
 		}
 		return previous;
 	}
 
-	async restoreLocationMfaEnabled(states: Map<number, boolean>): Promise<void> {
-		for (const [networkId, enabled] of states) {
-			await this.setLocationMfaEnabled(networkId, enabled);
+	async restoreLocationMfa(states: Map<number, LocationMfa>): Promise<void> {
+		for (const [networkId, state] of states) {
+			await this.setLocationMfa(networkId, state);
 		}
 	}
 

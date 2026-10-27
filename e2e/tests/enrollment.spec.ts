@@ -9,6 +9,7 @@ import {
 import {
 	type CoreApi,
 	type EnrollmentFixture,
+	type LocationMfa,
 	loggedInCoreApi,
 } from "../helpers/coreApi.js";
 import {
@@ -23,7 +24,7 @@ import { switchToTrayView } from "../helpers/windows.js";
 describe("enrollment", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfaStates: Map<number, boolean> | undefined;
+	let previousMfaStates: Map<number, LocationMfa> | undefined;
 	let fixture: EnrollmentFixture | undefined;
 
 	beforeEach(async () => {
@@ -42,7 +43,7 @@ describe("enrollment", () => {
 
 	afterEach(async () => {
 		if (previousMfaStates) {
-			await core.restoreLocationMfaEnabled(previousMfaStates);
+			await core.restoreLocationMfa(previousMfaStates);
 		}
 		await resetInstances();
 		if (fixture?.ephemeral) {
@@ -68,7 +69,16 @@ describe("enrollment", () => {
 
 	it("enrolls a user with TOTP MFA and connects from the full and tray views", async () => {
 		previousMfaStates = await core.disableAllLocationMfa();
-		await core.setLocationMfaEnabled(networkId, true);
+		await core.setLocationMfa(networkId, {
+			enabled: true,
+			flows: [
+				{
+					flow_id: await core.totpMfaFlowId(),
+					is_default: true,
+					group_ids: [],
+				},
+			],
+		});
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);

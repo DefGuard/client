@@ -37,8 +37,10 @@ const NETWORK = {
 	acl_enabled: false,
 	acl_default_allow: false,
 	allowed_ips_from_acl: false,
-	location_mfa_mode: "disabled",
+	mfa_enabled: false,
 	service_location_mode: "disabled",
+	posture_checks: [],
+	mfa_flows: [],
 };
 
 async function waitForCore() {
