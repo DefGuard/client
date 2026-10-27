@@ -1,5 +1,5 @@
-import { $, expect } from "@wdio/globals";
-import { resetInstances } from "../helpers/client.js";
+import { $, browser, expect } from "@wdio/globals";
+import { invoke, resetInstances } from "../helpers/client.js";
 import {
 	connectAndPing,
 	disconnect,
@@ -76,6 +76,20 @@ describe("enrollment", () => {
 		await selectTotpIfNeeded();
 		const secret = await configureTotp();
 		await finishEnrollment();
+		await browser.waitUntil(
+			async () =>
+				(
+					await invoke<Array<{ mfa_configured_methods: string[] | null }>>(
+						"all_instances",
+					)
+				).some((instance) => instance.mfa_configured_methods?.includes("totp")),
+			{
+				timeout: 60_000,
+				interval: 2_000,
+				timeoutMsg:
+					"Config polling did not report TOTP as configured - Core needs an enterprise license",
+			},
+		);
 
 		await connectAndPing(FULL_MFA_VIEW, secret);
 		await disconnect();
