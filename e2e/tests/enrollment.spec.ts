@@ -9,7 +9,6 @@ import {
 import {
 	type CoreApi,
 	type EnrollmentFixture,
-	type LocationMfaMode,
 	loggedInCoreApi,
 } from "../helpers/coreApi.js";
 import {
@@ -24,11 +23,11 @@ import { switchToTrayView } from "../helpers/windows.js";
 describe("enrollment", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfaModes: Map<number, LocationMfaMode> | undefined;
+	let previousMfaStates: Map<number, boolean> | undefined;
 	let fixture: EnrollmentFixture | undefined;
 
 	beforeEach(async () => {
-		previousMfaModes = undefined;
+		previousMfaStates = undefined;
 		fixture = undefined;
 		core = await loggedInCoreApi();
 		const networkName = process.env.NETWORK_NAME ?? "e2e";
@@ -42,8 +41,8 @@ describe("enrollment", () => {
 	});
 
 	afterEach(async () => {
-		if (previousMfaModes) {
-			await core.restoreLocationMfaModes(previousMfaModes);
+		if (previousMfaStates) {
+			await core.restoreLocationMfaEnabled(previousMfaStates);
 		}
 		await resetInstances();
 		if (fixture?.ephemeral) {
@@ -52,7 +51,7 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user without MFA and connects from the full and tray views", async () => {
-		previousMfaModes = await core.disableAllLocationMfa();
+		previousMfaStates = await core.disableAllLocationMfa();
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);
@@ -68,8 +67,8 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user with TOTP MFA and connects from the full and tray views", async () => {
-		previousMfaModes = await core.disableAllLocationMfa();
-		await core.setLocationMfaMode(networkId, "internal");
+		previousMfaStates = await core.disableAllLocationMfa();
+		await core.setLocationMfaEnabled(networkId, true);
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);

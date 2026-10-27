@@ -11,8 +11,6 @@ const requireEnv = (name: string): string => {
 const coreUrl = (): string => requireEnv("CORE_URL");
 const proxyUrl = (): string => requireEnv("PROXY_URL");
 
-export type LocationMfaMode = "disabled" | "internal" | "external";
-
 export interface DeviceConfig {
 	network_id: number;
 	network_name: string;
@@ -149,15 +147,18 @@ export class CoreApi {
 		);
 	}
 
-	async setLocationMfaMode(
+	async setLocationMfaEnabled(
 		networkId: number,
-		mode: LocationMfaMode,
-	): Promise<LocationMfaMode> {
+		enabled: boolean,
+	): Promise<boolean> {
 		const current = await this.getNetworkDetails(networkId);
-		const previous = current.location_mfa_mode as LocationMfaMode;
-		if (previous === mode) {
+		const previous = current.mfa_enabled === true;
+		if (previous === enabled) {
 			return previous;
 		}
+		const mfaFlows = await this.requestJson<
+			Array<{ id: number; is_default: boolean; groups: Array<{ id: number }> }>
+		>("GET", `/api/v1/location/${networkId}/mfa-flows`);
 		const joinList = (value: unknown): string =>
 			Array.isArray(value)
 				? value.join(",")
@@ -176,52 +177,59 @@ export class CoreApi {
 			dns: typeof current.dns === "string" ? current.dns : null,
 			mtu: current.mtu,
 			fwmark: current.fwmark,
+			client_mtu: current.client_mtu ?? null,
 			allow_all_groups: current.allow_all_groups === true,
 			allowed_groups: Array.isArray(current.allowed_groups)
 				? current.allowed_groups
 				: [],
 			keepalive_interval: current.keepalive_interval,
-			peer_disconnect_threshold:
-				mode === "disabled"
-					? peerDisconnectThreshold
-					: Math.max(
-							peerDisconnectThreshold,
-							MIN_PEER_DISCONNECT_THRESHOLD_WITH_MFA,
-						),
+			peer_disconnect_threshold: enabled
+				? Math.max(
+						peerDisconnectThreshold,
+						MIN_PEER_DISCONNECT_THRESHOLD_WITH_MFA,
+					)
+				: peerDisconnectThreshold,
 			acl_enabled: current.acl_enabled === true,
 			acl_default_allow: current.acl_default_allow === true,
-			location_mfa_mode: mode,
+			allowed_ips_from_acl: current.allowed_ips_from_acl === true,
+			mfa_enabled: enabled,
 			service_location_mode:
 				typeof current.service_location_mode === "string"
 					? current.service_location_mode
 					: "disabled",
+			posture_checks: Array.isArray(current.posture_checks)
+				? current.posture_checks
+				: [],
+			mfa_flows: mfaFlows.map((flow) => ({
+				flow_id: flow.id,
+				is_default: flow.is_default,
+				group_ids: flow.groups.map((group) => group.id),
+			})),
 		});
 		return previous;
 	}
 
 	// Core reports `mfa_required` during enrollment when any location on the instance enforces
-	// internal MFA, so a test that expects no MFA has to clear every location, not just its own.
-	async disableAllLocationMfa(): Promise<Map<number, LocationMfaMode>> {
-		const previous = new Map<number, LocationMfaMode>();
+	// MFA, so a test that expects no MFA has to clear every location, not just its own.
+	async disableAllLocationMfa(): Promise<Map<number, boolean>> {
+		const previous = new Map<number, boolean>();
 		try {
 			for (const network of await this.listNetworks()) {
 				previous.set(
 					network.id,
-					await this.setLocationMfaMode(network.id, "disabled"),
+					await this.setLocationMfaEnabled(network.id, false),
 				);
 			}
 		} catch (error) {
-			await this.restoreLocationMfaModes(previous).catch(() => undefined);
+			await this.restoreLocationMfaEnabled(previous).catch(() => undefined);
 			throw error;
 		}
 		return previous;
 	}
 
-	async restoreLocationMfaModes(
-		modes: Map<number, LocationMfaMode>,
-	): Promise<void> {
-		for (const [networkId, mode] of modes) {
-			await this.setLocationMfaMode(networkId, mode);
+	async restoreLocationMfaEnabled(states: Map<number, boolean>): Promise<void> {
+		for (const [networkId, enabled] of states) {
+			await this.setLocationMfaEnabled(networkId, enabled);
 		}
 	}
 
