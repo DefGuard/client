@@ -17,6 +17,7 @@ export function useTooltip({
   disabled = false,
   initialOpen = false,
   placement = 'top',
+  openDelayMs = 0,
   open: controlledOpen,
   onOpenChange: setControlledOpen,
 }: TooltipOptions = {}) {
@@ -45,6 +46,7 @@ export function useTooltip({
 
   const hover = useHover(context, {
     move: false,
+    delay: { open: openDelayMs },
     enabled: controlledOpen == null && !disabled,
   });
   const focus = useFocus(context, {

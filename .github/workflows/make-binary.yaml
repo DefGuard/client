@@ -30,14 +30,14 @@ jobs:
       - name: Rename client binary
         run: mv src-tauri/target/release/${{ inputs.flavor }} ${{ inputs.flavor }}-${{ inputs.system }}-${{ inputs.binary_arch }}-${{ github.ref_name }}
       - name: Tar client binary
-        uses: a7ul/tar-action@v1.2.0
+        uses: a7ul/tar-action@ed9cbd44fc9276db29ea2fb1f8adf3d7e0691589 # v1.2.0
         with:
           command: c
           files: |
             ${{ inputs.flavor }}-${{ inputs.system }}-${{ inputs.binary_arch }}-${{ github.ref_name }}
           outPath: ${{ inputs.flavor }}-${{ inputs.system }}-${{ inputs.binary_arch }}-${{ github.ref_name }}.tar.gz
       - name: Upload client archive
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

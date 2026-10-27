@@ -1,5 +1,6 @@
 import './style.scss';
 import clsx from 'clsx';
+import { TruncatedText } from '../../../../../shared/components/TruncatedText/TruncatedText';
 import { useAppData } from '../../../../../shared/providers/AppDataContext';
 import type {
   InstanceInfo,
@@ -20,7 +21,7 @@ type SelectionItemProps = {
 
 const SelectionItem = ({ label, selected, onClick }: SelectionItemProps) => (
   <button className={clsx('item', { selected })} onClick={onClick}>
-    <span>{label}</span>
+    <TruncatedText className="label" text={label} tooltipPlacement="right" delayTooltip />
   </button>
 );
 

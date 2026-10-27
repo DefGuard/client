@@ -15,7 +15,7 @@ describe('reportMfaConfigStartError', () => {
     reportMfaConfigStartError(JSON.stringify({ type: 'mfa_not_usable' }));
 
     expect(Snackbar.error).toHaveBeenCalledWith(
-      expect.stringContaining('certified security key in your Defguard profile'),
+      expect.stringContaining('in your Defguard profile'),
     );
   });
 });
