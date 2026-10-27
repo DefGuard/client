@@ -9,7 +9,6 @@ import {
 import {
 	type CoreApi,
 	type EnrollmentFixture,
-	type LocationMfaMode,
 	loggedInCoreApi,
 } from "../helpers/coreApi.js";
 import {
@@ -21,14 +20,30 @@ import {
 } from "../helpers/enrollment.js";
 import { switchToTrayView } from "../helpers/windows.js";
 
+const refreshInstanceConfiguration = async (token: string) => {
+	const actions = $(".overview-header-actions");
+	await actions.waitForClickable();
+	await actions.click();
+	const refresh = $(".menu-item*=Refresh configuration");
+	await refresh.waitForClickable();
+	await refresh.click();
+	const modal = $("#update-instance-modal");
+	await modal.waitForDisplayed();
+	await modal.$('[data-testid="field-token"]').setValue(token);
+	const update = modal.$("button=Update");
+	await update.waitForClickable();
+	await update.click();
+	await modal.waitForDisplayed({ reverse: true });
+};
+
 describe("enrollment", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfaModes: Map<number, LocationMfaMode> | undefined;
+	let previousMfaStates: Map<number, boolean> | undefined;
 	let fixture: EnrollmentFixture | undefined;
 
 	beforeEach(async () => {
-		previousMfaModes = undefined;
+		previousMfaStates = undefined;
 		fixture = undefined;
 		core = await loggedInCoreApi();
 		const networkName = process.env.NETWORK_NAME ?? "e2e";
@@ -42,8 +57,8 @@ describe("enrollment", () => {
 	});
 
 	afterEach(async () => {
-		if (previousMfaModes) {
-			await core.restoreLocationMfaModes(previousMfaModes);
+		if (previousMfaStates) {
+			await core.restoreLocationMfaEnabled(previousMfaStates);
 		}
 		await resetInstances();
 		if (fixture?.ephemeral) {
@@ -52,7 +67,7 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user without MFA and connects from the full and tray views", async () => {
-		previousMfaModes = await core.disableAllLocationMfa();
+		previousMfaStates = await core.disableAllLocationMfa();
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);
@@ -68,8 +83,8 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user with TOTP MFA and connects from the full and tray views", async () => {
-		previousMfaModes = await core.disableAllLocationMfa();
-		await core.setLocationMfaMode(networkId, "internal");
+		previousMfaStates = await core.disableAllLocationMfa();
+		await core.setLocationMfaEnabled(networkId, true);
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);
@@ -77,6 +92,9 @@ describe("enrollment", () => {
 		await selectTotpIfNeeded();
 		const secret = await configureTotp();
 		await finishEnrollment();
+		await refreshInstanceConfiguration(
+			await core.startDesktopConfiguration(fixture.username),
+		);
 
 		await connectAndPing(FULL_MFA_VIEW, secret);
 		await disconnect();
