@@ -19,6 +19,7 @@ jobs:
         with:
           draft: true
           generate_release_notes: true
+          tag_name: v2.2.0-beta1-staging
 
   create-sbom:
     needs:
