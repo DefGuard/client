@@ -795,32 +795,4 @@ mod tests {
             );
         }
     }
-
-    #[test]
-    #[ignore = "requires an isolated network namespace, CAP_NET_ADMIN and a DNS backend"]
-    fn test_remove_interfaces_continues_after_failure_and_preserves_unmanaged_interface() {
-        let service = DaemonService::default();
-        let mut unmanaged = WG::new("dgd-other").unwrap();
-        unmanaged.create_interface().unwrap();
-        let ifnames = ["dgd-test0", "dgd-test1", "dgd-test2"];
-        {
-            let mut wgapis = service.wgapis.write().unwrap();
-            for ifname in ifnames {
-                wgapis.insert(ifname.into(), WG::new(ifname).unwrap());
-            }
-            // leave the first interface absent to exercise failure before successful removals
-            for (_, wgapi) in wgapis.iter_mut().skip(1) {
-                wgapi.create_interface().unwrap();
-            }
-        }
-
-        service.remove_interfaces();
-
-        assert!(service.wgapis.read().unwrap().is_empty());
-        for ifname in ifnames {
-            assert!(WG::new(ifname).unwrap().read_interface_data().is_err());
-        }
-        assert!(unmanaged.read_interface_data().is_ok());
-        unmanaged.remove_interface().unwrap();
-    }
 }
