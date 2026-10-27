@@ -41,7 +41,10 @@ use nix::unistd::{chown, Group};
 #[cfg(unix)]
 use tokio::net::UnixListener;
 #[cfg(target_os = "linux")]
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::{
+    signal::unix::{signal, SignalKind},
+    sync::oneshot,
+};
 use tokio::{sync::mpsc, task::JoinHandle, time::interval};
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
@@ -688,44 +691,56 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     #[cfg(target_os = "linux")]
     {
-        let mut reconciler_error = None;
-        let result = server
-            .serve_with_incoming_shutdown(uds_stream, async {
-                let reconciler_result = tokio::select! {
-                    _ = interrupt.recv() => {
-                        info!("Received SIGINT, stopping Defguard daemon");
-                        None
-                    }
-                    _ = terminate.recv() => {
-                        info!("Received SIGTERM, stopping Defguard daemon");
-                        None
-                    }
-                    result = &mut reconciler_handle => Some(result),
-                };
-
-                if let Some(result) = reconciler_result {
-                    let message = match result {
-                        Ok(()) => "Service location reconciler ended unexpectedly".to_string(),
-                        Err(err) => format!("Service location reconciler task failed: {err}"),
-                    };
-                    error!("{message}");
-                    reconciler_error = Some(message);
-                } else {
-                    reconciler_handle.abort();
-                    let _ = (&mut reconciler_handle).await;
-                }
-
-                // close statistics streams so they do not hold up graceful server shutdown
-                daemon_service.stop_stat_tasks();
-            })
-            .await;
-
-        // server errors can bypass the shutdown future
-        if !reconciler_handle.is_finished() {
-            reconciler_handle.abort();
-            let _ = reconciler_handle.await;
+        enum ShutdownReason {
+            Signal,
+            Server(Result<(), tonic::transport::Error>),
+            Reconciler(Result<(), tokio::task::JoinError>),
         }
+
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let server = server.serve_with_incoming_shutdown(uds_stream, async {
+            let _ = shutdown_rx.await;
+        });
+        tokio::pin!(server);
+
+        let reason = tokio::select! {
+            _ = interrupt.recv() => {
+                info!("Received SIGINT, stopping Defguard daemon");
+                ShutdownReason::Signal
+            }
+            _ = terminate.recv() => {
+                info!("Received SIGTERM, stopping Defguard daemon");
+                ShutdownReason::Signal
+            }
+            result = &mut reconciler_handle => ShutdownReason::Reconciler(result),
+            result = &mut server => ShutdownReason::Server(result),
+        };
+
+        let reconciler_error = match &reason {
+            ShutdownReason::Reconciler(result) => {
+                let message = match result {
+                    Ok(()) => "Service location reconciler ended unexpectedly".to_string(),
+                    Err(err) => format!("Service location reconciler task failed: {err}"),
+                };
+                error!("{message}");
+                Some(message)
+            }
+            _ => {
+                reconciler_handle.abort();
+                let _ = reconciler_handle.await;
+                None
+            }
+        };
+
+        // close statistics streams so they do not hold up graceful server shutdown
         daemon_service.stop_stat_tasks();
+        let result = match reason {
+            ShutdownReason::Server(result) => result,
+            _ => {
+                let _ = shutdown_tx.send(());
+                server.await
+            }
+        };
         daemon_service.remove_interfaces();
 
         result?;
