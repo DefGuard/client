@@ -4,9 +4,9 @@ import z from 'zod';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
-import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
 import { Split } from '../../../../../shared/components/Split/Split';
+import { Toggle } from '../../../../../shared/components/Toggle/Toggle';
 import { useAppForm } from '../../../../../shared/form';
 import { formChangeLogic } from '../../../../../shared/formLogic';
 import { api } from '../../../../../shared/rust-api/api';
@@ -24,6 +24,7 @@ type FormFields = z.infer<typeof formSchema>;
 
 export const AdvancedSettingsStep = () => {
   const initData = useTunnelWizardStore((s) => s.tunnelData);
+  const enabled = useTunnelWizardStore((s) => s.advancedSettingsEnabled);
 
   const { mutateAsync } = useMutation({ mutationFn: api.saveTunnel });
 
@@ -45,8 +46,15 @@ export const AdvancedSettingsStep = () => {
       onChange: formSchema,
     },
     onSubmit: async ({ value }) => {
-      const storeValues = useTunnelWizardStore.getState().tunnelData;
-      const toSend = { ...storeValues, ...value };
+      const { tunnelData, advancedSettingsEnabled } = useTunnelWizardStore.getState();
+      const toCommand = (command: string) => (advancedSettingsEnabled ? command : '');
+      const toSend = {
+        ...tunnelData,
+        pre_up: toCommand(value.pre_up),
+        post_up: toCommand(value.post_up),
+        pre_down: toCommand(value.pre_down),
+        post_down: toCommand(value.post_down),
+      };
       await mutateAsync(toSend);
       useTunnelWizardStore.getState().next();
     },
@@ -63,7 +71,17 @@ export const AdvancedSettingsStep = () => {
           other network configuration.
         </p>
       </header>
-      <Divider spacing={ThemeSpacing.Xl2} />
+      <SizedBox height={ThemeSpacing.Xl2} />
+      <Toggle
+        testId="advanced-settings-toggle"
+        active={enabled}
+        label="Enable advanced configuration"
+        helper="PreUp, PostUp, PreDown and PostDown commands run on this computer every time the tunnel connects or disconnects. They are saved only when this is enabled. Otherwise they are discarded, including commands from an imported config file."
+        onClick={() => {
+          useTunnelWizardStore.getState().setAdvancedSettingsEnabled(!enabled);
+        }}
+      />
+      <SizedBox height={ThemeSpacing.Xl2} />
       <form
         onSubmit={(e) => {
           e.stopPropagation();
@@ -74,19 +92,23 @@ export const AdvancedSettingsStep = () => {
         <form.AppForm>
           <Split>
             <form.AppField name="pre_up">
-              {(field) => <field.FormInput notNull label="Pre-up" />}
+              {(field) => <field.FormInput notNull disabled={!enabled} label="Pre-up" />}
             </form.AppField>
             <form.AppField name="post_up">
-              {(field) => <field.FormInput notNull label="Post-up" />}
+              {(field) => <field.FormInput notNull disabled={!enabled} label="Post-up" />}
             </form.AppField>
           </Split>
           <SizedBox height={ThemeSpacing.Xl2} />
           <Split>
             <form.AppField name="pre_down">
-              {(field) => <field.FormInput notNull label="Pre-down" />}
+              {(field) => (
+                <field.FormInput notNull disabled={!enabled} label="Pre-down" />
+              )}
             </form.AppField>
             <form.AppField name="post_down">
-              {(field) => <field.FormInput notNull label="Post-down" />}
+              {(field) => (
+                <field.FormInput notNull disabled={!enabled} label="Post-down" />
+              )}
             </form.AppField>
           </Split>
         </form.AppForm>

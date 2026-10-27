@@ -51,6 +51,18 @@
     @include animate(color);
   }
 
+  &.with-helper {
+    display: flex;
+    width: 100%;
+  }
+
+  & > .helper {
+    cursor: default;
+    display: flex;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
   &.disabled {
     --circle: var(--border-disabled);
     --circle-x: 3px;

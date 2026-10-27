@@ -161,12 +161,12 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
       {
         items: [
           {
-            text: isInstance ? 'Refresh configuration' : 'Edit',
+            text: isInstance ? 'Refresh configuration' : 'Edit tunnel',
             icon: 'refresh',
             onClick: handleUpdate,
           },
           {
-            text: isInstance ? 'Delete instance' : 'Delete',
+            text: isInstance ? 'Delete instance' : 'Delete tunnel',
             icon: 'delete',
             onClick: handleDeleteIntent,
           },
