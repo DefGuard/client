@@ -22,6 +22,8 @@ import type {
 } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { isPresent } from '../../../utils/isPresent';
+import { IconKind } from '../../Icon';
+import type { IconKindValue } from '../../Icon/icon-types';
 
 type TokenData = {
   token: string;
@@ -36,7 +38,7 @@ type Options = {
   onStepAdvanced: (nextStepIndex: number) => void;
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
-  onServiceUnavailable?: () => void;
+  onConnectionError?: (message?: string, icon?: IconKindValue) => void;
 };
 
 export const useMfaMobileConnect = (
@@ -48,7 +50,7 @@ export const useMfaMobileConnect = (
     onStepAdvanced,
     onConnected,
     onPostureError,
-    onServiceUnavailable,
+    onConnectionError,
   }: Options,
 ) => {
   const { data: instances } = useQuery(getInstancesQueryOptions);
@@ -66,11 +68,13 @@ export const useMfaMobileConnect = (
   const onConnectedRef = useRef(onConnected);
   const onStepAdvancedRef = useRef(onStepAdvanced);
   const setMfaTokenRef = useRef(setMfaToken);
+  const onConnectionErrorRef = useRef(onConnectionError);
   const instanceId = instance?.id;
 
   onConnectedRef.current = onConnected;
   onStepAdvancedRef.current = onStepAdvanced;
   setMfaTokenRef.current = setMfaToken;
+  onConnectionErrorRef.current = onConnectionError;
 
   const cleanupListeners = useCallback(() => {
     if (unlistenRef.current !== null) {
@@ -161,7 +165,7 @@ export const useMfaMobileConnect = (
             setTokenData(null);
             if (!retryable) setMfaTokenRef.current(null);
             if (parseMfaError(event.payload.error)?.type === 'mobile_client_outdated') {
-              setConnectionError(message);
+              onConnectionErrorRef.current?.(message, IconKind.DisableMfa);
               return;
             }
             setConnectionError(
@@ -273,7 +277,7 @@ export const useMfaMobileConnect = (
         return;
       }
       if (isServiceUnavailable(e)) {
-        onServiceUnavailable?.();
+        onConnectionError?.();
         return;
       }
       setStartError(mfaErrorMessage(e));
@@ -289,7 +293,7 @@ export const useMfaMobileConnect = (
     cleanupListeners,
     setMfaToken,
     onPostureError,
-    onServiceUnavailable,
+    onConnectionError,
   ]);
 
   const reset = useCallback(() => {

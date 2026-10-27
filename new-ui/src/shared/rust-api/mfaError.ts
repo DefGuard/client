@@ -20,7 +20,7 @@ export const parseMfaError = (err: unknown): ParsedMfaError | null => {
 export const mfaErrorMessage = (err: unknown): string => {
   const parsed = parseMfaError(err);
   if (parsed?.type === 'mobile_client_outdated') {
-    return 'Your Defguard mobile app is out of date. Update it to approve this connection.';
+    return 'Your Defguard mobile app is out of date.\nUpgrade to approve this connection.';
   }
   return parsed?.message ?? String(err);
 };

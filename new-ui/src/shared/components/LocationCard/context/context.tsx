@@ -23,6 +23,8 @@ import {
   shouldStartMfa,
   usableMfaMethods,
 } from '../../../utils/mfa';
+import { IconKind } from '../../Icon';
+import type { IconKindValue } from '../../Icon/icon-types';
 import { findRouteConflicts, openRouteConflictInFullView } from '../api/connectError';
 import {
   LocationCardViews,
@@ -37,6 +39,7 @@ interface LocationCardContextValue {
   previousView: LocationCardViewsValue | null;
   postureError: string | null;
   connectionError: string | null;
+  connectionErrorIcon: IconKindValue | null;
   autoConnectOpenid: boolean;
   mfaMethod: MfaMethodValue;
   /** Whether the MFA flow can be passed as is, after configuring factors, or not at
@@ -51,7 +54,11 @@ interface LocationCardContextValue {
   setMfaToken: (token: string | null) => void;
   goToStep: (stepIndex: number) => void;
   setStepPlanOnce: (plan: MfaMethodValue[]) => void;
-  setView: (view: LocationCardViewsValue, connectionError?: string) => void;
+  setView: (
+    view: LocationCardViewsValue,
+    connectionError?: string,
+    icon?: IconKindValue | null,
+  ) => void;
   setPostureError: (error: string | null) => void;
   startMfa: () => void;
 }
@@ -84,6 +91,9 @@ export const LocationCardProvider = ({
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [postureError, setPostureError] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionErrorIcon, setConnectionErrorIcon] = useState<IconKindValue | null>(
+    null,
+  );
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
@@ -120,10 +130,15 @@ export const LocationCardProvider = ({
   }, [location.active]);
 
   const setView = useCallback(
-    (view: LocationCardViewsValue, connectionError?: string) => {
+    (
+      view: LocationCardViewsValue,
+      connectionError?: string,
+      icon: IconKindValue | null = IconKind.ServiceUnavailable,
+    ) => {
       setPreviousView(currentView);
       setCurrentView(view);
       setConnectionError(connectionError ?? null);
+      setConnectionErrorIcon(view === LocationCardViews.ConnectionError ? icon : null);
     },
     [currentView],
   );
@@ -205,6 +220,7 @@ export const LocationCardProvider = ({
         previousView,
         postureError,
         connectionError,
+        connectionErrorIcon,
         autoConnectOpenid,
         location,
         instance,

@@ -18,7 +18,7 @@ describe('isInvalidCode', () => {
 describe('mfaErrorMessage', () => {
   it('maps the outdated mobile client type to an upgrade message', () => {
     expect(mfaErrorMessage(JSON.stringify({ type: 'mobile_client_outdated' }))).toBe(
-      'Your Defguard mobile app is out of date. Update it to approve this connection.',
+      'Your Defguard mobile app is out of date.\nUpgrade to approve this connection.',
     );
   });
 
