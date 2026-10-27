@@ -26,12 +26,8 @@ import {
 
 const formSchema = z
   .object({
-    password: z
-      .string()
-      .trim()
-      .min(1, 'Field is required')
-      .regex(/^\S+$/, 'Password cannot contain spaces'),
-    repeat: z.string().trim(),
+    password: z.string().min(1, 'Field is required'),
+    repeat: z.string(),
   })
   .superRefine(({ password, repeat }, ctx) => {
     const passwordIssues = refinePasswordField(password);
@@ -84,7 +80,7 @@ export const PasswordStep = () => {
           });
         }
         useEnrollmentStore.setState({
-          userPassword: value.password.trim(),
+          userPassword: value.password,
         });
         if (skipMfa) {
           await activateUser();
