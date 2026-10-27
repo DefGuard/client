@@ -280,6 +280,7 @@ export type AppConfig = {
   mtu: number;
   auto_start_openid_mfa: boolean;
   start_minimized: boolean;
+  open_in_full_window: boolean;
 };
 
 export type AppConfigPatch = Partial<AppConfig>;

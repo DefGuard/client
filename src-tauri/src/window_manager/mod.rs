@@ -5,6 +5,7 @@ use tauri::{
 };
 
 use crate::{
+    appstate::AppState,
     commands::{build_instance_info, build_location_info},
     connection::active_connections::get_connection_id_by_type,
     database::{
@@ -223,10 +224,19 @@ pub(crate) fn show_tray_window(app: &AppHandle) {
     let _ = WindowManager::open_tray(app);
 }
 
+fn prefers_full_view(app: &AppHandle) -> bool {
+    app.state::<AppState>()
+        .app_config
+        .lock()
+        .unwrap()
+        .open_in_full_window
+}
+
 /// Show the compact (tray) window when there is tray content (a non-service
-/// location or a tunnel), otherwise fall back to the full view.
+/// location or a tunnel) and the "open in full window" setting is off,
+/// otherwise fall back to the full view.
 pub fn show_tray_or_full_view(app: &AppHandle) {
-    if block_on(has_tray_content()) {
+    if !prefers_full_view(app) && block_on(has_tray_content()) {
         // Hide the full view if it is open and visible (not minimized) so only the compact window is shown.
         if let Some(full_view) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
             let full_view_visible = full_view.is_visible().ok().unwrap_or(false);
@@ -242,7 +252,10 @@ pub fn show_tray_or_full_view(app: &AppHandle) {
 
 /// Surface the window that should host the MFA flow, and emit `MfaTrigger` targeted at that window.
 pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
-    let target = if let Some(window) = app
+    let target = if prefers_full_view(app) {
+        let _ = WindowManager::open_full_view(app);
+        FULL_VIEW_WINDOW_ID
+    } else if let Some(window) = app
         .get_webview_window(FULL_VIEW_WINDOW_ID)
         .filter(|w| w.is_visible().unwrap_or(false))
     {

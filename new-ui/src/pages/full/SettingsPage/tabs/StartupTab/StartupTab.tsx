@@ -50,6 +50,18 @@ export const StartupTab = ({ appConfig }: Props) => {
           onClick={() => patchConfig({ start_minimized: !appConfig.start_minimized })}
         />
       </SettingRow>
+      <SettingRow
+        title="Open app in full window"
+        description="Defguard always opens in the full window instead of the compact tray view, at startup and when opened from the system tray."
+        inline
+      >
+        <Toggle
+          active={appConfig.open_in_full_window}
+          onClick={() =>
+            patchConfig({ open_in_full_window: !appConfig.open_in_full_window })
+          }
+        />
+      </SettingRow>
     </>
   );
 };

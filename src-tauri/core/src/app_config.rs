@@ -58,6 +58,7 @@ pub struct AppConfig {
     mtu: u32,
     pub auto_start_openid_mfa: bool,
     pub start_minimized: bool,
+    pub open_in_full_window: bool,
 }
 
 // Important: keep in sync with client store default in frontend
@@ -71,6 +72,7 @@ impl Default for AppConfig {
             mtu: 0,
             auto_start_openid_mfa: false,
             start_minimized: false,
+            open_in_full_window: false,
         }
     }
 }
@@ -152,6 +154,7 @@ mod tests {
         assert_eq!(config.peer_alive_period, default.peer_alive_period);
         assert_eq!(config.mtu(), default.mtu());
         assert!(!config.start_minimized);
+        assert!(!config.open_in_full_window);
         // The config file is written out on first load.
         assert!(dir.path().join(APP_CONFIG_FILE_NAME).exists());
     }
@@ -189,6 +192,7 @@ mod tests {
             AppConfig::default().check_for_updates
         );
         assert!(!config.start_minimized);
+        assert!(!config.open_in_full_window);
     }
 
     #[test]
@@ -197,6 +201,7 @@ mod tests {
         let config = AppConfig {
             theme: AppTheme::Dark,
             start_minimized: true,
+            open_in_full_window: true,
             ..AppConfig::default()
         };
         config.save(dir.path());
@@ -204,6 +209,7 @@ mod tests {
         let reloaded = AppConfig::new(dir.path());
         assert_eq!(reloaded.theme, AppTheme::Dark);
         assert!(reloaded.start_minimized);
+        assert!(reloaded.open_in_full_window);
     }
 
     #[test]
