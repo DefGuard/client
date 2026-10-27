@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { motionTransitionStandard } from '../../consts';
 import { LoaderSpinner } from '../LoaderSpinner/LoaderSpinner';
 import customImage from './assets/custom.svg';
-import googleImage from './assets/google.svg';
+import googleImage from './assets/google.png';
 import jumpcloudImage from './assets/jumpcloud.svg';
 import microsoftImage from './assets/microsoft.svg';
 import oktaImage from './assets/okta.svg';
@@ -64,7 +64,7 @@ export const ExternalProviderButton = ({
         },
       )}
     >
-      <img src={providerImage} width={16} height={16} loading="eager" />
+      <img src={providerImage} width={16} height={16} loading="eager" decoding="async" />
       <span className="text">{text}</span>
       <AnimatePresence mode="wait">
         {loading && !disabled && (
