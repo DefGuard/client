@@ -32,8 +32,10 @@ export const ConnectModalMfaMobile = () => {
         useConnectModal.setState({ postureError: msg });
         useConnectModal.getState().setView(ConnectModalView.PostureCheckFail);
       },
-      onServiceUnavailable: () =>
-        useConnectModal.getState().setView(ConnectModalView.ConnectionError),
+      onConnectionError: (message) =>
+        useConnectModal.getState().setView(ConnectModalView.ConnectionError, {
+          connectionError: message ?? null,
+        }),
     },
   );
 

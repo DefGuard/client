@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   mfaBeginStep: vi.fn(),
   mfaConnectMobileApprove: vi.fn(),
   setMfaToken: vi.fn(),
+  onConnectionError: vi.fn(),
   instances: [{ id: 42, uuid: 'instance-uuid' }],
 }));
 
@@ -62,6 +63,7 @@ const renderMobileHook = (
         setMfaToken: mocks.setMfaToken,
         onStepAdvanced,
         onConnected,
+        onConnectionError: mocks.onConnectionError,
       }),
     { initialProps },
   );
@@ -249,6 +251,7 @@ describe('useMfaMobileConnect', () => {
     });
 
     expect(result.current.connectionError).toBe('Connection error. Please try again.');
+    expect(mocks.onConnectionError).not.toHaveBeenCalled();
     expect(mocks.setMfaToken).toHaveBeenLastCalledWith(null);
 
     await act(async () => {
@@ -262,7 +265,7 @@ describe('useMfaMobileConnect', () => {
     expect(mocks.mfaConnectMobileApprove).toHaveBeenCalledTimes(1);
   });
 
-  it('shows an upgrade message when the mobile client is outdated', async () => {
+  it('opens the connection error view when the mobile client is outdated', async () => {
     mocks.mfaBeginStep.mockResolvedValue({
       challenge: 'challenge-1',
       token: 'token-1',
@@ -289,9 +292,10 @@ describe('useMfaMobileConnect', () => {
       });
     });
 
-    expect(result.current.connectionError).toBe(
+    expect(mocks.onConnectionError).toHaveBeenCalledWith(
       'Your Defguard mobile app is out of date. Update it to approve this connection.',
     );
+    expect(result.current.connectionError).toBeNull();
     expect(result.current.qrValue).toBeNull();
     expect(result.current.isConnecting).toBe(false);
     expect(mocks.setMfaToken).toHaveBeenLastCalledWith(null);
