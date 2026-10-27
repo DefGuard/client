@@ -3,9 +3,18 @@
   flex-direction: column;
   align-items: center;
 
+  & > .btn {
+    width: 100%;
+  }
+
+  & > .icon {
+    --icon-color: var(--fg-white-50);
+  }
+
   .description {
     font: var(--t-body-xs-400);
     color: var(--fg-white-70);
     text-align: center;
+    white-space: pre-line;
   }
 }

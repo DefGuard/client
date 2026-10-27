@@ -22,6 +22,8 @@ import type {
 } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
 import { isPresent } from '../../../utils/isPresent';
+import { IconKind } from '../../Icon';
+import type { IconKindValue } from '../../Icon/icon-types';
 
 type TokenData = {
   token: string;
@@ -36,7 +38,7 @@ type Options = {
   onStepAdvanced: (nextStepIndex: number) => void;
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
-  onConnectionError?: (message?: string) => void;
+  onConnectionError?: (message?: string, icon?: IconKindValue) => void;
 };
 
 export const useMfaMobileConnect = (
@@ -163,7 +165,7 @@ export const useMfaMobileConnect = (
             setTokenData(null);
             if (!retryable) setMfaTokenRef.current(null);
             if (parseMfaError(event.payload.error)?.type === 'mobile_client_outdated') {
-              onConnectionErrorRef.current?.(message);
+              onConnectionErrorRef.current?.(message, IconKind.DisableMfa);
               return;
             }
             setConnectionError(

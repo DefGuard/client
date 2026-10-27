@@ -11,7 +11,7 @@ export const IconServiceUnavailable = (props: SVGProps<SVGSVGElement>) => {
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <g opacity="0.5">
+      <g>
         <path
           d="M11.9998 22.8388C17.9859 22.8388 22.8386 17.9861 22.8386 12.0001C22.8386 6.01403 17.9859 1.16138 11.9998 1.16138C6.01379 1.16138 1.16113 6.01403 1.16113 12.0001C1.16113 17.9861 6.01379 22.8388 11.9998 22.8388Z"
           stroke="currentColor"
