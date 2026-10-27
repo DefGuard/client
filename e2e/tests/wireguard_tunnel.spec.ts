@@ -5,11 +5,7 @@ import {
 	FULL_MFA_VIEW,
 	TRAY_MFA_VIEW,
 } from "../helpers/connection.js";
-import {
-	type CoreApi,
-	type LocationMfa,
-	loggedInCoreApi,
-} from "../helpers/coreApi.js";
+import { type CoreApi, loggedInCoreApi } from "../helpers/coreApi.js";
 import {
 	selectTunnel,
 	switchToFullView,
@@ -90,7 +86,7 @@ const submitTunnelEdit = async () => {
 describe("WireGuard tunnel", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfa: LocationMfa | undefined;
+	let previousMfaEnabled: boolean | undefined;
 	let config: TunnelConfig;
 
 	before(async () => {
@@ -103,13 +99,13 @@ describe("WireGuard tunnel", () => {
 			throw new Error(`Core network "${networkName}" was not found`);
 		}
 		networkId = network.id;
-		previousMfa = await core.setLocationMfa(networkId, { enabled: false });
+		previousMfaEnabled = await core.setLocationMfaEnabled(networkId, false);
 		config = await provisionTunnel(core, networkId, `e2e-tunnel-${Date.now()}`);
 	});
 
 	after(async () => {
-		if (previousMfa) {
-			await core.setLocationMfa(networkId, previousMfa);
+		if (previousMfaEnabled) {
+			await core.setLocationMfaEnabled(networkId, previousMfaEnabled);
 		}
 		if (config) {
 			await deleteTunnel(config.name);
