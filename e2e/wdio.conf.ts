@@ -67,7 +67,7 @@ export const config: WebdriverIO.Config = {
 	runner: "local",
 	hostname: "127.0.0.1",
 	port: DRIVER_PORT,
-	logLevel: "info",
+	logLevel: "warn",
 	specs: ["./tests/**/*.spec.ts"],
 	maxInstances: 1,
 	capabilities: [
