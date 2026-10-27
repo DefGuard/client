@@ -20,7 +20,7 @@ import {
 } from "../helpers/enrollment.js";
 import { switchToTrayView } from "../helpers/windows.js";
 
-const refreshInstanceConfiguration = async (url: string, token: string) => {
+const refreshInstanceConfiguration = async (token: string) => {
 	const actions = $(".overview-header-actions");
 	await actions.waitForClickable();
 	await actions.click();
@@ -29,7 +29,6 @@ const refreshInstanceConfiguration = async (url: string, token: string) => {
 	await refresh.click();
 	const modal = $("#update-instance-modal");
 	await modal.waitForDisplayed();
-	await modal.$('[data-testid="field-url"]').setValue(url);
 	await modal.$('[data-testid="field-token"]').setValue(token);
 	const update = modal.$("button=Update");
 	await update.waitForClickable();
@@ -94,7 +93,6 @@ describe("enrollment", () => {
 		const secret = await configureTotp();
 		await finishEnrollment();
 		await refreshInstanceConfiguration(
-			fixture.enrollmentUrl,
 			await core.startDesktopConfiguration(fixture.username),
 		);
 
