@@ -5,7 +5,16 @@ GROUP_NAME="defguard"
 SERVICE_NAME="defguard-service"
 
 case "$1" in
-    0|1|remove)
+    1)
+        # rpm runs this for the old package after installing the new version
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload
+            systemctl enable "$SERVICE_NAME"
+            systemctl restart "$SERVICE_NAME"
+        fi
+        ;;
+
+    0|remove)
         # Service file still exists, just disable it
         if [ -d /run/systemd/system ]; then
             systemctl disable "$SERVICE_NAME" || true

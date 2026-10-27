@@ -263,6 +263,18 @@ impl ServiceLocationManager {
         Ok(())
     }
 
+    pub fn remove_interfaces(&mut self) {
+        let ifnames = self.wgapis.keys().cloned().collect::<Vec<_>>();
+        for ifname in ifnames {
+            if let Err(err) = self.remove_tracked_interface(&ifname) {
+                error!(
+                    "Failed to remove Linux service location interface {ifname} during shutdown: \
+                    {err}"
+                );
+            }
+        }
+    }
+
     pub fn disconnect_service_locations_by_instance(
         &mut self,
         instance_id: &str,

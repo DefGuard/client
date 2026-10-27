@@ -40,6 +40,11 @@ use defguard_wireguard_rs::{
 use nix::unistd::{chown, Group};
 #[cfg(unix)]
 use tokio::net::UnixListener;
+#[cfg(target_os = "linux")]
+use tokio::{
+    signal::unix::{signal, SignalKind},
+    sync::oneshot,
+};
 use tokio::{sync::mpsc, task::JoinHandle, time::interval};
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
@@ -117,6 +122,41 @@ impl DaemonService {
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
             #[cfg(any(windows, target_os = "linux"))]
             service_location_manager,
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl DaemonService {
+    fn stop_stat_tasks(&self) {
+        match self.stat_tasks.lock() {
+            Ok(mut tasks) => {
+                for (_, handle) in tasks.drain() {
+                    handle.abort();
+                }
+            }
+            Err(err) => error!("Failed to lock statistics tasks during shutdown: {err}"),
+        }
+    }
+
+    fn remove_interfaces(&self) {
+        match self.wgapis.write() {
+            Ok(mut wgapis) => {
+                for (ifname, wgapi) in wgapis.drain() {
+                    match wgapi.remove_interface() {
+                        Ok(()) => info!("Removed WireGuard interface {ifname} during shutdown"),
+                        Err(err) => error!(
+                            "Failed to remove WireGuard interface {ifname} during shutdown: {err}"
+                        ),
+                    }
+                }
+            }
+            Err(err) => error!("Failed to lock WireGuard interfaces during shutdown: {err}"),
+        }
+
+        match self.service_location_manager.write() {
+            Ok(mut manager) => manager.remove_interfaces(),
+            Err(err) => error!("Failed to lock service location manager during shutdown: {err}"),
         }
     }
 }
@@ -586,21 +626,11 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
     debug!("Starting Defguard interface management daemon");
 
     #[cfg(target_os = "linux")]
-    let service_location_manager = Arc::new(RwLock::new(ServiceLocationManager::init()?));
-    // Nothing wakes the reconciler on Linux - there are no network, logon or resume watchers - so
-    // the tick is its only trigger.
+    let mut interrupt = signal(SignalKind::interrupt())?;
     #[cfg(target_os = "linux")]
-    let reconciler_handle = tokio::spawn(run_reconciler(
-        service_location_manager.clone(),
-        ReconcileSignal::default(),
-        SERVICE_LOCATION_RECONCILE_INTERVAL,
-    ));
-
-    let daemon_service = DaemonService::new(
-        &config,
-        #[cfg(target_os = "linux")]
-        service_location_manager,
-    );
+    let mut terminate = signal(SignalKind::terminate())?;
+    #[cfg(target_os = "linux")]
+    let service_location_manager = Arc::new(RwLock::new(ServiceLocationManager::init()?));
 
     // Remove existing socket if it exists
     if Path::new(DAEMON_SOCKET_PATH).exists() {
@@ -633,6 +663,21 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
         fs::set_permissions(DAEMON_SOCKET_PATH, fs::Permissions::from_mode(0o660))?;
     }
 
+    let daemon_service = Arc::new(DaemonService::new(
+        &config,
+        #[cfg(target_os = "linux")]
+        Arc::clone(&service_location_manager),
+    ));
+
+    // Nothing wakes the reconciler on Linux - there are no network, logon or resume watchers - so
+    // the tick is its only trigger.
+    #[cfg(target_os = "linux")]
+    let mut reconciler_handle = tokio::spawn(run_reconciler(
+        service_location_manager,
+        ReconcileSignal::default(),
+        SERVICE_LOCATION_RECONCILE_INTERVAL,
+    ));
+
     let uds_stream = UnixListenerStream::new(uds);
 
     info!("Defguard daemon version {VERSION} started, listening on socket {DAEMON_SOCKET_PATH}",);
@@ -640,24 +685,72 @@ pub async fn run_server(config: Config) -> anyhow::Result<()> {
 
     let server = Server::builder()
         .trace_fn(|_| tracing::info_span!("defguard_client_service"))
-        .add_service(DesktopDaemonServiceServer::new(daemon_service))
-        .serve_with_incoming(uds_stream);
+        .add_service(DesktopDaemonServiceServer::from_arc(Arc::clone(
+            &daemon_service,
+        )));
 
     #[cfg(target_os = "linux")]
-    tokio::select! {
-        result = server => result?,
-        result = reconciler_handle => {
-            let message = match result {
-                Ok(()) => "Service location reconciler ended unexpectedly".to_string(),
-                Err(err) => format!("Service location reconciler task failed: {err}"),
-            };
-            error!("{message}");
+    {
+        enum ShutdownReason {
+            Signal,
+            Server(Result<(), tonic::transport::Error>),
+            Reconciler(Result<(), tokio::task::JoinError>),
+        }
+
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let server = server.serve_with_incoming_shutdown(uds_stream, async {
+            let _ = shutdown_rx.await;
+        });
+        tokio::pin!(server);
+
+        let reason = tokio::select! {
+            _ = interrupt.recv() => {
+                info!("Received SIGINT, stopping Defguard daemon");
+                ShutdownReason::Signal
+            }
+            _ = terminate.recv() => {
+                info!("Received SIGTERM, stopping Defguard daemon");
+                ShutdownReason::Signal
+            }
+            result = &mut reconciler_handle => ShutdownReason::Reconciler(result),
+            result = &mut server => ShutdownReason::Server(result),
+        };
+
+        let reconciler_error = match &reason {
+            ShutdownReason::Reconciler(result) => {
+                let message = match result {
+                    Ok(()) => "Service location reconciler ended unexpectedly".to_string(),
+                    Err(err) => format!("Service location reconciler task failed: {err}"),
+                };
+                error!("{message}");
+                Some(message)
+            }
+            _ => {
+                reconciler_handle.abort();
+                let _ = reconciler_handle.await;
+                None
+            }
+        };
+
+        // close statistics streams so they do not hold up graceful server shutdown
+        daemon_service.stop_stat_tasks();
+        let result = match reason {
+            ShutdownReason::Server(result) => result,
+            _ => {
+                let _ = shutdown_tx.send(());
+                server.await
+            }
+        };
+        daemon_service.remove_interfaces();
+
+        result?;
+        if let Some(message) = reconciler_error {
             return Err(anyhow::anyhow!(message));
         }
     }
 
     #[cfg(not(target_os = "linux"))]
-    server.await?;
+    server.serve_with_incoming(uds_stream).await?;
 
     Ok(())
 }
@@ -682,4 +775,39 @@ pub(crate) async fn run_server(
         .await?;
 
     Ok(())
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_stopping_stat_tasks_closes_streams() {
+        let service = DaemonService::default();
+        let mut receivers = Vec::new();
+        for ifname in ["wg0", "wg1"] {
+            let (tx, rx) = mpsc::channel::<()>(1);
+            let handle = tokio::spawn(async move {
+                tx.closed().await;
+            });
+            service
+                .stat_tasks
+                .lock()
+                .unwrap()
+                .insert(ifname.to_string(), handle);
+            receivers.push(rx);
+        }
+
+        service.stop_stat_tasks();
+
+        assert!(service.stat_tasks.lock().unwrap().is_empty());
+        for mut rx in receivers {
+            assert_eq!(
+                tokio::time::timeout(Duration::from_secs(1), rx.recv())
+                    .await
+                    .expect("statistics stream remained open"),
+                None
+            );
+        }
+    }
 }

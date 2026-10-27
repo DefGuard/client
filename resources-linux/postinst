@@ -80,11 +80,10 @@ case "$1" in
             # ($2 holds the previous version) restart it so the new daemon binary
             # is loaded - otherwise an already-running old daemon keeps serving and
             # lacks newly added RPCs (e.g. list_interfaces used by the CLI).
-            # try-restart leaves a deliberately-stopped service stopped.
             if [ -z "$2" ]; then
                 systemctl start "$SERVICE_NAME"
             else
-                systemctl try-restart "$SERVICE_NAME"
+                systemctl restart "$SERVICE_NAME"
             fi
         fi
         ;;
