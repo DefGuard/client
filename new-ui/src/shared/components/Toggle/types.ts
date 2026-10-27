@@ -4,6 +4,7 @@ export interface ToggleProps {
   active: boolean;
   disabled?: boolean;
   label?: string;
+  helper?: string;
   onClick?: MouseEventHandler<HTMLDivElement>;
   testId?: string;
 }
