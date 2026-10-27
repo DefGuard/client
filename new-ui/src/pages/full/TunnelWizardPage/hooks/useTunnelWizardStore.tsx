@@ -3,6 +3,7 @@ import { TunnelWizardStep, type TunnelWizardStepValue } from '../types';
 
 type StoreValues = {
   activeStep: TunnelWizardStepValue;
+  advancedSettingsEnabled: boolean;
   tunnelData: {
     name: string;
     pubkey: string;
@@ -24,6 +25,7 @@ type StoreValues = {
 
 const defaults: StoreValues = {
   activeStep: TunnelWizardStep.GeneralInformation,
+  advancedSettingsEnabled: false,
   tunnelData: {
     name: '',
     address: '',
@@ -76,6 +78,7 @@ const prevStep = (step: TunnelWizardStepValue): TunnelWizardStepValue => {
 interface Store extends StoreValues {
   next: (values?: Partial<StoreValues['tunnelData']>) => void;
   back: (values?: Partial<StoreValues['tunnelData']>) => void;
+  setAdvancedSettingsEnabled: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -93,5 +96,7 @@ export const useTunnelWizardStore = create<Store>()((set, get) => ({
       tunnelData: { ...get().tunnelData, ...tunnelData },
     });
   },
+  setAdvancedSettingsEnabled: (advancedSettingsEnabled) =>
+    set({ advancedSettingsEnabled }),
   reset: () => set(defaults),
 }));
