@@ -119,6 +119,9 @@ export const isMfaConfigNetworkError = (err: unknown): boolean =>
 export const isMfaConfigProxyError = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'proxy_error';
 
+export const isMfaConfigSmtpNotConfigured = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'smtp_not_configured';
+
 /** Describes an OIDC polling error and its user-facing message. */
 export type OidcPollFailure = {
   kind:
