@@ -1175,3 +1175,70 @@ async fn test_proxy_base_path_is_preserved() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn test_setup_start_preserves_smtp_error_code() {
+    for (status, body) in [
+        (
+            500,
+            json!({ "error": "Internal server error", "code": "smtp_not_configured" }),
+        ),
+        (500, json!({ "code": "smtp_not_configured" })),
+        (
+            428,
+            json!({ "error": "different message", "code": "smtp_not_configured" }),
+        ),
+    ] {
+        let server = MockServer::start().await;
+        mount(
+            &server,
+            SETUP_START,
+            ResponseTemplate::new(status).set_body_json(body),
+        )
+        .await;
+        let err = mfa_config_setup_start(
+            mock_url(&server),
+            SESSION_TOKEN.into(),
+            MfaMethod::Email,
+            &ALL_CAPABILITIES,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(err, MfaConfigError::SmtpNotConfigured));
+        assert_eq!(
+            serde_json::to_value(&err).unwrap()["type"],
+            "smtp_not_configured"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_setup_start_unrecognized_error_code_keeps_proxy_error() {
+    for body in [
+        json!({ "error": "Internal server error" }),
+        json!({ "error": "Internal server error", "code": null }),
+        json!({ "error": "Internal server error", "code": "future_code" }),
+        json!({ "error": "Internal server error", "code": 123 }),
+    ] {
+        let server = MockServer::start().await;
+        mount(
+            &server,
+            SETUP_START,
+            ResponseTemplate::new(500).set_body_json(body),
+        )
+        .await;
+        let err = mfa_config_setup_start(
+            mock_url(&server),
+            SESSION_TOKEN.into(),
+            MfaMethod::Email,
+            &ALL_CAPABILITIES,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            matches!(err, MfaConfigError::ProxyError { status: 500, message } if message == "Internal server error")
+        );
+    }
+}
