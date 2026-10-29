@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations"]
+members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations", "enterprise/tpm"]
 default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
