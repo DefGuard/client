@@ -1,5 +1,5 @@
 [package]
-name = "tpm"
+name = "device-identity"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -8,6 +8,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+thiserror.workspace = true
 
 [lints]
 workspace = true
