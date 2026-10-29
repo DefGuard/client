@@ -1,7 +1,7 @@
 use crate::{
-    AttestationContext, AttestationEvidence, AttestationIdentity, AttestationMethod, Capabilities,
-    CredentialChallenge, DeviceIdentityError, IdentityRef, IdentityRequirements,
-    PossessionChallenge, PossessionProof, PublicIdentity,
+    AttestationIdentity, AttestationRequest, AttestationResponse, Capabilities,
+    DeviceIdentityError, IdentityRef, IdentityRequirements, PossessionChallenge, PossessionProof,
+    PublicIdentity,
 };
 
 pub(crate) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
@@ -26,18 +26,10 @@ pub(crate) fn attestation_identity(
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn activate_credential(
-    _identity: &IdentityRef,
-    _challenge: &CredentialChallenge,
-) -> Result<Vec<u8>, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
-}
-
 pub(crate) fn attest_identity(
     _identity: &IdentityRef,
-    _method: AttestationMethod,
-    _context: &AttestationContext,
-) -> Result<AttestationEvidence, DeviceIdentityError> {
+    _request: &AttestationRequest,
+) -> Result<AttestationResponse, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 

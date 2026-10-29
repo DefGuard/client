@@ -231,16 +231,39 @@ pub struct PossessionChallenge {
     pub binding: Vec<u8>,
 }
 
-/// Backend-specific evidence that Core must verify before granting trust
+/// Backend-specific challenge supplied by Core for identity attestation
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AttestationEvidence {
-    /// TPM certification data and public keys
-    Tpm(TpmEvidence),
+pub enum AttestationChallenge {
+    /// Credential activation challenge bound to the TPM endorsement and attestation keys
+    Tpm(CredentialChallenge),
+    /// App Attest uses the nonce supplied in the attestation context
+    AppleAppAttest,
+}
+
+/// Complete input for a stateless identity attestation operation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttestationRequest {
+    /// Core session, fresh nonce and application binding
+    pub context: AttestationContext,
+    /// Backend-specific input determining the attestation protocol
+    pub challenge: AttestationChallenge,
+}
+
+/// Attestation result submitted to Core for verification
+#[derive(Clone, PartialEq, Eq)]
+pub enum AttestationResponse {
+    /// TPM credential activation result and identity key certification
+    Tpm {
+        /// Recovered Core secret, sensitive until the challenge is verified
+        activation_secret: Vec<u8>,
+        /// Identity key certification signed by the attestation key
+        evidence: TpmEvidence,
+    },
     /// Apple-issued evidence for an App Attest key
     AppleAppAttest(AppleEvidence),
 }
 
-/// TPM key certification evidence, paired with a separate credential activation exchange
+/// TPM key certification evidence accompanying the credential activation result
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TpmEvidence {
     /// Endorsement key encoded as marshalled TPMT_PUBLIC
@@ -345,23 +368,13 @@ pub fn attestation_identity(
     backend::attestation_identity(identity)
 }
 
-/// Recovers Core's secret through TPM credential activation using the identity's EK and AK.
-/// Returns Unsupported on backends without TPM credential activation.
-pub fn activate_credential(
-    identity: &IdentityRef,
-    challenge: &CredentialChallenge,
-) -> Result<Vec<u8>, DeviceIdentityError> {
-    backend::activate_credential(identity, challenge)
-}
-
-/// Generates TPM Certify or Apple App Attest evidence bound to the supplied Core context.
-/// The application submits the evidence and any activation response to Core for verification.
+/// Processes the backend challenge and generates evidence bound to the supplied Core context.
+/// TPM returns the activation secret and certification, while Apple returns App Attest evidence.
 pub fn attest_identity(
     identity: &IdentityRef,
-    method: AttestationMethod,
-    context: &AttestationContext,
-) -> Result<AttestationEvidence, DeviceIdentityError> {
-    backend::attest_identity(identity, method, context)
+    request: &AttestationRequest,
+) -> Result<AttestationResponse, DeviceIdentityError> {
+    backend::attest_identity(identity, request)
 }
 
 /// Produces a proof bound to Core's challenge using the referenced identity.
@@ -437,29 +450,24 @@ mod tests {
     }
 
     #[test]
-    fn attestation_returns_unsupported_for_each_method() {
-        for method in [
-            AttestationMethod::TpmKeyAttestation,
-            AttestationMethod::AppleAppAttest,
+    fn attestation_returns_unsupported_for_each_challenge() {
+        for challenge in [
+            AttestationChallenge::Tpm(CredentialChallenge {
+                credential_blob: vec![3; 32],
+                encrypted_secret: vec![4; 32],
+            }),
+            AttestationChallenge::AppleAppAttest,
         ] {
-            assert_eq!(
-                attest_identity(&identity(), method, &context()),
+            let request = AttestationRequest {
+                context: context(),
+                challenge,
+            };
+
+            assert!(matches!(
+                attest_identity(&identity(), &request),
                 Err(DeviceIdentityError::Unsupported)
-            );
+            ));
         }
-    }
-
-    #[test]
-    fn credential_activation_returns_unsupported() {
-        let challenge = CredentialChallenge {
-            credential_blob: vec![3; 32],
-            encrypted_secret: vec![4; 32],
-        };
-
-        assert_eq!(
-            activate_credential(&identity(), &challenge),
-            Err(DeviceIdentityError::Unsupported)
-        );
     }
 
     #[test]
