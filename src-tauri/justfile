@@ -1,3 +1,5 @@
+export SQLX_OFFLINE := "true"
+
 # format Rust project
 format:
     cargo --locked fmt --all

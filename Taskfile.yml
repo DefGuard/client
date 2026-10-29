@@ -1,5 +1,8 @@
 version: "3"
 
+env:
+  SQLX_OFFLINE: "true"
+
 tasks:
   dev:
     cmds:
@@ -22,8 +25,6 @@ tasks:
       - pnpm dev
 
   build:
-    env:
-      SQLX_OFFLINE: "true"
     cmds:
       - cd new-ui && pnpm build
       - cargo tauri build --config src-tauri/tauri.local.conf.json
@@ -52,11 +53,12 @@ tasks:
     dir: src-tauri
     env:
       DATABASE_URL: sqlite:{{.TASKFILE_DIR}}/src-tauri/query-data.db
+      SQLX_OFFLINE: "false"
     cmds:
       - sqlx database drop -y
       - sqlx database create
       - sqlx migrate run --source migrations
-      - cargo sqlx prepare --workspace
+      - cargo sqlx prepare --workspace -- --workspace --all-targets --all-features
 
   lint-ui:
     desc: Format and lint the UI in new-ui.
