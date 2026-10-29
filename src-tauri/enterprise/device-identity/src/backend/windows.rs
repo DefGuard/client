@@ -1,6 +1,6 @@
 use crate::{
-    AttestationChallenge, AttestationContext, AttestationMethod, AttestationProgress,
-    AttestationSession, Capabilities, DeviceIdentityError, IdentityRef, IdentityRequirements,
+    AttestationContext, AttestationEvidence, AttestationIdentity, AttestationMethod, Capabilities,
+    CredentialChallenge, DeviceIdentityError, IdentityRef, IdentityRequirements,
     PossessionChallenge, PossessionProof, PublicIdentity,
 };
 
@@ -20,18 +20,24 @@ pub(crate) fn public_identity(
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn begin_attestation(
+pub(crate) fn attestation_identity(
     _identity: &IdentityRef,
-    _method: AttestationMethod,
-    _context: AttestationContext,
-) -> Result<AttestationProgress, DeviceIdentityError> {
+) -> Result<AttestationIdentity, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn continue_attestation(
-    _session: AttestationSession,
-    _challenge: AttestationChallenge,
-) -> Result<AttestationProgress, DeviceIdentityError> {
+pub(crate) fn activate_credential(
+    _identity: &IdentityRef,
+    _challenge: &CredentialChallenge,
+) -> Result<Vec<u8>, DeviceIdentityError> {
+    Err(DeviceIdentityError::Unsupported)
+}
+
+pub(crate) fn attest_identity(
+    _identity: &IdentityRef,
+    _method: AttestationMethod,
+    _context: &AttestationContext,
+) -> Result<AttestationEvidence, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
