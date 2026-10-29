@@ -1916,6 +1916,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "device-identity"
+version = "2.2.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7870,10 +7877,6 @@ name = "tower-service"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
-
-[[package]]
-name = "tpm"
-version = "2.2.0"
 
 [[package]]
 name = "tracing"
