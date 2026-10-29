@@ -143,8 +143,12 @@ export const resolveMfaStepPlan = (
   location: Pick<LocationInfo, 'connection_type' | 'mfa_steps' | 'mfa_step_plan'>,
   oneOffPlan: MfaMethodValue[] = [],
   instance?: MfaUsabilityInstance,
-): MfaMethodValue[] =>
-  mfaStepsOf(location).map((step, index) => {
+): MfaMethodValue[] => {
+  const steps = mfaStepsOf(location);
+  // Core keeps a step whose methods it filtered out (FIDO2 without a license), and no plan passes it.
+  if (steps.some((step) => step.methods.length === 0)) return [];
+
+  return steps.map((step, index) => {
     const usableMethods = usableMfaMethods(step, instance);
     const isUsable = (method: MfaMethodValue) =>
       usableMethods.some((entry) => entry.method === method);
@@ -157,6 +161,7 @@ export const resolveMfaStepPlan = (
 
     return (usableMethods[0] ?? step.methods[0]).method;
   });
+};
 
 /**
  * Whether the user has this factor set up. The instance's own report of the

@@ -4,6 +4,7 @@ import { TooltipContent } from '../../../../providers/tooltip/TooltipContent';
 import { TooltipProvider } from '../../../../providers/tooltip/TooltipContext';
 import { TooltipTrigger } from '../../../../providers/tooltip/TooltipTrigger';
 import type { InstanceInfo, LocationInfo } from '../../../../rust-api/types';
+import { isPresent } from '../../../../utils/isPresent';
 import {
   ConnectionAbility,
   type ConnectionAbilityValue,
@@ -38,10 +39,13 @@ export const LocationCardMfaEdit = ({
   connectionAbility,
 }: Props) => {
   const stepCount = mfaStepCount(location);
+  const [method] = resolveMfaStepPlan(location, [], instance);
   const label =
     stepCount > 1
       ? mfaStepsToText(stepCount)
-      : mfaToText(resolveMfaStepPlan(location, [], instance)[0], instance);
+      : isPresent(method)
+        ? mfaToText(method, instance)
+        : 'Unavailable';
 
   const canEdit =
     connectionAbility === ConnectionAbility.Available &&

@@ -291,6 +291,15 @@ describe('resolveMfaStepPlan', () => {
     expect(resolveMfaStepPlan(location)).toEqual([MfaMethod.Email]);
     expect(resolveMfaStepPlan(location, [], instance)).toEqual([MfaMethod.Totp]);
   });
+
+  it('is empty when a step offers no factor', () => {
+    const location = {
+      ...locationOf([step(MfaMethod.Totp), step()]),
+      mfa_step_plan: [MfaMethod.Totp, MfaMethod.Fido2],
+    };
+    expect(resolveMfaStepPlan(location)).toEqual([]);
+    expect(connectionAbilityOf(location)).toBe(ConnectionAbility.Unavailable);
+  });
 });
 
 const instanceOf = (id: number, overrides: Partial<InstanceInfo> = {}): InstanceInfo => ({
