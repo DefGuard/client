@@ -6,7 +6,7 @@ use tauri::{
 
 use crate::{
     appstate::AppState,
-    commands::{build_instance_info, build_location_info},
+    commands::{build_instance_info, build_location_info, load_auto_connect_context},
     connection::active_connections::get_connection_id_by_type,
     database::{
         models::{
@@ -319,7 +319,12 @@ pub async fn initiate_configure_factor_screen(
     let location = match location_id {
         Some(location_id) => {
             if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
-                Some(build_location_info(location, &connected_location_ids))
+                let auto_connect_context = load_auto_connect_context().await?;
+                Some(build_location_info(
+                    location,
+                    &connected_location_ids,
+                    &auto_connect_context,
+                ))
             } else {
                 warn!("Configure factors requested from unknown location {location_id}");
                 None

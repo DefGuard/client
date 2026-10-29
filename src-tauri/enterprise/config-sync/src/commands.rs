@@ -8,7 +8,7 @@ use defguard_client_core::{
     database::{
         models::{
             instance::{ClientTrafficPolicy, Instance},
-            location::{infer_mfa_method, Location},
+            location::{infer_mfa_method, AutoConnectBlock, AutoConnectContext, Location},
             Id, NoId,
         },
         DbPool,
@@ -35,6 +35,7 @@ pub async fn locations_changed(
         .map(|location| {
             let mut new_location = Location::<NoId>::from(location);
             new_location.route_all_traffic = false;
+            new_location.auto_connect = false;
             new_location.mfa_method = infer_mfa_method(new_location.location_mfa_mode, None);
             new_location
         })
@@ -48,12 +49,17 @@ pub async fn locations_changed(
     Ok(db_locations != core_locations)
 }
 
-/// Applies a fetched configuration to the local database. Returns whether the location set changed.
+#[derive(Debug, Default)]
+pub struct InstanceUpdate {
+    pub locations_changed: bool,
+    pub auto_connect_disabled: Vec<String>,
+}
+
 pub async fn do_update_instance(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
     response: DeviceConfigResponse,
-) -> Result<bool, Error> {
+) -> Result<InstanceUpdate, Error> {
     debug!("Updating instance {instance}");
     let locations_changed_val = locations_changed(transaction, instance, &response).await?;
     let instance_info = response
@@ -155,8 +161,57 @@ pub async fn do_update_instance(
     } else {
         info!("Locations for instance {instance} didn't change. Not updating them.");
     }
+    let auto_connect_disabled = disable_invalid_auto_connect(transaction).await?;
 
-    Ok(locations_changed_val)
+    Ok(InstanceUpdate {
+        locations_changed: locations_changed_val,
+        auto_connect_disabled,
+    })
+}
+
+/// Checks every instance, since all traffic routes collide machine-wide.
+/// Colliding all traffic locations all lose auto-connect until the user picks one again.
+async fn disable_invalid_auto_connect(
+    transaction: &mut Transaction<'_, Sqlite>,
+) -> Result<Vec<String>, Error> {
+    let context = AutoConnectContext::load(transaction).await?;
+
+    let all_traffic_service_locations = context
+        .locations()
+        .iter()
+        .filter(|location| location.is_service_location() && context.routes_all_traffic(location))
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    if all_traffic_service_locations.len() > 1 {
+        warn!(
+            "Multiple service locations route all traffic: {}",
+            all_traffic_service_locations.join(", ")
+        );
+    }
+
+    let mut disabled = Vec::new();
+    for (location, block) in context.invalid() {
+        match block {
+            AutoConnectBlock::Mfa => {
+                info!("Location {location} now requires MFA, disabling its auto-connect");
+            }
+            AutoConnectBlock::ServiceLocation => {
+                info!("Location {location} is now a service location, disabling its auto-connect");
+            }
+            AutoConnectBlock::AllTrafficTaken => {
+                warn!(
+                    "Location {location} collides with another all traffic location, disabling \
+                    its auto-connect"
+                );
+            }
+        }
+        let mut location = location.clone();
+        location.auto_connect = false;
+        location.save(transaction.as_mut()).await?;
+        disabled.push(location.name);
+    }
+
+    Ok(disabled)
 }
 
 /// Synchronizes the daemon's persisted service-location state from the current database state.

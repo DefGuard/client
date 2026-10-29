@@ -1,8 +1,12 @@
 # format Rust project
 format:
-    cargo +nightly --locked fmt --all  # use nightly toolchain for better import handling
+    cargo --locked fmt --all
 
 # lint Rust project
 lint:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+# test Rust project with nextest
+test *args:
+    cargo nextest run --workspace --no-fail-fast {{args}}
 

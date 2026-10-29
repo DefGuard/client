@@ -1,0 +1,117 @@
+version: "3"
+
+tasks:
+  dev:
+    cmds:
+      - npx concurrently -n "NEW,TAURI" "cd new-ui && pnpm dev" "cargo tauri dev"
+
+  dev-tauri:
+    desc: Run only the Tauri side with the local dev database and debug logging.
+    dir: src-tauri
+    env:
+      DATABASE_URL: sqlite:dev.db
+      DEFGUARD_CLIENT_DEV: "1"
+      DEFGUARD_CLIENT_LOG_LEVEL: debug
+    cmds:
+      - cargo tauri dev
+
+  dev-web:
+    desc: Run only the web frontend dev server.
+    dir: new-ui
+    cmds:
+      - pnpm dev
+
+  build:
+    env:
+      SQLX_OFFLINE: "true"
+    cmds:
+      - cd new-ui && pnpm build
+      - cargo tauri build --config src-tauri/tauri.local.conf.json
+
+  lint:
+    desc: Format and lint the Rust workspace and the UI.
+    cmds:
+      - task: lint-rust
+      - task: lint-ui
+
+  lint-rust:
+    desc: Format and lint the Rust workspace in src-tauri.
+    dir: src-tauri
+    cmds:
+      - cargo fmt --all
+      - cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test-rust:
+    desc: Run the Rust workspace tests in src-tauri with nextest. Extra args go after --.
+    dir: src-tauri
+    cmds:
+      - cargo nextest run --workspace --no-fail-fast {{.CLI_ARGS}}
+
+  query-data:
+    desc: Recreate a throwaway sqlite db from migrations and regenerate the sqlx offline query data in src-tauri/.sqlx.
+    dir: src-tauri
+    env:
+      DATABASE_URL: sqlite:{{.TASKFILE_DIR}}/src-tauri/query-data.db
+    cmds:
+      - sqlx database drop -y
+      - sqlx database create
+      - sqlx migrate run --source migrations
+      - cargo sqlx prepare --workspace
+
+  lint-ui:
+    desc: Format and lint the UI in new-ui.
+    dir: new-ui
+    cmds:
+      - pnpm fix
+      - pnpm lint
+
+  test-ui:
+    desc: Run the UI unit tests in new-ui with vitest. Extra args go after --.
+    dir: new-ui
+    cmds:
+      - pnpm test {{.CLI_ARGS}}
+
+  e2e-build:
+    desc: Build the client and install both frontend dependency sets.
+    platforms: [linux, darwin]
+    cmds:
+      - cd new-ui && pnpm install --frozen-lockfile && pnpm build
+      - cd e2e && pnpm install --frozen-lockfile
+      - cargo tauri build
+
+  e2e-provision:
+    desc: Provision the configured Core deployment. It must already be running.
+    platforms: [linux, darwin]
+    dir: e2e
+    preconditions:
+      - sh: test -f .env
+        msg: Missing e2e/.env, copy e2e/.env.example and fill it locally.
+    cmds:
+      - pnpm provision
+
+  e2e-test:
+    desc: Run the WebDriver suite. Core, Edge, gateway and defguard-service are external prerequisites.
+    platforms: [linux, darwin]
+    dir: e2e
+    preconditions:
+      - sh: test -f .env
+        msg: Missing e2e/.env, copy e2e/.env.example and fill it locally.
+      - sh: test -S /var/run/defguard.socket
+        msg: defguard-service is not running at /var/run/defguard.socket.
+      - sh: test -x "${TAURI_DRIVER:-$HOME/.cargo/bin/tauri-driver}"
+        msg: tauri-driver is missing, set TAURI_DRIVER to its location.
+      - sh: command -v WebKitWebDriver
+        msg: WebKitWebDriver is missing, enter nix develop.
+      - sh: command -v xvfb-run
+        msg: xvfb-run is missing, enter nix develop.
+      - sh: command -v dbus-run-session
+        msg: dbus-run-session is missing, enter nix develop.
+    cmds:
+      - NATIVE_DRIVER="${NATIVE_DRIVER:-$(command -v WebKitWebDriver)}" dbus-run-session -- xvfb-run -a pnpm test
+
+  e2e:
+    platforms: [linux, darwin]
+    cmds:
+      - task: e2e-build
+      - task: e2e-provision
+      - task: e2e-test

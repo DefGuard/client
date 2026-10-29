@@ -953,6 +953,7 @@ mod tests {
             mfa_steps: Json::default(),
             mfa_step_plan: Json::default(),
             client_mtu: None,
+            auto_connect: false,
             id: 1,
             instance_id: 1,
             network_id: 1,

@@ -10,6 +10,7 @@ fn make_location(id: Id, instance_id: Id, name: &str, endpoint: &str, mfa: bool)
         mfa_steps: Json::default(),
         mfa_step_plan: Json::default(),
         client_mtu: None,
+        auto_connect: false,
         id,
         instance_id,
         network_id: 1,

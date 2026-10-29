@@ -1,57 +1,29 @@
 //! Line reader that follows a log file by path and reopens it after rotation.
 
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
-#[cfg(not(unix))]
-use std::time::SystemTime;
 use std::{
-    fs::{metadata, File, Metadata},
+    fs::File,
     io::{self, BufRead, BufReader, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
-#[derive(PartialEq, Eq)]
-struct FileId {
-    #[cfg(unix)]
-    dev: u64,
-    #[cfg(unix)]
-    ino: u64,
-    #[cfg(not(unix))]
-    created: Option<SystemTime>,
-}
-
-impl FileId {
-    fn new(meta: &Metadata) -> Self {
-        #[cfg(unix)]
-        {
-            Self {
-                dev: meta.dev(),
-                ino: meta.ino(),
-            }
-        }
-        #[cfg(not(unix))]
-        {
-            Self {
-                created: meta.created().ok(),
-            }
-        }
-    }
-}
+use same_file::Handle;
 
 pub(crate) struct LogFileReader {
     path: PathBuf,
     reader: BufReader<File>,
-    id: FileId,
+    // Windows keeps a renamed file's creation time for a new file with the same name,
+    // so identity must come from the volume and file index, not timestamps.
+    handle: Handle,
 }
 
 impl LogFileReader {
     pub(crate) fn open(path: &Path) -> io::Result<Self> {
         let file = File::open(path)?;
-        let id = FileId::new(&file.metadata()?);
+        let handle = Handle::from_file(file.try_clone()?)?;
         Ok(Self {
             path: path.to_path_buf(),
             reader: BufReader::new(file),
-            id,
+            handle,
         })
     }
 
@@ -66,18 +38,18 @@ impl LogFileReader {
     }
 
     fn reopen_if_rotated(&mut self) -> io::Result<bool> {
-        let meta = match metadata(&self.path) {
-            Ok(meta) => meta,
-            // Mid-rotation; keep the old file for now.
+        let current = match Handle::from_path(&self.path) {
+            Ok(handle) => handle,
+            // mid-rotation, keep reading the old file until the new one appears
             Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(false),
             Err(err) => return Err(err),
         };
         let position = self.reader.stream_position()?;
-        if FileId::new(&meta) != self.id {
+        if current != self.handle {
             debug!("Log file {} was rotated, reopening", self.path.display());
             *self = Self::open(&self.path)?;
             Ok(true)
-        } else if meta.len() < position {
+        } else if current.as_file().metadata()?.len() < position {
             debug!("Log file {} was truncated, rewinding", self.path.display());
             self.reader.seek(SeekFrom::Start(0))?;
             Ok(true)

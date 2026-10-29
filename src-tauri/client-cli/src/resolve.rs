@@ -219,6 +219,7 @@ mod tests {
             mfa_steps: Json::default(),
             mfa_step_plan: Json::default(),
             client_mtu: None,
+            auto_connect: false,
         }
     }
 
