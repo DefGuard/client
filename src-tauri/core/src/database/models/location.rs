@@ -743,20 +743,18 @@ impl<I> Location<I> {
             && self.location_mfa_mode == LocationMfaMode::Disabled
     }
 
+    /// Matches the routes `routed_networks` installs, so default routes in `allowed_ips` count.
     /// Service locations ignore `route_all_traffic`, the daemon routes their `allowed_ips` as sent.
     pub fn routes_all_traffic(&self, policy: &ClientTrafficPolicy) -> bool {
-        if self.is_service_location() {
-            return self
-                .allowed_ips
-                .split(',')
-                .filter_map(|network| network.trim().parse::<IpAddrMask>().ok())
-                .any(|network| network.cidr == 0);
-        }
-        match policy {
-            ClientTrafficPolicy::ForceAllTraffic => true,
-            ClientTrafficPolicy::DisableAllTraffic => false,
-            ClientTrafficPolicy::None => self.route_all_traffic,
-        }
+        let forced = !self.is_service_location()
+            && match policy {
+                ClientTrafficPolicy::ForceAllTraffic => true,
+                ClientTrafficPolicy::DisableAllTraffic => false,
+                ClientTrafficPolicy::None => self.route_all_traffic,
+            };
+        crate::routed_networks(&self.address, &self.allowed_ips, forced)
+            .iter()
+            .any(|network| network.cidr == 0)
     }
 }
 
@@ -908,7 +906,7 @@ mod tests {
             address: "10.0.0.2/24".into(),
             pubkey: "pk".into(),
             endpoint: "1.2.3.4:51820".into(),
-            allowed_ips: "0.0.0.0/0".into(),
+            allowed_ips: "10.0.0.0/24".into(),
             dns: None,
             route_all_traffic: false,
             keepalive_interval: 25,
@@ -1099,6 +1097,7 @@ mod tests {
     async fn test_set_auto_connect_rejects_all_traffic_with_service_location(pool: SqlitePool) {
         let instance = new_instance().save(&pool).await.unwrap();
         let mut service = new_location(instance.id);
+        service.allowed_ips = "0.0.0.0/0".into();
         service.service_location_mode = ServiceLocationMode::AlwaysOn;
         let service = service.save(&pool).await.unwrap();
         let mut location = new_location(instance.id);
@@ -1118,7 +1117,6 @@ mod tests {
     ) {
         let instance = new_instance().save(&pool).await.unwrap();
         let mut service = new_location(instance.id);
-        service.allowed_ips = "10.0.0.0/24".into();
         service.service_location_mode = ServiceLocationMode::AlwaysOn;
         service.save(&pool).await.unwrap();
         let mut location = new_location(instance.id);
@@ -1146,6 +1144,58 @@ mod tests {
             .unwrap();
         let result = Location::set_auto_connect(&pool, second.id, true).await;
         assert!(matches!(result, Err(Error::InvalidInput(_))));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_rejects_second_default_route_location(pool: SqlitePool) {
+        for policy in [
+            ClientTrafficPolicy::None,
+            ClientTrafficPolicy::DisableAllTraffic,
+        ] {
+            let mut instance = new_instance();
+            instance.name = format!("{policy:?}");
+            instance.uuid = format!("uuid-{policy:?}");
+            instance.client_traffic_policy = policy;
+            let instance = instance.save(&pool).await.unwrap();
+            let mut first = new_location(instance.id);
+            first.allowed_ips = "0.0.0.0/0".into();
+            let first = first.save(&pool).await.unwrap();
+            let mut second = new_location(instance.id);
+            second.network_id = 2;
+            second.allowed_ips = "10.0.0.0/24, 0.0.0.0/0".into();
+            let second = second.save(&pool).await.unwrap();
+
+            Location::set_auto_connect(&pool, first.id, true)
+                .await
+                .unwrap();
+            let result = Location::set_auto_connect(&pool, second.id, true).await;
+            assert!(matches!(result, Err(Error::InvalidInput(_))));
+            Location::set_auto_connect(&pool, first.id, false)
+                .await
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn test_routes_all_traffic_counts_default_route_in_allowed_ips() {
+        let location = |allowed_ips: &str| {
+            let mut location = new_location(1);
+            location.allowed_ips = allowed_ips.into();
+            location
+        };
+        let predefined = location("10.0.0.0/24");
+        let ipv4_default = location("10.0.0.0/24, 0.0.0.0/0");
+        let ipv6_default = location("::/0");
+
+        for policy in [
+            ClientTrafficPolicy::None,
+            ClientTrafficPolicy::DisableAllTraffic,
+        ] {
+            assert!(!predefined.routes_all_traffic(&policy));
+            assert!(ipv4_default.routes_all_traffic(&policy));
+            assert!(ipv6_default.routes_all_traffic(&policy));
+        }
+        assert!(predefined.routes_all_traffic(&ClientTrafficPolicy::ForceAllTraffic));
     }
 
     #[sqlx::test(migrations = "../migrations")]

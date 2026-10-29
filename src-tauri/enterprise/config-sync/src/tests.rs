@@ -155,7 +155,7 @@ fn device_config(network_id: Id, name: &str, endpoint: &str) -> DeviceConfig {
         endpoint: endpoint.into(),
         assigned_ip: "10.6.0.2".into(),
         pubkey: format!("pk-{network_id}"),
-        allowed_ips: "0.0.0.0/0".into(),
+        allowed_ips: "10.0.0.0/24".into(),
         keepalive_interval: 25,
         ..Default::default()
     }
@@ -230,7 +230,7 @@ async fn seed_location(
         address: "10.6.0.2".into(),
         pubkey: format!("pk-{network_id}"),
         endpoint: endpoint.into(),
-        allowed_ips: "0.0.0.0/0".into(),
+        allowed_ips: "10.0.0.0/24".into(),
         dns: None,
         route_all_traffic: false,
         keepalive_interval: 25,
@@ -462,6 +462,28 @@ async fn test_update_instance_disables_all_traffic_auto_connect_across_instances
         other_auto_connect,
         auto_connect_of(&[("other-all", false), ("other-predefined", true)])
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_disables_colliding_default_route_auto_connect(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", false).await;
+    seed_auto_connect_location(&pool, instance.id, 2, "second", false).await;
+    let mut first = device_config(1, "first", "1.2.3.4:51820");
+    first.allowed_ips = "0.0.0.0/0".into();
+    let mut second = device_config(2, "second", "1.2.3.4:51820");
+    second.allowed_ips = "10.0.0.0/24, 0.0.0.0/0".into();
+    let mut response = device_config_response(&instance, first);
+    response.configs.push(second);
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", false), ("second", false)])
+    );
+    assert_eq!(disabled, ["first", "second"]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
