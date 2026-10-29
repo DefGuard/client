@@ -22,7 +22,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     database::models::{instance::MfaCapabilities, Id},
     mfa::{OIDC_POLL_INTERVAL, OIDC_POLL_TIMEOUT},
-    proxy::{post_with_headers, read_error_message},
+    proxy::post_with_headers,
 };
 
 // No leading slash: it would make `Url::join` discard a proxy base path (`https://host/defguard/`).
@@ -175,6 +175,9 @@ pub enum MfaConfigError {
     #[error("{message}")]
     NetworkError { message: String },
 
+    #[error("SMTP is not configured on this Defguard instance")]
+    SmtpNotConfigured,
+
     #[error("Proxy error (HTTP {status}): {message}")]
     ProxyError { status: u16, message: String },
 
@@ -300,7 +303,21 @@ async fn check_response(response: Response, endpoint: &str) -> Result<Response, 
         return Err(MfaConfigError::Unsupported);
     }
 
-    let message = read_error_message(response).await;
+    let body = response.json::<serde_json::Value>().await.ok();
+    if body
+        .as_ref()
+        .and_then(|body| body.get("code"))
+        .and_then(serde_json::Value::as_str)
+        == Some("smtp_not_configured")
+    {
+        return Err(MfaConfigError::SmtpNotConfigured);
+    }
+    let message = body
+        .as_ref()
+        .and_then(|body| body.get("error"))
+        .and_then(serde_json::Value::as_str)
+        .map(String::from)
+        .unwrap_or_else(|| format!("HTTP {status}"));
     match status {
         // a wrong code or FIDO2 assertion, any other 401 is a session Core no longer knows
         StatusCode::UNAUTHORIZED if message == INVALID_CODE_MESSAGE => {

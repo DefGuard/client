@@ -1,5 +1,5 @@
 import { error as logError } from '@tauri-apps/plugin-log';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   isMfaConfigAlreadyAuthorized,
   isMfaConfigCancelled,
@@ -11,10 +11,12 @@ import {
   isMfaConfigProxyError,
   isMfaConfigSecurityKeyError,
   isMfaConfigSessionExpired,
+  isMfaConfigSmtpNotConfigured,
   isMfaConfigTimeout,
   mfaErrorMessage,
 } from '../../../../shared/rust-api/mfaError';
 import { showEdgeComsError } from '../components/EdgeComsError/useEdgeComsErrorStore';
+import { showMfaConfigErrorModal } from './showMfaConfigErrorModal';
 
 type Options = {
   context: string;
@@ -34,8 +36,16 @@ export const useMfaConfigErrorHandler = ({
   onSessionExpired,
   fallback,
   hasCodeInput = true,
-}: Options) =>
-  useCallback(
+}: Options) => {
+  const dismissModalRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      dismissModalRef.current?.();
+    };
+  }, []);
+
+  return useCallback(
     (err: unknown, retry?: () => void) => {
       // A cancel is the user's own doing, so it is neither logged nor shown.
       if (isMfaConfigCancelled(err)) {
@@ -83,11 +93,16 @@ export const useMfaConfigErrorHandler = ({
         showEdgeComsError(retry);
         return;
       }
-      if (isMfaConfigProxyError(err)) {
-        setError('Service temporarily unavailable, try again.');
-        return;
+      let message = fallback;
+      if (isMfaConfigSmtpNotConfigured(err)) {
+        message =
+          'Email MFA is unavailable because SMTP is not configured on this Defguard instance. Contact your administrator.';
+      } else if (isMfaConfigProxyError(err)) {
+        message =
+          'Could not complete MFA configuration. Please try again or contact your administrator.';
       }
-      setError(fallback);
+      dismissModalRef.current = showMfaConfigErrorModal(message);
     },
     [context, setError, onSessionExpired, fallback, hasCodeInput],
   );
+};

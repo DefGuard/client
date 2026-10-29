@@ -23,13 +23,12 @@ export const LocationCardConnectionErrorView = () => {
         </>
       )}
       <p className="description">{connectionError ?? DEFAULT_CONNECTION_ERROR}</p>
-      <SizedBox height={ThemeSpacing.Xl} />
+      <SizedBox height={ThemeSpacing.Xl4} />
       <Button
         text="Got it"
         variant={ButtonVariant.Secondary}
         onClick={() => setView(LocationCardViews.Default)}
       />
-      <SizedBox height={ThemeSpacing.Xl} />
     </div>
   );
 };
