@@ -332,7 +332,15 @@ pub fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     backend::capabilities()
 }
 
-/// Creates an identity using the backend's predefined profile.
+/// Creates a hardware-backed identity for attestation and possession proofs.
+/// TPM uses ECDSA NIST P-256 with SHA-256. Apple uses an App Attest key.
+///
+/// TPM backends must generate a non-restricted signing key with fixedTPM,
+/// fixedParent and sensitiveDataOrigin set, plus an AK for key certification.
+/// Apple backends must generate an App Attest key bound to the Secure Enclave.
+///
+/// Returns a local reference for later attestation and possession proofs.
+/// Returns Unsupported when the required profile or mechanism is unavailable.
 pub fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
     backend::create_identity()
 }
