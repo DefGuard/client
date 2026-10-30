@@ -63,16 +63,20 @@ export const ConfigureSelectVerificationStep = ({ onCancel }: Props) => {
       hideScrollContainer
       withControls
     >
-      <FullPageTitle title="Additional verification required" />
+      <FullPageTitle title="Verify your identity to add a new MFA method" />
       <p className="description">
-        <span>{`To continue, please select one of your already set up methods. This is an extra security step to confirm your identity.`}</span>
+        <span>{`For security, verify your identity using one of your existing MFA methods. You'll be able to add a new method after verification.`}</span>
       </p>
       {isPresent(error) && <p className="error">{error}</p>}
+      <div className="label">
+        <p>Select an existing method</p>
+      </div>
       <div className="methods">
         {methods.map((method) => (
           <ConfigureMfaVerificatorFactorSelector
             key={method}
             mfaMethod={method}
+            instance={instance}
             selected={selected === method}
             onClick={() => {
               setSelected(method);
@@ -102,7 +106,7 @@ export const ConfigureSelectVerificationStep = ({ onCancel }: Props) => {
           )}
           {selected !== MfaMethod.Oidc && (
             <Button
-              text="Continue"
+              text="Verify identity"
               variant={ButtonVariant.Primary}
               disabled={selected === undefined || isCancelling}
               onClick={() => {

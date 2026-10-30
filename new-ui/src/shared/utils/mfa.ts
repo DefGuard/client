@@ -17,7 +17,7 @@ const mfaMethodLabels: Record<MfaMethodValue, string> = {
   [MfaMethod.Oidc]: 'OpenID',
   [MfaMethod.Totp]: 'Authenticator app',
   [MfaMethod.Biometric]: 'Mobile Biometric Authentication',
-  [MfaMethod.Fido2]: 'Security key',
+  [MfaMethod.Fido2]: 'FIDO2 Security Key',
 };
 
 export type OpenIdInstance = Pick<
