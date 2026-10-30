@@ -124,9 +124,10 @@ pub struct PcrBankCapability {
 }
 
 /// Library-defined combination of key and signature parameters
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfileId {
     /// ECC NIST P-256 with ECDSA and SHA-256
+    #[default]
     EcdsaP256Sha256,
     /// RSA-2048 with RSASSA-PKCS1-v1_5 and SHA-256
     RsaSsa2048Sha256,
@@ -341,10 +342,8 @@ pub fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
 }
 
 /// Creates an identity meeting the requirements without replacing an existing key.
-pub fn create_identity(
-    requirements: &IdentityRequirements,
-) -> Result<IdentityRef, DeviceIdentityError> {
-    backend::create_identity(requirements)
+pub fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
+    backend::create_identity()
 }
 
 /// Returns the identity's public attestation data for enrollment with Core.

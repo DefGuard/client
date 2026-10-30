@@ -1,22 +1,13 @@
 use crate::{
     AttestationIdentity, AttestationRequest, AttestationResponse, Capabilities,
-    DeviceIdentityError, IdentityRef, IdentityRequirements, PossessionChallenge, PossessionProof,
-    PublicIdentity,
+    DeviceIdentityError, IdentityRef, PossessionChallenge, PossessionProof,
 };
 
 pub(crate) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn create_identity(
-    _requirements: &IdentityRequirements,
-) -> Result<IdentityRef, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
-}
-
-pub(crate) fn public_identity(
-    _identity: &IdentityRef,
-) -> Result<PublicIdentity, DeviceIdentityError> {
+pub(crate) fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
