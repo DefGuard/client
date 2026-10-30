@@ -40,7 +40,7 @@ export const ConfigureMfaWizard = ({ onCancel, onSessionExpired }: Props) => {
       [ConfigureMfaStep.Fido2]: {
         id: ConfigureMfaStep.Fido2,
         order: 2,
-        label: 'Security Key',
+        label: mfaToText(MfaMethod.Fido2),
         hidden: !selectedSteps.includes(ConfigureMfaStep.Fido2),
       },
       [ConfigureMfaStep.RecoveryCodes]: {

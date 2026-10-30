@@ -4,29 +4,33 @@ import { Icon } from '../../../../../shared/components/Icon';
 import { RadioIndicator } from '../../../../../shared/components/RadioIndicator/RadioIndicator';
 import { mfaMethodIcon } from '../../../../../shared/consts';
 import { MfaMethod, type MfaMethodValue } from '../../../../../shared/rust-api/types';
-import { mfaToText } from '../../../../../shared/utils/mfa';
+import {
+  mfaToText,
+  type OpenIdInstance,
+  openIdProviderName,
+} from '../../../../../shared/utils/mfa';
 
 type FactorText = {
   title: string;
   description: string;
 };
 
-const factorText = (method: MfaMethodValue): FactorText => {
+const factorText = (method: MfaMethodValue, instance?: OpenIdInstance): FactorText => {
   switch (method) {
     case MfaMethod.Totp:
       return {
         title: 'Security code from your authenticator app',
-        description: `Use an app on your phone that generates a temporary code to confirm it's you (Google Authenticator, Microsoft Authenticator, Authy).`,
+        description: `Use an authenticator app on your phone, such as Google Authenticator, Microsoft Authenticator, or Authy, to generate a temporary code and verify your identity.`,
       };
     case MfaMethod.Email:
       return {
         title: `Code from email`,
-        description: `We'll send a temporary security code to your email. Enter the code to confirm it's you and continue.`,
+        description: `Enter the temporary security code sent to your email to verify your identity and continue.`,
       };
     case MfaMethod.Oidc:
       return {
-        title: mfaToText(MfaMethod.Oidc),
-        description: `Sign in with your identity provider in the browser to confirm it's you.`,
+        title: `Verify with ${openIdProviderName(instance)}`,
+        description: `Sign in through your identity provider in the browser to verify your identity.`,
       };
     case MfaMethod.Biometric:
       return { title: '', description: '' };
@@ -34,14 +38,15 @@ const factorText = (method: MfaMethodValue): FactorText => {
       return { title: '', description: '' };
     case MfaMethod.Fido2:
       return {
-        title: 'Security key',
-        description: `Use a security key registered to your account, such as a YubiKey, to confirm it's you.`,
+        title: mfaToText(MfaMethod.Fido2),
+        description: `Verify your identity using a registered security key, such as a YubiKey.`,
       };
   }
 };
 
 interface Props {
   mfaMethod: MfaMethodValue;
+  instance?: OpenIdInstance;
   selected: boolean;
   disabled?: boolean;
   onClick: () => void;
@@ -49,11 +54,12 @@ interface Props {
 
 export const ConfigureMfaVerificatorFactorSelector = ({
   mfaMethod,
+  instance,
   selected,
   disabled = false,
   onClick,
 }: Props) => {
-  const { title, description } = factorText(mfaMethod);
+  const { title, description } = factorText(mfaMethod, instance);
 
   return (
     <div

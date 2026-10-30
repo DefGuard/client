@@ -1,4 +1,13 @@
 #configure-select-verification-step {
+  .label {
+    padding-bottom: var(--spacing-md);
+
+    & > p {
+      font: var(--t-body-xs-500);
+      color: var(--fg-white-100);
+    }
+  }
+
   .methods {
     display: flex;
     flex-flow: column;

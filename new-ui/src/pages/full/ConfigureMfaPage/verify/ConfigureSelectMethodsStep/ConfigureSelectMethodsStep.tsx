@@ -117,22 +117,23 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       const available = isMfaMethodAvailable(method, instance);
       const satisfied = configuredMethods.includes(method) && available;
       const locked = isMfaMethodLocked(method, instance);
+      const methodName = mfaToText(method, instance ?? undefined);
 
       let hint: string | null = null;
       let badge: string | undefined;
       if (!available || locked) {
-        hint = `${mfaToText(method, instance ?? undefined)} is not available on this Defguard instance.`;
+        hint = `${methodName} is not available on this Defguard instance.`;
         badge = 'Unavailable';
       } else if (disabled && !configured) {
         if (satisfied) {
           // Reached only via the email fallback, which registers the factor as it verifies.
-          hint = `${mfaToText(method)} is required to continue.`;
+          hint = `${methodName} is required to continue.`;
           badge = 'Required';
         } else if (isClientConfigurableMethod(method)) {
-          hint = `This Defguard instance does not support configuring ${mfaToText(method)} from the desktop client.`;
+          hint = `This Defguard instance does not support configuring ${methodName} from the desktop client.`;
           badge = 'Not configurable';
         } else {
-          hint = `${mfaToText(method)} cannot be configured in the desktop client.`;
+          hint = `${methodName} cannot be configured in the desktop client.`;
           badge = 'Not configurable';
         }
       }
