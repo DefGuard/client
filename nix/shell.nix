@@ -61,6 +61,8 @@ in
         pnpm
       ]
       ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+        swtpm
+        tpm2-tools
         # Client E2E runtime and privileged service setup tools.
         xvfb-run
         xclip
