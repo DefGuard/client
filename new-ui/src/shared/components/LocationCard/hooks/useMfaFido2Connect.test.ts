@@ -186,4 +186,58 @@ describe('useMfaFido2Connect', () => {
     expect(onConnected).not.toHaveBeenCalled();
     expect(result.current.isVerifying).toBe(false);
   });
+
+  describe('with onFailure', () => {
+    const emitError = async (pin: string | null, err: string) => {
+      const onFailure = vi.fn();
+      const { result } = renderHook(() =>
+        useMfaFido2Connect(location, {
+          stepPlan: ['fido2'],
+          mfaToken: null,
+          setMfaToken: mocks.setMfaToken,
+          onFailure,
+        }),
+      );
+      await act(async () => result.current.verify(pin));
+      const errorListener = mocks.listen.mock.calls.find(
+        ([event]) => event === TauriEvent.MfaFido2Error,
+      )?.[1] as (event: { payload: { error: string } }) => void;
+      await act(async () => {
+        errorListener({ payload: { error: err } });
+      });
+      return { onFailure, result };
+    };
+
+    const pinRejected = JSON.stringify({
+      type: 'mfa_rejected',
+      message: 'Security key rejected the PIN: the security key rejected the PIN',
+    });
+
+    it('keeps a rejected PIN on the PIN input', async () => {
+      const { onFailure, result } = await emitError('1234', pinRejected);
+
+      expect(onFailure).not.toHaveBeenCalled();
+      expect(result.current.verifyError).toBe(
+        'Security key rejected the PIN: the security key rejected the PIN',
+      );
+    });
+
+    it('reports a rejected PIN when the platform collected it', async () => {
+      const { onFailure, result } = await emitError(null, pinRejected);
+
+      expect(onFailure).toHaveBeenCalledWith(pinRejected);
+      expect(result.current.verifyError).toBeNull();
+    });
+
+    it('reports a key error that the PIN input cannot fix', async () => {
+      const err = JSON.stringify({
+        type: 'mfa_rejected',
+        message: 'No security key detected',
+      });
+      const { onFailure, result } = await emitError('1234', err);
+
+      expect(onFailure).toHaveBeenCalledWith(err);
+      expect(result.current.verifyError).toBeNull();
+    });
+  });
 });

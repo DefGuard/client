@@ -1,3 +1,4 @@
+import { error as logError } from '@tauri-apps/plugin-log';
 import {
   createContext,
   type ReactNode,
@@ -11,6 +12,7 @@ import {
 import { useConnectionAbility } from '../../../hooks/useConnectionAbility';
 import { useAppData } from '../../../providers/AppDataContext';
 import { api } from '../../../rust-api/api';
+import { isMfaPostureError, mfaErrorMessage } from '../../../rust-api/mfaError';
 import type { InstanceInfo, LocationInfo, MfaStep } from '../../../rust-api/types';
 import { ConnectionType, MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
 import { useAppStore } from '../../../store/useAppStore';
@@ -24,9 +26,10 @@ import {
   usableMfaMethods,
 } from '../../../utils/mfa';
 import { IconKind } from '../../Icon';
-import type { IconKindValue } from '../../Icon/icon-types';
+import { MfaRetry, type MfaRetryValue, mfaErrorToCard } from '../api/cardError';
 import { findRouteConflicts, openRouteConflictInFullView } from '../api/connectError';
 import {
+  type LocationCardError,
   LocationCardViews,
   type LocationCardViewsValue,
   mfaMethodToLocationCardView,
@@ -38,8 +41,7 @@ interface LocationCardContextValue {
   currentView: LocationCardViewsValue;
   previousView: LocationCardViewsValue | null;
   postureError: string | null;
-  connectionError: string | null;
-  connectionErrorIcon: IconKindValue | null;
+  cardError: LocationCardError | null;
   autoConnectOpenid: boolean;
   mfaMethod: MfaMethodValue;
   /** Whether the MFA flow can be passed as is, after configuring factors, or not at
@@ -54,12 +56,11 @@ interface LocationCardContextValue {
   setMfaToken: (token: string | null) => void;
   goToStep: (stepIndex: number) => void;
   setStepPlanOnce: (plan: MfaMethodValue[]) => void;
-  setView: (
-    view: LocationCardViewsValue,
-    connectionError?: string,
-    icon?: IconKindValue | null,
-  ) => void;
+  setView: (view: LocationCardViewsValue) => void;
   setPostureError: (error: string | null) => void;
+  showError: (error: LocationCardError) => void;
+  /** Routes a failed MFA attempt to the posture view or the error template. */
+  showFailure: (err: unknown) => void;
   startMfa: () => void;
 }
 
@@ -90,10 +91,7 @@ export const LocationCardProvider = ({
   const [autoConnectOpenid, setAutoConnectOpenid] = useState(false);
   const [previousView, setPreviousView] = useState<LocationCardViewsValue | null>(null);
   const [postureError, setPostureError] = useState<string | null>(null);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [connectionErrorIcon, setConnectionErrorIcon] = useState<IconKindValue | null>(
-    null,
-  );
+  const [cardError, setCardError] = useState<LocationCardError | null>(null);
   const [currentView, setCurrentView] = useState<LocationCardViewsValue>(
     location.active ? LocationCardViews.Connected : LocationCardViews.Default,
   );
@@ -130,17 +128,20 @@ export const LocationCardProvider = ({
   }, [location.active]);
 
   const setView = useCallback(
-    (
-      view: LocationCardViewsValue,
-      connectionError?: string,
-      icon: IconKindValue | null = IconKind.ServiceUnavailable,
-    ) => {
+    (view: LocationCardViewsValue) => {
       setPreviousView(currentView);
       setCurrentView(view);
-      setConnectionError(connectionError ?? null);
-      setConnectionErrorIcon(view === LocationCardViews.ConnectionError ? icon : null);
+      if (view !== LocationCardViews.Error) setCardError(null);
     },
     [currentView],
+  );
+
+  const showError = useCallback(
+    (error: LocationCardError) => {
+      setCardError(error);
+      setView(LocationCardViews.Error);
+    },
+    [setView],
   );
 
   const goToStep = useCallback(
@@ -152,21 +153,56 @@ export const LocationCardProvider = ({
   );
 
   const startMfa = useCallback(async () => {
-    const conflicts = await findRouteConflicts(location);
-    if (conflicts.length > 0) {
-      await openRouteConflictInFullView({ location, conflicts });
-      return;
+    try {
+      const conflicts = await findRouteConflicts(location);
+      if (conflicts.length > 0) {
+        await openRouteConflictInFullView({ location, conflicts });
+        return;
+      }
+      mfaStarted.current = true;
+      const appConfig = await api.getAppConfig();
+      setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
+      const defaultPlan = resolveMfaStepPlan(location, [], instance);
+      setStepPlanOnce([]);
+      setStepIndex(0);
+      setMfaToken(null);
+      setMfaMethod(defaultPlan[0]);
+      setView(mfaMethodToLocationCardView(defaultPlan[0]));
+    } catch (err) {
+      void logError(`Failed to start MFA for location ${location.id}: ${err}`);
+      showError({
+        message: 'Could not start authentication. Please try again.',
+        icon: IconKind.WarningOutlined,
+      });
     }
-    mfaStarted.current = true;
-    const appConfig = await api.getAppConfig();
-    setAutoConnectOpenid(appConfig.auto_start_openid_mfa);
-    const defaultPlan = resolveMfaStepPlan(location, [], instance);
-    setStepPlanOnce([]);
-    setStepIndex(0);
-    setMfaToken(null);
-    setMfaMethod(defaultPlan[0]);
-    setView(mfaMethodToLocationCardView(defaultPlan[0]));
-  }, [setView, location, instance]);
+  }, [setView, showError, location, instance]);
+
+  const retryHandler = useCallback(
+    (retry: MfaRetryValue | null) => {
+      switch (retry) {
+        case MfaRetry.ResumeStep:
+          return () => setView(mfaMethodToLocationCardView(stepPlan[stepIndex]));
+        case MfaRetry.RestartMfa:
+          return () => void startMfa();
+        default:
+          return undefined;
+      }
+    },
+    [setView, startMfa, stepPlan, stepIndex],
+  );
+
+  const showFailure = useCallback(
+    (err: unknown) => {
+      if (isMfaPostureError(err, location)) {
+        setPostureError(mfaErrorMessage(err));
+        setView(LocationCardViews.PostureCheckFail);
+        return;
+      }
+      const { retry, ...error } = mfaErrorToCard(err);
+      showError({ ...error, onRetry: retryHandler(retry) });
+    },
+    [location, setView, showError, retryHandler],
+  );
 
   const mfaAutoStartRequested = useAppStore(
     (s) => s.mfaAutoStartLocationId === location.id,
@@ -219,8 +255,7 @@ export const LocationCardProvider = ({
         currentView,
         previousView,
         postureError,
-        connectionError,
-        connectionErrorIcon,
+        cardError,
         autoConnectOpenid,
         location,
         instance,
@@ -233,6 +268,8 @@ export const LocationCardProvider = ({
         mfaToken,
         setView,
         setPostureError,
+        showError,
+        showFailure,
         startMfa,
         setMfaMethod,
         setMfaToken,

@@ -13,8 +13,8 @@ const mocks = vi.hoisted(() => ({
   mfaPollOpenId: vi.fn(),
   openLink: vi.fn(),
   setMfaToken: vi.fn(),
-  setPostureError: vi.fn(),
   setView: vi.fn(),
+  showFailure: vi.fn(),
   useLocationCardContext: vi.fn(),
 }));
 
@@ -46,8 +46,8 @@ describe('useMfaOidcConnect', () => {
       location: { id: 7, instance_id: 42 },
       mfaToken: null,
       setMfaToken: mocks.setMfaToken,
-      setPostureError: mocks.setPostureError,
       setView: mocks.setView,
+      showFailure: mocks.showFailure,
       stepPlan: ['oidc'],
     });
     mocks.cancelMfa.mockResolvedValue(undefined);
@@ -102,6 +102,19 @@ describe('useMfaOidcConnect', () => {
     });
 
     expect(mocks.setMfaToken).toHaveBeenLastCalledWith(null);
+    expect(mocks.showFailure).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'attempt_limit', message: 'Attempt limit reached' }),
+    );
+  });
+
+  it('shows a failed start through the card instead of keeping it in the hook', async () => {
+    const startError = JSON.stringify({ type: 'network_error', message: 'unreachable' });
+    mocks.mfaBeginStep.mockRejectedValue(startError);
+    const { result } = renderHook(() => useMfaOidcConnect(true));
+
+    await waitFor(() => expect(mocks.showFailure).toHaveBeenCalledWith(startError));
+    expect(result.current.isStarting).toBe(false);
+    expect(result.current.isPolling).toBe(false);
   });
 
   it('retains and reuses the session token after a retryable poll timeout', async () => {
@@ -110,8 +123,8 @@ describe('useMfaOidcConnect', () => {
       location: { id: 7, instance_id: 42 },
       mfaToken: 'mfa-token',
       setMfaToken: mocks.setMfaToken,
-      setPostureError: mocks.setPostureError,
       setView: mocks.setView,
+      showFailure: mocks.showFailure,
       stepPlan: ['oidc'],
     });
     const { result, rerender } = renderHook(() => useMfaOidcConnect());

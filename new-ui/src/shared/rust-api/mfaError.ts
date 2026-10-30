@@ -66,6 +66,22 @@ export const isServiceUnavailable = (err: unknown): boolean => {
 export const isConnectFailure = (message: string): boolean =>
   message.includes('VPN connection failed');
 
+export const isMobileClientOutdated = (err: unknown): boolean =>
+  parseMfaError(err)?.type === 'mobile_client_outdated';
+
+/** The user declined the request in the mobile app. */
+export const isMobileApprovalRejected = (message: string): boolean =>
+  message === 'Mobile approval rejected';
+
+/** A mistyped PIN, which the user fixes in the PIN field. */
+export const isSecurityKeyPinRejected = (message: string): boolean =>
+  message.startsWith('Security key rejected the PIN') &&
+  !isSecurityKeyPinBlocked(message);
+
+/** Retyping does not help once the key locks itself. */
+export const isSecurityKeyPinBlocked = (message: string): boolean =>
+  message.includes('locked after too many PIN attempts');
+
 /** The proxy predates the MFA configuration API (HTTP 404 on /mfa-config/start). */
 export const isMfaConfigUnsupported = (err: unknown): boolean =>
   parseMfaError(err)?.type === 'unsupported';
@@ -134,6 +150,14 @@ export type OidcPollFailure = {
   message: string;
 };
 
+export const MfaFailureText = {
+  StaleAttempt: 'Authentication request could not be started. Please try again.',
+  Timeout: 'Authentication timed out. Please try again.',
+  ConnectFailure: 'Failed to establish VPN connection',
+  SessionExpired: 'Session expired. Please try again.',
+  Unknown: 'Authentication failed. Please try again.',
+} as const;
+
 /** Maps an OIDC error event to a type and user-facing message. */
 export const classifyOidcPollFailure = (rawError: string): OidcPollFailure => {
   const message = mfaErrorMessage(rawError);
@@ -141,19 +165,16 @@ export const classifyOidcPollFailure = (rawError: string): OidcPollFailure => {
     return { kind: 'attemptLimit', message };
   }
   if (isStaleAttempt(message)) {
-    return {
-      kind: 'staleAttempt',
-      message: 'Authentication request could not be started. Please try again.',
-    };
+    return { kind: 'staleAttempt', message: MfaFailureText.StaleAttempt };
   }
   if (isTimeout(rawError)) {
-    return { kind: 'timeout', message: 'Authentication timed out. Please try again.' };
+    return { kind: 'timeout', message: MfaFailureText.Timeout };
   }
   if (isConnectFailure(message)) {
-    return { kind: 'connectFailure', message: 'Failed to establish VPN connection' };
+    return { kind: 'connectFailure', message: MfaFailureText.ConnectFailure };
   }
   if (isSessionExpired(message)) {
-    return { kind: 'sessionExpired', message: 'Session expired. Please try again.' };
+    return { kind: 'sessionExpired', message: MfaFailureText.SessionExpired };
   }
-  return { kind: 'unknown', message: 'Authentication failed. Please try again.' };
+  return { kind: 'unknown', message: MfaFailureText.Unknown };
 };
