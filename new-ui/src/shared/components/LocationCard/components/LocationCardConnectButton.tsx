@@ -1,9 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
+import { error as logError } from '@tauri-apps/plugin-log';
 import { useConfigureFactorsScreen } from '../../../hooks/useConfigureFactorsScreen';
 import { api } from '../../../rust-api/api';
 import { connectConfigureFactorsSource } from '../../../utils/configureFactorsSource';
 import { ConnectionAbility, shouldStartMfa } from '../../../utils/mfa';
 import { IconKind } from '../../Icon';
+import { connectErrorToCard } from '../api/cardError';
 import { openRouteConflictInFullView, parseConnectError } from '../api/connectError';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
@@ -11,7 +13,7 @@ import { ConnectButton } from './ConnectButton/ConnectButton';
 import { connectBlockedTooltip } from './ConnectButton/consts';
 
 export const LocationCardConnectButton = () => {
-  const { location, connectionAbility, setPostureError, setView, startMfa } =
+  const { location, connectionAbility, setPostureError, setView, showError, startMfa } =
     useLocationCardContext();
 
   const canConfigureMfa = connectionAbility === ConnectionAbility.Configurable;
@@ -23,7 +25,7 @@ export const LocationCardConnectButton = () => {
     onSuccess: () => {
       setView(LocationCardViews.Connected);
     },
-    onError: (err) => {
+    onError: (err, variables) => {
       const connectError = parseConnectError(err);
 
       if (
@@ -34,8 +36,12 @@ export const LocationCardConnectButton = () => {
         setView(LocationCardViews.PostureCheckFail);
       } else if (connectError?.kind === 'routeConflict') {
         void openRouteConflictInFullView({ location, conflicts: connectError.conflicts });
-      } else if (connectError?.kind === 'serviceUnavailable') {
-        setView(LocationCardViews.ConnectionError);
+      } else {
+        void logError(`Failed to connect to location ${location.id}: ${err}`);
+        showError({
+          ...connectErrorToCard(connectError, location),
+          onRetry: () => connect(variables),
+        });
       }
     },
     meta: {
@@ -50,6 +56,14 @@ export const LocationCardConnectButton = () => {
     mutationFn: api.disconnect,
     onSuccess: () => {
       setView(LocationCardViews.Default);
+    },
+    onError: (err, variables) => {
+      void logError(`Failed to disconnect from location ${location.id}: ${err}`);
+      showError({
+        message: `Failed to disconnect from ${location.name}. Please try again.`,
+        icon: IconKind.WarningOutlined,
+        onRetry: () => disconnect(variables),
+      });
     },
     meta: {
       invalidate: ['locations'],

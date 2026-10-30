@@ -1,6 +1,7 @@
 import './style.scss';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ThemeSpacing } from '../../../../types';
+import { isPresent } from '../../../../utils/isPresent';
 import { Button } from '../../../Button/Button';
 import { ButtonVariant } from '../../../Button/types';
 import { Controls } from '../../../Controls/Controls';
@@ -14,12 +15,10 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 import { useMfaMobileConnect } from '../../hooks/useMfaMobileConnect';
 
-type Screen = 'loading' | 'qr' | 'error';
-
 export const LocationCardMfaMobileView = () => {
   const {
     setView,
-    setPostureError,
+    showFailure,
     location,
     stepLabel,
     canPickOtherMethod,
@@ -28,52 +27,32 @@ export const LocationCardMfaMobileView = () => {
     setMfaToken,
     goToStep,
   } = useLocationCardContext();
-  const { start, startError, qrValue, connectionError } = useMfaMobileConnect(location, {
+  const { start, qrValue } = useMfaMobileConnect(location, {
     stepPlan,
     mfaToken,
     setMfaToken,
     onStepAdvanced: goToStep,
     onConnected: () => setView(LocationCardViews.Connected),
-    onPostureError: (message) => setPostureError(message ?? null),
-    onConnectionError: (message, icon) =>
-      setView(LocationCardViews.ConnectionError, message, icon),
+    onFailure: showFailure,
   });
-  const [screen, setScreen] = useState<Screen>('loading');
   const startedRef = useRef(false);
 
-  // Auto-start on mount
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     void start();
   }, [start]);
 
-  useEffect(() => {
-    if (startError ?? connectionError) {
-      setScreen('error');
-    } else if (qrValue) {
-      setScreen('qr');
-    }
-  }, [startError, connectionError, qrValue]);
-
-  const backToLocation = () => {
-    setPostureError(null);
-    setView(LocationCardViews.Default);
-  };
-
-  const errorMessage = startError ?? connectionError;
-
   return (
     <div className="location-card-mfa-mobile">
       <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
-        {screen === 'loading' && <p>Preparing authentication...</p>}
-        {screen === 'qr' && (
-          <p>Open your Defguard mobile app and scan the QR code you see bellow.</p>
+        {!isPresent(qrValue) && <p>Preparing authentication...</p>}
+        {isPresent(qrValue) && (
+          <p>Open your Defguard mobile app and scan the QR code you see below.</p>
         )}
-        {screen === 'error' && <p className="error">{errorMessage}</p>}
       </LocationViewHeader>
-      {screen === 'qr' && qrValue && (
+      {isPresent(qrValue) && (
         <div className="qr-wrapper">
           <QrCard value={qrValue} size={184} />
         </div>
@@ -93,13 +72,6 @@ export const LocationCardMfaMobileView = () => {
               onClick={() => {
                 setView(LocationCardViews.MfaSettings);
               }}
-            />
-          )}
-          {screen === 'error' && (
-            <Button
-              text="Try again"
-              variant={ButtonVariant.Primary}
-              onClick={backToLocation}
             />
           )}
         </div>

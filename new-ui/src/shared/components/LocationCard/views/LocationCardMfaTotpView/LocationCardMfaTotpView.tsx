@@ -22,8 +22,8 @@ const MIN_POSTURE_LOADER_MS = 500;
 export const LocationCardMfaTotpView = () => {
   const {
     setView,
+    showFailure,
     location,
-    setPostureError,
     stepLabel,
     canPickOtherMethod,
     stepPlan,
@@ -31,7 +31,7 @@ export const LocationCardMfaTotpView = () => {
     setMfaToken,
     goToStep,
   } = useLocationCardContext();
-  const { verifyCode, isVerifying, verifyError, isStarting, startError } = useMfaConnect(
+  const { verifyCode, isVerifying, verifyError, isStarting } = useMfaConnect(
     location,
     MfaMethod.Totp,
     {
@@ -41,12 +41,7 @@ export const LocationCardMfaTotpView = () => {
       onStepAdvanced: goToStep,
       debounceMs: location.posture_check_required ? MIN_POSTURE_LOADER_MS : 0,
       onConnected: () => setView(LocationCardViews.Connected),
-      onSessionExpired: () => setView(LocationCardViews.Default),
-      onPostureError: (msg) => {
-        setPostureError(msg);
-        setView(LocationCardViews.PostureCheckFail);
-      },
-      onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
+      onFailure: showFailure,
     },
   );
 
@@ -76,14 +71,11 @@ export const LocationCardMfaTotpView = () => {
     if (value.length > 0) setError(null);
   }, []);
 
-  // Reflect server-side verify errors into the local error state
   useEffect(() => {
     if (verifyError) setError(verifyError);
   }, [verifyError]);
 
-  // Show loader when posture is being evaluated
-  const showLoader = location.posture_check_required && isStarting && !startError;
-  if (showLoader) {
+  if (location.posture_check_required && isStarting) {
     return <LocationCardMfaStartLoader />;
   }
 
@@ -98,7 +90,7 @@ export const LocationCardMfaTotpView = () => {
         length={6}
         value={totpCode}
         onChange={handleCodeChange}
-        error={startError ?? error}
+        error={error}
         onSubmit={handleVerify}
         loading={isStarting || isVerifying}
       />
