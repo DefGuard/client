@@ -168,15 +168,6 @@ pub struct IdentityRequirements {
     pub attestation_method: AttestationMethod,
 }
 
-/// Public key and backend associated with a local identity
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PublicIdentity {
-    /// Public key encoded as X.509 SubjectPublicKeyInfo DER
-    pub public_key_der: Vec<u8>,
-    /// Mechanism managing the corresponding private key
-    pub backend: BackendKind,
-}
-
 /// Core session challenge and application binding for an attestation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttestationContext {
@@ -354,11 +345,6 @@ pub fn create_identity(
     requirements: &IdentityRequirements,
 ) -> Result<IdentityRef, DeviceIdentityError> {
     backend::create_identity(requirements)
-}
-
-/// Returns the identity's public key and backend without exposing private key material.
-pub fn public_identity(identity: &IdentityRef) -> Result<PublicIdentity, DeviceIdentityError> {
-    backend::public_identity(identity)
 }
 
 /// Returns the identity's public attestation data for enrollment with Core.
