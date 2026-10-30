@@ -160,15 +160,6 @@ pub struct IdentityRef {
     pub id: String,
 }
 
-/// Required key profile and attestation protocol for a new identity
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IdentityRequirements {
-    /// Key and signature parameters required for the identity
-    pub profile: ProfileId,
-    /// Protocol the created identity must support
-    pub attestation_method: AttestationMethod,
-}
-
 /// Core session challenge and application binding for an attestation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttestationContext {
@@ -341,7 +332,7 @@ pub fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     backend::capabilities()
 }
 
-/// Creates an identity meeting the requirements without replacing an existing key.
+/// Creates an identity using the backend's predefined profile.
 pub fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
     backend::create_identity()
 }
@@ -410,20 +401,8 @@ mod tests {
     }
 
     #[test]
-    fn identity_operations_return_unsupported() {
-        let requirements = IdentityRequirements {
-            profile: ProfileId::EcdsaP256Sha256,
-            attestation_method: AttestationMethod::TpmKeyAttestation,
-        };
-
-        assert_eq!(
-            create_identity(&requirements),
-            Err(DeviceIdentityError::Unsupported)
-        );
-        assert_eq!(
-            public_identity(&identity()),
-            Err(DeviceIdentityError::Unsupported)
-        );
+    fn creating_identity_returns_unsupported() {
+        assert_eq!(create_identity(), Err(DeviceIdentityError::Unsupported));
     }
 
     #[test]
