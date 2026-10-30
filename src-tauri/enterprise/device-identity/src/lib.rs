@@ -372,7 +372,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn capabilities_preserve_unknown_algorithm_ids_and_flags() {
+    fn test_capabilities_preserve_unknown_algorithm_ids_and_flags() {
         let capabilities = TpmCapabilities {
             algorithms: vec![AlgorithmCapability {
                 id: AlgorithmId(0xffff),
@@ -384,63 +384,5 @@ mod tests {
         assert_eq!(capabilities.algorithms[0].id, AlgorithmId(0xffff));
         assert_eq!(capabilities.algorithms[0].flags, 0x8000_0000);
         assert!(capabilities.profiles.is_empty());
-    }
-
-    #[test]
-    fn unimplemented_backend_returns_unsupported() {
-        assert_eq!(capabilities(), Err(DeviceIdentityError::Unsupported));
-    }
-
-    fn identity() -> IdentityRef {
-        IdentityRef {
-            id: "test-identity".into(),
-        }
-    }
-
-    #[tokio::test]
-    async fn creating_identity_returns_unsupported() {
-        assert_eq!(
-            create_identity().await,
-            Err(DeviceIdentityError::Unsupported)
-        );
-    }
-
-    #[test]
-    fn attestation_identity_returns_unsupported() {
-        assert_eq!(
-            attestation_identity(&identity()),
-            Err(DeviceIdentityError::Unsupported)
-        );
-    }
-
-    #[tokio::test]
-    async fn attestation_returns_unsupported_for_each_challenge() {
-        for challenge in [
-            AttestationChallenge::Tpm(CredentialChallenge {
-                credential_blob: vec![3; 32],
-                encrypted_secret: vec![4; 32],
-            }),
-            AttestationChallenge::AppleAppAttest,
-        ] {
-            let request = AttestationRequest {
-                data: vec![1; 32],
-                challenge,
-            };
-
-            assert!(matches!(
-                attest_identity(&identity(), &request).await,
-                Err(DeviceIdentityError::Unsupported)
-            ));
-        }
-    }
-
-    #[tokio::test]
-    async fn possession_proof_returns_unsupported() {
-        let challenge = PossessionChallenge { data: vec![1; 32] };
-
-        assert_eq!(
-            prove_possession(&identity(), &challenge).await,
-            Err(DeviceIdentityError::Unsupported)
-        );
     }
 }

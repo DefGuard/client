@@ -13,3 +13,16 @@ tokio = { workspace = true, features = ["macros"] }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+aes = "0.8"
+base64.workspace = true
+cfb-mode = "0.8"
+ciborium = "0.2"
+hmac = "0.12"
+p256 = { version = "0.13", features = ["ecdh", "ecdsa", "pem"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+rsa = "0.9"
+sha2 = { version = "0.10", features = ["oid"] }
+tempfile.workspace = true
+x509-parser = "0.18"
