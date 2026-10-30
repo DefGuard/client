@@ -4,7 +4,7 @@ import { MfaMethod, type MfaMethodValue } from './rust-api/types';
 export const mfaMethodIcon: Record<MfaMethodValue, IconKindValue> = {
   [MfaMethod.Email]: 'mail',
   [MfaMethod.MobileApprove]: 'qr',
-  [MfaMethod.Oidc]: 'token',
+  [MfaMethod.Oidc]: 'lock-closed',
   [MfaMethod.Totp]: 'mobile-lock',
   [MfaMethod.Biometric]: 'biometric',
   [MfaMethod.Fido2]: 'software-key',
