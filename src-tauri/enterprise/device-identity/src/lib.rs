@@ -298,6 +298,15 @@ pub enum DeviceIdentityError {
     /// Required hardware or platform service is not available
     #[error("hardware identity backend is unavailable")]
     Unavailable,
+    /// The service is temporarily unavailable and the operation may be retried later
+    #[error("hardware identity service is temporarily unavailable")]
+    TemporarilyUnavailable,
+    /// The operation exceeded its time limit
+    #[error("hardware identity operation timed out")]
+    Timeout,
+    /// The service requires a delay before another attempt
+    #[error("hardware identity service rate limit exceeded")]
+    RateLimited,
     /// The caller lacks permission to access the backend
     #[error("permission to access hardware identity was denied")]
     PermissionDenied,
