@@ -329,8 +329,8 @@ pub fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
 ///
 /// Returns a local reference for later attestation and possession proofs.
 /// Returns Unsupported when the required profile or mechanism is unavailable.
-pub fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
-    backend::create_identity()
+pub async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
+    backend::create_identity().await
 }
 
 /// Returns the identity's public attestation data for enrollment with Core.
@@ -342,20 +342,20 @@ pub fn attestation_identity(
 
 /// Processes the backend challenge and generates evidence bound to the exact Core-encoded data.
 /// TPM returns the activation secret and certification, while Apple returns App Attest evidence.
-pub fn attest_identity(
+pub async fn attest_identity(
     identity: &IdentityRef,
     request: &AttestationRequest,
 ) -> Result<AttestationResponse, DeviceIdentityError> {
-    backend::attest_identity(identity, request)
+    backend::attest_identity(identity, request).await
 }
 
 /// Produces a proof bound to Core's challenge using the referenced identity.
 /// Core must verify it against the previously attested key.
-pub fn prove_possession(
+pub async fn prove_possession(
     identity: &IdentityRef,
     challenge: &PossessionChallenge,
 ) -> Result<PossessionProof, DeviceIdentityError> {
-    backend::prove_possession(identity, challenge)
+    backend::prove_possession(identity, challenge).await
 }
 
 #[cfg(test)]
@@ -388,9 +388,12 @@ mod tests {
         }
     }
 
-    #[test]
-    fn creating_identity_returns_unsupported() {
-        assert_eq!(create_identity(), Err(DeviceIdentityError::Unsupported));
+    #[tokio::test]
+    async fn creating_identity_returns_unsupported() {
+        assert_eq!(
+            create_identity().await,
+            Err(DeviceIdentityError::Unsupported)
+        );
     }
 
     #[test]
@@ -401,8 +404,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn attestation_returns_unsupported_for_each_challenge() {
+    #[tokio::test]
+    async fn attestation_returns_unsupported_for_each_challenge() {
         for challenge in [
             AttestationChallenge::Tpm(CredentialChallenge {
                 credential_blob: vec![3; 32],
@@ -416,18 +419,18 @@ mod tests {
             };
 
             assert!(matches!(
-                attest_identity(&identity(), &request),
+                attest_identity(&identity(), &request).await,
                 Err(DeviceIdentityError::Unsupported)
             ));
         }
     }
 
-    #[test]
-    fn possession_proof_returns_unsupported() {
+    #[tokio::test]
+    async fn possession_proof_returns_unsupported() {
         let challenge = PossessionChallenge { data: vec![1; 32] };
 
         assert_eq!(
-            prove_possession(&identity(), &challenge),
+            prove_possession(&identity(), &challenge).await,
             Err(DeviceIdentityError::Unsupported)
         );
     }

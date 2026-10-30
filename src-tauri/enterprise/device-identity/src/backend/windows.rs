@@ -7,7 +7,7 @@ pub(crate) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
+pub(crate) async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
@@ -17,14 +17,14 @@ pub(crate) fn attestation_identity(
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn attest_identity(
+pub(crate) async fn attest_identity(
     _identity: &IdentityRef,
     _request: &AttestationRequest,
 ) -> Result<AttestationResponse, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn prove_possession(
+pub(crate) async fn prove_possession(
     _identity: &IdentityRef,
     _challenge: &PossessionChallenge,
 ) -> Result<PossessionProof, DeviceIdentityError> {

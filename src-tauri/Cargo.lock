@@ -1920,6 +1920,7 @@ name = "device-identity"
 version = "2.2.0"
 dependencies = [
  "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]
