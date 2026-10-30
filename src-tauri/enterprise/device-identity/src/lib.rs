@@ -160,17 +160,6 @@ pub struct IdentityRef {
     pub id: String,
 }
 
-/// Core session challenge and application binding for an attestation
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AttestationContext {
-    /// Identifier of the attestation session established with Core
-    pub session_id: String,
-    /// Fresh challenge supplied by Core
-    pub nonce: Vec<u8>,
-    /// Application data to bind, such as the WireGuard public key
-    pub binding: Vec<u8>,
-}
-
 /// Public backend data supplied to Core before generating attestation challenges
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttestationIdentity {
@@ -203,15 +192,12 @@ pub struct CredentialChallenge {
     pub encrypted_secret: Vec<u8>,
 }
 
-/// Core challenge binding a possession proof to a session and application data
+/// Core-encoded challenge for a proof of identity key possession
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PossessionChallenge {
-    /// Identifier of the proof session established with Core
-    pub session_id: String,
-    /// Fresh single-use challenge supplied by Core
-    pub nonce: Vec<u8>,
-    /// Application data the proof must also cover
-    pub binding: Vec<u8>,
+    /// Opaque Core-encoded bytes containing nonce, session and operation binding.
+    /// The backend binds the proof to these exact bytes without reserializing them.
+    pub data: Vec<u8>,
 }
 
 /// Backend-specific challenge supplied by Core for identity attestation
@@ -219,16 +205,18 @@ pub struct PossessionChallenge {
 pub enum AttestationChallenge {
     /// Credential activation challenge bound to the TPM endorsement and attestation keys
     Tpm(CredentialChallenge),
-    /// App Attest uses the nonce supplied in the attestation context
+    /// App Attest uses the request data without an additional credential challenge
     AppleAppAttest,
 }
 
 /// Complete input for a stateless identity attestation operation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttestationRequest {
-    /// Core session, fresh nonce and application binding
-    pub context: AttestationContext,
-    /// Backend-specific input determining the attestation protocol
+    /// Opaque Core-encoded bytes containing nonce, session and operation binding.
+    /// Their SHA-256 digest becomes TPM qualifyingData or App Attest clientDataHash.
+    pub data: Vec<u8>,
+    /// Backend-specific input for credential activation on TPM.
+    /// Apple App Attest requires only the data field.
     pub challenge: AttestationChallenge,
 }
 
@@ -352,7 +340,7 @@ pub fn attestation_identity(
     backend::attestation_identity(identity)
 }
 
-/// Processes the backend challenge and generates evidence bound to the supplied Core context.
+/// Processes the backend challenge and generates evidence bound to the exact Core-encoded data.
 /// TPM returns the activation secret and certification, while Apple returns App Attest evidence.
 pub fn attest_identity(
     identity: &IdentityRef,
@@ -400,14 +388,6 @@ mod tests {
         }
     }
 
-    fn context() -> AttestationContext {
-        AttestationContext {
-            session_id: "test-session".into(),
-            nonce: vec![1; 32],
-            binding: vec![2; 32],
-        }
-    }
-
     #[test]
     fn creating_identity_returns_unsupported() {
         assert_eq!(create_identity(), Err(DeviceIdentityError::Unsupported));
@@ -431,7 +411,7 @@ mod tests {
             AttestationChallenge::AppleAppAttest,
         ] {
             let request = AttestationRequest {
-                context: context(),
+                data: vec![1; 32],
                 challenge,
             };
 
@@ -444,11 +424,7 @@ mod tests {
 
     #[test]
     fn possession_proof_returns_unsupported() {
-        let challenge = PossessionChallenge {
-            session_id: "test-session".into(),
-            nonce: vec![1; 32],
-            binding: vec![2; 32],
-        };
+        let challenge = PossessionChallenge { data: vec![1; 32] };
 
         assert_eq!(
             prove_possession(&identity(), &challenge),
