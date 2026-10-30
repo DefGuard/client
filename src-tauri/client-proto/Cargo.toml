@@ -24,4 +24,5 @@ tracing.workspace = true
 wmi.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 x25519-dalek = { workspace = true, features = ["getrandom", "static_secrets"] }

@@ -1758,6 +1758,7 @@ dependencies = [
  "defguard_wireguard_rs",
  "prost",
  "serde",
+ "serde_json",
  "serde_with",
  "tonic",
  "tonic-prost",
