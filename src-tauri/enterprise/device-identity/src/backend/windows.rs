@@ -3,28 +3,28 @@ use crate::{
     DeviceIdentityError, IdentityRef, PossessionChallenge, PossessionProof,
 };
 
-pub(crate) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
+pub(super) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
+pub(super) async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) fn attestation_identity(
+pub(super) fn attestation_identity(
     _identity: &IdentityRef,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) async fn attest_identity(
+pub(super) async fn attest_identity(
     _identity: &IdentityRef,
     _request: &AttestationRequest,
 ) -> Result<AttestationResponse, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(crate) async fn prove_possession(
+pub(super) async fn prove_possession(
     _identity: &IdentityRef,
     _challenge: &PossessionChallenge,
 ) -> Result<PossessionProof, DeviceIdentityError> {
