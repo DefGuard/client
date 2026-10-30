@@ -291,6 +291,7 @@ mod tests {
             mfa_steps: Default::default(),
             mfa_step_plan: Default::default(),
             client_mtu: None,
+            auto_connect: false,
         }
         .save(pool)
         .await

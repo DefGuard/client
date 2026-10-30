@@ -50,6 +50,10 @@
         > .label {
           font: var(--t-body-sm-400);
           color: inherit;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         &:not(.selected):hover {

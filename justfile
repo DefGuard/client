@@ -1,5 +1,7 @@
 set windows-shell := ["powershell.exe", "-c"]
 
+export SQLX_OFFLINE := "true"
+
 dev:
     npx concurrently \
         -n "NEW,TAURI" \

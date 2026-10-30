@@ -120,6 +120,7 @@ export const TauriCommand = {
   LocationInterfaceDetails: 'location_interface_details',
   UpdateLocationRouting: 'update_location_routing',
   SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
+  SetLocationAutoConnect: 'set_location_auto_connect',
   // Connections
   Connect: 'connect',
   CheckRouteConflict: 'check_route_conflict',
@@ -341,7 +342,20 @@ export type LocationInfo = {
   posture_check_required: boolean;
   mfa_steps: MfaStep[];
   mfa_step_plan: MfaMethodValue[];
+  auto_connect: boolean;
+  auto_connect_blocked: AutoConnectBlockValue | null;
+  /** Effective under the instance's traffic policy, unlike `route_all_traffic`. */
+  routes_all_traffic: boolean;
 };
+
+export const AutoConnectBlock = {
+  Mfa: 'mfa',
+  ServiceLocation: 'service_location',
+  AllTrafficTaken: 'all_traffic_taken',
+} as const;
+
+export type AutoConnectBlockValue =
+  (typeof AutoConnectBlock)[keyof typeof AutoConnectBlock];
 
 export type LocationStats = {
   collected_at: number;
@@ -497,6 +511,13 @@ export type SetLocationMfaStepPlanArgs = {
   locationId: number;
   mfaStepPlan: MfaMethodValue[];
 };
+
+export type SetLocationAutoConnectArgs = {
+  locationId: number;
+  autoConnect: boolean;
+};
+
+export type AutoConnectDisabled = boolean;
 
 export type OverviewViewSelection = {
   kind: 'instance' | 'tunnel';

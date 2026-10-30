@@ -1,0 +1,37 @@
+.auto-connect-instance-card {
+  display: flex;
+  flex-flow: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: var(--spacing-lg);
+  box-sizing: border-box;
+  border-radius: var(--radius-lg);
+  background-color: var(--bg-white-5);
+
+  & > .title {
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-80);
+  }
+
+  & > .locations {
+    display: flex;
+    flex-flow: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    row-gap: var(--spacing-sm);
+
+    & > .location {
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: space-between;
+      column-gap: var(--spacing-md);
+      padding: var(--spacing-sm);
+      box-sizing: border-box;
+
+      & > .badge {
+        --font: var(--t-body-xs-400);
+      }
+    }
+  }
+}

@@ -27,6 +27,7 @@ qrcode = { version = "0.14", features = ["image"] }
 regex = "1.13"
 reqwest = { version = "0.13", features = ["cookies", "json"] }
 rust-ini = "0.21"
+same-file = "1.0"
 secrecy = "0.10"
 semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -144,6 +145,7 @@ prost.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rust-ini.workspace = true
+same-file.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true

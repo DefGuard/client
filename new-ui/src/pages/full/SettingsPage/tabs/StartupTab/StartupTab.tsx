@@ -5,6 +5,7 @@ import { api } from '../../../../../shared/rust-api/api';
 import { getAutostartEnabledQueryOptions } from '../../../../../shared/rust-api/query';
 import type { AppConfig } from '../../../../../shared/rust-api/types';
 import { ThemeSpacing } from '../../../../../shared/types';
+import { AutoConnectSection } from '../../components/AutoConnectSection/AutoConnectSection';
 import { usePatchAppConfig } from '../../hooks/usePatchAppConfig';
 
 type Props = {
@@ -56,6 +57,7 @@ export const StartupTab = ({ appConfig }: Props) => {
           patchConfig({ open_in_full_window: !appConfig.open_in_full_window })
         }
       />
+      <AutoConnectSection launchAtLogin={autostartEnabled ?? true} />
     </>
   );
 };

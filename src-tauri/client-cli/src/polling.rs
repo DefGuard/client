@@ -36,6 +36,16 @@ pub async fn poll_config(state: &State) {
                     outcome.instance_name
                 );
             }
+            Ok(PollInstanceResult::Updated {
+                auto_connect_disabled,
+                ..
+            }) if !auto_connect_disabled.is_empty() => {
+                eprintln!(
+                    "Instance {} configuration update turned off auto-connect for: {}",
+                    outcome.instance_name,
+                    auto_connect_disabled.join(", ")
+                );
+            }
             Ok(PollInstanceResult::Updated { .. } | PollInstanceResult::Unchanged { .. }) => {}
             Err(Error::CoreNotEnterprise) => {
                 debug!(

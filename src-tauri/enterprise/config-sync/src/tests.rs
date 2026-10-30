@@ -9,14 +9,17 @@ use std::{
 use defguard_client_core::{
     database::models::{
         instance::{ClientTrafficPolicy, MfaCapabilities, OpenIdProviderKind},
-        location::{Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode},
+        location::{
+            AutoConnectContext, Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode,
+        },
         NoId,
     },
     mfa_contract::MfaContract,
 };
 use defguard_client_proto::defguard::client_types::{
-    DeviceConfig, DeviceConfigResponse, InstanceInfo, MfaCapabilities as ProtoMfaCapabilities,
-    MfaMethod, MfaUserState,
+    DeviceConfig, DeviceConfigResponse, InstanceInfo, LocationMfaMode as ProtoLocationMfaMode,
+    MfaCapabilities as ProtoMfaCapabilities, MfaMethod, MfaUserState,
+    ServiceLocationMode as ProtoServiceLocationMode,
 };
 use sqlx::SqlitePool;
 
@@ -152,7 +155,7 @@ fn device_config(network_id: Id, name: &str, endpoint: &str) -> DeviceConfig {
         endpoint: endpoint.into(),
         assigned_ip: "10.6.0.2".into(),
         pubkey: format!("pk-{network_id}"),
-        allowed_ips: "0.0.0.0/0".into(),
+        allowed_ips: "10.0.0.0/24".into(),
         keepalive_interval: 25,
         ..Default::default()
     }
@@ -227,7 +230,7 @@ async fn seed_location(
         address: "10.6.0.2".into(),
         pubkey: format!("pk-{network_id}"),
         endpoint: endpoint.into(),
-        allowed_ips: "0.0.0.0/0".into(),
+        allowed_ips: "10.0.0.0/24".into(),
         dns: None,
         route_all_traffic: false,
         keepalive_interval: 25,
@@ -238,6 +241,7 @@ async fn seed_location(
         mfa_steps: Default::default(),
         mfa_step_plan: Default::default(),
         client_mtu: None,
+        auto_connect: false,
     }
     .save(pool)
     .await
@@ -345,6 +349,305 @@ async fn test_config_changed_true_when_location_changes(pool: SqlitePool) {
         .unwrap();
 
     assert!(changed);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_config_changed_ignores_auto_connect(pool: SqlitePool) {
+    let instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    let mut location = seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
+    location.auto_connect = true;
+    location.save(&pool).await.unwrap();
+    let response = device_config_response(&instance, device_config(1, "office", "1.2.3.4:51820"));
+
+    let mut transaction = pool.begin().await.unwrap();
+    let changed = config_changed(&mut transaction, &instance, &response)
+        .await
+        .unwrap();
+
+    assert!(!changed);
+}
+
+async fn seed_auto_connect_location(
+    pool: &SqlitePool,
+    instance_id: Id,
+    network_id: Id,
+    name: &str,
+    route_all_traffic: bool,
+) {
+    let mut location = seed_location(pool, instance_id, network_id, name, "1.2.3.4:51820").await;
+    location.route_all_traffic = route_all_traffic;
+    location.auto_connect = true;
+    location.save(pool).await.unwrap();
+}
+
+fn service_config(network_id: Id, name: &str, allowed_ips: &str) -> DeviceConfig {
+    let mut config = device_config(network_id, name, "1.2.3.4:51820");
+    config.allowed_ips = allowed_ips.into();
+    config.service_location_mode = Some(ProtoServiceLocationMode::Alwayson as i32);
+    config
+}
+
+async fn update_and_read_auto_connect(
+    pool: &SqlitePool,
+    instance: &mut Instance<Id>,
+    response: DeviceConfigResponse,
+) -> (Vec<(String, bool)>, Vec<String>) {
+    let mut transaction = pool.begin().await.unwrap();
+    let mut disabled = do_update_instance(&mut transaction, instance, response)
+        .await
+        .unwrap()
+        .auto_connect_disabled;
+    transaction.commit().await.unwrap();
+    disabled.sort();
+    let mut connection = pool.acquire().await.unwrap();
+    let context = AutoConnectContext::load(&mut connection).await.unwrap();
+    assert_eq!(context.invalid().count(), 0);
+    let auto_connect = Location::find_by_instance_id(pool, instance.id, true)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|location| (location.name, location.auto_connect))
+        .collect();
+    (auto_connect, disabled)
+}
+
+fn auto_connect_of(names: &[(&str, bool)]) -> Vec<(String, bool)> {
+    names
+        .iter()
+        .map(|(name, auto_connect)| ((*name).to_string(), *auto_connect))
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_disables_colliding_all_traffic_auto_connect(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", true).await;
+    seed_auto_connect_location(&pool, instance.id, 2, "second", true).await;
+    seed_auto_connect_location(&pool, instance.id, 3, "predefined", false).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response.configs.extend([
+        device_config(2, "second", "1.2.3.4:51820"),
+        device_config(3, "predefined", "1.2.3.4:51820"),
+    ]);
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", false), ("predefined", true), ("second", false)])
+    );
+    assert_eq!(disabled, ["first", "second"]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_disables_all_traffic_auto_connect_across_instances(pool: SqlitePool) {
+    let other = seed_instance(&pool, "other", "https://other-proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, other.id, 1, "other-all", true).await;
+    seed_auto_connect_location(&pool, other.id, 2, "other-predefined", false).await;
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    let response = device_config_response(&instance, service_config(1, "service", "0.0.0.0/0"));
+
+    let (_, disabled) = update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(disabled, ["other-all"]);
+    let other_auto_connect = Location::find_by_instance_id(&pool, other.id, true)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|location| (location.name, location.auto_connect))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        other_auto_connect,
+        auto_connect_of(&[("other-all", false), ("other-predefined", true)])
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_disables_colliding_default_route_auto_connect(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", false).await;
+    seed_auto_connect_location(&pool, instance.id, 2, "second", false).await;
+    let mut first = device_config(1, "first", "1.2.3.4:51820");
+    first.allowed_ips = "0.0.0.0/0".into();
+    let mut second = device_config(2, "second", "1.2.3.4:51820");
+    second.allowed_ips = "10.0.0.0/24, 0.0.0.0/0".into();
+    let mut response = device_config_response(&instance, first);
+    response.configs.push(second);
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", false), ("second", false)])
+    );
+    assert_eq!(disabled, ["first", "second"]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_keeps_single_all_traffic_auto_connect(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", true).await;
+    seed_auto_connect_location(&pool, instance.id, 2, "predefined", false).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response
+        .configs
+        .push(device_config(2, "predefined", "1.2.3.4:51820"));
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", true), ("predefined", true)])
+    );
+    assert!(disabled.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_all_traffic_service_location_disables_auto_connect(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", true).await;
+    seed_auto_connect_location(&pool, instance.id, 2, "predefined", false).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response.configs.extend([
+        device_config(2, "predefined", "1.2.3.4:51820"),
+        service_config(3, "service", "10.0.0.0/24, 0.0.0.0/0"),
+    ]);
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", false), ("predefined", true), ("service", false)])
+    );
+    assert_eq!(disabled, ["first"]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_keeps_auto_connect_beside_predefined_service_location(
+    pool: SqlitePool,
+) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", true).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response
+        .configs
+        .push(service_config(2, "service", "10.0.0.0/24"));
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", true), ("service", false)])
+    );
+    assert!(disabled.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_keeps_multiple_all_traffic_service_locations(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", true).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response.configs.extend([
+        service_config(2, "service-a", "0.0.0.0/0"),
+        service_config(3, "service-b", "::/0"),
+    ]);
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", false), ("service-a", false), ("service-b", false)])
+    );
+    assert_eq!(disabled, ["first"]);
+    let service_locations = Location::find_by_instance_id(&pool, instance.id, true)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(Location::is_service_location)
+        .count();
+    assert_eq!(service_locations, 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_disables_auto_connect_for_new_service_location(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "office", false).await;
+    let response = device_config_response(&instance, service_config(1, "office", "10.0.0.0/24"));
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(auto_connect, auto_connect_of(&[("office", false)]));
+    assert_eq!(disabled, ["office"]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_update_instance_force_all_traffic_disables_colliding_auto_connect(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_auto_connect_location(&pool, instance.id, 1, "first", false).await;
+    seed_auto_connect_location(&pool, instance.id, 2, "second", false).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response
+        .configs
+        .push(device_config(2, "second", "1.2.3.4:51820"));
+    response.instance.as_mut().unwrap().client_traffic_policy =
+        Some(ClientTrafficPolicy::ForceAllTraffic as i32);
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(
+        auto_connect,
+        auto_connect_of(&[("first", false), ("second", false)])
+    );
+    assert_eq!(disabled, ["first", "second"]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+#[allow(
+    deprecated,
+    reason = "location_mfa_mode is the only proto field that sets the mode"
+)]
+async fn test_update_instance_disables_auto_connect_for_mfa_locations(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    for (network_id, name) in [(1, "internal"), (2, "external"), (3, "plain")] {
+        let mut location =
+            seed_location(&pool, instance.id, network_id, name, "1.2.3.4:51820").await;
+        location.auto_connect = true;
+        location.save(&pool).await.unwrap();
+    }
+    let mut internal = device_config(1, "internal", "1.2.3.4:51820");
+    internal.location_mfa_mode = Some(ProtoLocationMfaMode::Internal as i32);
+    let mut external = device_config(2, "external", "1.2.3.4:51820");
+    external.location_mfa_mode = Some(ProtoLocationMfaMode::External as i32);
+    let plain = device_config(3, "plain", "5.6.7.8:51820");
+    let mut response = device_config_response(&instance, internal);
+    response.configs.extend([external, plain]);
+
+    let (auto_connect, disabled) =
+        update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    assert_eq!(disabled, ["external", "internal"]);
+    assert_eq!(
+        auto_connect,
+        [
+            ("external".to_string(), false),
+            ("internal".to_string(), false),
+            ("plain".to_string(), true),
+        ]
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
