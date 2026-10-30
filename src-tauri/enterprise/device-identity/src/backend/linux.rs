@@ -3,7 +3,11 @@ use crate::{
     DeviceIdentityError, IdentityRef, PossessionChallenge, PossessionProof,
 };
 
+#[path = "linux/transport.rs"]
+mod transport;
+
 pub(super) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
+    let _context = transport::Context::open()?;
     Err(DeviceIdentityError::Unsupported)
 }
 

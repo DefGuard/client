@@ -36,12 +36,23 @@ Use a dedicated test TPM or an isolated software TPM. Tests create persistent lo
 identity records and may leave them behind because the facade has no deletion
 operation yet. Do not clear a TPM used for other applications to clean up these tests.
 
-For Linux, `swtpm` is the preferred fixture. The backend needs transport configuration
-before these tests can target it. If the implementation adopts the usual TSS transport
-environment variable, a typical setting is:
+For Linux, `swtpm` is the preferred fixture. The backend defaults to
+`device:/dev/tpmrm0`. Set `TSS2_TCTI` explicitly to select another transport:
 
 ```sh
 export TSS2_TCTI='swtpm:host=127.0.0.1,port=2321'
+```
+
+An empty or invalid setting fails without falling back to a hardware device.
+Transport initialization is implemented, while capability enumeration remains a stub.
+The capabilities contract test still fails with `Unsupported` on a running emulator.
+
+`linux_transport.rs` exercises transport errors in isolated child processes, leaving
+the parent environment unchanged. It covers missing devices, unavailable emulators
+and invalid configuration. Run its permission test as an unprivileged user:
+
+```sh
+cargo test -p device-identity --test linux_transport test_capabilities_reports_permission_denied -- --ignored --exact
 ```
 
 This test suite does not start an emulator, provision a persistent EK handle, or
