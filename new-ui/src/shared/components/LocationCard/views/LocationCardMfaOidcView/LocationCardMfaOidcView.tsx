@@ -24,8 +24,14 @@ type Screen = 'idle' | 'polling' | 'error';
 
 export const LocationCardMfaOidcView = () => {
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
-  const { setView, setPostureError, autoConnectOpenid, stepLabel, instance } =
-    useLocationCardContext();
+  const {
+    setView,
+    setPostureError,
+    autoConnectOpenid,
+    stepLabel,
+    instance,
+    canPickOtherMethod,
+  } = useLocationCardContext();
   const providerName = openIdProviderName(instance);
   const { start, isStarting, startError, isPolling, pollError } =
     useMfaOidcConnect(autoConnectOpenid);
@@ -92,6 +98,15 @@ export const LocationCardMfaOidcView = () => {
           onClick={() => setView(LocationCardViews.Default)}
         />
         <div className="right">
+          {canPickOtherMethod && (
+            <Button
+              text="Other methods"
+              variant={ButtonVariant.Outlined}
+              onClick={() => {
+                setView(LocationCardViews.MfaSettings);
+              }}
+            />
+          )}
           {screen !== 'error' && (
             <ExternalProviderButton
               text={`Authenticate with ${providerName}`}

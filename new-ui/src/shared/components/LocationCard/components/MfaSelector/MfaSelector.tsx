@@ -7,11 +7,9 @@ import {
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../rust-api/types';
-import { isPresent } from '../../../../utils/isPresent';
-import { findOpenIdProvider, mfaToText } from '../../../../utils/mfa';
+import { mfaToText } from '../../../../utils/mfa';
 import { Icon } from '../../../Icon';
 import checkboxSrc from './assets/checkbox.svg';
-import { openIdProviderIcon } from './consts';
 
 interface Props {
   factor: MfaMethodValue;
@@ -38,8 +36,6 @@ export const MfaSelector = ({
 }: Props) => {
   const isMobileOnly = factor === MfaMethod.Biometric;
   const showCheckbox = isSelectable && selected;
-  const openIdProvider =
-    factor === MfaMethod.Oidc ? findOpenIdProvider(instance) : undefined;
 
   return (
     <div
@@ -60,12 +56,7 @@ export const MfaSelector = ({
       {showCheckbox && <img src={checkboxSrc} alt="" width={24} height={24} />}
       {!showCheckbox && (
         <div className="icon-col">
-          {isPresent(openIdProvider) && (
-            <img src={openIdProviderIcon[openIdProvider]} alt="" width={20} height={20} />
-          )}
-          {!isPresent(openIdProvider) && (
-            <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
-          )}
+          <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
         </div>
       )}
       <div className="middle">
