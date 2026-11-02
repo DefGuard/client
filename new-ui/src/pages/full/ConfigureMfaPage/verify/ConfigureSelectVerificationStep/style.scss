@@ -1,18 +1,37 @@
 #configure-select-verification-step {
-  .label {
-    padding-bottom: var(--spacing-md);
+  & > .content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
 
-    & > p {
-      font: var(--t-body-xs-500);
+    & > .title {
+      text-align: center;
+      font: var(--t-h4);
       color: var(--fg-white-100);
     }
-  }
 
-  .methods {
-    display: flex;
-    flex-flow: column;
-    row-gap: var(--spacing-md);
-    width: 100%;
-    padding-bottom: var(--spacing-xl);
+    & > .subtitle {
+      max-width: 380px;
+      text-align: center;
+      font: var(--t-body-sm-400);
+      color: var(--fg-white-70);
+    }
+
+    & > .error {
+      padding-bottom: var(--spacing-xl);
+      text-align: center;
+      font: var(--t-body-sm-400);
+      color: var(--fg-critical);
+    }
+
+    & > .methods {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-md);
+      width: 100%;
+      max-width: 296px;
+    }
   }
 }

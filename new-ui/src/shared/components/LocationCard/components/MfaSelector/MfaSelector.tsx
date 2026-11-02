@@ -8,7 +8,7 @@ import {
   type MfaMethodValue,
 } from '../../../../rust-api/types';
 import { isPresent } from '../../../../utils/isPresent';
-import { findOpenIdProvider, mfaToText } from '../../../../utils/mfa';
+import { findOpenIdProvider, mfaToText, openIdProviderName } from '../../../../utils/mfa';
 import { Icon } from '../../../Icon';
 import checkboxSrc from './assets/checkbox.svg';
 import { openIdProviderIcon } from './consts';
@@ -69,7 +69,11 @@ export const MfaSelector = ({
         </div>
       )}
       <div className="middle">
-        <p className="name">{mfaToText(factor, instance)}</p>
+        <p className="name">
+          {factor === MfaMethod.Oidc
+            ? `Verify with ${openIdProviderName(instance)}`
+            : mfaToText(factor, instance)}
+        </p>
       </div>
       <div className="right">
         {(isMobileOnly || !configured) && (
