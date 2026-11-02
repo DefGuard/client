@@ -28,7 +28,7 @@ export const LocationCardMfaFido2View = () => {
     mfaToken,
     setMfaToken,
     goToStep,
-    setPostureError,
+    showFailure,
   } = useLocationCardContext();
   const { verify, isVerifying, isAwaitingTouch, verifyError } = useMfaFido2Connect(
     location,
@@ -38,11 +38,7 @@ export const LocationCardMfaFido2View = () => {
       setMfaToken,
       onConnected: () => setView(LocationCardViews.Connected),
       onStepAdvanced: goToStep,
-      onPostureError: (message) => {
-        setPostureError(message);
-        setView(LocationCardViews.PostureCheckFail);
-      },
-      onServiceUnavailable: () => setView(LocationCardViews.ConnectionError),
+      onFailure: showFailure,
     },
   );
 
@@ -67,7 +63,6 @@ export const LocationCardMfaFido2View = () => {
     setError(null);
   }, [pin, setError]);
 
-  // Reflect backend errors into the local error state
   useEffect(() => {
     if (verifyError) setError(verifyError);
   }, [verifyError]);
@@ -92,7 +87,7 @@ export const LocationCardMfaFido2View = () => {
             </p>
           </LocationViewHeader>
           <SizedBox height={ThemeSpacing.Xl} />
-          {collectsPin ? (
+          {collectsPin && (
             <Input
               type="password"
               label="PIN"
@@ -101,8 +96,6 @@ export const LocationCardMfaFido2View = () => {
               onChange={(value) => setPin(isPresent(value) ? String(value) : null)}
               error={error}
             />
-          ) : (
-            isPresent(error) && <p className="error">{error}</p>
           )}
         </Fragment>
       )}

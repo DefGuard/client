@@ -1,12 +1,9 @@
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../../../rust-api/query';
 import { ThemeSpacing } from '../../../../types';
 import { findOpenIdProvider, openIdProviderName } from '../../../../utils/mfa';
-import { Button } from '../../../Button/Button';
-import { ButtonVariant } from '../../../Button/types';
 import { Checkbox } from '../../../Checkbox/Checkbox';
 import { Controls } from '../../../Controls/Controls';
 import { Divider } from '../../../Divider/Divider';
@@ -20,54 +17,28 @@ import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
 import { useMfaOidcConnect } from '../../hooks/useMfaOidcConnect';
 
-type Screen = 'idle' | 'polling' | 'error';
-
 export const LocationCardMfaOidcView = () => {
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
-  const { setView, setPostureError, autoConnectOpenid, stepLabel, instance } =
-    useLocationCardContext();
+  const { setView, autoConnectOpenid, stepLabel, instance } = useLocationCardContext();
   const providerName = openIdProviderName(instance);
-  const { start, isStarting, startError, isPolling, pollError } =
-    useMfaOidcConnect(autoConnectOpenid);
-  const [screen, setScreen] = useState<Screen>('idle');
-
-  useEffect(() => {
-    if (startError ?? pollError) {
-      setScreen((prev) => (prev !== 'idle' ? 'error' : prev));
-    } else if (isPolling) {
-      setScreen('polling');
-    }
-  }, [startError, pollError, isPolling]);
-
-  const handleStart = useCallback(async () => {
-    await start();
-    setScreen('polling');
-  }, [start]);
-
-  const errorMessage = startError ?? pollError;
-
-  const backToLocation = () => {
-    setPostureError(null);
-    setView(LocationCardViews.Default);
-  };
+  const { start, isStarting, isPolling } = useMfaOidcConnect(autoConnectOpenid);
 
   return (
     <div className="location-card-mfa-oidc">
       <Divider spacing={ThemeSpacing.Md} />
       <LocationViewHeader title={stepLabel ?? 'Multi-factor authentication'}>
-        {screen === 'idle' && (
+        {!isPolling && (
           <p>
             {`To connect to the VPN, sign in with ${providerName} by clicking button below. A browser window will open and redirect you to ${providerName} for authentication.`}
           </p>
         )}
-        {screen === 'polling' && (
+        {isPolling && (
           <p>
             {`Complete the sign-in in your browser. This page will update automatically.`}
           </p>
         )}
-        {screen === 'error' && <p className="error">{errorMessage}</p>}
       </LocationViewHeader>
-      {screen === 'idle' && !autoConnectOpenid && (
+      {!isPolling && !autoConnectOpenid && (
         <div className="actions">
           <SizedBox height={ThemeSpacing.Lg} />
           <Checkbox
@@ -92,21 +63,12 @@ export const LocationCardMfaOidcView = () => {
           onClick={() => setView(LocationCardViews.Default)}
         />
         <div className="right">
-          {screen !== 'error' && (
-            <ExternalProviderButton
-              text={`Authenticate with ${providerName}`}
-              provider={findOpenIdProvider(instance) ?? 'custom'}
-              loading={screen === 'polling' || isStarting}
-              onClick={handleStart}
-            />
-          )}
-          {screen === 'error' && (
-            <Button
-              text="Try again"
-              variant={ButtonVariant.Primary}
-              onClick={backToLocation}
-            />
-          )}
+          <ExternalProviderButton
+            text={`Authenticate with ${providerName}`}
+            provider={findOpenIdProvider(instance) ?? 'custom'}
+            loading={isPolling || isStarting}
+            onClick={() => void start()}
+          />
         </div>
       </Controls>
     </div>
