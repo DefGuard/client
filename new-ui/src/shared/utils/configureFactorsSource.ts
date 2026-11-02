@@ -18,3 +18,9 @@ export const mfaEditConfigureFactorsSource = (): ConfigureFactorsSourceValue =>
   getCurrentWindow().label === WindowId.FullView
     ? ConfigureFactorsSource.FullMfaEdit
     : ConfigureFactorsSource.TrayMfaEdit;
+
+export const isMfaEditConfigureFactorsSource = (
+  source: ConfigureFactorsSourceValue | null,
+): boolean =>
+  source === ConfigureFactorsSource.FullMfaEdit ||
+  source === ConfigureFactorsSource.TrayMfaEdit;

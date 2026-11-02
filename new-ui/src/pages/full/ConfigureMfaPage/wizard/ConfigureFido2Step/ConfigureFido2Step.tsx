@@ -15,14 +15,11 @@ import {
 } from '../../../../../shared/rust-api/fido2';
 import { MfaMethod, TauriEvent } from '../../../../../shared/rust-api/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import {
-  discardMfaConfiguration,
-  useConfigureMfaStore,
-} from '../../hooks/useConfigureMfaStore';
+import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
 
 interface Props {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
   /** The session outlived its deadline, so the whole flow has to start over. */
   onSessionExpired: () => void;
 }
@@ -75,8 +72,7 @@ export const ConfigureFido2Step = ({ onCancel, onSessionExpired }: Props) => {
   });
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: discardMfaConfiguration,
-    onSettled: onCancel,
+    mutationFn: onCancel,
   });
 
   const handleSubmit = useCallback(() => {
