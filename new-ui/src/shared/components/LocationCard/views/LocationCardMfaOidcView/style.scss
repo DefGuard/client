@@ -1,16 +1,10 @@
-.location-card-view-header {
-  p.error {
-    color: var(--fg-critical);
-  }
-}
-
 .location-card-mfa-oidc {
   .controls {
     > .right {
       flex: 1;
       min-width: 0;
 
-      // the primary action (provider button or "Try again") fills the row
+      // the provider button fills the row
       > :last-child {
         flex: 1;
         min-width: 0;

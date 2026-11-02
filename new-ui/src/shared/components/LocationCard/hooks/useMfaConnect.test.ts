@@ -30,13 +30,17 @@ const location = {
   posture_check_required: false,
 } as LocationInfo;
 
-const renderCodeMfa = (setMfaToken: (token: string | null) => void) =>
+const renderCodeMfa = (
+  setMfaToken: (token: string | null) => void,
+  onFailure?: (err: unknown) => void,
+) =>
   renderHook(() =>
     useMfaConnect(location, MfaMethod.Totp, {
       stepPlan: [MfaMethod.Totp],
       mfaToken: null,
       setMfaToken,
       onStepAdvanced: vi.fn(),
+      onFailure,
     }),
   );
 
@@ -73,5 +77,47 @@ describe('useMfaConnect', () => {
 
     expect(result.current.token).toBeNull();
     expect(setMfaToken).toHaveBeenCalledWith(null);
+  });
+
+  describe('with onFailure', () => {
+    it('keeps an invalid code on the input', async () => {
+      mocks.mfaFinishCode.mockRejectedValue(
+        JSON.stringify({ type: 'mfa_rejected', message: 'invalid code' }),
+      );
+      const onFailure = vi.fn();
+      const { result } = renderCodeMfa(vi.fn(), onFailure);
+      await waitFor(() => expect(result.current.token).toBe('session-token'));
+
+      await act(async () => result.current.verifyCode('123456'));
+
+      expect(result.current.verifyError).toBe('Invalid code');
+      expect(onFailure).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['attempt limit', JSON.stringify({ type: 'attempt_limit', message: 'Too many' })],
+      ['session expired', JSON.stringify({ type: 'other', message: 'invalid token' })],
+      ['VPN failure', 'VPN connection failed: interface error'],
+    ])('reports %s instead of showing it on the input', async (_, err) => {
+      mocks.mfaFinishCode.mockRejectedValue(err);
+      const onFailure = vi.fn();
+      const { result } = renderCodeMfa(vi.fn(), onFailure);
+      await waitFor(() => expect(result.current.token).toBe('session-token'));
+
+      await act(async () => result.current.verifyCode('123456'));
+
+      expect(onFailure).toHaveBeenCalledWith(err);
+      expect(result.current.verifyError).toBeNull();
+    });
+
+    it('reports a failed start instead of exposing startError', async () => {
+      const err = JSON.stringify({ type: 'network_error', message: 'unreachable' });
+      mocks.mfaBeginStep.mockRejectedValue(err);
+      const onFailure = vi.fn();
+      const { result } = renderCodeMfa(vi.fn(), onFailure);
+
+      await waitFor(() => expect(onFailure).toHaveBeenCalledWith(err));
+      expect(result.current.startError).toBeNull();
+    });
   });
 });
