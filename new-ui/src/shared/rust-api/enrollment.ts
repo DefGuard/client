@@ -115,7 +115,10 @@ export const enrollmentAddInstance = async (
     if (
       startResult.user.device_names.some((n) => n.trim().toLowerCase() === normalizedName)
     ) {
-      return { error: `Device name '${values.name}' is already in use` };
+      return {
+        error: `Device name '${values.name}' is already in use`,
+        errorKind: 'name_taken',
+      };
     }
 
     handOffSession = true;
