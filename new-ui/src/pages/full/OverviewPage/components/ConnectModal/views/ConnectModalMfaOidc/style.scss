@@ -1,16 +1,9 @@
-// Beats the modal's default `.controls` top padding; the description's bottom
-// padding is the only gap between the text and the buttons, as in the design.
-#modals-root #mfa-oidc-view > .controls {
-  padding-top: 0;
-}
-
 #mfa-oidc-view {
-  .controls > .right {
-    flex: 1;
-    min-width: 0;
+  .other-methods {
+    flex-shrink: 0;
+  }
 
-    > * {
-      width: 100%;
-    }
+  .primary-action {
+    flex: 1;
   }
 }

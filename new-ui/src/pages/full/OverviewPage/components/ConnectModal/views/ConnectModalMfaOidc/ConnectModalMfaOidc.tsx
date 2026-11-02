@@ -78,6 +78,7 @@ export const ConnectModalMfaOidc = () => {
       <Controls>
         {showOtherMethods && (
           <Button
+            containerProps={{ className: 'other-methods' }}
             variant={ButtonVariant.Secondary}
             text="Other methods"
             onClick={() => {
@@ -85,23 +86,23 @@ export const ConnectModalMfaOidc = () => {
             }}
           />
         )}
-        <div className="right">
-          {screen !== 'error' && (
-            <ExternalProviderButton
-              text={`Continue with ${providerName}`}
-              provider={findOpenIdProvider(instance) ?? 'custom'}
-              loading={screen === 'polling' || isStarting}
-              onClick={handleStart}
-            />
-          )}
-          {screen === 'error' && (
-            <Button
-              text="Try again"
-              variant={ButtonVariant.Primary}
-              onClick={() => setScreen('idle')}
-            />
-          )}
-        </div>
+        {screen !== 'error' && (
+          <ExternalProviderButton
+            className="primary-action"
+            text={`Continue with ${providerName}`}
+            provider={findOpenIdProvider(instance) ?? 'custom'}
+            loading={screen === 'polling' || isStarting}
+            onClick={handleStart}
+          />
+        )}
+        {screen === 'error' && (
+          <Button
+            containerProps={{ className: 'primary-action' }}
+            text="Try again"
+            variant={ButtonVariant.Primary}
+            onClick={() => setScreen('idle')}
+          />
+        )}
       </Controls>
     </div>
   );
