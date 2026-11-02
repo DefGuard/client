@@ -1,17 +1,12 @@
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
-import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkbox';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
 import { ExternalProviderButton } from '../../../../../../../shared/components/ExternalProviderButton/ExternalProviderButton';
-import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
-import { api } from '../../../../../../../shared/rust-api/api';
 import { getAppConfigQueryOptions } from '../../../../../../../shared/rust-api/query';
-import { ThemeSpacing } from '../../../../../../../shared/types';
-import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import {
   findOpenIdProvider,
   openIdProviderName,
@@ -30,6 +25,8 @@ export const ConnectModalMfaOidc = () => {
     useShallow((s) => [s.perviousView, s.location, s.autoStartOpenId]),
   );
   const { instance, canPickOtherMethod } = useMfaStep();
+  const showOtherMethods =
+    canPickOtherMethod && appConfig?.auto_start_openid_mfa === false;
   const providerName = openIdProviderName(instance);
 
   const { start, isStarting, startError, isPolling, pollError } = useConnectModalMfaOidc({
@@ -79,7 +76,7 @@ export const ConnectModalMfaOidc = () => {
       )}
       {screen === 'error' && <p className="view-description">{errorMessage}</p>}
       <Controls>
-        {canPickOtherMethod && (
+        {showOtherMethods && (
           <Button
             variant={ButtonVariant.Secondary}
             text="Other methods"
@@ -106,23 +103,6 @@ export const ConnectModalMfaOidc = () => {
           )}
         </div>
       </Controls>
-      {isPresent(appConfig) && screen === 'idle' && !initAutoStart && (
-        <Fragment>
-          <SizedBox height={ThemeSpacing.Xl3} />
-          <Checkbox
-            active={appConfig.auto_start_openid_mfa}
-            text={`Don't show this screen next time`}
-            onClick={() => {
-              void api.setAppConfig(
-                {
-                  auto_start_openid_mfa: !appConfig.auto_start_openid_mfa,
-                },
-                true,
-              );
-            }}
-          />
-        </Fragment>
-      )}
     </div>
   );
 };
