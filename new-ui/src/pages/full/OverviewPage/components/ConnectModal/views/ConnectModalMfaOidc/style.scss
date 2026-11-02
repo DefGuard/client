@@ -1,8 +1,9 @@
 #mfa-oidc-view {
-  .actions {
-    .btn,
-    .external-provider-button {
-      width: 100%;
-    }
+  .other-methods {
+    flex-shrink: 0;
+  }
+
+  .primary-action {
+    flex: 1;
   }
 }

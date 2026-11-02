@@ -455,4 +455,62 @@ describe('useMfaMobileConnect', () => {
     const parkedTokens = mocks.mfaConnectMobileApprove.mock.calls.map((call) => call[2]);
     expect(parkedTokens).toEqual(['token-1', 'token-2']);
   });
+
+  describe('with onFailure', () => {
+    const renderWithFailure = (onFailure: (err: unknown) => void) =>
+      renderHook(() =>
+        useMfaMobileConnect(location, {
+          stepPlan: [],
+          mfaToken: null,
+          setMfaToken: mocks.setMfaToken,
+          onStepAdvanced: vi.fn(),
+          onConnectionError: mocks.onConnectionError,
+          onFailure,
+        }),
+      );
+
+    it('reports an approval error instead of keeping it in the hook', async () => {
+      mocks.mfaBeginStep.mockResolvedValue({
+        challenge: 'challenge-1',
+        token: 'token-1',
+      });
+      mocks.mfaConnectMobileApprove.mockResolvedValue('task-1');
+      const onFailure = vi.fn();
+      const { result } = renderWithFailure(onFailure);
+
+      await act(async () => {
+        await result.current.start();
+      });
+      await waitFor(() => expect(mocks.listen).toHaveBeenCalledTimes(3));
+      const errorListener = mocks.listen.mock.calls.find(
+        ([event]) => event === TauriEvent.MfaMobileError,
+      )?.[1] as (event: { payload: { error: string } }) => void;
+      const err = JSON.stringify({ type: 'mobile_client_outdated' });
+
+      await act(async () => {
+        errorListener({ payload: { error: err } });
+      });
+
+      expect(onFailure).toHaveBeenCalledWith(err);
+      expect(mocks.onConnectionError).not.toHaveBeenCalled();
+      expect(result.current.connectionError).toBeNull();
+    });
+
+    it('reports a posture rejection on start', async () => {
+      const err = JSON.stringify({
+        type: 'posture_rejected',
+        message: 'no disk encryption',
+      });
+      mocks.mfaBeginStep.mockRejectedValue(err);
+      const onFailure = vi.fn();
+      const { result } = renderWithFailure(onFailure);
+
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(onFailure).toHaveBeenCalledWith(err);
+      expect(result.current.startError).toBeNull();
+    });
+  });
 });

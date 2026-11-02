@@ -80,6 +80,7 @@ ignore = [
     { id = "RUSTSEC-2026-0381", reason = "webpki-roots <1.0.10 pulled by hyper-rustls; bundles distrusted emSign root" },
     { id = "RUSTSEC-2026-0382", reason = "rustls-webpki <0.103.16 pulled by rustls; may accept distrusted emSign intermediates" },
     { id = "RUSTSEC-2026-0383", reason = "webpki-root-certs <1.0.10 pulled by rustls-platform-verifier; bundles distrusted emSign root" },
+    { id = "RUSTSEC-2026-0418", reason = "expires 2026-11-30, libz-sys <1.1.31 pulled by vergen-git2 build dependency via git2/libgit2-sys, already on latest" },
     # The "unmaintained" advisories below stem from our use of Tauri v2, which
     # depends on GTK3 bindings that are no longer maintained.
     { id = "RUSTSEC-2024-0370", reason = "Tauri v2 GTK3 dependency (unmaintained)" },

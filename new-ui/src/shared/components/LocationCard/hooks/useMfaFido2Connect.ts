@@ -8,8 +8,10 @@ import {
   isCancelled,
   isConnectFailure,
   isMfaPostureError,
+  isSecurityKeyPinRejected,
   isServiceUnavailable,
   isTimeout,
+  MfaFailureText,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import type {
@@ -19,6 +21,7 @@ import type {
   MfaMethodValue,
 } from '../../../rust-api/types';
 import { TauriEvent } from '../../../rust-api/types';
+import { isPresent } from '../../../utils/isPresent';
 
 type Options = {
   stepPlan: MfaMethodValue[];
@@ -28,6 +31,8 @@ type Options = {
   onStepAdvanced?: (nextStepIndex: number) => void;
   onPostureError?: (message: string) => void;
   onServiceUnavailable?: () => void;
+  // replaces the other error callbacks and all non-input error state
+  onFailure?: (err: unknown) => void;
 };
 
 /**
@@ -46,6 +51,7 @@ export const useMfaFido2Connect = (
     onStepAdvanced,
     onPostureError,
     onServiceUnavailable,
+    onFailure,
   }: Options,
 ) => {
   const [isVerifying, setIsVerifying] = useState(false);
@@ -75,13 +81,20 @@ export const useMfaFido2Connect = (
       setIsAwaitingTouch(false);
       setVerifyError(null);
 
-      // Finish this attempt and update the view.
       const tryFinishAttempt = () => {
         if (!attempt.tryFinish()) return false;
         taskOutstandingRef.current = false;
         setIsVerifying(false);
         setIsAwaitingTouch(false);
         return true;
+      };
+
+      const fail = (err: unknown) => {
+        if (isPresent(onFailure)) {
+          onFailure(err);
+        } else {
+          setVerifyError(mfaErrorMessage(err));
+        }
       };
 
       // Attach listeners before starting in case the task fails immediately.
@@ -120,6 +133,12 @@ export const useMfaFido2Connect = (
               void error(
                 `FIDO2 MFA failed for location ${location.id}: ${event.payload.error}`,
               );
+              const message = mfaErrorMessage(event.payload.error);
+              const pinRejected = pin !== null && isSecurityKeyPinRejected(message);
+              if (isPresent(onFailure) && !pinRejected) {
+                onFailure(event.payload.error);
+                return;
+              }
 
               if (isMfaPostureError(event.payload.error, location)) {
                 onPostureError?.(mfaErrorMessage(event.payload.error));
@@ -129,12 +148,9 @@ export const useMfaFido2Connect = (
                 onServiceUnavailable?.();
                 return;
               }
-              const message = mfaErrorMessage(event.payload.error);
-              // Show the server error; it tells the user whether the key, PIN, or touch failed.
+              // the server error tells the user whether the key, PIN, or touch failed
               setVerifyError(
-                isConnectFailure(message)
-                  ? 'Failed to establish VPN connection'
-                  : message,
+                isConnectFailure(message) ? MfaFailureText.ConnectFailure : message,
               );
             }),
           ),
@@ -142,7 +158,7 @@ export const useMfaFido2Connect = (
       } catch (err) {
         if (!tryFinishAttempt()) return;
         void error(`FIDO2 MFA listener setup failed for location ${location.id}: ${err}`);
-        setVerifyError(mfaErrorMessage(err));
+        fail(err);
         return;
       }
 
@@ -162,7 +178,7 @@ export const useMfaFido2Connect = (
       } catch (err) {
         if (!tryFinishAttempt()) return;
         void error(`FIDO2 MFA start failed for location ${location.id}: ${err}`);
-        setVerifyError(mfaErrorMessage(err));
+        fail(err);
       }
     },
     [
@@ -175,6 +191,7 @@ export const useMfaFido2Connect = (
       onStepAdvanced,
       onPostureError,
       onServiceUnavailable,
+      onFailure,
     ],
   );
 

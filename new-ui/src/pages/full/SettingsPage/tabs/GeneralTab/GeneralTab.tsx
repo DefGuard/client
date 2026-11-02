@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
+import { Divider } from '../../../../../shared/components/Divider/Divider';
 import { Input } from '../../../../../shared/components/Input/Input';
 import { Select } from '../../../../../shared/components/Select/Select';
 import type { SelectOption } from '../../../../../shared/components/Select/types';
 import { Toggle } from '../../../../../shared/components/Toggle/Toggle';
 import { type AppConfig, LogLevel } from '../../../../../shared/rust-api/types';
+import { ThemeSpacing } from '../../../../../shared/types';
 import { SettingRow } from '../../components/SettingRow/SettingRow';
 import { SettingsFooter } from '../../components/SettingsFooter/SettingsFooter';
 import { usePatchAppConfig } from '../../hooks/usePatchAppConfig';
@@ -71,21 +73,21 @@ export const GeneralTab = ({ appConfig }: Props) => {
         />
       </SettingRow>
 
-      <SettingRow title="Check for updates automatically" inline>
-        <Toggle
-          active={appConfig.check_for_updates}
-          onClick={() => patchConfig({ check_for_updates: !appConfig.check_for_updates })}
-        />
-      </SettingRow>
-
-      <SettingRow title="Auto start OpenID MFA" inline>
-        <Toggle
-          active={appConfig.auto_start_openid_mfa}
-          onClick={() =>
-            patchConfig({ auto_start_openid_mfa: !appConfig.auto_start_openid_mfa })
-          }
-        />
-      </SettingRow>
+      <Toggle
+        label="Check for updates automatically"
+        active={appConfig.check_for_updates}
+        onClick={() => patchConfig({ check_for_updates: !appConfig.check_for_updates })}
+      />
+      <Divider spacing={ThemeSpacing.Xl} />
+      <Toggle
+        label="Auto start OpenID MFA"
+        helper="When connecting to a location protected by OpenID MFA, Defguard skips the sign-in prompt and opens your identity provider's login page in the browser right away."
+        active={appConfig.auto_start_openid_mfa}
+        onClick={() =>
+          patchConfig({ auto_start_openid_mfa: !appConfig.auto_start_openid_mfa })
+        }
+      />
+      <Divider spacing={ThemeSpacing.Xl} />
 
       <SettingsFooter />
     </>

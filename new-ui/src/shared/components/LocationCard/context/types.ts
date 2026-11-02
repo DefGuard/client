@@ -1,4 +1,12 @@
 import { MfaMethod, type MfaMethodValue } from '../../../rust-api/types';
+import type { IconKindValue } from '../../Icon/icon-types';
+
+export type LocationCardError = {
+  message: string;
+  icon: IconKindValue;
+  // absent when retrying cannot help, the view then offers only "Got it"
+  onRetry?: () => void;
+};
 
 export const LocationCardViews = {
   Default: 'default',
@@ -11,7 +19,7 @@ export const LocationCardViews = {
   Connecting: 'connecting',
   Connected: 'connected',
   PostureCheckFail: 'posture-check-fail',
-  ConnectionError: 'connection-error',
+  Error: 'error',
 } as const;
 
 export type LocationCardViewsValue =

@@ -91,6 +91,7 @@ export const IconKind = {
   EmptyPoint: 'empty-point',
   DevicesActive: 'devices-active',
   UserActive: 'user-active',
+  UserShield: 'user-shield',
   Windows: 'windows',
   AppStore: 'app-store',
   Apple: 'apple',

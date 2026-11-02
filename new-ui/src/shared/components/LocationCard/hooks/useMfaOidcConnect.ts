@@ -4,13 +4,7 @@ import { error } from '@tauri-apps/plugin-log';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMfaClientAttempt } from '../../../hooks/useMfaClientAttempt';
 import { api } from '../../../rust-api/api';
-import {
-  classifyOidcPollFailure,
-  isMfaPostureError,
-  isServiceUnavailable,
-  isTimeout,
-  mfaErrorMessage,
-} from '../../../rust-api/mfaError';
+import { isServiceUnavailable, isTimeout } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type { MfaErrorPayload, MfaStepAdvancedPayload } from '../../../rust-api/types';
 import { MfaMethod, TauriEvent } from '../../../rust-api/types';
@@ -19,20 +13,11 @@ import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 
 export const useMfaOidcConnect = (autoStart = false) => {
-  const {
-    location,
-    setPostureError,
-    setView,
-    stepPlan,
-    mfaToken,
-    setMfaToken,
-    goToStep,
-  } = useLocationCardContext();
+  const { location, setView, showFailure, stepPlan, mfaToken, setMfaToken, goToStep } =
+    useLocationCardContext();
 
   const [isStarting, setIsStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
-  const [pollError, setPollError] = useState<string | null>(null);
   const isPollingRef = useRef(false);
 
   const { data: instances } = useQuery(getInstancesQueryOptions);
@@ -49,7 +34,7 @@ export const useMfaOidcConnect = (autoStart = false) => {
 
   const start = useCallback(async () => {
     if (!instance) {
-      setStartError('Instance not found');
+      showFailure('Instance not found');
       return;
     }
 
@@ -61,8 +46,6 @@ export const useMfaOidcConnect = (autoStart = false) => {
       setMfaToken(null);
     }
     setIsStarting(true);
-    setStartError(null);
-    setPollError(null);
     let beginningStep = true;
 
     try {
@@ -129,11 +112,13 @@ export const useMfaOidcConnect = (autoStart = false) => {
           void error(
             `OIDC MFA failed for location ${location.id}: ${event.payload.error}`,
           );
-          const failure = classifyOidcPollFailure(event.payload.error);
-          if (failure.kind !== 'timeout' && !isServiceUnavailable(event.payload.error)) {
+          if (
+            !isTimeout(event.payload.error) &&
+            !isServiceUnavailable(event.payload.error)
+          ) {
             setMfaToken(null);
           }
-          setPollError(failure.message);
+          showFailure(event.payload.error);
         }),
       );
     } catch (e) {
@@ -147,16 +132,7 @@ export const useMfaOidcConnect = (autoStart = false) => {
         if (!retryable) setMfaToken(null);
       }
       void error(`OIDC MFA start failed for location ${location.id}: ${e}`);
-      if (isMfaPostureError(e, location)) {
-        setPostureError(mfaErrorMessage(e));
-        setView(LocationCardViews.PostureCheckFail);
-        return;
-      }
-      if (isServiceUnavailable(e)) {
-        setView(LocationCardViews.ConnectionError);
-        return;
-      }
-      setStartError(mfaErrorMessage(e));
+      showFailure(e);
     } finally {
       if (attempt.isLive()) {
         setIsStarting(false);
@@ -169,8 +145,8 @@ export const useMfaOidcConnect = (autoStart = false) => {
     stepPlan,
     mfaToken,
     setMfaToken,
-    setPostureError,
     setView,
+    showFailure,
     goToStep,
   ]);
 
@@ -187,5 +163,5 @@ export const useMfaOidcConnect = (autoStart = false) => {
     return () => window.clearTimeout(timer);
   }, [autoStart]);
 
-  return { start, isStarting, startError, isPolling, pollError };
+  return { start, isStarting, isPolling };
 };

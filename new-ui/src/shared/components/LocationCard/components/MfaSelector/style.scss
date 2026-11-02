@@ -65,6 +65,22 @@
     }
   }
 
+  &.hover-checkbox {
+    & > .checkbox-indicator {
+      display: none;
+    }
+
+    &:hover {
+      & > .icon-col {
+        display: none;
+      }
+
+      & > .checkbox-indicator {
+        display: block;
+      }
+    }
+  }
+
   > .middle {
     display: flex;
     flex-flow: row nowrap;
@@ -101,6 +117,10 @@
     color: var(--fg-white-40);
     font: var(--t-body-sm-400);
     white-space: nowrap;
+
+    &.configurable {
+      font: var(--t-body-xxs-400);
+    }
   }
 
   .factor-icon {

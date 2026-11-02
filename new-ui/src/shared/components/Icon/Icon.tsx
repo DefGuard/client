@@ -130,6 +130,7 @@ import { IconUbuntu } from './icons/IconUbuntu';
 import { IconUpload } from './icons/IconUpload';
 import { IconUser } from './icons/IconUser';
 import { IconUserActive } from './icons/IconUserActive';
+import { IconUserShield } from './icons/IconUserShield';
 import { IconUsers } from './icons/IconUsers';
 import { IconWarningFilled } from './icons/IconWarningFilled';
 import { IconWarningOutlined } from './icons/IconWarningOutlined';
@@ -430,6 +431,8 @@ export const Icon = <T extends IconKindValue>({
         return IconUser;
       case 'user-active':
         return IconUserActive;
+      case 'user-shield':
+        return IconUserShield;
       case 'users':
         return IconUsers;
       case 'webhooks':

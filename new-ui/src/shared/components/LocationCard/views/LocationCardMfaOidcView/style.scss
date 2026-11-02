@@ -1,17 +1,13 @@
-.location-card-view-header {
-  p.error {
-    color: var(--fg-critical);
-  }
-}
-
 .location-card-mfa-oidc {
   .controls {
     > .right {
       flex: 1;
+      min-width: 0;
 
-      .btn,
-      .external-provider-button {
-        width: 100%;
+      // the provider button fills the row
+      > :last-child {
+        flex: 1;
+        min-width: 0;
       }
     }
   }

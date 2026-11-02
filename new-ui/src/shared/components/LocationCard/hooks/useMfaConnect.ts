@@ -11,6 +11,7 @@ import {
   isSessionExpired,
   isStaleAttempt,
   isTimeout,
+  MfaFailureText,
   mfaErrorMessage,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
@@ -29,6 +30,8 @@ type UseMfaConnectOptions = {
   onSessionExpired?: () => void;
   onPostureError?: (message: string) => void;
   onServiceUnavailable?: () => void;
+  // replaces the other error callbacks and all non-input error state
+  onFailure?: (err: unknown) => void;
 };
 
 const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
@@ -51,6 +54,7 @@ export const useMfaConnect = (
     onSessionExpired,
     onPostureError,
     onServiceUnavailable,
+    onFailure,
   }: UseMfaConnectOptions,
 ) => {
   const [token, setToken] = useState<string | null>(mfaToken);
@@ -97,6 +101,10 @@ export const useMfaConnect = (
           setToken(null);
           setMfaToken(null);
         }
+        if (isPresent(onFailure)) {
+          onFailure(err);
+          return;
+        }
         if (isMfaPostureError(err, location)) {
           onPostureError?.(mfaErrorMessage(err));
           return;
@@ -140,14 +148,14 @@ export const useMfaConnect = (
           setToken(null);
           setMfaToken(null);
         }
-        if (isAttemptLimit(err)) {
+        if (isPresent(onFailure) && !isInvalidCode(message)) {
+          onFailure(err);
+        } else if (isAttemptLimit(err)) {
           setVerifyError(message);
         } else if (isStaleAttempt(message)) {
-          setVerifyError(
-            'Authentication request could not be started. Please try again.',
-          );
+          setVerifyError(MfaFailureText.StaleAttempt);
         } else if (isConnectFailure(message)) {
-          setVerifyError('Failed to establish VPN connection');
+          setVerifyError(MfaFailureText.ConnectFailure);
         } else if (isInvalidCode(message)) {
           setVerifyError('Invalid code');
         } else if (isSessionExpired(message)) {
@@ -169,6 +177,7 @@ export const useMfaConnect = (
       onStepAdvanced,
       onConnected,
       onSessionExpired,
+      onFailure,
       setMfaToken,
     ],
   );

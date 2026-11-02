@@ -43,6 +43,7 @@ export const MfaSettingsSection = ({
                   action === MfaFactorAction.Configure &&
                   configureMethods.some((queued) => queued === method)
                 }
+                configurable={action === MfaFactorAction.Configure}
                 isSelectable={action !== MfaFactorAction.None}
                 onClick={() => {
                   if (action === MfaFactorAction.Pick) {
