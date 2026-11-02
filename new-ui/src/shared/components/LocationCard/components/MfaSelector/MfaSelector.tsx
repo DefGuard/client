@@ -73,9 +73,10 @@ export const MfaSelector = ({
         </p>
       </div>
       <div className="right">
-        {(isMobileOnly || !configured) && (
-          <p className="disabled-label">
-            {isMobileOnly ? 'Mobile client only' : 'Not configured'}
+        {isMobileOnly && <p className="disabled-label">Mobile client only</p>}
+        {!isMobileOnly && !configured && (
+          <p className={clsx('disabled-label', { configurable })}>
+            {configurable ? 'Select to configure' : 'Not configured'}
           </p>
         )}
         {isSelectable && configured && isDefault && (
