@@ -23,6 +23,7 @@ export const useMfaStep = () => {
   const currentStep = isPresent(location) ? mfaStepsOf(location)[stepIndex] : undefined;
 
   return {
+    instance,
     canPickOtherMethod:
       isPresent(currentStep) && usableMfaMethods(currentStep, instance).length > 1,
     stepPlan,
