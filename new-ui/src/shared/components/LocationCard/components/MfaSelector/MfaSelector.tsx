@@ -8,6 +8,7 @@ import {
   type MfaMethodValue,
 } from '../../../../rust-api/types';
 import { mfaToText, openIdProviderName } from '../../../../utils/mfa';
+import { CheckboxIndicator } from '../../../CheckboxIndicator/CheckboxIndicator';
 import { Icon } from '../../../Icon';
 import checkboxSrc from './assets/checkbox.svg';
 
@@ -18,6 +19,7 @@ interface Props {
   active?: boolean;
   isDefault?: boolean;
   configured?: boolean;
+  configurable?: boolean;
   isSelectable: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
   containerProps?: Omit<HTMLProps<HTMLDivElement>, 'onClick'>;
@@ -32,10 +34,12 @@ export const MfaSelector = ({
   active = false,
   isDefault = false,
   configured = true,
+  configurable = false,
   isSelectable,
 }: Props) => {
   const isMobileOnly = factor === MfaMethod.Biometric;
   const showCheckbox = isSelectable && selected;
+  const showHoverCheckbox = isSelectable && configurable && !selected;
 
   return (
     <div
@@ -46,6 +50,7 @@ export const MfaSelector = ({
         selected,
         active,
         disabled: !isSelectable,
+        'hover-checkbox': showHoverCheckbox,
       })}
       onClick={(event) => {
         if (isSelectable) {
@@ -59,6 +64,7 @@ export const MfaSelector = ({
           <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
         </div>
       )}
+      {showHoverCheckbox && <CheckboxIndicator active={false} size="sm" />}
       <div className="middle">
         <p className="name">
           {factor === MfaMethod.Oidc
@@ -67,9 +73,10 @@ export const MfaSelector = ({
         </p>
       </div>
       <div className="right">
-        {(isMobileOnly || !configured) && (
-          <p className="disabled-label">
-            {isMobileOnly ? 'Mobile client only' : 'Not configured'}
+        {isMobileOnly && <p className="disabled-label">Mobile client only</p>}
+        {!isMobileOnly && !configured && (
+          <p className={clsx('disabled-label', { configurable })}>
+            {configurable ? 'Select to configure' : 'Not configured'}
           </p>
         )}
         {isSelectable && configured && isDefault && (
