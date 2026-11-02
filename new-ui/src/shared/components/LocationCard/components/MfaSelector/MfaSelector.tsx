@@ -9,6 +9,7 @@ import {
 } from '../../../../rust-api/types';
 import { isPresent } from '../../../../utils/isPresent';
 import { findOpenIdProvider, mfaToText, openIdProviderName } from '../../../../utils/mfa';
+import { CheckboxIndicator } from '../../../CheckboxIndicator/CheckboxIndicator';
 import { Icon } from '../../../Icon';
 import checkboxSrc from './assets/checkbox.svg';
 import { openIdProviderIcon } from './consts';
@@ -20,6 +21,7 @@ interface Props {
   active?: boolean;
   isDefault?: boolean;
   configured?: boolean;
+  configurable?: boolean;
   isSelectable: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
   containerProps?: Omit<HTMLProps<HTMLDivElement>, 'onClick'>;
@@ -34,10 +36,12 @@ export const MfaSelector = ({
   active = false,
   isDefault = false,
   configured = true,
+  configurable = false,
   isSelectable,
 }: Props) => {
   const isMobileOnly = factor === MfaMethod.Biometric;
   const showCheckbox = isSelectable && selected;
+  const showHoverCheckbox = isSelectable && configurable && !selected;
   const openIdProvider =
     factor === MfaMethod.Oidc ? findOpenIdProvider(instance) : undefined;
 
@@ -50,6 +54,7 @@ export const MfaSelector = ({
         selected,
         active,
         disabled: !isSelectable,
+        'hover-checkbox': showHoverCheckbox,
       })}
       onClick={(event) => {
         if (isSelectable) {
@@ -68,6 +73,7 @@ export const MfaSelector = ({
           )}
         </div>
       )}
+      {showHoverCheckbox && <CheckboxIndicator active={false} size="sm" />}
       <div className="middle">
         <p className="name">
           {factor === MfaMethod.Oidc
