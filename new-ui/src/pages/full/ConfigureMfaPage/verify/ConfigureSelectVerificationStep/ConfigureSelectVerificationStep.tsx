@@ -1,20 +1,15 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
 import { Button } from '../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../shared/components/Controls/Controls';
-import { ExternalProviderButton } from '../../../../../shared/components/ExternalProviderButton/ExternalProviderButton';
-import { FullPageTitle } from '../../../../../shared/components/FullPageTitle/FullPageTitle';
+import { Icon, IconKind } from '../../../../../shared/components/Icon';
+import { MfaSelector } from '../../../../../shared/components/LocationCard/components/MfaSelector/MfaSelector';
+import { SizedBox } from '../../../../../shared/components/SizedBox/SizedBox';
 import { FullPage } from '../../../../../shared/layouts/FullPage/FullPage';
-import { ConfigureFactorsSource, MfaMethod } from '../../../../../shared/rust-api/types';
+import { ConfigureFactorsSource } from '../../../../../shared/rust-api/types';
+import { ThemeSpacing, ThemeVariable } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
-import {
-  type ClientAuthorizingMethod,
-  findOpenIdProvider,
-  openIdProviderName,
-} from '../../../../../shared/utils/mfa';
-import { ConfigureMfaVerificatorFactorSelector } from '../../components/ConfigureMfaVerificatorFactorSelector/ConfigureMfaVerificatorFactorSelector';
 import {
   discardMfaConfiguration,
   useConfigureMfaStore,
@@ -35,10 +30,6 @@ export const ConfigureSelectVerificationStep = ({ onCancel }: Props) => {
     (s) => s.source === ConfigureFactorsSource.AddPage,
   );
   const instance = useConfigureMfaStore((s) => s.instance) ?? undefined;
-
-  const [selected, setSelected] = useState<ClientAuthorizingMethod | undefined>(
-    methods[0],
-  );
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
     // the source is read before the discard resets the store
@@ -63,26 +54,34 @@ export const ConfigureSelectVerificationStep = ({ onCancel }: Props) => {
       hideScrollContainer
       withControls
     >
-      <FullPageTitle title="Verify your identity to add a new MFA method" />
-      <p className="description">
-        <span>{`For security, verify your identity using one of your existing MFA methods. You'll be able to add a new method after verification.`}</span>
-      </p>
-      {isPresent(error) && <p className="error">{error}</p>}
-      <div className="label">
-        <p>Select an existing method</p>
-      </div>
-      <div className="methods">
-        {methods.map((method) => (
-          <ConfigureMfaVerificatorFactorSelector
-            key={method}
-            mfaMethod={method}
-            instance={instance}
-            selected={selected === method}
-            onClick={() => {
-              setSelected(method);
-            }}
-          />
-        ))}
+      <div className="content">
+        <Icon
+          icon={IconKind.UserShield}
+          size={28}
+          staticColor={ThemeVariable.FgWhite50}
+        />
+        <SizedBox height={ThemeSpacing.Xl2} />
+        <p className="title">Verify your identity</p>
+        <SizedBox height={ThemeSpacing.Sm} />
+        <p className="subtitle">
+          To add a new MFA method, please select one of the available options to verify
+          your identity.
+        </p>
+        <SizedBox height={ThemeSpacing.Xl2} />
+        {isPresent(error) && <p className="error">{error}</p>}
+        <div className="methods">
+          {methods.map((method) => (
+            <MfaSelector
+              key={method}
+              factor={method}
+              instance={instance}
+              isSelectable={!isCancelling}
+              onClick={() => {
+                useConfigureMfaStore.getState().selectVerificationMethod(method);
+              }}
+            />
+          ))}
+        </div>
       </div>
       <Controls>
         <Button
@@ -93,29 +92,6 @@ export const ConfigureSelectVerificationStep = ({ onCancel }: Props) => {
             cancel();
           }}
         />
-        <div className="right">
-          {selected === MfaMethod.Oidc && (
-            <ExternalProviderButton
-              text={`Authenticate with ${openIdProviderName(instance)}`}
-              provider={findOpenIdProvider(instance) ?? 'custom'}
-              disabled={isCancelling}
-              onClick={() => {
-                useConfigureMfaStore.getState().selectVerificationMethod(MfaMethod.Oidc);
-              }}
-            />
-          )}
-          {selected !== MfaMethod.Oidc && (
-            <Button
-              text="Verify identity"
-              variant={ButtonVariant.Primary}
-              disabled={selected === undefined || isCancelling}
-              onClick={() => {
-                if (selected === undefined) return;
-                useConfigureMfaStore.getState().selectVerificationMethod(selected);
-              }}
-            />
-          )}
-        </div>
       </Controls>
     </FullPage>
   );
