@@ -1,3 +1,8 @@
+// Wide enough for "Other methods" next to "Continue with Microsoft".
+#modals-root .modal.size-small.connect-modal {
+  --max-width: 400px;
+}
+
 #connect-modal {
   .view-description {
     font: var(--t-body-xs-400);

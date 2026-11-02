@@ -1,17 +1,12 @@
 import './style.scss';
 import { useQuery } from '@tanstack/react-query';
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
-import { Checkbox } from '../../../../../../../shared/components/Checkbox/Checkbox';
+import { Controls } from '../../../../../../../shared/components/Controls/Controls';
 import { ExternalProviderButton } from '../../../../../../../shared/components/ExternalProviderButton/ExternalProviderButton';
-import { SizedBox } from '../../../../../../../shared/components/SizedBox/SizedBox';
-import { useAppData } from '../../../../../../../shared/providers/AppDataContext';
-import { api } from '../../../../../../../shared/rust-api/api';
 import { getAppConfigQueryOptions } from '../../../../../../../shared/rust-api/query';
-import { ThemeSpacing } from '../../../../../../../shared/types';
-import { isPresent } from '../../../../../../../shared/utils/isPresent';
 import {
   findOpenIdProvider,
   openIdProviderName,
@@ -20,6 +15,7 @@ import { ConnectModalPostureCheckLoading } from '../../components/ConnectModalPo
 import { ConnectModalView } from '../../hooks/types';
 import { useConnectModal } from '../../hooks/useConnectModal';
 import { useConnectModalMfaOidc } from '../../hooks/useConnectModalMfaOidc';
+import { useMfaStep } from '../../hooks/useMfaStep';
 
 type Screen = 'idle' | 'polling' | 'error';
 
@@ -28,8 +24,9 @@ export const ConnectModalMfaOidc = () => {
   const [perviousView, location, initAutoStart] = useConnectModal(
     useShallow((s) => [s.perviousView, s.location, s.autoStartOpenId]),
   );
-  const { instances } = useAppData();
-  const instance = instances.find((entry) => entry.id === location?.instance_id);
+  const { instance, canPickOtherMethod } = useMfaStep();
+  const showOtherMethods =
+    canPickOtherMethod && appConfig?.auto_start_openid_mfa === false;
   const providerName = openIdProviderName(instance);
 
   const { start, isStarting, startError, isPolling, pollError } = useConnectModalMfaOidc({
@@ -78,10 +75,21 @@ export const ConnectModalMfaOidc = () => {
         </p>
       )}
       {screen === 'error' && <p className="view-description">{errorMessage}</p>}
-      <div className="actions">
+      <Controls>
+        {showOtherMethods && (
+          <Button
+            containerProps={{ className: 'other-methods' }}
+            variant={ButtonVariant.Secondary}
+            text="Other methods"
+            onClick={() => {
+              useConnectModal.getState().setView(ConnectModalView.MfaSettings);
+            }}
+          />
+        )}
         {screen !== 'error' && (
           <ExternalProviderButton
-            text={`Authenticate with ${providerName}`}
+            className="primary-action"
+            text={`Continue with ${providerName}`}
             provider={findOpenIdProvider(instance) ?? 'custom'}
             loading={screen === 'polling' || isStarting}
             onClick={handleStart}
@@ -89,29 +97,13 @@ export const ConnectModalMfaOidc = () => {
         )}
         {screen === 'error' && (
           <Button
+            containerProps={{ className: 'primary-action' }}
             text="Try again"
             variant={ButtonVariant.Primary}
             onClick={() => setScreen('idle')}
           />
         )}
-        {isPresent(appConfig) && screen === 'idle' && !initAutoStart && (
-          <Fragment>
-            <SizedBox height={ThemeSpacing.Xl3} />
-            <Checkbox
-              active={appConfig.auto_start_openid_mfa}
-              text={`Don't show this screen next time`}
-              onClick={() => {
-                void api.setAppConfig(
-                  {
-                    auto_start_openid_mfa: !appConfig.auto_start_openid_mfa,
-                  },
-                  true,
-                );
-              }}
-            />
-          </Fragment>
-        )}
-      </div>
+      </Controls>
     </div>
   );
 };
