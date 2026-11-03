@@ -35,7 +35,7 @@ fn test_device_identity_fields_can_be_absent_in_legacy_json() {
     let enrollment: EnrollmentStartRequest =
         serde_json::from_str(r#"{"token":"enrollment-token"}"#).unwrap();
     assert!(enrollment.device_identity.is_none());
-    assert!(enrollment.proposed_wireguard_pubkey.is_none());
+    assert!(enrollment.wireguard_key.is_none());
 
     let polling: InstanceInfoRequest =
         serde_json::from_str(r#"{"token":"polling-token"}"#).unwrap();

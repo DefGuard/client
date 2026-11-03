@@ -321,7 +321,7 @@ async fn enroll(base_url: &Url, token: String) -> Result<CliConfig, CliError> {
         .post(url)
         .json(&EnrollmentStartRequest {
             token,
-            proposed_wireguard_pubkey: None,
+            wireguard_key: None,
             device_identity: None,
         })
         .send()
