@@ -43,7 +43,7 @@
       ayatana-ido
       libdbusmenu-gtk3
     ]
-    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.systemd];
+    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.systemd pkgs.tpm2-tss];
 
   # Rust/cargo inputs shared by buildDepsOnly and the main build.
   cargoNativeBuildInputs = [
