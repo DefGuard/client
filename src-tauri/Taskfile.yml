@@ -1,0 +1,13 @@
+version: '3'
+
+tasks:
+  format:
+    desc: Format the Rust workspace with nightly rustfmt, which handles imports better.
+    cmd: cargo +nightly --locked fmt --all
+
+  lint:
+    desc: Lint the Rust workspace with clippy.
+    preconditions:
+      - sh: test -d ../dist
+        msg: ../dist is missing, run pnpm build in new-ui or create the directory first.
+    cmd: cargo clippy --workspace --all-targets --all-features -- -D warnings

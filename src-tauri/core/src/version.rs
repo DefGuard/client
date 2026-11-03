@@ -20,7 +20,7 @@ pub const CLIENT_PLATFORM_HEADER: &str = "defguard-client-platform";
 pub const LOG_FILENAME: &str = "defguard-client";
 pub const WELCOME_FORCE_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_FORCE";
 pub const WELCOME_SKIP_ENV_VAR: &str = "DEFGUARD_CLIENT_WELCOME_SKIP";
-pub const WELCOME_CONTENT_VERSION: Version = Version::new(2, 1, 0);
+pub const WELCOME_CONTENT_VERSION: Version = Version::new(2, 2, 0);
 pub use defguard_client_common::VERSION as PKG_VERSION;
 
 /// Selects the version string the client should report: the build-version override when present
@@ -232,7 +232,7 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::write(
             dir.path().join(VERSION_STATE_FILE_NAME),
-            br#"{"version":"2.1.0","welcome_shown":"2.0.0"}"#,
+            br#"{"version":"2.2.0","welcome_shown":"2.1.0"}"#,
         )
         .unwrap();
 
