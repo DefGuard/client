@@ -11,6 +11,7 @@ import { ExternalProviderButton } from '../../../ExternalProviderButton/External
 import { IconKind } from '../../../Icon';
 import { IconButton } from '../../../IconButton/IconButton';
 import { IconButtonVariant } from '../../../IconButton/types';
+import { SizedBox } from '../../../SizedBox/SizedBox';
 import { LocationViewHeader } from '../../components/LocationViewHeader/LocationViewHeader';
 import { useLocationCardContext } from '../../context/context';
 import { LocationCardViews } from '../../context/types';
@@ -40,6 +41,14 @@ export const LocationCardMfaOidcView = () => {
           </p>
         )}
       </LocationViewHeader>
+      <SizedBox height={ThemeSpacing.Xl} />
+      <ExternalProviderButton
+        className="provider"
+        text={`Authenticate with ${providerName}`}
+        provider={findOpenIdProvider(instance) ?? 'custom'}
+        loading={isPolling || isStarting}
+        onClick={() => void start()}
+      />
       <Controls>
         <IconButton
           variant={IconButtonVariant.BigSelected}
@@ -47,8 +56,8 @@ export const LocationCardMfaOidcView = () => {
           iconRotation="left"
           onClick={() => setView(LocationCardViews.Default)}
         />
-        <div className="right">
-          {showOtherMethods && (
+        {showOtherMethods && (
+          <div className="right">
             <Button
               text="Other methods"
               variant={ButtonVariant.Outlined}
@@ -56,14 +65,8 @@ export const LocationCardMfaOidcView = () => {
                 setView(LocationCardViews.MfaSettings);
               }}
             />
-          )}
-          <ExternalProviderButton
-            text={`Authenticate with ${providerName}`}
-            provider={findOpenIdProvider(instance) ?? 'custom'}
-            loading={isPolling || isStarting}
-            onClick={() => void start()}
-          />
-        </div>
+          </div>
+        )}
       </Controls>
     </div>
   );
