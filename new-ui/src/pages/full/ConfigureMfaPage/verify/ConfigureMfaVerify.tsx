@@ -10,7 +10,7 @@ import { ConfigureVerifyOidcStep } from './ConfigureVerifyOidcStep/ConfigureVeri
 import { ConfigureVerifyTotpStep } from './ConfigureVerifyTotpStep/ConfigureVerifyTotpStep';
 
 type Props = {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
   onSessionExpired: () => void;
 };
 

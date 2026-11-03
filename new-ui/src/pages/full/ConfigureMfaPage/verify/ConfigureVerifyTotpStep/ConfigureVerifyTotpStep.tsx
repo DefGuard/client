@@ -13,7 +13,7 @@ import { useMfaConfigErrorHandler } from '../../hooks/useMfaConfigErrorHandler';
 const CODE_LENGTH = 6;
 
 interface Props {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
   /** The session outlived its deadline, so the whole flow has to start over. */
   onSessionExpired: () => void;
 }

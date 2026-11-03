@@ -10,7 +10,7 @@ import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useConfigureVerifyFido2 } from './useConfigureVerifyFido2';
 
 interface Props {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
   onSessionExpired: () => void;
 }
 

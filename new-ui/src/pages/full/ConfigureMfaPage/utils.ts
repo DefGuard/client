@@ -1,4 +1,6 @@
 import {
+  ConfigureFactorsSource,
+  type ConfigureFactorsSourceValue,
   type MfaConfigStartResult,
   MfaMethod,
   type MfaMethodValue,
@@ -44,14 +46,18 @@ export const mfaStepsOf = (methods: MfaMethodValue[]): ConfigureMfaStepValue[] =
     methods.some((method) => mfaFactorStep(method) === step),
   );
 
+/** Another key of a repeatable factor is offered from the Add page only. Elsewhere a configured
+ *  one already answers what the location asks. */
 export const isMfaFactorOfferable = (
   method: MfaMethodValue,
   configuredMethods: MfaMethodValue[],
   setupMethods: MfaMethodValue[],
+  source: ConfigureFactorsSourceValue | null,
 ): boolean => {
   const factor = mfaFactor(method);
   if (!factor || !setupMethods.includes(method)) return false;
-  return factor.repeatable || !configuredMethods.includes(method);
+  if (factor.repeatable && source === ConfigureFactorsSource.AddPage) return true;
+  return !configuredMethods.includes(method);
 };
 
 const codeMfaMethods: MfaMethodValue[] = [MfaMethod.Totp, MfaMethod.Email];
