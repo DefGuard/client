@@ -35,16 +35,17 @@ pub(super) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
         .into_iter()
         .map(|profile| check_profile(&mut context, profile))
         .collect::<Result<_, _>>()?;
-    let attestation_methods = if details.profiles.iter().any(|profile| {
-        profile.profile == ProfileId::EcdsaP256Sha256 && profile.support == SupportStatus::Supported
-    }) {
-        vec![AttestationMethod::TpmKeyAttestation]
-    } else {
-        Vec::new()
-    };
+    let attestation_method = details
+        .profiles
+        .iter()
+        .any(|profile| {
+            profile.profile == ProfileId::EcdsaP256Sha256
+                && profile.support == SupportStatus::Supported
+        })
+        .then_some(AttestationMethod::TpmKeyAttestation);
     Ok(Capabilities {
         backend: BackendKind::Tpm,
-        attestation_methods,
+        attestation_method,
         details: PlatformCapabilities::Tpm(details),
     })
 }
