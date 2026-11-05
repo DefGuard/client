@@ -34,8 +34,8 @@ pub enum AttestationMethod {
 pub struct Capabilities {
     /// Backend used on this platform
     pub backend: BackendKind,
-    /// Attestation protocols available from this backend
-    pub attestation_methods: Vec<AttestationMethod>,
+    /// Attestation method available from this backend, or None when unsupported.
+    pub attestation_method: Option<AttestationMethod>,
     /// Raw and interpreted platform-specific capabilities
     pub details: PlatformCapabilities,
 }

@@ -27,9 +27,10 @@ async fn test_capabilities_report_the_platform_backend_and_required_profile() {
     match (&caps.backend, &caps.details) {
         (BackendKind::Tpm, PlatformCapabilities::Tpm(tpm)) => {
             assert_eq!(expected_backend(), BackendKind::Tpm);
-            assert!(caps
-                .attestation_methods
-                .contains(&AttestationMethod::TpmKeyAttestation));
+            assert_eq!(
+                caps.attestation_method,
+                Some(AttestationMethod::TpmKeyAttestation)
+            );
             assert!(tpm
                 .algorithms
                 .iter()
@@ -51,9 +52,10 @@ async fn test_capabilities_report_the_platform_backend_and_required_profile() {
         (BackendKind::AppleAppAttest, PlatformCapabilities::Apple(apple)) => {
             assert_eq!(expected_backend(), BackendKind::AppleAppAttest);
             assert!(apple.app_attest_supported);
-            assert!(caps
-                .attestation_methods
-                .contains(&AttestationMethod::AppleAppAttest));
+            assert_eq!(
+                caps.attestation_method,
+                Some(AttestationMethod::AppleAppAttest)
+            );
         }
         _ => panic!("backend kind and capability details must agree"),
     }
