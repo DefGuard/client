@@ -12,7 +12,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-tss-esapi-sys = "0.6"
+tss-esapi = "7.7"
 
 [lints]
 workspace = true
