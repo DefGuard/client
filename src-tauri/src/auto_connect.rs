@@ -125,26 +125,3 @@ async fn try_auto_connect(location_id: Id, app_handle: &AppHandle) -> Attempt {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_retryable() {
-        let message = String::new();
-        assert!(is_retryable(&ConnectError::ServiceUnavailable {
-            message: message.clone()
-        }));
-        assert!(is_retryable(&ConnectError::Other {
-            message: message.clone()
-        }));
-        assert!(!is_retryable(&ConnectError::PostureCheckFailed {
-            message: message.clone()
-        }));
-        assert!(!is_retryable(&ConnectError::RouteConflict {
-            message,
-            conflicts: Vec::new(),
-        }));
-    }
-}

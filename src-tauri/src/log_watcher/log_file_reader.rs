@@ -6,24 +6,64 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use same_file::Handle;
+#[derive(PartialEq, Eq)]
+struct FileId {
+    volume: u64,
+    index: u64,
+}
+
+impl FileId {
+    #[cfg(unix)]
+    fn of(file: &File) -> io::Result<Self> {
+        use std::os::unix::fs::MetadataExt;
+
+        let metadata = file.metadata()?;
+        Ok(Self {
+            volume: metadata.dev(),
+            index: metadata.ino(),
+        })
+    }
+
+    // std exposes the volume and file index only behind the unstable `windows_by_handle`
+    #[cfg(windows)]
+    fn of(file: &File) -> io::Result<Self> {
+        use std::os::windows::io::AsRawHandle;
+
+        use windows_sys::Win32::Storage::FileSystem::{
+            GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+        };
+
+        // SAFETY: a plain C struct of integers and FILETIMEs, all-zero is a valid value.
+        let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+        // SAFETY: the handle stays open for the call, `info` is a valid out pointer.
+        if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(Self {
+            volume: info.dwVolumeSerialNumber.into(),
+            index: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+        })
+    }
+}
 
 pub(crate) struct LogFileReader {
     path: PathBuf,
     reader: BufReader<File>,
     // Windows keeps a renamed file's creation time for a new file with the same name,
     // so identity must come from the volume and file index, not timestamps.
-    handle: Handle,
+    id: FileId,
 }
 
 impl LogFileReader {
     pub(crate) fn open(path: &Path) -> io::Result<Self> {
-        let file = File::open(path)?;
-        let handle = Handle::from_file(file.try_clone()?)?;
+        Self::from_file(path, File::open(path)?)
+    }
+
+    fn from_file(path: &Path, file: File) -> io::Result<Self> {
         Ok(Self {
             path: path.to_path_buf(),
+            id: FileId::of(&file)?,
             reader: BufReader::new(file),
-            handle,
         })
     }
 
@@ -38,18 +78,18 @@ impl LogFileReader {
     }
 
     fn reopen_if_rotated(&mut self) -> io::Result<bool> {
-        let current = match Handle::from_path(&self.path) {
-            Ok(handle) => handle,
+        let current = match File::open(&self.path) {
+            Ok(file) => file,
             // mid-rotation, keep reading the old file until the new one appears
             Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(false),
             Err(err) => return Err(err),
         };
         let position = self.reader.stream_position()?;
-        if current != self.handle {
+        if FileId::of(&current)? != self.id {
             debug!("Log file {} was rotated, reopening", self.path.display());
-            *self = Self::open(&self.path)?;
+            *self = Self::from_file(&self.path, current)?;
             Ok(true)
-        } else if current.as_file().metadata()?.len() < position {
+        } else if current.metadata()?.len() < position {
             debug!("Log file {} was truncated, rewinding", self.path.display());
             self.reader.seek(SeekFrom::Start(0))?;
             Ok(true)
