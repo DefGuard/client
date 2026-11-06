@@ -1,0 +1,101 @@
+version: '3'
+
+includes:
+  rust:
+    taskfile: ./src-tauri/Taskfile.yml
+    dir: ./src-tauri
+
+tasks:
+  dev:
+    desc: Run dev-web and dev-tauri together.
+    deps: [dev-web, dev-tauri]
+
+  dev-tauri:
+    desc: Run only the Tauri side with the local dev database and debug logging.
+    dir: src-tauri
+    env:
+      DATABASE_URL: sqlite:dev.db
+      DEFGUARD_CLIENT_DEV: '1'
+      DEFGUARD_CLIENT_LOG_LEVEL: debug
+    cmd: cargo tauri dev
+
+  dev-welcome:
+    desc: Run only the Tauri side like dev-tauri, forcing the welcome window to open.
+    dir: src-tauri
+    env:
+      DATABASE_URL: sqlite:dev.db
+      DEFGUARD_CLIENT_DEV: '1'
+      DEFGUARD_CLIENT_LOG_LEVEL: debug
+      DEFGUARD_CLIENT_WELCOME_FORCE: '1'
+    cmd: cargo tauri dev
+
+  dev-web:
+    desc: Run only the web frontend dev server.
+    dir: new-ui
+    cmd: pnpm dev
+
+  lint:
+    desc: Lint new-ui and the Rust workspace.
+    cmds:
+      - task: lint-web
+      - task: rust:lint
+
+  lint-web:
+    desc: Lint new-ui with biome, prettier, stylelint and tsc.
+    dir: new-ui
+    cmd: pnpm lint
+
+  build:
+    desc: Build the frontend and the Tauri bundle (unsigned MSI on Windows).
+    cmds:
+      - cmd: pnpm build
+        dir: new-ui
+      - cmd: cargo tauri build --config src-tauri/tauri.local.conf.json
+        platforms: [windows]
+      - cmd: cargo tauri build
+        platforms: [linux, darwin]
+
+  e2e-build:
+    desc: Build the Linux client and install both frontend dependency sets.
+    platforms: [linux]
+    cmds:
+      - cmd: pnpm install --frozen-lockfile && pnpm build
+        dir: new-ui
+      - cmd: pnpm install --frozen-lockfile
+        dir: e2e
+      - cargo tauri build
+
+  e2e-provision:
+    desc: Provision the configured Core deployment. It must already be running.
+    dir: e2e
+    preconditions:
+      - sh: test -f .env
+        msg: Missing e2e/.env, copy e2e/.env.example and fill it locally.
+    cmd: pnpm provision
+
+  e2e-test:
+    desc: Run the Linux WebDriver suite. Core, Edge, gateway and defguard-service are external prerequisites.
+    platforms: [linux]
+    dir: e2e
+    preconditions:
+      - sh: test -f .env
+        msg: Missing e2e/.env, copy e2e/.env.example and fill it locally.
+      - sh: test -S /var/run/defguard.socket
+        msg: defguard-service is not running at /var/run/defguard.socket.
+      - sh: test -x "${TAURI_DRIVER:-$HOME/.cargo/bin/tauri-driver}"
+        msg: tauri-driver is missing, set TAURI_DRIVER to its location.
+      - sh: command -v WebKitWebDriver
+        msg: WebKitWebDriver is missing, enter nix develop.
+      - sh: command -v xvfb-run
+        msg: xvfb-run is missing, enter nix develop.
+      - sh: command -v dbus-run-session
+        msg: dbus-run-session is missing, enter nix develop.
+    cmd: NATIVE_DRIVER="${NATIVE_DRIVER:-$(command -v WebKitWebDriver)}" dbus-run-session -- xvfb-run -a pnpm test
+
+  e2e:
+    desc: Build, provision and run the Linux E2E suite.
+    platforms: [linux]
+    cmds:
+      - task: e2e-build
+      - task: e2e-provision
+      - task: e2e-test

@@ -12,7 +12,7 @@ import { ConfigureFinishStep } from './ConfigureFinishStep/ConfigureFinishStep';
 import { ConfigureRecoveryCodesStep } from './ConfigureRecoveryCodesStep/ConfigureRecoveryCodesStep';
 
 type Props = {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
   onSessionExpired: () => void;
 };
 

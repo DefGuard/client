@@ -1,14 +1,5 @@
 .location-card-mfa-oidc {
-  .controls {
-    > .right {
-      flex: 1;
-      min-width: 0;
-
-      // the provider button fills the row
-      > :last-child {
-        flex: 1;
-        min-width: 0;
-      }
-    }
+  .provider {
+    width: 100%;
   }
 }

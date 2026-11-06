@@ -20,6 +20,7 @@ import {
   type MfaStep,
 } from '../../../../../shared/rust-api/types';
 import { ThemeVariable } from '../../../../../shared/types';
+import { isMfaEditConfigureFactorsSource } from '../../../../../shared/utils/configureFactorsSource';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import {
   CLIENT_CONFIGURABLE_METHODS,
@@ -31,10 +32,7 @@ import {
   mfaToText,
   setupMethodsOf,
 } from '../../../../../shared/utils/mfa';
-import {
-  discardMfaConfiguration,
-  useConfigureMfaStore,
-} from '../../hooks/useConfigureMfaStore';
+import { useConfigureMfaStore } from '../../hooks/useConfigureMfaStore';
 import { isMfaFactorOfferable } from '../../utils';
 import '../style.scss';
 import './style.scss';
@@ -52,7 +50,7 @@ type MethodRowState = {
 };
 
 interface Props {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
 }
 
 export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
@@ -61,6 +59,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
   const location = useConfigureMfaStore((s) => s.location);
   const initialSelection = useConfigureMfaStore((s) => s.initialSelection);
   const instance = useConfigureMfaStore((s) => s.instance);
+  const source = useConfigureMfaStore((s) => s.source);
 
   const setupMethods = useMemo(() => setupMethodsOf(instance), [instance]);
 
@@ -74,7 +73,9 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     () => (isPresent(location) ? locationMfaSteps(location) : []),
     [location],
   );
-  const isLocationAware = locationSteps.length > 0;
+  // Editing a location's defaults already picked the factors, so it gets the Add page list.
+  const isLocationAware =
+    locationSteps.length > 0 && !isMfaEditConfigureFactorsSource(source);
 
   /** The fallback registers email as it mails the code, so email is disabled but not
    *  something the account already holds. */
@@ -104,15 +105,19 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
   const [availableMethods, lockedMethods] = useMemo(
     () =>
       fork(CLIENT_CONFIGURABLE_METHODS, (method) =>
-        isMfaFactorOfferable(method, configuredMethods, setupMethods),
+        isMfaFactorOfferable(method, configuredMethods, setupMethods, source),
       ),
-    [configuredMethods, setupMethods],
+    [configuredMethods, setupMethods, source],
   );
 
   const describeMethod = useCallback(
     (method: MfaMethodValue): MethodRowState => {
-      // A repeatable factor stays offerable once configured, keeping its badge and its pick.
-      const disabled = !isMfaFactorOfferable(method, configuredMethods, setupMethods);
+      const disabled = !isMfaFactorOfferable(
+        method,
+        configuredMethods,
+        setupMethods,
+        source,
+      );
       const configured = accountConfigured.includes(method);
       const available = isMfaMethodAvailable(method, instance);
       const satisfied = configuredMethods.includes(method) && available;
@@ -142,23 +147,18 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       }
 
       return {
-        // Pre-ticked only for a factor that answers a step on its own; a mobile-only one does
-        // not, however configured it is.
-        checked:
-          selected.includes(method) ||
-          (disabled && satisfied && isDesktopDrivableMethod(method)),
+        checked: !disabled && selected.includes(method),
         disabled,
         badge,
         hint,
         locked,
       };
     },
-    [accountConfigured, configuredMethods, setupMethods, selected, instance],
+    [accountConfigured, configuredMethods, setupMethods, source, selected, instance],
   );
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: discardMfaConfiguration,
-    onSettled: onCancel,
+    mutationFn: onCancel,
   });
 
   const toggle = useCallback(
@@ -212,6 +212,8 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     const { checked, disabled, badge, hint, locked } = describeMethod(method);
     // The "Not configurable" section text blames version incompatibility, so a withheld row says it.
     const explained = sectionExplained || locked;
+    let rowBadge: string | undefined;
+    if (explained) rowBadge = badge;
     const row = (
       <FactorSelector
         key={method}
@@ -220,7 +222,7 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
         variant={SelectionItemVariant.Checkbox}
         selected={checked}
         disabled={disabled}
-        badge={explained ? badge : undefined}
+        badge={rowBadge}
         onClick={() => {
           toggle(method);
         }}
@@ -237,6 +239,13 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
     );
   };
 
+  let title = 'Select the MFA method(s) to configure';
+  let description = 'Pick the multi-factor authentication methods you want to set up.';
+  if (isLocationAware && isPresent(location)) {
+    title = 'Set up missing MFA methods';
+    description = `Choose an MFA method required by your administrator that you haven't configured yet. You can set up just the method needed to access ${location.name} or configure additional methods for future use.`;
+  }
+
   return (
     <FullPage
       id="configure-select-methods-step"
@@ -244,23 +253,12 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
       hideScrollContainer
       withControls
     >
-      <FullPageTitle
-        title={
-          isLocationAware ? 'Configure MFA' : 'Select the MFA method(s) to configure'
-        }
-      />
+      <FullPageTitle title={title} />
       <p className="description">
-        {isLocationAware && isPresent(location) ? (
-          <>
-            <span>{`For additional security, your company has introduced new access requirements for ${location.name}. The setup is simple and should only take a few minutes.`}</span>
-            <span>{`If multiple authentication options are available, you can choose your preferred method below. Otherwise, simply start the setup process to get access to the location.`}</span>
-          </>
-        ) : (
-          <span>{`Pick the multi-factor authentication methods you want to set up.`}</span>
-        )}
+        <span>{description}</span>
       </p>
       <div className={clsx('steps', { sections: !isLocationAware })}>
-        {isLocationAware ? (
+        {isLocationAware &&
           groups.map((methods, index) => (
             // Index as key: Core owns the order and it never reorders here.
             <div className="step" key={index}>
@@ -273,8 +271,8 @@ export const ConfigureSelectMethodsStep = ({ onCancel }: Props) => {
                 {methods.map((method) => renderMethod(method, true))}
               </div>
             </div>
-          ))
-        ) : (
+          ))}
+        {!isLocationAware && (
           <>
             {availableMethods.length > 0 && (
               <div className="step">

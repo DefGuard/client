@@ -55,10 +55,9 @@ type StoreValues = {
   authorized: boolean;
   /** Issued for the account's first factor only, so an empty list is an ordinary success. */
   recoveryCodes: string[];
-  /** Which entry point opened this flow. Recorded for later, nothing branches on it yet. */
   source: ConfigureFactorsSourceValue | null;
-  /** The location that sent the user here, so the screens can speak to what that location
-   *  needs. Null when the flow was not started from a location. */
+  /** Speaks to what the location needs and sends a cancel back to its instance. Null when the
+   *  flow was not started from a location. */
   location: LocationInfo | null;
 };
 
@@ -69,6 +68,7 @@ type FlowState = Pick<
   | 'completedMethods'
   | 'selectedMethods'
   | 'recoveryCodes'
+  | 'source'
 >;
 
 /** Picked factors still to set up, in wizard order. */
@@ -81,6 +81,7 @@ const pendingMethods = (state: FlowState): MfaMethodValue[] =>
         method,
         state.configuredMethods,
         setupMethodsOf(state.instance),
+        state.source,
       ),
   ) ?? [];
 
@@ -272,7 +273,7 @@ export const startMfaConfiguration = async (
   // Only pre-ticks, the user still confirms in the selection step.
   const { configuredMethods } = useConfigureMfaStore.getState();
   const initialSelection = preselectedMethods.filter((method) =>
-    isMfaFactorOfferable(method, configuredMethods, setupMethodsOf(instance)),
+    isMfaFactorOfferable(method, configuredMethods, setupMethodsOf(instance), source),
   );
   useConfigureMfaStore.setState({ initialSelection });
 };

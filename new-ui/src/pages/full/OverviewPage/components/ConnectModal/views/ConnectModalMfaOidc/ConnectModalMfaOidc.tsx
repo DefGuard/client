@@ -5,8 +5,10 @@ import { useShallow } from 'zustand/shallow';
 import { Button } from '../../../../../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../../../../../shared/components/Button/types';
 import { Controls } from '../../../../../../../shared/components/Controls/Controls';
+import { Divider } from '../../../../../../../shared/components/Divider/Divider';
 import { ExternalProviderButton } from '../../../../../../../shared/components/ExternalProviderButton/ExternalProviderButton';
 import { getAppConfigQueryOptions } from '../../../../../../../shared/rust-api/query';
+import { ThemeSpacing } from '../../../../../../../shared/types';
 import {
   findOpenIdProvider,
   openIdProviderName,
@@ -75,35 +77,37 @@ export const ConnectModalMfaOidc = () => {
         </p>
       )}
       {screen === 'error' && <p className="view-description">{errorMessage}</p>}
-      <Controls>
-        {showOtherMethods && (
-          <Button
-            containerProps={{ className: 'other-methods' }}
-            variant={ButtonVariant.Secondary}
-            text="Other methods"
-            onClick={() => {
-              useConnectModal.getState().setView(ConnectModalView.MfaSettings);
-            }}
-          />
-        )}
-        {screen !== 'error' && (
-          <ExternalProviderButton
-            className="primary-action"
-            text={`Continue with ${providerName}`}
-            provider={findOpenIdProvider(instance) ?? 'custom'}
-            loading={screen === 'polling' || isStarting}
-            onClick={handleStart}
-          />
-        )}
-        {screen === 'error' && (
-          <Button
-            containerProps={{ className: 'primary-action' }}
-            text="Try again"
-            variant={ButtonVariant.Primary}
-            onClick={() => setScreen('idle')}
-          />
-        )}
-      </Controls>
+      {screen !== 'error' && (
+        <ExternalProviderButton
+          className="primary-action"
+          text={`Continue with ${providerName}`}
+          provider={findOpenIdProvider(instance) ?? 'custom'}
+          loading={screen === 'polling' || isStarting}
+          onClick={handleStart}
+        />
+      )}
+      {screen === 'error' && (
+        <Button
+          containerProps={{ className: 'primary-action' }}
+          text="Try again"
+          variant={ButtonVariant.Primary}
+          onClick={() => setScreen('idle')}
+        />
+      )}
+      {showOtherMethods && (
+        <>
+          <Divider spacing={ThemeSpacing.Lg} />
+          <Controls>
+            <Button
+              variant={ButtonVariant.Secondary}
+              text="Other methods"
+              onClick={() => {
+                useConnectModal.getState().setView(ConnectModalView.MfaSettings);
+              }}
+            />
+          </Controls>
+        </>
+      )}
     </div>
   );
 };
