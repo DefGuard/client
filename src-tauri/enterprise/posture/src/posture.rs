@@ -71,6 +71,7 @@ pub async fn request_posture_authorization(
         pubkey: device_pubkey,
         device_posture_data: Some(posture_data),
         token: Some(token),
+        possession_response: None,
     };
 
     let url = Url::parse(proxy_url)
@@ -89,6 +90,11 @@ pub async fn request_posture_authorization(
                 .json()
                 .await
                 .map_err(|e| Error::HttpError(e.to_string()))?;
+            if body.possession_challenge.is_some() {
+                return Err(Error::PostureCheckFailed(
+                    "Device identity possession challenge is not supported yet".into(),
+                ));
+            }
             info!("Posture check approved for location {location_id}");
             Ok((!body.preshared_key.is_empty()).then_some(body.preshared_key))
         }
