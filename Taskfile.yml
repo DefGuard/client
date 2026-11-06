@@ -1,5 +1,8 @@
 version: '3'
 
+env:
+  SQLX_OFFLINE: 'true'
+
 includes:
   rust:
     taskfile: ./src-tauri/Taskfile.yml
@@ -44,6 +47,28 @@ tasks:
     desc: Lint new-ui with biome, prettier, stylelint and tsc.
     dir: new-ui
     cmd: pnpm lint
+
+  test-rust:
+    desc: Run the Rust workspace tests in src-tauri with nextest. Extra args go after --.
+    dir: src-tauri
+    cmd: cargo nextest run --workspace --no-fail-fast {{.CLI_ARGS}}
+
+  test-ui:
+    desc: Run the UI unit tests in new-ui with vitest. Extra args go after --.
+    dir: new-ui
+    cmd: pnpm test {{.CLI_ARGS}}
+
+  query-data:
+    desc: Recreate a throwaway sqlite db from migrations and regenerate the sqlx offline query data in src-tauri/.sqlx.
+    dir: src-tauri
+    env:
+      DATABASE_URL: sqlite:{{.TASKFILE_DIR}}/src-tauri/query-data.db
+      SQLX_OFFLINE: 'false'
+    cmds:
+      - sqlx database drop -y
+      - sqlx database create
+      - sqlx migrate run --source migrations
+      - cargo sqlx prepare --workspace -- --workspace --all-targets --all-features
 
   build:
     desc: Build the frontend and the Tauri bundle (unsigned MSI on Windows).

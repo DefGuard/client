@@ -1,12 +1,14 @@
-use std::fmt;
 #[cfg(not(target_os = "macos"))]
 use std::str::FromStr;
+use std::{collections::HashMap, fmt};
 
 use defguard_wireguard_rs::net::IpAddrMask;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::{key::Key, peer::Peer, InterfaceConfiguration};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExecutor};
+use sqlx::{
+    prelude::Type, query, query_as, query_scalar, types::Json, SqliteConnection, SqliteExecutor,
+};
 
 #[cfg(not(target_os = "macos"))]
 use super::wireguard_keys::WireguardKeys;
@@ -214,6 +216,8 @@ pub struct Location<I = NoId> {
     /// application settings.
     #[serde(default)]
     pub client_mtu: Option<u32>,
+    #[serde(default)]
+    pub auto_connect: bool,
 }
 
 impl fmt::Display for Location<Id> {
@@ -243,7 +247,7 @@ impl Location<Id> {
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
             mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
-            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\", auto_connect \
             FROM location WHERE service_location_mode <= $1 \
             ORDER BY name ASC",
             max_service_location_mode
@@ -282,7 +286,7 @@ impl Location<Id> {
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\", \
             mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
-            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\", auto_connect \
             FROM location WHERE name = $1 AND service_location_mode <= $2 ORDER BY name ASC",
             name,
             max,
@@ -301,8 +305,8 @@ impl Location<Id> {
             endpoint = $5, allowed_ips = $6, dns = $7, network_id = $8, route_all_traffic = $9, \
             keepalive_interval = $10, location_mfa_mode = $11, service_location_mode = $12, \
             mfa_method = $13, posture_check_required = $14, mfa_steps = $15, \
-            mfa_step_plan = $16, client_mtu = $17 \
-            WHERE id = $18",
+            mfa_step_plan = $16, client_mtu = $17, auto_connect = $18 \
+            WHERE id = $19",
             self.instance_id,
             self.name,
             self.address,
@@ -320,6 +324,7 @@ impl Location<Id> {
             self.mfa_steps,
             self.mfa_step_plan,
             self.client_mtu,
+            self.auto_connect,
             self.id,
         )
         .execute(executor)
@@ -339,7 +344,7 @@ impl Location<Id> {
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
             mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
-            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\", auto_connect \
             FROM location WHERE id = $1",
             location_id
         )
@@ -364,7 +369,7 @@ impl Location<Id> {
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
             mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
-            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\", auto_connect \
             FROM location WHERE instance_id = $1 AND service_location_mode <= $2 \
             ORDER BY name ASC",
             instance_id,
@@ -385,7 +390,7 @@ impl Location<Id> {
             location_mfa_mode \"location_mfa_mode: LocationMfaMode\", \
             service_location_mode \"service_location_mode: ServiceLocationMode\",
             mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", \
-            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" \
+            mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\", auto_connect \
             FROM location WHERE pubkey = $1",
             pubkey
         )
@@ -582,18 +587,42 @@ impl Location<Id> {
         Ok(())
     }
 
+    pub async fn set_auto_connect(
+        pool: &DbPool,
+        location_id: Id,
+        auto_connect: bool,
+    ) -> Result<(), Error> {
+        // immediate lock so two concurrent requests can't both pass the all traffic check
+        let mut transaction = pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut location = Self::find_by_id(&mut *transaction, location_id)
+            .await?
+            .ok_or(Error::NotFound)?;
+        if auto_connect {
+            let context = AutoConnectContext::load(&mut transaction).await?;
+            if let Some(block) = context.block(&location) {
+                return Err(Error::InvalidInput(block.reason().into()));
+            }
+        }
+        location.auto_connect = auto_connect;
+        location.save(&mut *transaction).await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
     /// Persist the route-all-traffic flag for a location, rejecting the update if
     /// the owning instance's [`ClientTrafficPolicy`] forbids the requested value.
+    /// Returns whether auto-connect was turned off to avoid an all traffic collision.
     pub async fn update_routing(
         pool: &DbPool,
         location_id: Id,
         route_all_traffic: bool,
-    ) -> Result<(), Error> {
-        let mut location = Self::find_by_id(pool, location_id)
+    ) -> Result<bool, Error> {
+        let mut transaction = pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut location = Self::find_by_id(&mut *transaction, location_id)
             .await?
             .ok_or(Error::NotFound)?;
 
-        let instance = Instance::find_by_id(pool, location.instance_id)
+        let instance = Instance::find_by_id(&mut *transaction, location.instance_id)
             .await?
             .ok_or(Error::NotFound)?;
 
@@ -613,8 +642,21 @@ impl Location<Id> {
         }
 
         location.route_all_traffic = route_all_traffic;
-        location.save(pool).await?;
-        Ok(())
+        let auto_connect_disabled = location.auto_connect
+            && AutoConnectContext::load(&mut transaction)
+                .await?
+                .block(&location)
+                .is_some();
+        if auto_connect_disabled {
+            info!(
+                "Location {location} now routes all traffic while another all traffic location \
+                is set to auto-connect, disabling its auto-connect"
+            );
+            location.auto_connect = false;
+        }
+        location.save(&mut *transaction).await?;
+        transaction.commit().await?;
+        Ok(auto_connect_disabled)
     }
 
     /// Returns a filter value that can be used in SQL queries like `service_location_mode <= ?`
@@ -639,8 +681,9 @@ impl Location<NoId> {
             "INSERT INTO location (instance_id, name, address, pubkey, endpoint, allowed_ips, \
             dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode, \
             service_location_mode, mfa_method, posture_check_required, mfa_steps, \
-            mfa_step_plan, client_mtu) \
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) \
+            mfa_step_plan, client_mtu, auto_connect) \
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, \
+            $18) \
             RETURNING id \"id!\"",
             self.instance_id,
             self.name,
@@ -659,6 +702,7 @@ impl Location<NoId> {
             self.mfa_steps,
             self.mfa_step_plan,
             self.client_mtu,
+            self.auto_connect,
         )
         .fetch_one(executor)
         .await?;
@@ -682,6 +726,7 @@ impl Location<NoId> {
             mfa_steps: self.mfa_steps,
             mfa_step_plan: self.mfa_step_plan,
             client_mtu: self.client_mtu,
+            auto_connect: self.auto_connect,
         })
     }
 }
@@ -696,6 +741,101 @@ impl<I> Location<I> {
     pub fn is_service_location(&self) -> bool {
         self.service_location_mode != ServiceLocationMode::Disabled
             && self.location_mfa_mode == LocationMfaMode::Disabled
+    }
+
+    /// Matches the routes `routed_networks` installs, so default routes in `allowed_ips` count.
+    /// Service locations ignore `route_all_traffic`, the daemon routes their `allowed_ips` as sent.
+    pub fn routes_all_traffic(&self, policy: &ClientTrafficPolicy) -> bool {
+        let forced = !self.is_service_location()
+            && match policy {
+                ClientTrafficPolicy::ForceAllTraffic => true,
+                ClientTrafficPolicy::DisableAllTraffic => false,
+                ClientTrafficPolicy::None => self.route_all_traffic,
+            };
+        crate::routed_networks(&self.address, &self.allowed_ips, forced)
+            .iter()
+            .any(|network| network.cidr == 0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoConnectBlock {
+    Mfa,
+    ServiceLocation,
+    AllTrafficTaken,
+}
+
+impl AutoConnectBlock {
+    #[must_use]
+    pub fn reason(self) -> &'static str {
+        match self {
+            Self::Mfa => "Locations with MFA can't auto-connect.",
+            Self::ServiceLocation => "Service locations can't auto-connect.",
+            Self::AllTrafficTaken => {
+                "Another all traffic location is already set to auto-connect or managed by the \
+                service."
+            }
+        }
+    }
+}
+
+/// Snapshot of all instances' locations, since all traffic routes collide machine-wide.
+pub struct AutoConnectContext {
+    policies: HashMap<Id, ClientTrafficPolicy>,
+    locations: Vec<Location<Id>>,
+}
+
+impl AutoConnectContext {
+    pub async fn load(connection: &mut SqliteConnection) -> Result<Self, Error> {
+        let policies = Instance::all(&mut *connection)
+            .await?
+            .into_iter()
+            .map(|instance| (instance.id, instance.client_traffic_policy))
+            .collect();
+        let locations = Location::all(&mut *connection, true).await?;
+        Ok(Self {
+            policies,
+            locations,
+        })
+    }
+
+    #[must_use]
+    pub fn locations(&self) -> &[Location<Id>] {
+        &self.locations
+    }
+
+    #[must_use]
+    pub fn routes_all_traffic(&self, location: &Location<Id>) -> bool {
+        self.policies
+            .get(&location.instance_id)
+            .is_some_and(|policy| location.routes_all_traffic(policy))
+    }
+
+    /// Checks `location` as given, so callers can pass unsaved changes.
+    #[must_use]
+    pub fn block(&self, location: &Location<Id>) -> Option<AutoConnectBlock> {
+        if location.mfa_enabled() {
+            return Some(AutoConnectBlock::Mfa);
+        }
+        if location.service_location_mode != ServiceLocationMode::Disabled {
+            return Some(AutoConnectBlock::ServiceLocation);
+        }
+        let taken = self.routes_all_traffic(location)
+            && self.locations.iter().any(|other| {
+                other.id != location.id
+                    && (other.auto_connect || other.is_service_location())
+                    && self.routes_all_traffic(other)
+            });
+        taken.then_some(AutoConnectBlock::AllTrafficTaken)
+    }
+
+    /// Locations set to auto-connect that can't, which must never stay saved.
+    pub fn invalid(&self) -> impl Iterator<Item = (&Location<Id>, AutoConnectBlock)> {
+        self.locations
+            .iter()
+            .filter(|location| location.auto_connect)
+            .filter_map(|location| self.block(location).map(|block| (location, block)))
     }
 }
 
@@ -720,6 +860,7 @@ impl From<Location<Id>> for Location {
             mfa_steps: location.mfa_steps,
             mfa_step_plan: location.mfa_step_plan,
             client_mtu: location.client_mtu,
+            auto_connect: location.auto_connect,
         }
     }
 }
@@ -765,7 +906,7 @@ mod tests {
             address: "10.0.0.2/24".into(),
             pubkey: "pk".into(),
             endpoint: "1.2.3.4:51820".into(),
-            allowed_ips: "0.0.0.0/0".into(),
+            allowed_ips: "10.0.0.0/24".into(),
             dns: None,
             route_all_traffic: false,
             keepalive_interval: 25,
@@ -776,6 +917,7 @@ mod tests {
             mfa_steps: Default::default(),
             mfa_step_plan: Default::default(),
             client_mtu: None,
+            auto_connect: false,
         }
     }
 
@@ -851,6 +993,366 @@ mod tests {
             .unwrap()
             .expect("location should exist");
         assert_eq!(found.client_mtu, None);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_auto_connect_round_trip(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id).save(&pool).await.unwrap();
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert!(!found.auto_connect);
+
+        location.auto_connect = true;
+        location.save(&pool).await.unwrap();
+        let mut found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert!(found.auto_connect);
+
+        found.name = "renamed".into();
+        found.save(&pool).await.unwrap();
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert!(found.auto_connect);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let location = new_location(instance.id).save(&pool).await.unwrap();
+
+        Location::set_auto_connect(&pool, location.id, true)
+            .await
+            .unwrap();
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert!(found.auto_connect);
+
+        Location::set_auto_connect(&pool, location.id, false)
+            .await
+            .unwrap();
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert!(!found.auto_connect);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_rejects_mfa_location(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.location_mfa_mode = LocationMfaMode::Internal;
+        let location = location.save(&pool).await.unwrap();
+
+        let result = Location::set_auto_connect(&pool, location.id, true).await;
+        assert!(matches!(result, Err(Error::InvalidInput(_))));
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert!(!found.auto_connect);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_allows_one_all_traffic_location(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut first = new_location(instance.id);
+        first.route_all_traffic = true;
+        let first = first.save(&pool).await.unwrap();
+        let mut second = new_location(instance.id);
+        second.network_id = 2;
+        second.route_all_traffic = true;
+        let second = second.save(&pool).await.unwrap();
+        let mut predefined = new_location(instance.id);
+        predefined.network_id = 3;
+        let predefined = predefined.save(&pool).await.unwrap();
+
+        Location::set_auto_connect(&pool, first.id, true)
+            .await
+            .unwrap();
+        let result = Location::set_auto_connect(&pool, second.id, true).await;
+        assert!(matches!(result, Err(Error::InvalidInput(_))));
+        Location::set_auto_connect(&pool, predefined.id, true)
+            .await
+            .unwrap();
+
+        Location::set_auto_connect(&pool, first.id, false)
+            .await
+            .unwrap();
+        Location::set_auto_connect(&pool, second.id, true)
+            .await
+            .unwrap();
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_rejects_all_traffic_with_service_location(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut service = new_location(instance.id);
+        service.allowed_ips = "0.0.0.0/0".into();
+        service.service_location_mode = ServiceLocationMode::AlwaysOn;
+        let service = service.save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.network_id = 2;
+        location.route_all_traffic = true;
+        let location = location.save(&pool).await.unwrap();
+
+        let result = Location::set_auto_connect(&pool, location.id, true).await;
+        assert!(matches!(result, Err(Error::InvalidInput(_))));
+        let result = Location::set_auto_connect(&pool, service.id, true).await;
+        assert!(matches!(result, Err(Error::InvalidInput(_))));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_allows_all_traffic_beside_predefined_service_location(
+        pool: SqlitePool,
+    ) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut service = new_location(instance.id);
+        service.service_location_mode = ServiceLocationMode::AlwaysOn;
+        service.save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.network_id = 2;
+        location.route_all_traffic = true;
+        let location = location.save(&pool).await.unwrap();
+
+        Location::set_auto_connect(&pool, location.id, true)
+            .await
+            .unwrap();
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_force_all_traffic_allows_one_location(pool: SqlitePool) {
+        let mut instance = new_instance();
+        instance.client_traffic_policy = ClientTrafficPolicy::ForceAllTraffic;
+        let instance = instance.save(&pool).await.unwrap();
+        let first = new_location(instance.id).save(&pool).await.unwrap();
+        let mut second = new_location(instance.id);
+        second.network_id = 2;
+        let second = second.save(&pool).await.unwrap();
+
+        Location::set_auto_connect(&pool, first.id, true)
+            .await
+            .unwrap();
+        let result = Location::set_auto_connect(&pool, second.id, true).await;
+        assert!(matches!(result, Err(Error::InvalidInput(_))));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_rejects_second_default_route_location(pool: SqlitePool) {
+        for policy in [
+            ClientTrafficPolicy::None,
+            ClientTrafficPolicy::DisableAllTraffic,
+        ] {
+            let mut instance = new_instance();
+            instance.name = format!("{policy:?}");
+            instance.uuid = format!("uuid-{policy:?}");
+            instance.client_traffic_policy = policy;
+            let instance = instance.save(&pool).await.unwrap();
+            let mut first = new_location(instance.id);
+            first.allowed_ips = "0.0.0.0/0".into();
+            let first = first.save(&pool).await.unwrap();
+            let mut second = new_location(instance.id);
+            second.network_id = 2;
+            second.allowed_ips = "10.0.0.0/24, 0.0.0.0/0".into();
+            let second = second.save(&pool).await.unwrap();
+
+            Location::set_auto_connect(&pool, first.id, true)
+                .await
+                .unwrap();
+            let result = Location::set_auto_connect(&pool, second.id, true).await;
+            assert!(matches!(result, Err(Error::InvalidInput(_))));
+            Location::set_auto_connect(&pool, first.id, false)
+                .await
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn test_routes_all_traffic_counts_default_route_in_allowed_ips() {
+        let location = |allowed_ips: &str| {
+            let mut location = new_location(1);
+            location.allowed_ips = allowed_ips.into();
+            location
+        };
+        let predefined = location("10.0.0.0/24");
+        let ipv4_default = location("10.0.0.0/24, 0.0.0.0/0");
+        let ipv6_default = location("::/0");
+
+        for policy in [
+            ClientTrafficPolicy::None,
+            ClientTrafficPolicy::DisableAllTraffic,
+        ] {
+            assert!(!predefined.routes_all_traffic(&policy));
+            assert!(ipv4_default.routes_all_traffic(&policy));
+            assert!(ipv6_default.routes_all_traffic(&policy));
+        }
+        assert!(predefined.routes_all_traffic(&ClientTrafficPolicy::ForceAllTraffic));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_update_routing_disables_colliding_auto_connect(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut first = new_location(instance.id);
+        first.route_all_traffic = true;
+        first.auto_connect = true;
+        let first = first.save(&pool).await.unwrap();
+        let mut second = new_location(instance.id);
+        second.network_id = 2;
+        second.auto_connect = true;
+        let second = second.save(&pool).await.unwrap();
+
+        let auto_connect_disabled = Location::update_routing(&pool, second.id, true)
+            .await
+            .unwrap();
+        assert!(auto_connect_disabled);
+
+        let found = |id| Location::find_by_id(&pool, id);
+        assert!(found(first.id).await.unwrap().unwrap().auto_connect);
+        let second = found(second.id).await.unwrap().unwrap();
+        assert!(second.route_all_traffic);
+        assert!(!second.auto_connect);
+        assert_auto_connect_valid(&pool).await;
+    }
+
+    async fn assert_auto_connect_valid(pool: &SqlitePool) {
+        let mut connection = pool.acquire().await.unwrap();
+        let context = AutoConnectContext::load(&mut connection).await.unwrap();
+        let invalid = context
+            .invalid()
+            .map(|(location, block)| (location.name.clone(), block))
+            .collect::<Vec<_>>();
+        assert!(invalid.is_empty(), "invalid auto-connect: {invalid:?}");
+    }
+
+    async fn save_other_instance(pool: &SqlitePool) -> Instance<Id> {
+        let mut instance = new_instance();
+        instance.name = "other".into();
+        instance.uuid = "uuid-2".into();
+        instance.save(pool).await.unwrap()
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_allows_one_all_traffic_location_across_instances(
+        pool: SqlitePool,
+    ) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let other_instance = save_other_instance(&pool).await;
+        let mut first = new_location(instance.id);
+        first.route_all_traffic = true;
+        let first = first.save(&pool).await.unwrap();
+        let mut second = new_location(other_instance.id);
+        second.route_all_traffic = true;
+        let second = second.save(&pool).await.unwrap();
+
+        Location::set_auto_connect(&pool, first.id, true)
+            .await
+            .unwrap();
+        let result = Location::set_auto_connect(&pool, second.id, true).await;
+        assert!(matches!(result, Err(Error::InvalidInput(_))));
+        assert_auto_connect_valid(&pool).await;
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_rejects_all_traffic_with_other_instance_service_location(
+        pool: SqlitePool,
+    ) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let other_instance = save_other_instance(&pool).await;
+        let mut service = new_location(other_instance.id);
+        service.allowed_ips = "0.0.0.0/0".into();
+        service.service_location_mode = ServiceLocationMode::AlwaysOn;
+        service.save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.route_all_traffic = true;
+        let location = location.save(&pool).await.unwrap();
+
+        let result = Location::set_auto_connect(&pool, location.id, true).await;
+        assert!(matches!(result, Err(Error::InvalidInput(_))));
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_update_routing_disables_auto_connect_beside_all_traffic_service_location(
+        pool: SqlitePool,
+    ) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut service = new_location(instance.id);
+        service.allowed_ips = "::/0".into();
+        service.service_location_mode = ServiceLocationMode::AlwaysOn;
+        service.save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.network_id = 2;
+        location.auto_connect = true;
+        let location = location.save(&pool).await.unwrap();
+
+        let auto_connect_disabled = Location::update_routing(&pool, location.id, true)
+            .await
+            .unwrap();
+
+        assert!(auto_connect_disabled);
+        assert_auto_connect_valid(&pool).await;
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_update_routing_keeps_auto_connect_without_collision(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.auto_connect = true;
+        let location = location.save(&pool).await.unwrap();
+
+        let auto_connect_disabled = Location::update_routing(&pool, location.id, true)
+            .await
+            .unwrap();
+
+        assert!(!auto_connect_disabled);
+        let found = Location::find_by_id(&pool, location.id)
+            .await
+            .unwrap()
+            .expect("location should exist");
+        assert!(found.auto_connect);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_set_auto_connect_off_ignores_blocks(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut location = new_location(instance.id);
+        location.location_mfa_mode = LocationMfaMode::Internal;
+        location.auto_connect = true;
+        let location = location.save(&pool).await.unwrap();
+
+        Location::set_auto_connect(&pool, location.id, false)
+            .await
+            .unwrap();
+
+        assert_auto_connect_valid(&pool).await;
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_concurrent_all_traffic_requests_keep_one(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+        let mut ids = Vec::new();
+        for network_id in 1..=2 {
+            let mut location = new_location(instance.id);
+            location.network_id = network_id;
+            location.route_all_traffic = true;
+            ids.push(location.save(&pool).await.unwrap().id);
+        }
+
+        let (first, second) = tokio::join!(
+            Location::set_auto_connect(&pool, ids[0], true),
+            Location::set_auto_connect(&pool, ids[1], true),
+        );
+
+        assert_eq!(usize::from(first.is_ok()) + usize::from(second.is_ok()), 1);
+        assert_auto_connect_valid(&pool).await;
     }
 
     #[test]

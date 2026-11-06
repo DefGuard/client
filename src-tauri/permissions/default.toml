@@ -60,6 +60,7 @@ commands.allow = [
   "take_pending_add_instance",
   "get_platform_header",
   "set_location_mfa_step_plan",
+  "set_location_auto_connect",
   "open_tray_window",
   "open_full_view_window",
   "swap_to_tray",

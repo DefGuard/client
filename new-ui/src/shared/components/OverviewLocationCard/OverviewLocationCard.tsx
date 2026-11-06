@@ -11,6 +11,7 @@ import {
 import { useConnectModal } from '../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import { useConfigureFactorsScreen } from '../../hooks/useConfigureFactorsScreen';
 import { useConnectionAbility } from '../../hooks/useConnectionAbility';
+import { useUpdateLocationRouting } from '../../hooks/useUpdateLocationRouting';
 import { api } from '../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../rust-api/query';
 import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
@@ -41,12 +42,7 @@ interface Props {
 export const OverviewLocationCard = ({ location, instance }: Props) => {
   const navigate = useNavigate();
   const { data: appConfig } = useQuery(getAppConfigQueryOptions);
-  const { mutate: updateRouting } = useMutation({
-    mutationFn: api.updateLocationRouting,
-    meta: {
-      invalidate: ['locations'],
-    },
-  });
+  const { mutate: updateRouting } = useUpdateLocationRouting(location.name);
 
   const { mutate: connect, isPending: isConnecting } = useMutation({
     mutationFn: api.connect,

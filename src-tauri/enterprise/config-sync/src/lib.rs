@@ -26,6 +26,7 @@ use sqlx::{Sqlite, Transaction};
 
 use crate::commands::{
     disable_enterprise_features, do_update_instance, sync_service_locations_best_effort,
+    InstanceUpdate,
 };
 
 static POLLING_ENDPOINT: &str = "/api/v1/poll";
@@ -47,6 +48,7 @@ pub enum PollInstanceResult {
     },
     Updated {
         locations_changed: bool,
+        auto_connect_disabled: Vec<String>,
         version_mismatch: Option<VersionMismatchPayload>,
     },
     ChangedWhileActive {
@@ -261,8 +263,10 @@ async fn apply_fetched_config(
         instance.name, instance.id,
     );
     instance.mfa_contract = mfa_contract;
-    let locations_changed =
-        do_update_instance(transaction, instance, device_config.clone()).await?;
+    let InstanceUpdate {
+        locations_changed,
+        auto_connect_disabled,
+    } = do_update_instance(transaction, instance, device_config.clone()).await?;
     info!(
         "Updated instance {}({}) configuration based on core's response",
         instance.name, instance.id
@@ -270,6 +274,7 @@ async fn apply_fetched_config(
 
     Ok(PollInstanceResult::Updated {
         locations_changed,
+        auto_connect_disabled,
         version_mismatch,
     })
 }

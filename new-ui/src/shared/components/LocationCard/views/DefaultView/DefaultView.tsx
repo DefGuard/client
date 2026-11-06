@@ -1,6 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
 import { Fragment } from 'react/jsx-runtime';
-import { api } from '../../../../rust-api/api';
+import { useUpdateLocationRouting } from '../../../../hooks/useUpdateLocationRouting';
 import { ClientTrafficPolicy } from '../../../../rust-api/types';
 import { ThemeSpacing } from '../../../../types';
 import { shouldStartMfa } from '../../../../utils/mfa';
@@ -15,12 +14,7 @@ import { LocationCardViews } from '../../context/types';
 export const DefaultView = () => {
   const { location, instance, setView, connectionAbility } = useLocationCardContext();
 
-  const { mutate: updateRouting } = useMutation({
-    mutationFn: api.updateLocationRouting,
-    meta: {
-      invalidate: ['locations'],
-    },
-  });
+  const { mutate: updateRouting } = useUpdateLocationRouting(location.name);
 
   return (
     <div className="location-view-default">

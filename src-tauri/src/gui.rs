@@ -26,6 +26,7 @@ use crate::utils::sync_connections;
 use crate::{
     app_config::AppConfig,
     appstate::AppState,
+    auto_connect::connect_auto_connect_locations,
     autostart,
     commands::*,
     database::{
@@ -158,6 +159,11 @@ async fn startup(app_handle: &AppHandle) {
         Err(err) => error!("Failed to configure system tray: {err}"),
     }
     debug!("Tray menu has been re-generated successfully.");
+
+    let auto_connect_handle = app_handle.clone();
+    async_runtime::spawn(async move {
+        connect_auto_connect_locations(&auto_connect_handle).await;
+    });
 }
 
 pub fn run_app() {
@@ -198,6 +204,7 @@ pub fn run_app() {
             get_platform_header,
             get_posture_data,
             set_location_mfa_step_plan,
+            set_location_auto_connect,
             open_tray_window,
             open_full_view_window,
             swap_to_tray,

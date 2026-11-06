@@ -82,6 +82,8 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Pipes",
     # HANDLE & file functions
     "Win32_System_IO",
+    # File identity (GetFileInformationByHandle)
+    "Win32_Storage_FileSystem",
     "Win32_System_Threading",
     # Network address change notifications (NotifyAddrChange)
     "Win32_NetworkManagement_IpHelper",

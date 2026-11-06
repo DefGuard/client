@@ -1,0 +1,33 @@
+.auto-connect-section {
+  display: flex;
+  flex-flow: column;
+  align-items: stretch;
+  justify-content: flex-start;
+
+  & > .title {
+    font: var(--t-body-sm-500);
+    color: var(--fg-white-100);
+  }
+
+  & > .description {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-70);
+
+    & > span {
+      color: var(--fg-white-100);
+    }
+  }
+
+  & > .hint {
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-70);
+  }
+
+  & > .instances {
+    display: flex;
+    flex-flow: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    row-gap: var(--spacing-lg);
+  }
+}

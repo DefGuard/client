@@ -4,6 +4,7 @@
 #[cfg(target_os = "macos")]
 pub mod apple;
 pub mod appstate;
+pub mod auto_connect;
 pub mod autostart;
 pub mod commands;
 pub mod events;
