@@ -1,6 +1,9 @@
 use defguard_client_proto::defguard::{
     client_types::{EnrollmentStartRequest, InstanceInfoRequest},
-    device_identity::v1::{attestation_request, AttestationRequest, CredentialChallenge},
+    device_identity::v1::{
+        attestation_request, AttestationRequest, AttestationStatus, CredentialChallenge,
+        IdentityErrorCode, IdentityState,
+    },
 };
 use prost::Message;
 
@@ -28,6 +31,23 @@ fn test_device_identity_attestation_requests_roundtrip_json_and_protobuf() {
             request
         );
     }
+}
+
+#[test]
+fn test_device_identity_attestation_failed_roundtrip_json_and_protobuf() {
+    let state = IdentityState {
+        identity_id: "identity".into(),
+        attestation_status: AttestationStatus::AttestationFailed as i32,
+        error: Some(IdentityErrorCode::InvalidEvidence as i32),
+        ..Default::default()
+    };
+    let json = serde_json::to_vec(&state).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<IdentityState>(&json).unwrap(),
+        state
+    );
+    let binary = state.encode_to_vec();
+    assert_eq!(IdentityState::decode(binary.as_slice()).unwrap(), state);
 }
 
 #[test]
