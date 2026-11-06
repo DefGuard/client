@@ -8,10 +8,10 @@ import { api } from '../../../rust-api/api';
 import {
   isConnectFailure,
   isMfaPostureError,
+  isMobileClientOutdated,
   isServiceUnavailable,
   isTimeout,
   mfaErrorMessage,
-  parseMfaError,
 } from '../../../rust-api/mfaError';
 import { getInstancesQueryOptions } from '../../../rust-api/query';
 import type {
@@ -39,6 +39,8 @@ type Options = {
   onConnected?: () => void;
   onPostureError?: (message?: string) => void;
   onConnectionError?: (message?: string, icon?: IconKindValue) => void;
+  // replaces the other error callbacks and all error state
+  onFailure?: (err: unknown) => void;
 };
 
 export const useMfaMobileConnect = (
@@ -51,6 +53,7 @@ export const useMfaMobileConnect = (
     onConnected,
     onPostureError,
     onConnectionError,
+    onFailure,
   }: Options,
 ) => {
   const { data: instances } = useQuery(getInstancesQueryOptions);
@@ -69,12 +72,14 @@ export const useMfaMobileConnect = (
   const onStepAdvancedRef = useRef(onStepAdvanced);
   const setMfaTokenRef = useRef(setMfaToken);
   const onConnectionErrorRef = useRef(onConnectionError);
+  const onFailureRef = useRef(onFailure);
   const instanceId = instance?.id;
 
   onConnectedRef.current = onConnected;
   onStepAdvancedRef.current = onStepAdvanced;
   setMfaTokenRef.current = setMfaToken;
   onConnectionErrorRef.current = onConnectionError;
+  onFailureRef.current = onFailure;
 
   const cleanupListeners = useCallback(() => {
     if (unlistenRef.current !== null) {
@@ -164,7 +169,11 @@ export const useMfaMobileConnect = (
               isTimeout(event.payload.error) || isServiceUnavailable(event.payload.error);
             setTokenData(null);
             if (!retryable) setMfaTokenRef.current(null);
-            if (parseMfaError(event.payload.error)?.type === 'mobile_client_outdated') {
+            if (isPresent(onFailureRef.current)) {
+              onFailureRef.current(event.payload.error);
+              return;
+            }
+            if (isMobileClientOutdated(event.payload.error)) {
               onConnectionErrorRef.current?.(message, IconKind.DisableMfa);
               return;
             }
@@ -199,8 +208,12 @@ export const useMfaMobileConnect = (
           } else if (!isTimeout(e) && !isServiceUnavailable(e)) {
             setMfaTokenRef.current(null);
           }
-          setConnectionError('Failed to start mobile approval. Please try again.');
           void error(`Mobile MFA connect failed for location ${location.id}: ${e}`);
+          if (isPresent(onFailureRef.current)) {
+            onFailureRef.current(e);
+          } else {
+            setConnectionError('Failed to start mobile approval. Please try again.');
+          }
         }
       }
     })();
@@ -226,8 +239,16 @@ export const useMfaMobileConnect = (
   }, [tokenData, instance]);
 
   const start = useCallback(async () => {
+    const failStart = (reason: string) => {
+      if (isPresent(onFailure)) {
+        onFailure(reason);
+      } else {
+        setStartError(reason);
+      }
+    };
+
     if (!instance) {
-      setStartError('Instance not found');
+      failStart('Instance not found');
       return;
     }
 
@@ -258,7 +279,7 @@ export const useMfaMobileConnect = (
       setMfaToken(session.token);
 
       if (!isPresent(session.challenge)) {
-        setStartError('Unsupported response from proxy');
+        failStart('Unsupported response from proxy');
         return;
       }
 
@@ -272,6 +293,10 @@ export const useMfaMobileConnect = (
       void error(`Mobile MFA start failed for location ${location.id}: ${e}`);
       const retryable = isTimeout(e) || isServiceUnavailable(e);
       if (!retryable) setMfaToken(null);
+      if (isPresent(onFailure)) {
+        onFailure(e);
+        return;
+      }
       if (isMfaPostureError(e, location)) {
         onPostureError?.(mfaErrorMessage(e));
         return;
@@ -294,6 +319,7 @@ export const useMfaMobileConnect = (
     setMfaToken,
     onPostureError,
     onConnectionError,
+    onFailure,
   ]);
 
   const reset = useCallback(() => {

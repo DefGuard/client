@@ -20,6 +20,7 @@ import {
 import { ThemeSpacing } from '../../../shared/types';
 import { isPresent } from '../../../shared/utils/isPresent';
 import { useEnrollmentStore } from '../EnrollmentPage/hooks/useEnrollmentStore';
+import { getAddInstanceFailure } from './utils/getAddInstanceFailure';
 
 const formSchema = z.object({
   token: z.string().min(1, 'Required'),
@@ -54,49 +55,36 @@ export const AddInstancePage = () => {
     onSubmit: async ({ value, formApi }) => {
       const result = await enrollmentAddInstance(value);
       if (result.error ?? result.errorKind) {
-        if (result.errorKind === 'network') {
+        void error(
+          `Failed to add instance (${result.errorKind ?? 'unknown'}): ${result.error ?? ''}`,
+        );
+        const failure = getAddInstanceFailure(result, hasInitialValues);
+        if (failure.kind === 'field') {
           formApi.setErrorMap({
-            onSubmit: { fields: { url: 'Invalid URL.' } },
+            onSubmit: { fields: { [failure.field]: failure.message } },
           });
-          return;
+        } else {
+          Snackbar.error(failure.message);
         }
-        if (result.errorKind === 'unauthorized') {
-          formApi.setErrorMap({
-            onSubmit: { fields: { token: 'Invalid token.' } },
-          });
-          return;
-        }
-        if (result.error?.toLowerCase().includes('device name')) {
-          formApi.setErrorMap({
-            onSubmit: { fields: { name: 'Name already used.' } },
-          });
-          return;
-        }
-        void error(`Failed to add instance: ${result.error ?? 'unknown error'}`);
-        Snackbar.error('Communication error, contact administrator.');
         return;
       }
-      if (result.session_id) {
-        await enrollmentCreateDevice(result.session_id, value.name.trim());
+
+      const { session_id, startResponse } = result;
+      if (session_id) {
+        const created = await enrollmentCreateDevice(session_id, value.name.trim());
+        if (created.error) {
+          void error(`Failed to create device: ${created.error}`);
+          Snackbar.error('Failed to create device, contact administrator.');
+          return;
+        }
       }
-      if (
-        result.startResponse &&
-        !result.startResponse.user.enrolled &&
-        result.session_id
-      ) {
-        useEnrollmentStore
-          .getState()
-          .start(result.startResponse, result.session_id, undefined);
-        navigate({
-          to: '/full/enrollment',
-          replace: true,
-        });
-      } else {
-        navigate({
-          to: '/full/overview',
-          replace: true,
-        });
+
+      if (session_id && startResponse && !startResponse.user.enrolled) {
+        useEnrollmentStore.getState().start(startResponse, session_id, undefined);
+        navigate({ to: '/full/enrollment', replace: true });
+        return;
       }
+      navigate({ to: '/full/overview', replace: true });
     },
   });
 

@@ -1,8 +1,10 @@
-#mfa-oidc-view {
-  .actions {
-    .btn,
-    .external-provider-button {
-      width: 100%;
-    }
+#connect-modal #mfa-oidc-view {
+  .primary-action {
+    width: 100%;
+  }
+
+  // the divider above already provides the spacing
+  .controls {
+    padding-top: 0;
   }
 }

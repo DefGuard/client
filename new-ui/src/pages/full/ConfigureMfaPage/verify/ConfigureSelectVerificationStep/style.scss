@@ -1,9 +1,37 @@
 #configure-select-verification-step {
-  .methods {
+  & > .content {
     display: flex;
+    flex: 1 1 auto;
     flex-flow: column;
-    row-gap: var(--spacing-md);
-    width: 100%;
-    padding-bottom: var(--spacing-xl);
+    align-items: center;
+    justify-content: center;
+
+    & > .title {
+      text-align: center;
+      font: var(--t-h4);
+      color: var(--fg-white-100);
+    }
+
+    & > .subtitle {
+      max-width: 380px;
+      text-align: center;
+      font: var(--t-body-sm-400);
+      color: var(--fg-white-70);
+    }
+
+    & > .error {
+      padding-bottom: var(--spacing-xl);
+      text-align: center;
+      font: var(--t-body-sm-400);
+      color: var(--fg-critical);
+    }
+
+    & > .methods {
+      display: flex;
+      flex-flow: column;
+      row-gap: var(--spacing-md);
+      width: 100%;
+      max-width: 296px;
+    }
   }
 }

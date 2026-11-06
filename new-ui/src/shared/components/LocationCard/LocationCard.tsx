@@ -13,7 +13,7 @@ import { LocationCardProvider, useLocationCardContext } from './context/context'
 import { LocationCardViews, type LocationCardViewsValue } from './context/types';
 import { ConnectedView } from './views/ConnectedView/ConnectedView';
 import { DefaultView } from './views/DefaultView/DefaultView';
-import { LocationCardConnectionErrorView } from './views/LocationCardConnectionErrorView/LocationCardConnectionErrorView';
+import { LocationCardErrorView } from './views/LocationCardErrorView/LocationCardErrorView';
 import { LocationCardMfaEmailView } from './views/LocationCardMfaEmailView/LocationCardMfaEmailView';
 import { LocationCardMfaFido2View } from './views/LocationCardMfaFido2View/LocationCardMfaFido2View';
 import { LocationCardMfaMobileView } from './views/LocationCardMfaMobileView/LocationCardMfaMobileView';
@@ -41,7 +41,7 @@ const views: Record<LocationCardViewsValue, ReactNode> = {
   [LocationCardViews.Connecting]: null,
   [LocationCardViews.Connected]: <ConnectedView />,
   [LocationCardViews.PostureCheckFail]: <LocationCardPostureCheckFailView />,
-  [LocationCardViews.ConnectionError]: <LocationCardConnectionErrorView />,
+  [LocationCardViews.Error]: <LocationCardErrorView />,
 };
 
 interface InnerProps {

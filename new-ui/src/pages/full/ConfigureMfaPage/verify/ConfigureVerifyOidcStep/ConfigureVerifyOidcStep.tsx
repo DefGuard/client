@@ -12,7 +12,7 @@ import { useLeaveVerification } from '../../hooks/useLeaveVerification';
 import { useConfigureVerifyOidc } from './useConfigureVerifyOidc';
 
 interface Props {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
   onSessionExpired: () => void;
 }
 

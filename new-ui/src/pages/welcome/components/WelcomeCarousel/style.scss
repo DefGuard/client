@@ -20,11 +20,18 @@
 
     img,
     video {
+      flex-shrink: 0;
       width: 100%;
       height: 349px;
       object-fit: cover;
       object-position: top;
-      border-radius: var(--radius-md);
+    }
+
+    &.rounded {
+      img,
+      video {
+        border-radius: var(--radius-md);
+      }
     }
 
     > .content {

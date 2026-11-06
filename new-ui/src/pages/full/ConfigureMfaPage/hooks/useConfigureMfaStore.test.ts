@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../../../shared/rust-api/api';
 import {
   ClientTrafficPolicy,
+  ConfigureFactorsSource,
   type InstanceInfo,
   MfaMethod,
 } from '../../../../shared/rust-api/types';
@@ -144,6 +145,35 @@ describe('startMfaConfiguration', () => {
     await startMfaConfiguration(instance, {
       preselectedMethods: [MfaMethod.Email, MfaMethod.Fido2],
     });
+
+    expect(useConfigureMfaStore.getState().initialSelection).toEqual([MfaMethod.Fido2]);
+  });
+
+  it('drops a configured FIDO2 preselected from a location', async () => {
+    Object.assign(api, { mfaConfigStart: vi.fn().mockResolvedValue(startResult) });
+
+    await startMfaConfiguration(
+      { ...instance, mfa_configured_methods: [MfaMethod.Fido2] },
+      {
+        preselectedMethods: [MfaMethod.Fido2],
+        source: ConfigureFactorsSource.FullConnect,
+      },
+    );
+
+    const state = useConfigureMfaStore.getState();
+    expect(state.initialSelection).toEqual([]);
+
+    state.selectMethods([MfaMethod.Fido2]);
+    expect(useConfigureMfaStore.getState().activeStep).toBe(ConfigureMfaStep.Finish);
+  });
+
+  it('keeps a configured FIDO2 preselected from the Add page', async () => {
+    Object.assign(api, { mfaConfigStart: vi.fn().mockResolvedValue(startResult) });
+
+    await startMfaConfiguration(
+      { ...instance, mfa_configured_methods: [MfaMethod.Fido2] },
+      { preselectedMethods: [MfaMethod.Fido2], source: ConfigureFactorsSource.AddPage },
+    );
 
     expect(useConfigureMfaStore.getState().initialSelection).toEqual([MfaMethod.Fido2]);
   });

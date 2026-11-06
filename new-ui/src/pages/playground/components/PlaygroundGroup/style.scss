@@ -1,0 +1,11 @@
+.playground-group {
+  display: flex;
+  flex-flow: column;
+  gap: var(--spacing-md);
+  width: 100%;
+
+  & > .title {
+    font: var(--t-body-xs-500);
+    color: var(--fg-white-100);
+  }
+}

@@ -50,6 +50,7 @@ export const ConnectModal = () => {
     <Modal
       id="connect-modal"
       size="small"
+      contentClassName="connect-modal"
       title={stepLabel ?? (view ? ConnectModalTitle[view] : '')}
       isOpen={isOpen}
       afterClose={() => {

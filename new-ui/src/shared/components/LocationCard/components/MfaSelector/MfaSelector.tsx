@@ -7,11 +7,10 @@ import {
   MfaMethod,
   type MfaMethodValue,
 } from '../../../../rust-api/types';
-import { isPresent } from '../../../../utils/isPresent';
-import { findOpenIdProvider, mfaToText } from '../../../../utils/mfa';
+import { mfaToText, openIdProviderName } from '../../../../utils/mfa';
+import { CheckboxIndicator } from '../../../CheckboxIndicator/CheckboxIndicator';
 import { Icon } from '../../../Icon';
 import checkboxSrc from './assets/checkbox.svg';
-import { openIdProviderIcon } from './consts';
 
 interface Props {
   factor: MfaMethodValue;
@@ -20,6 +19,7 @@ interface Props {
   active?: boolean;
   isDefault?: boolean;
   configured?: boolean;
+  configurable?: boolean;
   isSelectable: boolean;
   onClick?: MouseEventHandler<HTMLDivElement>;
   containerProps?: Omit<HTMLProps<HTMLDivElement>, 'onClick'>;
@@ -34,12 +34,12 @@ export const MfaSelector = ({
   active = false,
   isDefault = false,
   configured = true,
+  configurable = false,
   isSelectable,
 }: Props) => {
   const isMobileOnly = factor === MfaMethod.Biometric;
   const showCheckbox = isSelectable && selected;
-  const openIdProvider =
-    factor === MfaMethod.Oidc ? findOpenIdProvider(instance) : undefined;
+  const showHoverCheckbox = isSelectable && configurable && !selected;
 
   return (
     <div
@@ -50,6 +50,7 @@ export const MfaSelector = ({
         selected,
         active,
         disabled: !isSelectable,
+        'hover-checkbox': showHoverCheckbox,
       })}
       onClick={(event) => {
         if (isSelectable) {
@@ -60,21 +61,22 @@ export const MfaSelector = ({
       {showCheckbox && <img src={checkboxSrc} alt="" width={24} height={24} />}
       {!showCheckbox && (
         <div className="icon-col">
-          {isPresent(openIdProvider) && (
-            <img src={openIdProviderIcon[openIdProvider]} alt="" width={20} height={20} />
-          )}
-          {!isPresent(openIdProvider) && (
-            <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
-          )}
+          <Icon className="factor-icon" icon={mfaMethodIcon[factor]} size={20} />
         </div>
       )}
+      {showHoverCheckbox && <CheckboxIndicator active={false} size="sm" />}
       <div className="middle">
-        <p className="name">{mfaToText(factor, instance)}</p>
+        <p className="name">
+          {factor === MfaMethod.Oidc
+            ? `Verify with ${openIdProviderName(instance)}`
+            : mfaToText(factor, instance)}
+        </p>
       </div>
       <div className="right">
-        {(isMobileOnly || !configured) && (
-          <p className="disabled-label">
-            {isMobileOnly ? 'Mobile client only' : 'Not configured'}
+        {isMobileOnly && <p className="disabled-label">Mobile client only</p>}
+        {!isMobileOnly && !configured && (
+          <p className={clsx('disabled-label', { configurable })}>
+            {configurable ? 'Select to configure' : 'Not configured'}
           </p>
         )}
         {isSelectable && configured && isDefault && (

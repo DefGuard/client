@@ -1,0 +1,12 @@
+.playground-test-factor-selector {
+  display: flex;
+  flex-flow: column;
+  gap: var(--spacing-xl);
+  width: 100%;
+
+  h3 {
+    margin: 0;
+    font: var(--t-body-sm-600);
+    text-align: center;
+  }
+}

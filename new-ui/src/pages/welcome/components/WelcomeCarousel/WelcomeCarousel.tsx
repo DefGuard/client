@@ -1,4 +1,5 @@
 import './style.scss';
+import clsx from 'clsx';
 import { AnimatePresence, motion } from 'motion/react';
 import { Fragment, useState } from 'react';
 import { Button } from '../../../../shared/components/Button/Button';
@@ -71,7 +72,7 @@ export const WelcomeCarousel = ({ slides }: WelcomeCarouselProps) => {
         <AnimatePresence mode="popLayout" custom={direction} initial={false}>
           <motion.div
             key={activeIndex}
-            className="carousel-slide"
+            className={clsx('carousel-slide', { rounded: activeSlide.rounded })}
             custom={direction}
             variants={slideVariants}
             initial="enter"

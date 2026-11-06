@@ -650,11 +650,13 @@ export type EnrollmentErrorKind = 'network' | 'unauthorized' | 'server';
 
 export type AddInstanceRequest = { url: string; token: string; name: string };
 
+export type AddInstanceErrorKind = EnrollmentErrorKind | 'name_taken';
+
 export type AddInstanceResult = {
   startResponse?: EnrollmentStartResult;
   session_id?: string;
   error?: string;
-  errorKind?: EnrollmentErrorKind;
+  errorKind?: AddInstanceErrorKind;
 };
 
 export type UpdateInstanceRequest = { instanceId: number; url: string; token: string };
