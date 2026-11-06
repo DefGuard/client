@@ -8,8 +8,8 @@ pub mod defguard {
     }
 
     pub mod device_identity {
-        pub mod v1 {
-            tonic::include_proto!("defguard.device_identity.v1");
+        pub mod v2 {
+            tonic::include_proto!("defguard.device_identity.v2");
         }
     }
 

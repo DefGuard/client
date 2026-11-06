@@ -44,8 +44,8 @@ mod proto {
 
         #[allow(dead_code)]
         pub mod device_identity {
-            pub mod v1 {
-                include!(concat!(env!("OUT_DIR"), "/defguard.device_identity.v1.rs"));
+            pub mod v2 {
+                include!(concat!(env!("OUT_DIR"), "/defguard.device_identity.v2.rs"));
             }
         }
 

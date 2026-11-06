@@ -1,6 +1,6 @@
 use defguard_client_proto::defguard::{
     client_types::{EnrollmentStartRequest, InstanceInfoRequest},
-    device_identity::v1::{
+    device_identity::v2::{
         attestation_request, AttestationRequest, AttestationStatus, CredentialChallenge,
         IdentityErrorCode, IdentityState,
     },
