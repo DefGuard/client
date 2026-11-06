@@ -1,3 +1,5 @@
+//! Backends must run blocking platform calls outside async executor threads.
+
 use thiserror::Error;
 
 #[cfg(target_os = "linux")]
@@ -325,8 +327,8 @@ pub enum DeviceIdentityError {
 }
 
 /// Returns client-reported backend capabilities.
-pub fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
-    backend::capabilities()
+pub async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
+    backend::capabilities().await
 }
 
 /// Creates a hardware-backed identity for attestation and possession proofs.
@@ -343,10 +345,10 @@ pub async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
 }
 
 /// Returns the identity's public attestation data for enrollment with Core.
-pub fn attestation_identity(
+pub async fn attestation_identity(
     identity: &IdentityRef,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {
-    backend::attestation_identity(identity)
+    backend::attestation_identity(identity).await
 }
 
 /// Processes the backend challenge and generates evidence bound to the exact Core-encoded data.

@@ -113,7 +113,9 @@ pub async fn enroll() -> (IdentityRef, IdentityVerifier) {
     let identity = create_identity()
         .await
         .expect("create a hardware-backed identity");
-    let metadata = attestation_identity(&identity).expect("read public attestation identity");
+    let metadata = attestation_identity(&identity)
+        .await
+        .expect("read public attestation identity");
     let (request, secret) = prepare_attestation(&metadata);
     let response = attest_identity(&identity, &request)
         .await
