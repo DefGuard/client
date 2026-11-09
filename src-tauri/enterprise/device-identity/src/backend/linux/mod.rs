@@ -20,12 +20,13 @@ use tss_esapi::{
 };
 
 use crate::{
-    AttestationIdentity, AttestationMethod, AttestationRequest, AttestationResponse, BackendKind,
-    Capabilities, DeviceIdentityError, Identity, PlatformCapabilities, PossessionChallenge,
-    PossessionProof, ProfileId, ProfileSupport, SupportStatus, TpmAttestationIdentity, TpmIdentity,
-    TpmKeyBlobs,
+    AttestationChallenge, AttestationIdentity, AttestationMethod, AttestationRequest,
+    AttestationResponse, BackendKind, Capabilities, DeviceIdentityError, Identity,
+    PlatformCapabilities, PossessionChallenge, PossessionProof, ProfileId, ProfileSupport,
+    SupportStatus, TpmAttestationIdentity, TpmIdentity, TpmKeyBlobs,
 };
 
+mod attestation;
 mod ek;
 mod raw_capabilities;
 
@@ -271,11 +272,24 @@ pub(super) async fn attestation_identity(
     }))
 }
 
+/// Activates Core's credential and certifies the identity key on a blocking worker.
+/// The certification binds SHA-256 of the exact request data without persisting state.
 pub(super) async fn attest_identity(
-    _identity: &Identity,
-    _request: &AttestationRequest,
+    identity: &Identity,
+    request: &AttestationRequest,
 ) -> Result<AttestationResponse, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    let Identity::Tpm(identity) = identity else {
+        return Err(DeviceIdentityError::Unsupported);
+    };
+    let AttestationChallenge::Tpm(challenge) = &request.challenge else {
+        return Err(DeviceIdentityError::InvalidChallenge);
+    };
+    let identity = identity.clone();
+    let data = request.data.clone();
+    let challenge = challenge.clone();
+    tokio::task::spawn_blocking(move || attestation::attest(identity, data, challenge))
+        .await
+        .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
 pub(super) async fn prove_possession(

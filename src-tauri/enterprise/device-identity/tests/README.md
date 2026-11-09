@@ -12,8 +12,9 @@ cargo test -p device-identity
 cargo test -p device-identity --test contract -- --ignored
 ```
 
-The second command is expected to fail on the current stubs. Run a single scenario
-by adding its name before `-- --ignored`.
+The full hardware suite still requires possession-proof support, which remains a
+stub on Linux. Run a single scenario by adding its name before `-- --ignored`.
+Linux creation, public enrollment data, and attestation are implemented.
 
 ## Contracts
 
@@ -123,6 +124,24 @@ fixture for these contracts, not a production Core verifier.
 Two ordinary tests use software-generated signed structures to check that the test
 verifiers accept valid inputs and reject altered data, keys, signatures and counters.
 They run without hardware or Apple service access.
+
+## Linux attestation
+
+```sh
+cargo test -p device-identity --test contract test_attestation_verifies_and_rejects_changed_data_or_evidence -- --ignored
+cargo test -p device-identity --test contract test_tpm_rejects_a_corrupted_credential_challenge -- --ignored
+cargo test -p device-identity --test contract test_attestation_rejects_damaged_identity_without_replacing_keys -- --ignored
+```
+
+These scenarios use independent software MakeCredential and attestation verification.
+The backend restores the stored SRK and EK templates, loads the AK, activates the
+credential using PolicySecret with empty Endorsement authorization, and releases the
+EK before loading the identity key. Certify binds SHA-256 of the unchanged request
+data, and the returned ECDSA signature uses ASN.1 DER. Invalid challenges and damaged
+identity data return errors without creating replacement keys. Failure paths release
+TPM resources, and subsequent valid requests must still succeed.
+
+Negative hardware tests intentionally provoke TPM errors, so TSS warnings are expected.
 
 The EK certificate fixtures in `fixtures/` are synthetic, self-signed RSA and ECC
 certificates used only to test public-key matching. They are not trust anchors.

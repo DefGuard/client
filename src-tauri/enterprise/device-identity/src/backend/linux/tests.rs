@@ -13,8 +13,9 @@ use tss_esapi::{
 
 use super::{create_srk, srk_template, tcti_configuration};
 use crate::{
-    AttestationIdentity, DeviceIdentityError, Identity, TpmAttestationIdentity, TpmEndorsementKey,
-    TpmIdentity, TpmKeyBlobs,
+    AttestationChallenge, AttestationIdentity, AttestationRequest, CredentialChallenge,
+    DeviceIdentityError, Identity, TpmAttestationIdentity, TpmEndorsementKey, TpmIdentity,
+    TpmKeyBlobs,
 };
 
 static HARDWARE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -199,9 +200,8 @@ async fn test_create_identity_returns_reloadable_key_blobs() {
     }
 }
 
-#[tokio::test]
-async fn test_attestation_identity_uses_supplied_public_data_without_hardware() {
-    let identity = Identity::Tpm(TpmIdentity {
+fn identity_fixture() -> Identity {
+    Identity::Tpm(TpmIdentity {
         ek: TpmEndorsementKey {
             template: vec![1],
             public: vec![2, 3],
@@ -216,7 +216,12 @@ async fn test_attestation_identity_uses_supplied_public_data_without_hardware() 
             public: vec![10],
             private: vec![11],
         },
-    });
+    })
+}
+
+#[tokio::test]
+async fn test_attestation_identity_uses_supplied_public_data_without_hardware() {
+    let identity = identity_fixture();
     assert_eq!(
         crate::attestation_identity(&identity).await.unwrap(),
         AttestationIdentity::Tpm(TpmAttestationIdentity {
@@ -296,4 +301,58 @@ fn test_ek_certificate_matches_the_key_but_not_another_key_or_malformed_der() {
         }
         assert!(!super::ek::certificate_matches(&public, certificate).unwrap());
     }
+}
+
+#[tokio::test]
+async fn test_attest_identity_rejects_invalid_inputs_without_hardware() {
+    let apple = Identity::AppleAppAttest {
+        key_id: "apple-key".into(),
+    };
+    let mut request = AttestationRequest {
+        data: vec![1],
+        challenge: AttestationChallenge::AppleAppAttest,
+    };
+    assert_eq!(
+        crate::attest_identity(&apple, &request).await.err(),
+        Some(DeviceIdentityError::Unsupported)
+    );
+    let identity = identity_fixture();
+    assert_eq!(
+        crate::attest_identity(&identity, &request).await.err(),
+        Some(DeviceIdentityError::InvalidChallenge)
+    );
+    for (credential_blob, encrypted_secret) in [
+        (vec![], vec![1]),
+        (vec![1], vec![]),
+        (vec![0; 65_536], vec![1]),
+        (vec![1], vec![0; 65_536]),
+    ] {
+        request.challenge = AttestationChallenge::Tpm(CredentialChallenge {
+            credential_blob,
+            encrypted_secret,
+        });
+        assert_eq!(
+            crate::attest_identity(&identity, &request).await.err(),
+            Some(DeviceIdentityError::InvalidChallenge)
+        );
+    }
+}
+
+#[test]
+fn test_attestation_signature_der_pads_sign_bits_and_removes_leading_zeroes() {
+    use tss_esapi::structures::{EccSignature, Signature as TpmSignature};
+    let signature = EccSignature::create(
+        HashingAlgorithm::Sha256,
+        EccParameter::try_from(vec![0x80]).unwrap(),
+        EccParameter::try_from(vec![0, 1]).unwrap(),
+    )
+    .unwrap();
+    let encoded = super::attestation::encode_signature(TpmSignature::EcDsa(signature)).unwrap();
+    assert_eq!(encoded.algorithm, crate::SignatureAlgorithm::EcdsaSha256);
+    assert_eq!(encoded.bytes, vec![0x30, 7, 2, 2, 0, 0x80, 2, 1, 1]);
+    p256::ecdsa::Signature::from_der(&encoded.bytes).expect("parse the signature independently");
+    assert_eq!(
+        super::attestation::encode_signature(TpmSignature::Null),
+        Err(DeviceIdentityError::Unsupported)
+    );
 }

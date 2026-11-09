@@ -2016,6 +2016,7 @@ dependencies = [
  "ciborium",
  "hmac 0.12.1",
  "p256",
+ "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",
  "rand_core 0.6.4",
