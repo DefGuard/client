@@ -16,7 +16,6 @@ use crate::{
     PossessionProof, ProfileId, ProfileSupport, SupportStatus,
 };
 
-#[path = "linux/raw_capabilities.rs"]
 mod raw_capabilities;
 
 pub(super) async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {

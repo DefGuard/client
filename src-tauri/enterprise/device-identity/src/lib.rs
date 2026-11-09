@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 #[cfg(target_os = "linux")]
-#[path = "backend/linux.rs"]
+#[path = "backend/linux/mod.rs"]
 mod backend;
 #[cfg(target_os = "macos")]
 #[path = "backend/macos.rs"]
