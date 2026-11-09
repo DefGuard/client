@@ -1494,7 +1494,7 @@ checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 
 [[package]]
 name = "defguard-cli"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "base64 0.23.1",
  "chrono",
@@ -1530,7 +1530,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1610,7 +1610,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-common"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "nix",
  "vergen-git2",
@@ -1618,7 +1618,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-config-sync"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "defguard-client-core",
  "defguard-client-proto",
@@ -1636,7 +1636,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-core"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "base64 0.23.1",
  "block2 0.6.2",
@@ -1680,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-posture"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "defguard-client-core",
  "defguard-client-proto",
@@ -1698,7 +1698,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-proto"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "defguard_wireguard_rs",
  "prost",
@@ -1714,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-provisioning"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "defguard-client-core",
  "log",
@@ -1725,7 +1725,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-service"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1756,7 +1756,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-client-service-locations"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "base64 0.23.1",
  "defguard-client-common",
@@ -1782,7 +1782,7 @@ dependencies = [
 
 [[package]]
 name = "defguard-dg"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "clap",
  "defguard-client-common",

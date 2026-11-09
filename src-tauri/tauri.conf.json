@@ -67,7 +67,7 @@
   "productName": "Defguard",
   "mainBinaryName": "defguard-client",
   "identifier": "net.defguard",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "app": {
     "security": {
       "capabilities": ["main-capability"],
