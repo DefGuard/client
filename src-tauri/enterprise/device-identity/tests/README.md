@@ -58,6 +58,14 @@ signature, challenge binding, and the recovered activation secret. EK manufactur
 CA policy belongs to Core and is outside these facade tests. An absent EK certificate
 is allowed for software TPM fixtures.
 
+The Linux key-creation test can run before the remaining attestation methods are
+implemented. It reloads both keys in new TPM contexts using only the returned blobs
+and SRK input template, checks their profiles, and uses empty authorization:
+
+```sh
+cargo test -p device-identity --lib test_create_identity_returns_reloadable_key_blobs -- --ignored
+```
+
 ## macOS
 
 Use a macOS 27+ host where App Attest reports support. The test process needs the

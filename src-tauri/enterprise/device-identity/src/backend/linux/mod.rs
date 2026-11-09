@@ -3,6 +3,7 @@ use std::env;
 use tss_esapi::{
     attributes::ObjectAttributesBuilder,
     constants::response_code::Tss2ResponseCodeKind,
+    handles::KeyHandle,
     interface_types::{
         algorithm::{HashingAlgorithm, PublicAlgorithm},
         ecc::EccCurve,
@@ -10,17 +11,18 @@ use tss_esapi::{
         resource_handles::Hierarchy,
     },
     structures::{
-        CreatePrimaryKeyResult, EccScheme, HashScheme, KeyDerivationFunctionScheme, PublicBuilder,
-        PublicEccParameters, PublicEccParametersBuilder, PublicParameters, PublicRsaParameters,
-        RsaExponent, RsaScheme, SymmetricDefinitionObject,
+        CreatePrimaryKeyResult, EccScheme, HashScheme, KeyDerivationFunctionScheme, Public,
+        PublicBuilder, PublicEccParameters, PublicEccParametersBuilder, PublicParameters,
+        PublicRsaParameters, RsaExponent, RsaScheme, SymmetricDefinitionObject,
     },
+    traits::Marshall,
     Context, Error, TctiNameConf,
 };
 
 use crate::{
     AttestationIdentity, AttestationMethod, AttestationRequest, AttestationResponse, BackendKind,
     Capabilities, DeviceIdentityError, Identity, PlatformCapabilities, PossessionChallenge,
-    PossessionProof, ProfileId, ProfileSupport, SupportStatus,
+    PossessionProof, ProfileId, ProfileSupport, SupportStatus, TpmIdentity, TpmKeyBlobs,
 };
 
 mod raw_capabilities;
@@ -34,15 +36,19 @@ pub(super) async fn capabilities() -> Result<Capabilities, DeviceIdentityError> 
         .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
-fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
+fn tcti_configuration() -> Result<TctiNameConf, DeviceIdentityError> {
     let configuration = match env::var("TSS2_TCTI") {
         Ok(value) => value,
         Err(env::VarError::NotPresent) => "device:/dev/tpmrm0".into(),
         Err(env::VarError::NotUnicode(_)) => return Err(DeviceIdentityError::BackendFailure),
     };
-    let configuration: TctiNameConf = configuration
+    configuration
         .parse()
-        .map_err(|_| DeviceIdentityError::BackendFailure)?;
+        .map_err(|_| DeviceIdentityError::BackendFailure)
+}
+
+fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
+    let configuration = tcti_configuration()?;
     // the wrapper's ESYS pointer is private, so raw inventory uses its own short-lived context
     let mut details = raw_capabilities::read(&configuration)?;
     let mut context = Context::new(configuration).map_err(|_| DeviceIdentityError::Unavailable)?;
@@ -113,13 +119,7 @@ fn check_profile(
     Ok(ProfileSupport { profile, support })
 }
 
-/// Assumes empty Owner authorization and leaves the SRK's authorization empty.
-/// The caller must flush the transient key handle after use.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "create_identity is not implemented yet")
-)]
-fn create_srk(context: &mut Context) -> Result<CreatePrimaryKeyResult, Error> {
+fn srk_template() -> Result<Public, Error> {
     let attributes = ObjectAttributesBuilder::new()
         .with_fixed_tpm(true)
         .with_fixed_parent(true)
@@ -130,7 +130,7 @@ fn create_srk(context: &mut Context) -> Result<CreatePrimaryKeyResult, Error> {
         .with_sign_encrypt(false)
         .with_restricted(true)
         .build()?;
-    let public = PublicBuilder::new()
+    PublicBuilder::new()
         .with_public_algorithm(PublicAlgorithm::Ecc)
         .with_name_hashing_algorithm(HashingAlgorithm::Sha256)
         .with_object_attributes(attributes)
@@ -142,15 +142,103 @@ fn create_srk(context: &mut Context) -> Result<CreatePrimaryKeyResult, Error> {
             .build()?,
         )
         .with_ecc_unique_identifier(Default::default())
-        .build()?;
+        .build()
+}
 
+/// Assumes empty Owner authorization and leaves the SRK's authorization empty.
+/// The caller must flush the transient key handle after use.
+fn create_srk(context: &mut Context, template: Public) -> Result<CreatePrimaryKeyResult, Error> {
     context.execute_with_nullauth_session(|ctx| {
-        ctx.create_primary(Hierarchy::Owner, public, None, None, None, None)
+        ctx.create_primary(Hierarchy::Owner, template, None, None, None, None)
     })
 }
 
+fn create_signing_key(
+    context: &mut Context,
+    parent: KeyHandle,
+    restricted: bool,
+) -> Result<TpmKeyBlobs, Error> {
+    let attributes = ObjectAttributesBuilder::new()
+        .with_fixed_tpm(true)
+        .with_fixed_parent(true)
+        .with_sensitive_data_origin(true)
+        .with_user_with_auth(true)
+        .with_no_da(true)
+        .with_sign_encrypt(true)
+        .with_decrypt(false)
+        .with_restricted(restricted)
+        .build()?;
+    let public = PublicBuilder::new()
+        .with_public_algorithm(PublicAlgorithm::Ecc)
+        .with_name_hashing_algorithm(HashingAlgorithm::Sha256)
+        .with_object_attributes(attributes)
+        .with_ecc_parameters(
+            PublicEccParametersBuilder::new_unrestricted_signing_key(
+                EccScheme::EcDsa(HashScheme::new(HashingAlgorithm::Sha256)),
+                EccCurve::NistP256,
+            )
+            .with_restricted(restricted)
+            .build()?,
+        )
+        .with_ecc_unique_identifier(Default::default())
+        .build()?;
+    let created = context
+        .execute_with_nullauth_session(|ctx| ctx.create(parent, public, None, None, None, None))?;
+    Ok(TpmKeyBlobs {
+        public: created.out_public.marshall()?,
+        private: created.out_private.value().to_vec(),
+    })
+}
+
+fn create_tpm_identity(context: &mut Context) -> Result<TpmIdentity, Error> {
+    let template = srk_template()?;
+    let srk_template = template.marshall()?;
+    let srk = create_srk(context, template)?;
+    context.execute_with_temporary_object(srk.key_handle.into(), |ctx, parent| {
+        let parent = KeyHandle::from(parent);
+        let ak = create_signing_key(ctx, parent, true)?;
+        let identity_key = create_signing_key(ctx, parent, false)?;
+        Ok(TpmIdentity {
+            srk_template,
+            ak,
+            identity_key,
+        })
+    })
+}
+
+fn creation_error(error: Error) -> DeviceIdentityError {
+    match error {
+        Error::Tss2Error(code) => match code.kind() {
+            Some(Tss2ResponseCodeKind::AuthFail | Tss2ResponseCodeKind::BadAuth) => {
+                DeviceIdentityError::PermissionDenied
+            }
+            Some(
+                Tss2ResponseCodeKind::Asymmetric
+                | Tss2ResponseCodeKind::Curve
+                | Tss2ResponseCodeKind::KeySize
+                | Tss2ResponseCodeKind::Scheme
+                | Tss2ResponseCodeKind::Hash
+                | Tss2ResponseCodeKind::Symmetric
+                | Tss2ResponseCodeKind::Kdf
+                | Tss2ResponseCodeKind::Mode,
+            ) => DeviceIdentityError::Unsupported,
+            _ => DeviceIdentityError::BackendFailure,
+        },
+        _ => DeviceIdentityError::BackendFailure,
+    }
+}
+
 pub(super) async fn create_identity() -> Result<Identity, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    tokio::task::spawn_blocking(|| {
+        let configuration = tcti_configuration()?;
+        let mut context =
+            Context::new(configuration).map_err(|_| DeviceIdentityError::Unavailable)?;
+        create_tpm_identity(&mut context)
+            .map(Identity::Tpm)
+            .map_err(creation_error)
+    })
+    .await
+    .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
 pub(super) async fn attestation_identity(
