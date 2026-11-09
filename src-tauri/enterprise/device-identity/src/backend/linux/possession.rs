@@ -14,9 +14,8 @@ use super::{
 };
 use crate::{DeviceIdentityError, PossessionProof, TpmKeyBlobs};
 
-/// Loads the unrestricted identity key and signs a software-computed SHA-256 digest.
-/// A null validation ticket is sufficient for this key; no TPM hashing is required.
-/// The local context releases any remaining transient handles on error.
+/// The unrestricted identity key accepts a software digest with a null validation ticket.
+/// Restricted keys would require a TPM-issued hash ticket. Context drop releases handles on error.
 pub(super) fn prove(
     template: Vec<u8>,
     key: TpmKeyBlobs,

@@ -19,6 +19,7 @@ pub fn check(condition: bool, message: &str) -> TestResult<()> {
     }
 }
 
+/// Deliberately not a production Core encoding, backends must treat these bytes as opaque.
 pub fn challenge_data(purpose: &str) -> Vec<u8> {
     let mut nonce = [0u8; 32];
     OsRng.fill_bytes(&mut nonce);
@@ -31,6 +32,7 @@ pub fn challenge_data(purpose: &str) -> Vec<u8> {
     .concat()
 }
 
+/// The TPM secret stays on the verifier side, only its MakeCredential wrapping reaches the backend.
 pub fn prepare_attestation(
     metadata: &AttestationIdentity,
 ) -> (AttestationRequest, Option<[u8; 32]>) {
@@ -53,6 +55,8 @@ pub fn prepare_attestation(
     )
 }
 
+/// Test-only key and replay-counter state established by independent attestation verification.
+/// Cloning also copies the Apple counter, use the same instance to test replay rejection.
 #[derive(Clone)]
 pub enum IdentityVerifier {
     Tpm(VerifyingKey),
@@ -60,6 +64,7 @@ pub enum IdentityVerifier {
 }
 
 impl IdentityVerifier {
+    /// Successful Apple verification advances the counter, TPM verification has no mutable state.
     pub fn verify_proof(&mut self, data: &[u8], proof: &PossessionProof) -> TestResult<()> {
         match (self, proof) {
             (Self::Tpm(key), PossessionProof::Signature(signature)) => {
@@ -77,6 +82,7 @@ impl IdentityVerifier {
     }
 }
 
+/// TPM checks omit EK manufacturer trust policy, this fixture is not a production Core verifier.
 pub fn verify_attestation(
     metadata: &AttestationIdentity,
     request: &AttestationRequest,
@@ -125,6 +131,7 @@ pub async fn enroll() -> (Identity, IdentityVerifier) {
     (identity, verifier)
 }
 
+/// Message bytes must be unhashed, the verifier hashes internally and expects a DER signature.
 pub fn verify_signature(key: &VerifyingKey, message: &[u8], signature: &[u8]) -> TestResult<()> {
     let signature = Signature::from_der(signature).map_err(|error| error.to_string())?;
     key.verify(message, &signature)

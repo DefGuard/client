@@ -54,9 +54,11 @@ fn tcti_configuration() -> Result<TctiNameConf, DeviceIdentityError> {
         .map_err(|_| DeviceIdentityError::BackendFailure)
 }
 
+/// RSA support alone does not enable attestation, identity creation requires the ECC profile.
+/// Parameter checks do not provision keys or test hierarchy authorization.
 fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
     let configuration = tcti_configuration()?;
-    // the wrapper's ESYS pointer is private, so raw inventory uses its own short-lived context
+    // The wrapper's ESYS pointer is private, so raw inventory uses its own short-lived context
     let mut details = raw_capabilities::read(&configuration)?;
     let mut context = Context::new(configuration).map_err(|_| DeviceIdentityError::Unavailable)?;
     details.profiles = [ProfileId::EcdsaP256Sha256, ProfileId::RsaSsa2048Sha256]

@@ -164,13 +164,16 @@ pub enum Identity {
     AppleAppAttest { key_id: String },
 }
 
-/// Caller-owned EK data and blobs for loading the AK and identity key.
+/// Caller-owned material for reloading keys, not transferable to another TPM.
+/// Linux keys have empty authorization, so protect the stored blobs from other local users.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TpmIdentity {
     pub ek: TpmEndorsementKey,
     /// Marshalled input TPMT_PUBLIC for CreatePrimary, not its generated public area.
     pub srk_template: Vec<u8>,
+    /// Restricted signing key used to certify the identity key, not arbitrary application data.
     pub ak: TpmKeyBlobs,
+    /// Unrestricted signing key that accepts software-computed challenge digests.
     pub identity_key: TpmKeyBlobs,
 }
 
@@ -185,6 +188,8 @@ pub struct TpmEndorsementKey {
     pub certificate_chain_der: Vec<Vec<u8>>,
 }
 
+/// Both blobs are required to reload a key under its original SRK.
+/// Neither blob is a persistent TPM handle or an exported plaintext private key.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TpmKeyBlobs {
     /// Marshalled TPMT_PUBLIC for loading the key.
@@ -219,13 +224,13 @@ pub struct TpmAttestationIdentity {
 /// Credential activation challenge prepared by Core for a specific EK and AK
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CredentialChallenge {
-    /// Contents of the TPM2B_ID_OBJECT produced by MakeCredential
+    /// TPM2B_ID_OBJECT contents from MakeCredential, without the outer size field.
     pub credential_blob: Vec<u8>,
-    /// Contents of TPM2B_ENCRYPTED_SECRET carrying the encrypted protection seed
+    /// TPM2B_ENCRYPTED_SECRET contents without the outer size field, not the plaintext seed.
     pub encrypted_secret: Vec<u8>,
 }
 
-/// Core-encoded challenge for a proof of identity key possession
+/// Expiry and single-use nonce checks belong to Core, not this stateless backend.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PossessionChallenge {
     /// Opaque Core-encoded bytes containing nonce, session and operation binding.
@@ -357,7 +362,8 @@ pub enum DeviceIdentityError {
     BackendFailure,
 }
 
-/// Returns client-reported backend capabilities.
+/// On Linux, profile support does not confirm hierarchy authorization or EK certificate availability.
+/// Inventory failures return an error, not a successful report of unsupported hardware.
 pub async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     backend::capabilities().await
 }

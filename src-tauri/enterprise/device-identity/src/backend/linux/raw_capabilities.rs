@@ -30,7 +30,7 @@ impl Context {
             tcti: ptr::null_mut(),
             esys: ptr::null_mut(),
         };
-        // the loader borrows the C string only during initialization
+        // The loader borrows the C string only during initialization
         let result =
             unsafe { tss::Tss2_TctiLdr_Initialize(configuration.as_ptr(), &mut context.tcti) };
         if result != 0 {
@@ -69,7 +69,7 @@ impl Context {
             )
         };
         let data = if result == 0 {
-            // the result is copied before releasing the ESYS allocation
+            // The result is copied before releasing the ESYS allocation
             unsafe { output.as_ref() }
                 .copied()
                 .ok_or(DeviceIdentityError::BackendFailure)
@@ -99,6 +99,7 @@ impl Drop for Context {
     }
 }
 
+/// Returns no partial inventory if a capability page fails or cannot advance safely.
 pub(super) fn read(configuration: &TctiNameConf) -> Result<TpmCapabilities, DeviceIdentityError> {
     let mut context = Context::new(configuration)?;
     let mut details = TpmCapabilities::default();
@@ -114,7 +115,7 @@ pub(super) fn read(configuration: &TctiNameConf) -> Result<TpmCapabilities, Devi
         loop {
             let (more, page) = context.capability(capability, property)?;
             let mut last = None;
-            // the validated capability selector determines which union member ESYS populated
+            // The validated capability selector determines which union member ESYS populated
             unsafe {
                 match capability {
                     CapabilityType::Algorithms => {
@@ -157,7 +158,7 @@ pub(super) fn read(configuration: &TctiNameConf) -> Result<TpmCapabilities, Devi
                             details
                                 .commands
                                 .push(CommandCapability { attributes: *entry });
-                            // command attributes include the vendor bit alongside the command index
+                            // Command attributes include the vendor bit alongside the command index
                             last = Some(*entry & (TPMA_CC_V | 0xffff));
                         }
                     }
