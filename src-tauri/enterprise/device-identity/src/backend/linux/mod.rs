@@ -1,11 +1,18 @@
 use std::env;
 
 use tss_esapi::{
+    attributes::ObjectAttributesBuilder,
     constants::response_code::Tss2ResponseCodeKind,
-    interface_types::{algorithm::HashingAlgorithm, ecc::EccCurve, key_bits::RsaKeyBits},
+    interface_types::{
+        algorithm::{HashingAlgorithm, PublicAlgorithm},
+        ecc::EccCurve,
+        key_bits::RsaKeyBits,
+        resource_handles::Hierarchy,
+    },
     structures::{
-        EccScheme, HashScheme, KeyDerivationFunctionScheme, PublicEccParameters, PublicParameters,
-        PublicRsaParameters, RsaExponent, RsaScheme, SymmetricDefinitionObject,
+        CreatePrimaryKeyResult, EccScheme, HashScheme, KeyDerivationFunctionScheme, PublicBuilder,
+        PublicEccParameters, PublicEccParametersBuilder, PublicParameters, PublicRsaParameters,
+        RsaExponent, RsaScheme, SymmetricDefinitionObject,
     },
     Context, Error, TctiNameConf,
 };
@@ -17,6 +24,9 @@ use crate::{
 };
 
 mod raw_capabilities;
+
+#[cfg(test)]
+mod tests;
 
 pub(super) async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     tokio::task::spawn_blocking(read_capabilities)
@@ -101,6 +111,42 @@ fn check_profile(
         Err(_) => return Err(DeviceIdentityError::BackendFailure),
     };
     Ok(ProfileSupport { profile, support })
+}
+
+/// Assumes empty Owner authorization and leaves the SRK's authorization empty.
+/// The caller must flush the transient key handle after use.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "create_identity is not implemented yet")
+)]
+fn create_srk(context: &mut Context) -> Result<CreatePrimaryKeyResult, Error> {
+    let attributes = ObjectAttributesBuilder::new()
+        .with_fixed_tpm(true)
+        .with_fixed_parent(true)
+        .with_sensitive_data_origin(true)
+        .with_user_with_auth(true)
+        .with_no_da(true)
+        .with_decrypt(true)
+        .with_sign_encrypt(false)
+        .with_restricted(true)
+        .build()?;
+    let public = PublicBuilder::new()
+        .with_public_algorithm(PublicAlgorithm::Ecc)
+        .with_name_hashing_algorithm(HashingAlgorithm::Sha256)
+        .with_object_attributes(attributes)
+        .with_ecc_parameters(
+            PublicEccParametersBuilder::new_restricted_decryption_key(
+                SymmetricDefinitionObject::AES_128_CFB,
+                EccCurve::NistP256,
+            )
+            .build()?,
+        )
+        .with_ecc_unique_identifier(Default::default())
+        .build()?;
+
+    context.execute_with_nullauth_session(|ctx| {
+        ctx.create_primary(Hierarchy::Owner, public, None, None, None, None)
+    })
 }
 
 pub(super) async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
