@@ -72,6 +72,7 @@ pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 /// On Linux nothing wakes it, so this is the only trigger and sets the worst-case recovery time.
 #[cfg(any(windows, target_os = "linux"))]
 pub(crate) const SERVICE_LOCATION_RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
+
 #[cfg(target_os = "linux")]
 fn should_block_ipv6<'a>(
     allowed_ips: impl IntoIterator<Item = &'a IpAddrMask>,
@@ -83,6 +84,27 @@ fn should_block_ipv6<'a>(
                 && allowed_ip.address.is_unspecified()
                 && allowed_ip.cidr == 0
         })
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, PartialEq)]
+enum Ipv6BlockChange {
+    Keep,
+    ReturnRouteToTunnel,
+    Replace,
+    Remove,
+}
+
+/// A block in the interface's current fwmark table is never deleted: wireguard-rs did not add
+/// its own `::/0` route there, so deleting ours would let IPv6 leak through the main table.
+#[cfg(target_os = "linux")]
+fn ipv6_block_change(block_fwmark: Option<u32>, fwmark: u32, block_ipv6: bool) -> Ipv6BlockChange {
+    match (block_fwmark == Some(fwmark), block_ipv6) {
+        (true, true) => Ipv6BlockChange::Keep,
+        (true, false) => Ipv6BlockChange::ReturnRouteToTunnel,
+        (false, true) => Ipv6BlockChange::Replace,
+        (false, false) => Ipv6BlockChange::Remove,
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -142,35 +164,63 @@ impl DaemonService {
 
     #[cfg(target_os = "linux")]
     fn configure_ipv6_block(&self, ifname: &str, config: &InterfaceConfiguration, wgapi: &WG) {
-        match self.ipv6_blocks.lock() {
-            Ok(mut blocks) => {
-                blocks.remove(ifname);
-                if should_block_ipv6(
-                    config.peers.iter().flat_map(|peer| &peer.allowed_ips),
-                    &config.addresses,
-                ) {
-                    match wgapi.read_interface_data() {
-                        Ok(host) => match host.fwmark {
-                            Some(fwmark) if fwmark != 0 => match Ipv6Block::new(fwmark) {
-                                Ok(block) => {
-                                    blocks.insert(ifname.to_owned(), block);
-                                    debug!("Blocked IPv6 connections for interface {ifname}");
-                                }
-                                Err(err) => {
-                                    error!("Failed to block IPv6 on interface {ifname}: {err}")
-                                }
-                            },
-                            _ => warn!(
-                                "Cannot block IPv6 on interface {ifname}: WireGuard fwmark is missing or zero"
-                            ),
-                        },
-                        Err(err) => {
-                            error!("Failed to read WireGuard data for interface {ifname}: {err}")
-                        }
+        let mut blocks = match self.ipv6_blocks.lock() {
+            Ok(blocks) => blocks,
+            Err(err) => {
+                error!("Failed to lock IPv6 blocks for interface {ifname}: {err}");
+                return;
+            }
+        };
+        let block_ipv6 = should_block_ipv6(
+            config.peers.iter().flat_map(|peer| &peer.allowed_ips),
+            &config.addresses,
+        );
+        if !block_ipv6 && !blocks.contains_key(ifname) {
+            return;
+        }
+        // Without the fwmark it is unknown which table an existing block protects, so keep it.
+        let fwmark = match wgapi.read_interface_data() {
+            Ok(host) => host.fwmark.filter(|fwmark| *fwmark != 0),
+            Err(err) => {
+                error!("Failed to read WireGuard data for interface {ifname}: {err}");
+                return;
+            }
+        };
+        let Some(fwmark) = fwmark else {
+            if block_ipv6 {
+                warn!(
+                    "Cannot block IPv6 on interface {ifname}: WireGuard fwmark is missing or zero"
+                );
+            }
+            return;
+        };
+
+        let block = blocks.remove(ifname);
+        match ipv6_block_change(block.as_ref().map(Ipv6Block::fwmark), fwmark, block_ipv6) {
+            Ipv6BlockChange::Keep => {
+                if let Some(block) = block {
+                    blocks.insert(ifname.to_owned(), block);
+                }
+            }
+            Ipv6BlockChange::ReturnRouteToTunnel => {
+                if let Some(block) = block {
+                    if let Err((block, err)) = block.into_tunnel_route(ifname) {
+                        error!("Failed to route IPv6 into interface {ifname}: {err}");
+                        blocks.insert(ifname.to_owned(), block);
                     }
                 }
             }
-            Err(err) => error!("Failed to lock IPv6 blocks for interface {ifname}: {err}"),
+            Ipv6BlockChange::Replace => {
+                drop(block);
+                match Ipv6Block::new(fwmark) {
+                    Ok(block) => {
+                        blocks.insert(ifname.to_owned(), block);
+                        debug!("Blocked IPv6 connections for interface {ifname}");
+                    }
+                    Err(err) => error!("Failed to block IPv6 on interface {ifname}: {err}"),
+                }
+            }
+            Ipv6BlockChange::Remove => drop(block),
         }
     }
 }
@@ -771,7 +821,7 @@ mod tests {
 
     use defguard_wireguard_rs::net::IpAddrMask;
 
-    use super::should_block_ipv6;
+    use super::{ipv6_block_change, should_block_ipv6, Ipv6BlockChange};
 
     fn test_ip(address: IpAddr, cidr: u8) -> IpAddrMask {
         IpAddrMask::new(address, cidr)
@@ -804,5 +854,33 @@ mod tests {
         let allowed_ips = [test_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)];
 
         assert!(!should_block_ipv6(allowed_ips.iter(), &[]));
+    }
+
+    #[test]
+    fn test_block_in_current_table_is_never_deleted() {
+        assert_eq!(
+            ipv6_block_change(Some(51820), 51820, true),
+            Ipv6BlockChange::Keep
+        );
+        assert_eq!(
+            ipv6_block_change(Some(51820), 51820, false),
+            Ipv6BlockChange::ReturnRouteToTunnel
+        );
+    }
+
+    #[test]
+    fn test_block_in_other_table_is_replaced_or_removed() {
+        assert_eq!(
+            ipv6_block_change(Some(51820), 51821, true),
+            Ipv6BlockChange::Replace
+        );
+        assert_eq!(
+            ipv6_block_change(Some(51820), 51821, false),
+            Ipv6BlockChange::Remove
+        );
+        assert_eq!(
+            ipv6_block_change(None, 51820, true),
+            Ipv6BlockChange::Replace
+        );
     }
 }

@@ -27,6 +27,35 @@ impl Ipv6Block {
         )?;
         Ok(Self { fwmark })
     }
+
+    pub(crate) fn fwmark(&self) -> u32 {
+        self.fwmark
+    }
+
+    /// Replaces the unreachable route with the tunnel's own `::/0` route in the same table.
+    ///
+    /// When an interface is configured again, wireguard-rs skips adding its `::/0` route because
+    /// this block already occupies the slot, so deleting the block would leave the table without
+    /// an IPv6 default and let IPv6 fall through to the main table. On failure the block is kept.
+    pub(crate) fn into_tunnel_route(self, ifname: &str) -> Result<(), (Self, io::Error)> {
+        let index = match nix::net::if_::if_nametoindex(ifname) {
+            Ok(index) => index,
+            Err(err) => return Err((self, err.into())),
+        };
+        let mut message = route_message(self.fwmark);
+        message.header.scope = RouteScope::Link;
+        message.header.kind = RouteType::Unicast;
+        message.attributes.push(RouteAttribute::Oif(index));
+        if let Err(err) = netlink_request(
+            RouteNetlinkMessage::NewRoute(message),
+            NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE | NLM_F_REPLACE,
+        ) {
+            return Err((self, err));
+        }
+        // The route now belongs to the tunnel, so it must survive this block.
+        std::mem::forget(self);
+        Ok(())
+    }
 }
 
 impl Drop for Ipv6Block {

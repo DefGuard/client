@@ -32,7 +32,7 @@ netlink-packet-route = "0.33"
 netlink-sys = "0.9"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", features = ["fs", "user"] }
+nix = { version = "0.31", features = ["fs", "net", "user"] }
 
 [target.'cfg(windows)'.dependencies]
 async-stream = "0.3"
