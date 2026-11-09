@@ -12,15 +12,15 @@ export const openSystemExtensionModal = () => {
     content: (
       <div className="markdown-render">
         <p>
-          Defguard needs permission to create VPN connections on your Mac. Enable its Network
-          Extension in macOS System Settings to continue.
+          Defguard needs permission to create VPN connections on your Mac. Enable its
+          Network Extension in macOS System Settings to continue.
         </p>
-        <h4>How to enable it:</h4>
-        <ul>
+        <p className="label">How to enable it:</p>
+        <ol>
           <li>Open System Settings.</li>
           <li>Go to General → Login Items &amp; Extensions.</li>
           <li>Find Defguard under Network Extensions and enable it.</li>
-        </ul>
+        </ol>
       </div>
     ),
     submitProps: {

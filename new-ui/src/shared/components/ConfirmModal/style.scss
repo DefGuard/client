@@ -10,12 +10,24 @@
     color: var(--fg-white-100);
   }
 
-  ul {
+  .label {
+    margin-top: var(--spacing-sm);
+    font: var(--t-body-xs-400);
+    color: var(--fg-white-60);
+  }
+
+  ul,
+  ol {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
     padding-left: 21px;
     margin-bottom: var(--spacing-sm);
     list-style: disc;
+  }
+
+  ol {
+    padding-left: var(--spacing-2xl);
+    list-style: decimal;
   }
 }
