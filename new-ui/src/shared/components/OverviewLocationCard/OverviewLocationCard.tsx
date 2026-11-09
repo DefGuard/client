@@ -21,9 +21,9 @@ import { ConnectionAbility, resolveMfaStepPlan, shouldStartMfa } from '../../uti
 import { Divider } from '../Divider/Divider';
 import { IconKind } from '../Icon';
 import {
-  findRouteConflicts,
   handleFullViewConnectError,
   openRouteConflictModal,
+  preflightConnect,
 } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
 import { connectBlockedTooltip } from '../LocationCard/components/ConnectButton/consts';
@@ -107,11 +107,14 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
           autoStartOpenId: appConfig.auto_start_openid_mfa,
           mfaMethod: stepPlan[0],
         });
-      void findRouteConflicts(location).then((conflicts) =>
-        conflicts.length > 0
-          ? openRouteConflictModal(location, conflicts, openMfa)
-          : openMfa(),
-      );
+      void preflightConnect(location).then((conflicts) => {
+        if (!conflicts) return;
+        if (conflicts.length > 0) {
+          openRouteConflictModal(location, conflicts, openMfa);
+        } else {
+          openMfa();
+        }
+      });
       return;
     }
 

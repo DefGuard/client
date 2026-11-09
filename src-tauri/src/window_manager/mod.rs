@@ -269,6 +269,18 @@ pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
     let _ = app.emit_to(target, EventKey::MfaTrigger.into(), location);
 }
 
+/// Show the full view with the "enable system extension" modal.
+pub fn show_system_extension_required(app: &AppHandle) {
+    swap_to_full_view(app.clone());
+    if let Err(err) = app.emit_to(
+        FULL_VIEW_WINDOW_ID,
+        EventKey::SystemExtensionRequired.into(),
+        (),
+    ) {
+        error!("Failed to emit system extension required event: {err:?}");
+    }
+}
+
 #[tauri::command]
 pub fn open_tray_window(app: AppHandle) {
     show_tray_window(&app);

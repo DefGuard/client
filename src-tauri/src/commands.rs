@@ -91,7 +91,35 @@ pub enum ConnectError {
         conflicts: Vec<ConflictingConnection>,
     },
     #[error("{message}")]
+    SystemExtensionDisabled { message: String },
+    #[error("{message}")]
     Other { message: String },
+}
+
+#[cfg(all(target_os = "macos", feature = "macos_installer"))]
+fn system_extension_disabled() -> ConnectError {
+    ConnectError::SystemExtensionDisabled {
+        message: "The Defguard network extension is not enabled in System Settings.".into(),
+    }
+}
+
+#[tauri::command]
+pub fn open_system_extension_settings(app: AppHandle) -> Result<(), Error> {
+    #[cfg(all(target_os = "macos", feature = "macos_installer"))]
+    {
+        use tauri_plugin_opener::OpenerExt;
+
+        use crate::system_extension::settings_url;
+
+        app.opener()
+            .open_url(settings_url(), None::<&str>)
+            .map_err(|err| Error::CommandError(err.to_string()))?;
+    }
+
+    #[cfg(not(all(target_os = "macos", feature = "macos_installer")))]
+    let _ = app;
+
+    Ok(())
 }
 
 impl From<Error> for ConnectError {
@@ -264,6 +292,16 @@ pub async fn connect(
     handle: AppHandle,
 ) -> Result<(), ConnectError> {
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
+    #[cfg(all(target_os = "macos", feature = "macos_installer"))]
+    {
+        use crate::system_extension::vpn_extension_ready;
+
+        if !vpn_extension_ready().await {
+            warn!("Refusing to connect: the VPN system extension is not enabled");
+            return Err(system_extension_disabled());
+        }
+    }
+
     if connection_type == ConnectionType::Location {
         if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
             debug!(
@@ -317,8 +355,18 @@ pub async fn connect(
     Ok(())
 }
 
+/// Checks run before starting MFA, which reaches `connect` only after the user authenticates.
 #[tauri::command(async)]
-pub async fn check_route_conflict(location_id: Id) -> Result<(), ConnectError> {
+pub async fn check_can_connect(location_id: Id) -> Result<(), ConnectError> {
+    #[cfg(all(target_os = "macos", feature = "macos_installer"))]
+    {
+        use crate::system_extension::vpn_extension_ready;
+
+        if !vpn_extension_ready().await {
+            return Err(system_extension_disabled());
+        }
+    }
+
     let location = Location::find_by_id(&*DB_POOL, location_id)
         .await?
         .ok_or(Error::NotFound)?;
@@ -581,12 +629,9 @@ fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uui
         Err(_) => warn!("Failed to clear in-memory provisioning config"),
     }
 
-    let mut provisioning_instance_id = match app_state.provisioning_instance_id.lock() {
-        Ok(provisioning_instance_id) => provisioning_instance_id,
-        Err(_) => {
-            warn!("Failed to check provisioning instance id");
-            return;
-        }
+    let Ok(mut provisioning_instance_id) = app_state.provisioning_instance_id.lock() else {
+        warn!("Failed to check provisioning instance ID");
+        return;
     };
     if provisioning_instance_id.as_deref() == Some(saved_instance_uuid) {
         match handle.path().app_data_dir() {
@@ -1471,6 +1516,7 @@ fn reported_app_version(package_version: &str) -> String {
 }
 
 #[tauri::command]
+#[must_use]
 pub fn get_client_build_version() -> String {
     reported_app_version(defguard_client_core::version::PKG_VERSION)
 }
@@ -1648,14 +1694,14 @@ pub async fn enrollment_start(
     state: State<'_, AppState>,
 ) -> Result<EnrollmentStartResult, String> {
     debug!("Starting enrollment at {proxy_url}");
-    let uses_provisioning_token = match state.provisioning_config.lock() {
-        Ok(provisioning_config) => provisioning_config
+    let uses_provisioning_token = if let Ok(provisioning_config) = state.provisioning_config.lock()
+    {
+        provisioning_config
             .as_ref()
-            .is_some_and(|config| config.enrollment_token == token),
-        Err(_) => {
-            warn!("Failed to read in-memory provisioning config");
-            false
-        }
+            .is_some_and(|config| config.enrollment_token == token)
+    } else {
+        warn!("Failed to read in-memory provisioning config");
+        false
     };
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let (session, response) = enrollment::enrollment_start(url, token)

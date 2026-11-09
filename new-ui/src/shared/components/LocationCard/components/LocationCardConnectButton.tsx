@@ -7,6 +7,7 @@ import { ConnectionAbility, shouldStartMfa } from '../../../utils/mfa';
 import { IconKind } from '../../Icon';
 import { connectErrorToCard } from '../api/cardError';
 import { openRouteConflictInFullView, parseConnectError } from '../api/connectError';
+import { showSystemExtensionModal } from '../api/systemExtension';
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 import { ConnectButton } from './ConnectButton/ConnectButton';
@@ -36,6 +37,8 @@ export const LocationCardConnectButton = () => {
         setView(LocationCardViews.PostureCheckFail);
       } else if (connectError?.kind === 'routeConflict') {
         void openRouteConflictInFullView({ location, conflicts: connectError.conflicts });
+      } else if (connectError?.kind === 'systemExtensionDisabled') {
+        void showSystemExtensionModal();
       } else {
         void logError(`Failed to connect to location ${location.id}: ${err}`);
         showError({

@@ -1,31 +1,47 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectionType, type LocationInfo } from '../../../rust-api/types';
-import { findRouteConflicts } from './connectError';
+import { preflightConnect } from './connectError';
 
-const mocks = vi.hoisted(() => ({ checkRouteConflict: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  checkCanConnect: vi.fn(),
+  showSystemExtensionModal: vi.fn(),
+}));
 
 vi.mock('@tauri-apps/api/event', () => ({ emitTo: vi.fn() }));
+vi.mock('./systemExtension', () => ({
+  openSystemExtensionModal: vi.fn(),
+  showSystemExtensionModal: mocks.showSystemExtensionModal,
+}));
 vi.mock('../../../rust-api/api', () => ({
-  api: { checkRouteConflict: mocks.checkRouteConflict },
+  api: { checkCanConnect: mocks.checkCanConnect },
 }));
 
 const location = { id: 7 } as LocationInfo;
 const conflict = { id: 3, connection_type: ConnectionType.Location, name: 'Office' };
 
-describe('findRouteConflicts', () => {
+describe('preflightConnect', () => {
   it('returns the conflicts only for a route conflict error', async () => {
-    mocks.checkRouteConflict.mockRejectedValueOnce({
+    mocks.checkCanConnect.mockRejectedValueOnce({
       kind: 'routeConflict',
       message: 'conflict',
       conflicts: [conflict],
     });
-    await expect(findRouteConflicts(location)).resolves.toEqual([conflict]);
-    expect(mocks.checkRouteConflict).toHaveBeenCalledWith(7);
+    await expect(preflightConnect(location)).resolves.toEqual([conflict]);
+    expect(mocks.checkCanConnect).toHaveBeenCalledWith(7);
 
-    mocks.checkRouteConflict.mockResolvedValueOnce(undefined);
-    await expect(findRouteConflicts(location)).resolves.toEqual([]);
+    mocks.checkCanConnect.mockResolvedValueOnce(undefined);
+    await expect(preflightConnect(location)).resolves.toEqual([]);
 
-    mocks.checkRouteConflict.mockRejectedValueOnce({ kind: 'other', message: 'db' });
-    await expect(findRouteConflicts(location)).resolves.toEqual([]);
+    mocks.checkCanConnect.mockRejectedValueOnce({ kind: 'other', message: 'db' });
+    await expect(preflightConnect(location)).resolves.toEqual([]);
+  });
+
+  it('shows the system extension modal and blocks when the extension is disabled', async () => {
+    mocks.checkCanConnect.mockRejectedValueOnce({
+      kind: 'systemExtensionDisabled',
+      message: 'disabled',
+    });
+    await expect(preflightConnect(location)).resolves.toBeNull();
+    expect(mocks.showSystemExtensionModal).toHaveBeenCalledOnce();
   });
 });
