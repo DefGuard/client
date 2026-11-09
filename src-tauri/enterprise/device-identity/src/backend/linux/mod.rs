@@ -22,9 +22,11 @@ use tss_esapi::{
 use crate::{
     AttestationIdentity, AttestationMethod, AttestationRequest, AttestationResponse, BackendKind,
     Capabilities, DeviceIdentityError, Identity, PlatformCapabilities, PossessionChallenge,
-    PossessionProof, ProfileId, ProfileSupport, SupportStatus, TpmIdentity, TpmKeyBlobs,
+    PossessionProof, ProfileId, ProfileSupport, SupportStatus, TpmAttestationIdentity, TpmIdentity,
+    TpmKeyBlobs,
 };
 
+mod ek;
 mod raw_capabilities;
 
 #[cfg(test)]
@@ -36,6 +38,8 @@ pub(super) async fn capabilities() -> Result<Capabilities, DeviceIdentityError> 
         .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
+/// Reads TSS2_TCTI, defaulting to device:/dev/tpmrm0 only when the variable is absent.
+/// Invalid configuration is returned as an error rather than replaced.
 fn tcti_configuration() -> Result<TctiNameConf, DeviceIdentityError> {
     let configuration = match env::var("TSS2_TCTI") {
         Ok(value) => value,
@@ -119,6 +123,8 @@ fn check_profile(
     Ok(ProfileSupport { profile, support })
 }
 
+/// Builds the ECC P-256 storage template used to recreate the same parent later.
+/// The caller retains this input template, not the generated SRK public area.
 fn srk_template() -> Result<Public, Error> {
     let attributes = ObjectAttributesBuilder::new()
         .with_fixed_tpm(true)
@@ -153,6 +159,8 @@ fn create_srk(context: &mut Context, template: Public) -> Result<CreatePrimaryKe
     })
 }
 
+/// Creates an ECDSA P-256/SHA-256 key with empty authorization, without loading it.
+/// Restricted keys serve as AKs, unrestricted keys sign possession challenges.
 fn create_signing_key(
     context: &mut Context,
     parent: KeyHandle,
@@ -190,23 +198,31 @@ fn create_signing_key(
     })
 }
 
-fn create_tpm_identity(context: &mut Context) -> Result<TpmIdentity, Error> {
-    let template = srk_template()?;
-    let srk_template = template.marshall()?;
-    let srk = create_srk(context, template)?;
-    context.execute_with_temporary_object(srk.key_handle.into(), |ctx, parent| {
-        let parent = KeyHandle::from(parent);
-        let ak = create_signing_key(ctx, parent, true)?;
-        let identity_key = create_signing_key(ctx, parent, false)?;
-        Ok(TpmIdentity {
-            srk_template,
-            ak,
-            identity_key,
+/// Collects EK data and creates AK and identity blobs without persistent handles.
+/// Releases the transient SRK after key creation, including error paths.
+fn create_tpm_identity(context: &mut Context) -> Result<TpmIdentity, DeviceIdentityError> {
+    let ek = ek::read(context)?;
+    let template = srk_template().map_err(tpm_error)?;
+    let srk_template = template.marshall().map_err(tpm_error)?;
+    let srk = create_srk(context, template).map_err(tpm_error)?;
+    context
+        .execute_with_temporary_object(srk.key_handle.into(), |ctx, parent| {
+            let parent = KeyHandle::from(parent);
+            let ak = create_signing_key(ctx, parent, true)?;
+            let identity_key = create_signing_key(ctx, parent, false)?;
+            Ok(TpmIdentity {
+                ek,
+                srk_template,
+                ak,
+                identity_key,
+            })
         })
-    })
+        .map_err(tpm_error)
 }
 
-fn creation_error(error: Error) -> DeviceIdentityError {
+/// Maps recognized authorization and algorithm errors to facade errors.
+/// Other errors become BackendFailure.
+fn tpm_error(error: Error) -> DeviceIdentityError {
     match error {
         Error::Tss2Error(code) => match code.kind() {
             Some(Tss2ResponseCodeKind::AuthFail | Tss2ResponseCodeKind::BadAuth) => {
@@ -228,23 +244,31 @@ fn creation_error(error: Error) -> DeviceIdentityError {
     }
 }
 
+/// Runs TPM identity creation on a blocking worker, leaving persistence to the caller.
 pub(super) async fn create_identity() -> Result<Identity, DeviceIdentityError> {
     tokio::task::spawn_blocking(|| {
         let configuration = tcti_configuration()?;
         let mut context =
             Context::new(configuration).map_err(|_| DeviceIdentityError::Unavailable)?;
-        create_tpm_identity(&mut context)
-            .map(Identity::Tpm)
-            .map_err(creation_error)
+        create_tpm_identity(&mut context).map(Identity::Tpm)
     })
     .await
     .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
+/// Copies the supplied EK and AK public data without accessing the TPM.
+/// Rejects identities from other backends.
 pub(super) async fn attestation_identity(
-    _identity: &Identity,
+    identity: &Identity,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    let Identity::Tpm(identity) = identity else {
+        return Err(DeviceIdentityError::Unsupported);
+    };
+    Ok(AttestationIdentity::Tpm(TpmAttestationIdentity {
+        ek_public: identity.ek.public.clone(),
+        ek_certificate_chain_der: identity.ek.certificate_chain_der.clone(),
+        ak_public: identity.ak.public.clone(),
+    }))
 }
 
 pub(super) async fn attest_identity(

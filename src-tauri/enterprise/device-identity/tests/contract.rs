@@ -81,6 +81,12 @@ async fn test_created_identity_has_stable_public_enrollment_data() {
             let Identity::Tpm(stored) = &identity else {
                 panic!("expected TPM identity data");
             };
+            assert!(!stored.ek.template.is_empty());
+            assert_eq!(stored.ek.public, metadata.ek_public);
+            assert_eq!(
+                stored.ek.certificate_chain_der,
+                metadata.ek_certificate_chain_der
+            );
             assert!(!stored.srk_template.is_empty());
             assert!(!stored.ak.private.is_empty());
             assert!(!stored.identity_key.private.is_empty());

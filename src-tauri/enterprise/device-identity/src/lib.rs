@@ -164,13 +164,25 @@ pub enum Identity {
     AppleAppAttest { key_id: String },
 }
 
-/// Data for loading the AK and identity key under a recreated SRK.
+/// Caller-owned EK data and blobs for loading the AK and identity key.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TpmIdentity {
+    pub ek: TpmEndorsementKey,
     /// Marshalled input TPMT_PUBLIC for CreatePrimary, not its generated public area.
     pub srk_template: Vec<u8>,
     pub ak: TpmKeyBlobs,
     pub identity_key: TpmKeyBlobs,
+}
+
+/// Public EK data and the parameters needed to recreate it in the TPM.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TpmEndorsementKey {
+    /// Marshalled input TPMT_PUBLIC for CreatePrimary in the Endorsement hierarchy.
+    pub template: Vec<u8>,
+    /// Marshalled TPMT_PUBLIC returned by the TPM.
+    pub public: Vec<u8>,
+    /// Available DER certificates starting with the EK certificate, possibly empty or incomplete.
+    pub certificate_chain_der: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -351,7 +363,7 @@ pub async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
 }
 
 /// Creates a hardware-backed identity for attestation and possession proofs.
-/// TPM uses ECDSA NIST P-256 with SHA-256. Apple uses an App Attest key.
+/// TPM signing keys use ECDSA NIST P-256 with SHA-256. Apple uses an App Attest key.
 ///
 /// TPM backends must generate a non-restricted signing key with fixedTPM,
 /// fixedParent and sensitiveDataOrigin set, plus an AK for key certification.
@@ -363,7 +375,8 @@ pub async fn create_identity() -> Result<Identity, DeviceIdentityError> {
     backend::create_identity().await
 }
 
-/// Returns public enrollment data without exposing the identity's private blobs.
+/// Returns public enrollment data from the supplied identity without accessing hardware.
+/// The returned data is not itself proof of hardware origin.
 pub async fn attestation_identity(
     identity: &Identity,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {

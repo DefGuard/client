@@ -33,10 +33,23 @@ challenge bookkeeping belong to Core and need separate Core tests.
 ## Linux and Windows
 
 Use a dedicated test TPM or an isolated software TPM. TPM identity data consists of
-the SRK input template and separate public/private blobs for the AK and identity key.
+the SRK input template, separate public/private blobs for the AK and identity key,
+and EK data: its input template, public area, and available certificates.
 The caller retains these fields and supplies them to subsequent operations. Private
 blobs are protected by the TPM parent, not exported private keys. The library does
 not create identity files, database records, or persistent TPM handles.
+
+On Linux, creation assumes empty Owner and Endorsement authorization. It creates a
+transient EK using a default tss-esapi profile, preferring ECC P-256 when its NV
+certificate is present, otherwise RSA-2048 when its certificate is present. Without
+either certificate it uses ECC P-256 and returns an empty certificate list. Other NV
+read errors are propagated. A certificate whose public key differs from the default
+EK is unsupported. Manufacturer-specific templates and nonces are not handled.
+
+Only the EK certificate from NV is currently returned. The backend does not fetch CA
+certificates or contact manufacturer services. Certificate trust belongs to Core.
+The stored EK template allows later recreation for credential activation.
+`attestation_identity()` projects the stored public data without accessing the TPM.
 
 Do not clear a TPM used for other applications to clean up these tests.
 
@@ -110,3 +123,6 @@ fixture for these contracts, not a production Core verifier.
 Two ordinary tests use software-generated signed structures to check that the test
 verifiers accept valid inputs and reject altered data, keys, signatures and counters.
 They run without hardware or Apple service access.
+
+The EK certificate fixtures in `fixtures/` are synthetic, self-signed RSA and ECC
+certificates used only to test public-key matching. They are not trust anchors.
