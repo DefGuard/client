@@ -46,7 +46,10 @@ use crate::{
         models::{
             connection::{ActiveConnection, Connection, ConnectionInfo},
             instance::{mfa_contract_from_instance_info, Instance, InstanceInfo},
-            location::{Location, LocationMfaMethod, LocationMfaMode, LocationMfaStep},
+            location::{
+                AutoConnectBlock, AutoConnectContext, Location, LocationMfaMethod, LocationMfaMode,
+                LocationMfaStep,
+            },
             location_stats::LocationStats,
             tunnel::{Tunnel, TunnelConnection, TunnelConnectionInfo, TunnelStats},
             wireguard_keys::WireguardKeys,
@@ -55,7 +58,10 @@ use crate::{
         DB_POOL,
     },
     error::Error,
-    events::{AddInstancePayload, EventKey, TunnelsDisabledPayload, TunnelsEnabledPayload},
+    events::{
+        notify_auto_connect_disabled, AddInstancePayload, EventKey, TunnelsDisabledPayload,
+        TunnelsEnabledPayload,
+    },
     fido2_window::{platform_context, WindowLevelGuard},
     into_location,
     log_watcher::{
@@ -64,6 +70,7 @@ use crate::{
     },
     periodic::config::{
         do_update_instance, poll_instance_with_events, sync_service_locations_best_effort,
+        InstanceUpdate,
     },
     proxy::construct_platform_header,
     tauri_err_to_app_err,
@@ -256,6 +263,31 @@ async fn connect_location_with_psk(
     Ok(())
 }
 
+pub(crate) async fn connect_location(
+    location: Location<Id>,
+    handle: &AppHandle,
+) -> Result<(), ConnectError> {
+    if location.is_service_location() {
+        error!(
+            "Refusing to connect location {location} from the app: it is a service \
+            location, managed by the background service"
+        );
+        return Err(Error::InvalidInput(format!(
+            "Location \"{}\" is a service location and is managed by the defguard service",
+            location.name
+        ))
+        .into());
+    }
+    // MFA flows bring the tunnel up themselves, only posture-only locations resolve a PSK here
+    let preshared_key = if location.posture_check_required {
+        authorize_posture_session(&location).await?
+    } else {
+        None
+    };
+    connect_location_with_psk(location, preshared_key, handle).await?;
+    Ok(())
+}
+
 /// Open new WireGuard connection.
 #[tauri::command(async)]
 pub async fn connect(
@@ -270,28 +302,7 @@ pub async fn connect(
                 "Identified location with ID {location_id} as \"{}\", handling connection.",
                 location.name
             );
-
-            // Avoid connecting a service location - they should be managed by the background service.
-            if location.is_service_location() {
-                error!(
-                    "Refusing to connect location {location} from the app: it is a service \
-                    location, managed by the background service"
-                );
-                return Err(Error::InvalidInput(format!(
-                    "Location \"{}\" is a service location and is managed by the defguard service",
-                    location.name
-                ))
-                .into());
-            }
-            // Connect-time MFA brings the tunnel up itself (keeping the preshared
-            // key backend-side), so the only preshared key resolved here is for
-            // posture-only locations.
-            let preshared_key = if location.posture_check_required {
-                authorize_posture_session(&location).await?
-            } else {
-                None
-            };
-            connect_location_with_psk(location, preshared_key, &handle).await?;
+            connect_location(location, &handle).await?;
         } else {
             error!(
                 "Location with ID {location_id} not found in the database, aborting connection \
@@ -546,9 +557,10 @@ async fn refresh_instance_config(instance_id: Id, handle: &AppHandle) -> Result<
         error!("Instance {instance_id} not found, skipping config update check");
         return Err(Error::NotFound);
     };
-    let instance_changed =
+    let (instance_changed, auto_connect_disabled) =
         poll_instance_with_events(&mut transaction, &mut instance, handle).await?;
     transaction.commit().await?;
+    notify_auto_connect_disabled(handle, &auto_connect_disabled);
 
     sync_service_locations_best_effort(&DB_POOL, &instance).await;
     if instance_changed {
@@ -780,6 +792,9 @@ pub struct LocationInfo {
     pub mfa_method: Option<LocationMfaMethod>,
     pub mfa_steps: Vec<LocationMfaStep>,
     pub mfa_step_plan: Vec<LocationMfaMethod>,
+    pub auto_connect: bool,
+    pub auto_connect_blocked: Option<AutoConnectBlock>,
+    pub routes_all_traffic: bool,
 }
 
 impl LocationInfo {
@@ -799,13 +814,26 @@ impl fmt::Display for LocationInfo {
     }
 }
 
-/// `connected_location_ids` is read once by the caller, so a listing does not take the
-/// connections lock per location.
+pub(crate) async fn load_auto_connect_context() -> Result<AutoConnectContext, Error> {
+    let mut connection = DB_POOL.acquire().await?;
+    AutoConnectContext::load(&mut connection).await
+}
+
+/// `connected_location_ids` and `auto_connect_context` are read once by the caller, so a listing
+/// does not query them per location.
 pub(crate) fn build_location_info(
     location: Location<Id>,
     connected_location_ids: &[Id],
+    auto_connect_context: &AutoConnectContext,
 ) -> LocationInfo {
+    let auto_connect_blocked = auto_connect_context.block(&location);
+    if location.auto_connect && auto_connect_blocked.is_some() {
+        warn!("Location {location} is set to auto-connect while it can't, showing it as off");
+    }
     LocationInfo {
+        auto_connect: location.auto_connect && auto_connect_blocked.is_none(),
+        auto_connect_blocked,
+        routes_all_traffic: auto_connect_context.routes_all_traffic(&location),
         id: location.id,
         instance_id: location.instance_id,
         name: location.name,
@@ -843,9 +871,10 @@ pub async fn all_locations(instance_id: Id) -> Result<Vec<LocationInfo>, Error> 
         locations.len()
     );
     let active_locations_ids = get_connection_id_by_type(ConnectionType::Location).await;
+    let auto_connect_context = load_auto_connect_context().await?;
     let location_info = locations
         .into_iter()
-        .map(|location| build_location_info(location, &active_locations_ids))
+        .map(|location| build_location_info(location, &active_locations_ids, &auto_connect_context))
         .collect::<Vec<_>>();
     trace!(
         "Returning information about {} locations for instance {instance}",
@@ -923,9 +952,12 @@ pub async fn update_instance(
                 Error::ResourceNotFound("instance info in device config response".to_string())
             })?;
         let mut transaction = DB_POOL.begin().await?;
-        let locations_changed =
-            do_update_instance(&mut transaction, &mut instance, response).await?;
+        let InstanceUpdate {
+            locations_changed,
+            auto_connect_disabled,
+        } = do_update_instance(&mut transaction, &mut instance, response).await?;
         transaction.commit().await?;
+        notify_auto_connect_disabled(&app_handle, &auto_connect_disabled);
 
         sync_service_locations_best_effort(&DB_POOL, &instance).await;
 
@@ -1074,18 +1106,19 @@ pub async fn update_location_routing(
     route_all_traffic: bool,
     connection_type: ConnectionType,
     handle: AppHandle,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     debug!("Updating location routing {location_id} with {connection_type}");
     let name = get_tunnel_or_location_name(location_id, connection_type).await;
 
     match connection_type {
         ConnectionType::Location => {
-            Location::update_routing(&DB_POOL, location_id, route_all_traffic).await?;
+            let auto_connect_disabled =
+                Location::update_routing(&DB_POOL, location_id, route_all_traffic).await?;
             debug!("Location routing updated for location {name}(ID: {location_id})");
             handle
                 .emit(EventKey::LocationUpdate.into(), ())
                 .map_err(tauri_err_to_app_err)?;
-            Ok(())
+            Ok(auto_connect_disabled)
         }
         ConnectionType::Tunnel => {
             if let Some(mut tunnel) = Tunnel::find_by_id(&*DB_POOL, location_id).await? {
@@ -1095,7 +1128,7 @@ pub async fn update_location_routing(
                 handle
                     .emit(EventKey::LocationUpdate.into(), ())
                     .map_err(tauri_err_to_app_err)?;
-                Ok(())
+                Ok(false)
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
                 Err(Error::NotFound)
@@ -1113,6 +1146,21 @@ pub async fn set_location_mfa_step_plan(
     debug!("Received command to set MFA step plan for location {location_id}");
     Location::set_mfa_step_plan(&DB_POOL, location_id, mfa_step_plan).await?;
     debug!("MFA step plan updated for location (ID: {location_id})");
+    handle
+        .emit(EventKey::LocationUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub async fn set_location_auto_connect(
+    location_id: Id,
+    auto_connect: bool,
+    handle: AppHandle,
+) -> Result<(), Error> {
+    debug!("Received command to set auto-connect {auto_connect} for location {location_id}");
+    Location::set_auto_connect(&DB_POOL, location_id, auto_connect).await?;
+    debug!("Auto-connect updated for location (ID: {location_id})");
     handle
         .emit(EventKey::LocationUpdate.into(), ())
         .map_err(tauri_err_to_app_err)?;

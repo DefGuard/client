@@ -4,6 +4,8 @@
 //! starting enrollment, creating a device, activating the user, registering
 //! MFA, and finishing the enrollment.
 
+use std::time::Duration;
+
 use defguard_client_proto::defguard::client_types::{
     CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
     EnrollmentStartResponse,
@@ -17,6 +19,10 @@ use crate::{
     proxy::{construct_platform_header, read_error_message},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
+
+// generous because self-hosted instances can sit behind slow or distant links
+const ENROLLMENT_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const ENROLLMENT_REQ_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Error type returned by enrollment operations.
 ///
@@ -117,7 +123,13 @@ pub async fn enrollment_start(
     proxy_url: Url,
     token: String,
 ) -> Result<(EnrollmentSession, EnrollmentStartResponse), EnrollmentError> {
-    let client = Client::new();
+    let client = Client::builder()
+        .connect_timeout(ENROLLMENT_CONNECT_TIMEOUT)
+        .timeout(ENROLLMENT_REQ_TIMEOUT)
+        .build()
+        .map_err(|e| EnrollmentError::Other {
+            message: format!("Failed to build HTTP client: {e}"),
+        })?;
 
     let url = proxy_url
         .join("api/v1/enrollment/start")

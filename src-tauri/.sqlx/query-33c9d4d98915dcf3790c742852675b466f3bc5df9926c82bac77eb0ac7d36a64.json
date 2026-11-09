@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\",\n            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\" FROM location WHERE instance_id = $1 AND service_location_mode <= $2 ORDER BY name ASC",
+  "query": "SELECT id \"id: _\", instance_id, name, address, pubkey, endpoint, allowed_ips, dns, network_id, route_all_traffic, keepalive_interval, location_mfa_mode \"location_mfa_mode: LocationMfaMode\", service_location_mode \"service_location_mode: ServiceLocationMode\",\n            mfa_method \"mfa_method: _\", posture_check_required, mfa_steps \"mfa_steps: _\", mfa_step_plan \"mfa_step_plan: _\", client_mtu \"client_mtu: _\", auto_connect FROM location WHERE instance_id = $1 AND service_location_mode <= $2 ORDER BY name ASC",
   "describe": {
     "columns": [
       {
@@ -200,6 +200,17 @@
             "name": "client_mtu"
           }
         }
+      },
+      {
+        "name": "auto_connect",
+        "ordinal": 18,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "location",
+            "name": "auto_connect"
+          }
+        }
       }
     ],
     "parameters": {
@@ -223,8 +234,9 @@
       false,
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "18bb20a2fcb95b953a8e3f6414db44ca47231624d1b96199312bd6472d16f3b2"
+  "hash": "33c9d4d98915dcf3790c742852675b466f3bc5df9926c82bac77eb0ac7d36a64"
 }

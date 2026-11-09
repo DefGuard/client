@@ -22,7 +22,9 @@ fn expected_backend() -> BackendKind {
 #[ignore = "Requires a supported TPM or configured macOS App Attest host"]
 async fn test_capabilities_report_the_platform_backend_and_required_profile() {
     let _hardware = HARDWARE.lock().await;
-    let caps = capabilities().expect("query an available hardware backend");
+    let caps = capabilities()
+        .await
+        .expect("query an available hardware backend");
     assert_eq!(caps.backend, expected_backend());
     match (&caps.backend, &caps.details) {
         (BackendKind::Tpm, PlatformCapabilities::Tpm(tpm)) => {
@@ -67,8 +69,12 @@ async fn test_created_identity_has_stable_public_enrollment_data() {
     let _hardware = HARDWARE.lock().await;
     let identity = create_identity().await.expect("create an identity");
     assert!(!identity.id.is_empty());
-    let first = attestation_identity(&identity).expect("read public identity data");
-    let second = attestation_identity(&identity).expect("read public identity data again");
+    let first = attestation_identity(&identity)
+        .await
+        .expect("read public identity data");
+    let second = attestation_identity(&identity)
+        .await
+        .expect("read public identity data again");
     assert_eq!(first, second);
     match first {
         AttestationIdentity::Tpm(metadata) => {
@@ -93,7 +99,9 @@ async fn test_created_identity_has_stable_public_enrollment_data() {
 async fn test_attestation_verifies_and_rejects_changed_data_or_evidence() {
     let _hardware = HARDWARE.lock().await;
     let identity = create_identity().await.expect("create an identity");
-    let metadata = attestation_identity(&identity).expect("read public identity data");
+    let metadata = attestation_identity(&identity)
+        .await
+        .expect("read public identity data");
     let (request, secret) = prepare_attestation(&metadata);
     let response = attest_identity(&identity, &request)
         .await
@@ -178,12 +186,16 @@ async fn test_possession_proof_binds_the_exact_data_and_registered_key() {
 async fn test_creating_another_identity_preserves_the_existing_identity() {
     let _hardware = HARDWARE.lock().await;
     let (first, mut verifier) = enroll().await;
-    let metadata = attestation_identity(&first).expect("read first identity metadata");
+    let metadata = attestation_identity(&first)
+        .await
+        .expect("read first identity metadata");
     let second = create_identity().await.expect("create a second identity");
     assert_ne!(first, second);
     assert_eq!(
         metadata,
-        attestation_identity(&first).expect("reload first identity metadata")
+        attestation_identity(&first)
+            .await
+            .expect("reload first identity metadata")
     );
     let challenge = PossessionChallenge {
         data: challenge_data("identity-preservation"),
@@ -202,7 +214,9 @@ async fn test_creating_another_identity_preserves_the_existing_identity() {
 async fn test_tpm_rejects_a_corrupted_credential_challenge() {
     let _hardware = HARDWARE.lock().await;
     let identity = create_identity().await.expect("create an identity");
-    let metadata = attestation_identity(&identity).expect("read EK and AK");
+    let metadata = attestation_identity(&identity)
+        .await
+        .expect("read EK and AK");
     let (request, _) = prepare_attestation(&metadata);
     let mut bad_blob = request.clone();
     let AttestationChallenge::Tpm(credential) = &mut bad_blob.challenge else {

@@ -6,7 +6,7 @@ use std::{
 
 pub use defguard_client_config_sync::commands::{
     disable_enterprise_features, do_update_instance, locations_changed, sync_service_locations,
-    sync_service_locations_best_effort,
+    sync_service_locations_best_effort, InstanceUpdate,
 };
 use defguard_client_config_sync::{
     poll_instance, poll_instances, PollInstanceResult, VersionMismatchPayload,
@@ -27,7 +27,9 @@ use tauri::{AppHandle, Emitter};
 use tokio::time::sleep;
 
 use crate::{
-    commands::disconnect_all_tunnels, events::TunnelsEnabledPayload, tray::reload_tray_menu,
+    commands::disconnect_all_tunnels,
+    events::{notify_auto_connect_disabled, TunnelsEnabledPayload},
+    tray::reload_tray_menu,
 };
 
 const INTERVAL_SECONDS: Duration = Duration::from_secs(30);
@@ -77,6 +79,7 @@ pub async fn poll_config(handle: AppHandle) {
 
         let mut config_retrieved = 0;
         let mut tray_stale = false;
+        let mut auto_connect_disabled = Vec::new();
         for outcome in outcomes {
             let instance_name = outcome.instance_name;
             let instance_id = outcome.instance_id;
@@ -84,6 +87,7 @@ pub async fn poll_config(handle: AppHandle) {
                 Ok(result) => {
                     config_retrieved += 1;
                     tray_stale |= instance_changed(&result);
+                    auto_connect_disabled.extend_from_slice(disabled_auto_connect(&result));
                     emit_version_mismatch(&handle, instance_id, version_mismatch(&result));
                     emit_poll_result_events(&handle, instance_id, &instance_name, result);
                     debug!(
@@ -114,6 +118,7 @@ pub async fn poll_config(handle: AppHandle) {
         if tray_stale {
             reload_tray_menu(&handle).await;
         }
+        notify_auto_connect_disabled(&handle, &auto_connect_disabled);
 
         let currently_disabled = Instance::tunnels_disabled(&*DB_POOL).await.unwrap_or(false);
 
@@ -147,23 +152,32 @@ pub async fn poll_config(handle: AppHandle) {
     }
 }
 
-/// Retrieves configuration for a given [`Instance`].
-/// Updates the instance if there aren't any active connections, otherwise emits
-/// a ConfigChanged event so the frontend can prompt the user to reconnect.
-/// Returns whether the instance itself was written.
+/// Applies the polled config, or emits ConfigChanged while connections are active.
+/// Returns whether the instance was written and the locations that lost auto-connect.
 pub async fn poll_instance_with_events(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,
     handle: &AppHandle,
-) -> Result<bool, Error> {
+) -> Result<(bool, Vec<String>), Error> {
     let has_active_connections = !active_connections(instance).await?.is_empty();
     let result = poll_instance(transaction, instance, has_active_connections).await?;
     let changed = instance_changed(&result);
+    let auto_connect_disabled = disabled_auto_connect(&result).to_vec();
 
     emit_version_mismatch(handle, instance.id, version_mismatch(&result));
     emit_poll_result_events(handle, instance.id, &instance.name, result);
 
-    Ok(changed)
+    Ok((changed, auto_connect_disabled))
+}
+
+fn disabled_auto_connect(result: &PollInstanceResult) -> &[String] {
+    match result {
+        PollInstanceResult::Updated {
+            auto_connect_disabled,
+            ..
+        } => auto_connect_disabled,
+        PollInstanceResult::Unchanged { .. } | PollInstanceResult::ChangedWhileActive { .. } => &[],
+    }
 }
 
 /// Whether the poll wrote to the instance, which the tray menu is built from.

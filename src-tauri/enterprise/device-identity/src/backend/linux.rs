@@ -19,7 +19,13 @@ use crate::{
 #[path = "linux/raw_capabilities.rs"]
 mod raw_capabilities;
 
-pub(super) fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
+pub(super) async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
+    tokio::task::spawn_blocking(read_capabilities)
+        .await
+        .map_err(|_| DeviceIdentityError::BackendFailure)?
+}
+
+fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
     let configuration = match env::var("TSS2_TCTI") {
         Ok(value) => value,
         Err(env::VarError::NotPresent) => "device:/dev/tpmrm0".into(),
@@ -102,7 +108,7 @@ pub(super) async fn create_identity() -> Result<IdentityRef, DeviceIdentityError
     Err(DeviceIdentityError::Unsupported)
 }
 
-pub(super) fn attestation_identity(
+pub(super) async fn attestation_identity(
     _identity: &IdentityRef,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {
     Err(DeviceIdentityError::Unsupported)

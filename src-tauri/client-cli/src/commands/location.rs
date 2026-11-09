@@ -120,8 +120,12 @@ pub async fn handle_set(
     }
 
     if let Some(true) = route_all_traffic {
-        Location::update_routing(&state.pool, location_id, true).await?;
+        let auto_connect_disabled =
+            Location::update_routing(&state.pool, location_id, true).await?;
         changed.push("route-all-traffic → on".to_string());
+        if auto_connect_disabled {
+            changed.push("auto-connect → off".to_string());
+        }
     } else if predefined_traffic {
         Location::update_routing(&state.pool, location_id, false).await?;
         changed.push("route-all-traffic → off".to_string());

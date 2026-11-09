@@ -17,7 +17,6 @@ import { ThemeSpacing } from '../../../../../shared/types';
 import { isPresent } from '../../../../../shared/utils/isPresent';
 import { mfaToText } from '../../../../../shared/utils/mfa';
 import {
-  discardMfaConfiguration,
   selectPendingMethod,
   useConfigureMfaStore,
 } from '../../hooks/useConfigureMfaStore';
@@ -27,7 +26,7 @@ import { ConfigureMfaStep } from '../../types';
 const CODE_LENGTH = 6;
 
 interface Props {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
   /** The session outlived its deadline, so the whole flow has to start over. */
   onSessionExpired: () => void;
 }
@@ -105,8 +104,7 @@ export const ConfigureFactorStep = ({ onCancel, onSessionExpired }: Props) => {
   });
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: discardMfaConfiguration,
-    onSettled: onCancel,
+    mutationFn: onCancel,
   });
 
   const isBusy = isStartingSetup || isFinishingSetup || isCancelling;

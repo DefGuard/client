@@ -18,7 +18,7 @@ import '../style.scss';
 import './style.scss';
 
 interface Props {
-  onCancel: () => void;
+  onCancel: () => Promise<void>;
 }
 
 /** shown when the session offers more than one method, or only OpenID */
@@ -32,18 +32,13 @@ export const ConfigureSelectVerificationStep = ({ onCancel }: Props) => {
   const instance = useConfigureMfaStore((s) => s.instance) ?? undefined;
 
   const { mutate: cancel, isPending: isCancelling } = useMutation({
-    // the source is read before the discard resets the store
     mutationFn: async () => {
-      const { source } = useConfigureMfaStore.getState();
-      await discardMfaConfiguration();
-      return source;
-    },
-    onSettled: (source) => {
-      if (source === ConfigureFactorsSource.AddPage) {
-        void navigate({ to: '/full/add/mfa' });
+      if (!fromAddPage) {
+        await onCancel();
         return;
       }
-      onCancel();
+      await navigate({ to: '/full/add/mfa', replace: true });
+      await discardMfaConfiguration();
     },
   });
 

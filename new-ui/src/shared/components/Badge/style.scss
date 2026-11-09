@@ -1,11 +1,14 @@
 .badge {
   --bg-color: var(--bg-white-10);
   --text-color: var(--fg-white-100);
+  --icon-color: var(--text-color);
+  --font: var(--t-badge);
 
   display: inline-flex;
   flex-flow: row nowrap;
   align-items: center;
   justify-content: center;
+  column-gap: var(--badge-gap);
   height: var(--badge-height);
   padding: 0 var(--badge-spacing);
   box-sizing: border-box;
@@ -21,7 +24,7 @@
   }
 
   & > span {
-    font: var(--t-badge);
+    font: var(--font);
     color: var(--text-color);
     white-space: nowrap;
 

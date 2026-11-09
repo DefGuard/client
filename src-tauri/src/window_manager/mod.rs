@@ -6,7 +6,7 @@ use tauri::{
 
 use crate::{
     appstate::AppState,
-    commands::{build_instance_info, build_location_info},
+    commands::{build_instance_info, build_location_info, load_auto_connect_context},
     connection::active_connections::get_connection_id_by_type,
     database::{
         models::{
@@ -40,7 +40,7 @@ pub const COMPACT_WINDOW_ID: &str = "compact-view";
 pub const FULL_VIEW_WINDOW_ID: &str = "full-view";
 pub const WELCOME_WINDOW_ID: &str = "welcome";
 pub const WELCOME_WINDOW_WIDTH: f64 = 640.0;
-pub const WELCOME_WINDOW_HEIGHT: f64 = 585.0;
+pub const WELCOME_WINDOW_HEIGHT: f64 = 634.0;
 pub const COMPACT_WINDOW_WIDTH: f64 = 380.0;
 pub const COMPACT_WINDOW_HEIGHT: f64 = 680.0;
 pub const FULL_VIEW_WINDOW_WIDTH: f64 = 800.0;
@@ -319,7 +319,12 @@ pub async fn initiate_configure_factor_screen(
     let location = match location_id {
         Some(location_id) => {
             if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
-                Some(build_location_info(location, &connected_location_ids))
+                let auto_connect_context = load_auto_connect_context().await?;
+                Some(build_location_info(
+                    location,
+                    &connected_location_ids,
+                    &auto_connect_context,
+                ))
             } else {
                 warn!("Configure factors requested from unknown location {location_id}");
                 None

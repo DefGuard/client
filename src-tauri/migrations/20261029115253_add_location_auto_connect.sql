@@ -1,0 +1,1 @@
+ALTER TABLE location ADD COLUMN auto_connect BOOLEAN NOT NULL DEFAULT false;

@@ -1,12 +1,16 @@
 import './style.scss';
 import clsx from 'clsx';
-import { TruncatedText } from '../../../../../shared/components/TruncatedText/TruncatedText';
 import { useAppData } from '../../../../../shared/providers/AppDataContext';
+import { TooltipContent } from '../../../../../shared/providers/tooltip/TooltipContent';
+import { TooltipProvider } from '../../../../../shared/providers/tooltip/TooltipContext';
+import { TooltipTrigger } from '../../../../../shared/providers/tooltip/TooltipTrigger';
 import type {
   InstanceInfo,
   LocationInfo,
   OverviewViewSelection,
 } from '../../../../../shared/rust-api/types';
+
+const labelTooltipOpenDelayMs = 1000;
 
 type Props = {
   instances: InstanceInfo[];
@@ -20,9 +24,16 @@ type SelectionItemProps = {
 };
 
 const SelectionItem = ({ label, selected, onClick }: SelectionItemProps) => (
-  <button className={clsx('item', { selected })} onClick={onClick}>
-    <TruncatedText className="label" text={label} tooltipPlacement="right" delayTooltip />
-  </button>
+  <TooltipProvider placement="top" openDelayMs={labelTooltipOpenDelayMs}>
+    <TooltipTrigger>
+      <button className={clsx('item', { selected })} onClick={onClick}>
+        <span className="label">{label}</span>
+      </button>
+    </TooltipTrigger>
+    <TooltipContent>
+      <p>{label}</p>
+    </TooltipContent>
+  </TooltipProvider>
 );
 
 export const OverviewSelection = ({ instances, tunnels }: Props) => {

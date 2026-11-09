@@ -243,6 +243,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
         }),
         mfa_step_plan: Json::default(),
         client_mtu: dev_config.mtu,
+        auto_connect: false,
     }
 }
 

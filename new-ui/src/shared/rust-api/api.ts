@@ -5,6 +5,7 @@ import type {
   AddInstanceEventPayload,
   AppConfig,
   AppConfigPatch,
+  AutoConnectDisabled,
   Connection,
   ConnectionArgs,
   CreateDeviceResponse,
@@ -28,6 +29,7 @@ import type {
   SaveDeviceConfigResponse,
   SessionState,
   SessionStatePatch,
+  SetLocationAutoConnectArgs,
   SetLocationMfaStepPlanArgs,
   StatsArgs,
   TunnelInfo,
@@ -57,11 +59,14 @@ const hasAnyVisibleLocations = (): Promise<boolean> =>
 const getLocationDetails = (args: LocationDetailsArgs): Promise<LocationDetails> =>
   invoke(TauriCommand.LocationInterfaceDetails, args);
 
-const updateLocationRouting = (args: RoutingArgs): Promise<Connection> =>
+const updateLocationRouting = (args: RoutingArgs): Promise<AutoConnectDisabled> =>
   invoke(TauriCommand.UpdateLocationRouting, args);
 
 const setLocationMfaStepPlan = (args: SetLocationMfaStepPlanArgs): Promise<void> =>
   invoke(TauriCommand.SetLocationMfaStepPlan, args);
+
+const setLocationAutoConnect = (args: SetLocationAutoConnectArgs): Promise<void> =>
+  invoke(TauriCommand.SetLocationAutoConnect, args);
 
 const connect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Connect, args);
@@ -353,6 +358,7 @@ export const api = {
   getLocationDetails,
   updateLocationRouting,
   setLocationMfaStepPlan,
+  setLocationAutoConnect,
   // Connections
   connect,
   checkRouteConflict,

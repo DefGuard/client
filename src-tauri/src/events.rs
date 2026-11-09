@@ -111,6 +111,53 @@ impl TunnelsDisabledPayload {
     }
 }
 
+const MAX_LISTED_LOCATIONS: usize = 3;
+
+fn list_locations(locations: &[String]) -> String {
+    let listed = locations[..locations.len().min(MAX_LISTED_LOCATIONS)].join(", ");
+    match locations.len().saturating_sub(MAX_LISTED_LOCATIONS) {
+        0 => listed,
+        hidden => format!("{listed} and {hidden} more"),
+    }
+}
+
+fn notify_locations(app_handle: &AppHandle, locations: &[String], title: &str, body: &str) {
+    if locations.is_empty() {
+        return;
+    }
+    let title = match locations.len() {
+        1 => title.to_string(),
+        count => format!("{title} for {count} locations"),
+    };
+    if let Err(err) = app_handle
+        .notification()
+        .builder()
+        .title(&title)
+        .body(format!("{} {body}", list_locations(locations)))
+        .show()
+    {
+        warn!("Notification \"{title}\" not shown. Reason: {err}");
+    }
+}
+
+pub(crate) fn notify_auto_connect_disabled(app_handle: &AppHandle, locations: &[String]) {
+    notify_locations(
+        app_handle,
+        locations,
+        "Auto-connect turned off",
+        "won't connect automatically at startup after a configuration update.         Open Settings > Startup & Auto-connect for details.",
+    );
+}
+
+pub(crate) fn notify_auto_connect_failed(app_handle: &AppHandle, locations: &[String]) {
+    notify_locations(
+        app_handle,
+        locations,
+        "Auto-connect failed",
+        "couldn't connect automatically at startup. Connect manually or check the logs.",
+    );
+}
+
 #[derive(Clone, Serialize)]
 pub struct TunnelsEnabledPayload;
 
