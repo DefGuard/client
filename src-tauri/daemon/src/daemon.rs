@@ -508,11 +508,6 @@ impl DesktopDaemonService for DaemonService {
             wgapi
         };
 
-        #[cfg(windows)]
-        if let Ok(mut blocks) = self.ipv6_blocks.lock() {
-            blocks.remove(&ifname);
-        }
-
         #[cfg(not(windows))]
         {
             debug!("Cleaning up interface {ifname} routing");
@@ -532,9 +527,14 @@ impl DesktopDaemonService for DaemonService {
             Status::new(Code::Internal, msg)
         })?;
 
-        #[cfg(target_os = "linux")]
-        if let Ok(mut blocks) = self.ipv6_blocks.lock() {
-            blocks.remove(&ifname);
+        // On Linux the unreachable route must outlive the interface's fwmark rules, or IPv6
+        // falls through to the main table while the interface is being removed.
+        #[cfg(any(windows, target_os = "linux"))]
+        match self.ipv6_blocks.lock() {
+            Ok(mut blocks) => {
+                blocks.remove(&ifname);
+            }
+            Err(err) => error!("Failed to lock IPv6 blocks for interface {ifname}: {err}"),
         }
         debug!("Finished removing interface {ifname}");
         Ok(Response::new(()))
@@ -823,35 +823,31 @@ mod tests {
 
     use super::{ipv6_block_change, should_block_ipv6, Ipv6BlockChange};
 
-    fn test_ip(address: IpAddr, cidr: u8) -> IpAddrMask {
-        IpAddrMask::new(address, cidr)
-    }
-
     #[test]
     fn test_ipv6_default_without_ipv6_address_blocks() {
-        let allowed_ips = [test_ip(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)];
+        let allowed_ips = [IpAddrMask::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)];
 
         assert!(should_block_ipv6(allowed_ips.iter(), &[]));
     }
 
     #[test]
     fn test_assigned_ipv6_address_disables_block() {
-        let allowed_ips = [test_ip(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)];
-        let addresses = [test_ip(IpAddr::V6(Ipv6Addr::LOCALHOST), 128)];
+        let allowed_ips = [IpAddrMask::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)];
+        let addresses = [IpAddrMask::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 128)];
 
         assert!(!should_block_ipv6(allowed_ips.iter(), &addresses));
     }
 
     #[test]
     fn test_without_ipv6_default_does_not_block() {
-        let allowed_ips = [test_ip(IpAddr::V6(Ipv6Addr::LOCALHOST), 128)];
+        let allowed_ips = [IpAddrMask::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 128)];
 
         assert!(!should_block_ipv6(allowed_ips.iter(), &[]));
     }
 
     #[test]
     fn test_ipv4_default_does_not_block_ipv6() {
-        let allowed_ips = [test_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)];
+        let allowed_ips = [IpAddrMask::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)];
 
         assert!(!should_block_ipv6(allowed_ips.iter(), &[]));
     }

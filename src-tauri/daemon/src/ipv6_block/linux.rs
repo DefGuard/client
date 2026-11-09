@@ -14,7 +14,16 @@ use netlink_sys::{constants::NETLINK_ROUTE, Socket, SocketAddr};
 use tracing::error;
 
 const SOCKET_BUFFER_LENGTH: usize = 12_288;
+// IPv6 route deletion ignores the route type but matches the protocol, so a protocol of our own
+// keeps Drop from deleting the tunnel's `::/0` route. 77 is not assigned by the kernel or iproute2.
+const ROUTE_PROTOCOL: RouteProtocol = RouteProtocol::Other(77);
 
+/// Makes IPv6 connections fail immediately on a tunnel that has no IPv6 address.
+///
+/// wireguard-rs routes unmarked traffic through the routing table numbered after the interface
+/// fwmark. This replaces the tunnel's `::/0` route in that table with an unreachable route, which
+/// is deleted again when this value is dropped. The route is not tied to the interface, so it
+/// outlives it unless deleted.
 pub(crate) struct Ipv6Block {
     fwmark: u32,
 }
@@ -43,6 +52,7 @@ impl Ipv6Block {
             Err(err) => return Err((self, err.into())),
         };
         let mut message = route_message(self.fwmark);
+        message.header.protocol = RouteProtocol::Boot;
         message.header.scope = RouteScope::Link;
         message.header.kind = RouteType::Unicast;
         message.attributes.push(RouteAttribute::Oif(index));
@@ -64,7 +74,9 @@ impl Drop for Ipv6Block {
             RouteNetlinkMessage::DelRoute(route_message(self.fwmark)),
             NLM_F_REQUEST | NLM_F_ACK,
         ) {
-            if err.kind() != io::ErrorKind::NotFound {
+            let already_removed = err.kind() == io::ErrorKind::NotFound
+                || err.raw_os_error() == Some(nix::errno::Errno::ESRCH as i32);
+            if !already_removed {
                 error!(
                     "Failed to remove IPv6 unreachable route from table {}: {err}",
                     self.fwmark
@@ -80,7 +92,7 @@ fn route_message(fwmark: u32) -> RouteMessage {
         address_family: AddressFamily::Inet6,
         destination_prefix_length: 0,
         table: RouteHeader::RT_TABLE_UNSPEC,
-        protocol: RouteProtocol::Boot,
+        protocol: ROUTE_PROTOCOL,
         scope: RouteScope::Universe,
         kind: RouteType::Unreachable,
         ..Default::default()
