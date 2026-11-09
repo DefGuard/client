@@ -18,7 +18,7 @@ by adding its name before `-- --ignored`.
 ## Contracts
 
 - Capabilities identify the platform backend and its supported identity profile.
-- Created identities have nonempty local references and stable public enrollment data.
+- Created identities return caller-owned key data and stable public enrollment data.
 - TPM activation recovers a fresh secret chosen by the test verifier.
 - Attestation certifies the required identity key and binds the exact opaque Core bytes.
 - Changed attestation data, evidence or activation secrets fail independent verification.
@@ -32,13 +32,16 @@ challenge bookkeeping belong to Core and need separate Core tests.
 
 ## Linux and Windows
 
-Use a dedicated test TPM or an isolated software TPM. Tests create persistent local
-identity records and may leave them behind because the facade has no deletion
-operation yet. Do not clear a TPM used for other applications to clean up these tests.
+Use a dedicated test TPM or an isolated software TPM. TPM identity data consists of
+the SRK input template and separate public/private blobs for the AK and identity key.
+The caller retains these fields and supplies them to subsequent operations. Private
+blobs are protected by the TPM parent, not exported private keys. The library does
+not create identity files, database records, or persistent TPM handles.
 
-For Linux, `swtpm` is the preferred fixture. The backend needs transport configuration
-before these tests can target it. If the implementation adopts the usual TSS transport
-environment variable, a typical setting is:
+Do not clear a TPM used for other applications to clean up these tests.
+
+For Linux, `swtpm` is the preferred fixture. The backend reads `TSS2_TCTI`, defaulting
+to `device:/dev/tpmrm0`. To select an emulator:
 
 ```sh
 export TSS2_TCTI='swtpm:host=127.0.0.1,port=2321'
@@ -46,8 +49,7 @@ export TSS2_TCTI='swtpm:host=127.0.0.1,port=2321'
 
 This test suite does not start an emulator, provision a persistent EK handle, or
 configure OS permissions. These are responsibilities of the runner and backend.
-Windows needs a suitable TPM accessible through its transport and a writable test
-identity store.
+Windows needs a suitable TPM accessible through its transport.
 
 The independent software MakeCredential fixture supports standard RSA-2048 and
 NIST P-256 EKs with SHA-256 and AES-128-CFB. AK and identity keys must use ECDSA
@@ -62,6 +64,10 @@ Use a macOS 27+ host where App Attest reports support. The test process needs th
 signing, provisioning and application identity required by App Attest. Plain
 `cargo test` may need an app-hosted runner or packaging to obtain that execution
 context. The Rust facade alone does not provide it.
+
+The caller retains the returned App Attest key ID. The key itself remains managed
+by the platform, not by a library-owned store. Tests may leave platform-managed keys
+behind and consume service quotas.
 
 Initial attestation needs access to Apple services. Assertions are verified locally.
 Set:

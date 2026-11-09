@@ -1,3 +1,4 @@
+//! Identity data is owned and persisted by the caller, not the library.
 //! Backends must run blocking platform calls outside async executor threads.
 
 use thiserror::Error;
@@ -155,11 +156,29 @@ pub struct ProfileSupport {
     pub support: SupportStatus,
 }
 
-/// Reference to a locally managed identity
+/// Caller-owned data needed to reuse an identity across operations and restarts.
+/// The library does not persist it or send it to Core.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct IdentityRef {
-    /// Local storage identifier
-    pub id: String,
+pub enum Identity {
+    Tpm(TpmIdentity),
+    AppleAppAttest { key_id: String },
+}
+
+/// Data for loading the AK and identity key under a recreated SRK.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TpmIdentity {
+    /// Marshalled input TPMT_PUBLIC for CreatePrimary, not its generated public area.
+    pub srk_template: Vec<u8>,
+    pub ak: TpmKeyBlobs,
+    pub identity_key: TpmKeyBlobs,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TpmKeyBlobs {
+    /// Marshalled TPMT_PUBLIC for loading the key.
+    pub public: Vec<u8>,
+    /// Parent-protected TPM2B_PRIVATE contents without the outer size field, not a raw private key.
+    pub private: Vec<u8>,
 }
 
 /// Public backend data supplied to Core before generating attestation challenges
@@ -338,15 +357,15 @@ pub async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
 /// fixedParent and sensitiveDataOrigin set, plus an AK for key certification.
 /// Apple backends must generate an App Attest key bound to the Secure Enclave.
 ///
-/// Returns a local reference for later attestation and possession proofs.
-/// Returns Unsupported when the required profile or mechanism is unavailable.
-pub async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
+/// Returns all client-owned data needed for later attestation and possession proofs.
+/// The caller must retain the complete identity. Unsupported profiles return Unsupported.
+pub async fn create_identity() -> Result<Identity, DeviceIdentityError> {
     backend::create_identity().await
 }
 
-/// Returns the identity's public attestation data for enrollment with Core.
+/// Returns public enrollment data without exposing the identity's private blobs.
 pub async fn attestation_identity(
-    identity: &IdentityRef,
+    identity: &Identity,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {
     backend::attestation_identity(identity).await
 }
@@ -354,16 +373,16 @@ pub async fn attestation_identity(
 /// Processes the backend challenge and generates evidence bound to the exact Core-encoded data.
 /// TPM returns the activation secret and certification, while Apple returns App Attest evidence.
 pub async fn attest_identity(
-    identity: &IdentityRef,
+    identity: &Identity,
     request: &AttestationRequest,
 ) -> Result<AttestationResponse, DeviceIdentityError> {
     backend::attest_identity(identity, request).await
 }
 
-/// Produces a proof bound to Core's challenge using the referenced identity.
+/// Produces a proof bound to Core's challenge using the supplied identity data.
 /// Core must verify it against the previously attested key.
 pub async fn prove_possession(
-    identity: &IdentityRef,
+    identity: &Identity,
     challenge: &PossessionChallenge,
 ) -> Result<PossessionProof, DeviceIdentityError> {
     backend::prove_possession(identity, challenge).await

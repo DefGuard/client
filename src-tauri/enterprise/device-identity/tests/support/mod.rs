@@ -3,7 +3,7 @@ pub mod tpm;
 
 use device_identity::{
     attest_identity, attestation_identity, create_identity, AttestationChallenge,
-    AttestationIdentity, AttestationRequest, AttestationResponse, IdentityRef, PossessionProof,
+    AttestationIdentity, AttestationRequest, AttestationResponse, Identity, PossessionProof,
     SignatureAlgorithm,
 };
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
@@ -109,7 +109,7 @@ pub fn verify_attestation(
     }
 }
 
-pub async fn enroll() -> (IdentityRef, IdentityVerifier) {
+pub async fn enroll() -> (Identity, IdentityVerifier) {
     let identity = create_identity()
         .await
         .expect("create a hardware-backed identity");

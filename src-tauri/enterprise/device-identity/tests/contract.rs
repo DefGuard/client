@@ -3,7 +3,7 @@ mod support;
 use device_identity::{
     attest_identity, attestation_identity, capabilities, create_identity, prove_possession,
     AttestationChallenge, AttestationIdentity, AttestationMethod, AttestationResponse, BackendKind,
-    PlatformCapabilities, PossessionChallenge, PossessionProof, ProfileId, SupportStatus,
+    Identity, PlatformCapabilities, PossessionChallenge, PossessionProof, ProfileId, SupportStatus,
 };
 use support::{challenge_data, enroll, prepare_attestation, verify_attestation};
 
@@ -64,11 +64,10 @@ async fn test_capabilities_report_the_platform_backend_and_required_profile() {
 }
 
 #[tokio::test]
-#[ignore = "Requires persistent TPM key storage or a configured App Attest host"]
+#[ignore = "Requires TPM key creation or a configured App Attest host"]
 async fn test_created_identity_has_stable_public_enrollment_data() {
     let _hardware = HARDWARE.lock().await;
     let identity = create_identity().await.expect("create an identity");
-    assert!(!identity.id.is_empty());
     let first = attestation_identity(&identity)
         .await
         .expect("read public identity data");
@@ -79,12 +78,25 @@ async fn test_created_identity_has_stable_public_enrollment_data() {
     match first {
         AttestationIdentity::Tpm(metadata) => {
             assert_eq!(expected_backend(), BackendKind::Tpm);
+            let Identity::Tpm(stored) = &identity else {
+                panic!("expected TPM identity data");
+            };
+            assert!(!stored.srk_template.is_empty());
+            assert!(!stored.ak.private.is_empty());
+            assert!(!stored.identity_key.private.is_empty());
+            assert_eq!(stored.ak.public, metadata.ak_public);
+            support::tpm::signing_key(&stored.identity_key.public, false)
+                .expect("identity must be an unrestricted TPM-generated ECDSA P-256/SHA-256 key");
             assert!(!metadata.ek_public.is_empty());
             support::tpm::signing_key(&metadata.ak_public, true)
                 .expect("AK must be a restricted TPM-generated ECDSA P-256/SHA-256 key");
         }
         AttestationIdentity::AppleAppAttest { key_id } => {
             assert_eq!(expected_backend(), BackendKind::AppleAppAttest);
+            let Identity::AppleAppAttest { key_id: stored } = &identity else {
+                panic!("expected App Attest identity data");
+            };
+            assert_eq!(&key_id, stored);
             use base64::Engine;
             let key_id = base64::engine::general_purpose::STANDARD
                 .decode(key_id)
@@ -182,7 +194,7 @@ async fn test_possession_proof_binds_the_exact_data_and_registered_key() {
 }
 
 #[tokio::test]
-#[ignore = "Requires persistent hardware key storage and a verified identity"]
+#[ignore = "Requires hardware key creation and a verified identity"]
 async fn test_creating_another_identity_preserves_the_existing_identity() {
     let _hardware = HARDWARE.lock().await;
     let (first, mut verifier) = enroll().await;
