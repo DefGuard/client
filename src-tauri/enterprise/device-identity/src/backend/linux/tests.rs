@@ -347,12 +347,30 @@ fn test_attestation_signature_der_pads_sign_bits_and_removes_leading_zeroes() {
         EccParameter::try_from(vec![0, 1]).unwrap(),
     )
     .unwrap();
-    let encoded = super::attestation::encode_signature(TpmSignature::EcDsa(signature)).unwrap();
+    let encoded = super::keys::encode_signature(TpmSignature::EcDsa(signature)).unwrap();
     assert_eq!(encoded.algorithm, crate::SignatureAlgorithm::EcdsaSha256);
     assert_eq!(encoded.bytes, vec![0x30, 7, 2, 2, 0, 0x80, 2, 1, 1]);
     p256::ecdsa::Signature::from_der(&encoded.bytes).expect("parse the signature independently");
     assert_eq!(
-        super::attestation::encode_signature(TpmSignature::Null),
+        super::keys::encode_signature(TpmSignature::Null),
         Err(DeviceIdentityError::Unsupported)
+    );
+}
+
+#[tokio::test]
+async fn test_prove_possession_rejects_another_backend_and_invalid_template_without_hardware() {
+    let challenge = crate::PossessionChallenge {
+        data: vec![1, 2, 3],
+    };
+    let apple = Identity::AppleAppAttest {
+        key_id: "apple-key".into(),
+    };
+    assert_eq!(
+        crate::prove_possession(&apple, &challenge).await,
+        Err(DeviceIdentityError::Unsupported)
+    );
+    assert_eq!(
+        crate::prove_possession(&identity_fixture(), &challenge).await,
+        Err(DeviceIdentityError::IdentityLost)
     );
 }

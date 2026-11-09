@@ -296,3 +296,50 @@ async fn test_attestation_rejects_damaged_identity_without_replacing_keys() {
     verify_attestation(&metadata, &request, secret.as_ref(), &response)
         .expect("verify the original keys after failed attempts");
 }
+
+#[cfg(any(target_os = "linux", windows))]
+#[tokio::test]
+#[ignore = "Requires a TPM with empty Owner and Endorsement authorization"]
+async fn test_tpm_possession_needs_no_ek_or_ak_and_rejects_damaged_identity() {
+    let _hardware = HARDWARE.lock().await;
+    let (mut identity, mut verifier) = enroll().await;
+    let Identity::Tpm(stored) = &mut identity else {
+        panic!("expected TPM identity")
+    };
+    stored.ek.template.clear();
+    stored.ek.public.clear();
+    stored.ek.certificate_chain_der.clear();
+    stored.ak.public.clear();
+    stored.ak.private.clear();
+    let challenge = PossessionChallenge {
+        data: challenge_data("possession-without-attestation-keys"),
+    };
+    let proof = prove_possession(&identity, &challenge)
+        .await
+        .expect("sign without EK or AK data");
+    verifier
+        .verify_proof(&challenge.data, &proof)
+        .expect("verify the identity key signature");
+    for damaged in 0..3 {
+        let mut changed = identity.clone();
+        let Identity::Tpm(stored) = &mut changed else {
+            unreachable!()
+        };
+        match damaged {
+            0 => stored.srk_template = vec![0],
+            1 => stored.identity_key.public = vec![0],
+            2 => stored.identity_key.private[0] ^= 1,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            prove_possession(&changed, &challenge).await.err(),
+            Some(DeviceIdentityError::IdentityLost)
+        );
+    }
+    let proof = prove_possession(&identity, &challenge)
+        .await
+        .expect("sign after rejected identity data");
+    verifier
+        .verify_proof(&challenge.data, &proof)
+        .expect("verify the original key after failures");
+}

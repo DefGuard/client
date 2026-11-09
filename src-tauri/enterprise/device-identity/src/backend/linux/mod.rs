@@ -28,6 +28,8 @@ use crate::{
 
 mod attestation;
 mod ek;
+mod keys;
+mod possession;
 mod raw_capabilities;
 
 #[cfg(test)]
@@ -292,9 +294,19 @@ pub(super) async fn attest_identity(
         .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
+/// Signs SHA-256 of the exact challenge bytes on a blocking worker.
+/// Uses only the SRK and identity key, with empty authorization and no stored state.
 pub(super) async fn prove_possession(
-    _identity: &Identity,
-    _challenge: &PossessionChallenge,
+    identity: &Identity,
+    challenge: &PossessionChallenge,
 ) -> Result<PossessionProof, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    let Identity::Tpm(identity) = identity else {
+        return Err(DeviceIdentityError::Unsupported);
+    };
+    let template = identity.srk_template.clone();
+    let key = identity.identity_key.clone();
+    let data = challenge.data.clone();
+    tokio::task::spawn_blocking(move || possession::prove(template, key, data))
+        .await
+        .map_err(|_| DeviceIdentityError::BackendFailure)?
 }

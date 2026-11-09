@@ -1,7 +1,7 @@
 # Device identity contract tests
 
 `contract.rs` exercises the public facade. Hardware-dependent tests use `#[ignore]`
-until the backends are implemented and a suitable runner is configured. They require
+because they need a suitable runner. They require
 successful operations and cryptographically valid results. They do not accept
 `Unsupported` as a successful outcome and do not mock the backend.
 
@@ -12,9 +12,8 @@ cargo test -p device-identity
 cargo test -p device-identity --test contract -- --ignored
 ```
 
-The full hardware suite still requires possession-proof support, which remains a
-stub on Linux. Run a single scenario by adding its name before `-- --ignored`.
-Linux creation, public enrollment data, and attestation are implemented.
+All Linux operations are implemented. Run a single scenario by adding its name
+before `-- --ignored`. The macOS and Windows backends remain stubs.
 
 ## Contracts
 
@@ -72,9 +71,9 @@ signature, challenge binding, and the recovered activation secret. EK manufactur
 CA policy belongs to Core and is outside these facade tests. An absent EK certificate
 is allowed for software TPM fixtures.
 
-The Linux key-creation test can run before the remaining attestation methods are
-implemented. It reloads both keys in new TPM contexts using only the returned blobs
-and SRK input template, checks their profiles, and uses empty authorization:
+The Linux key-creation test reloads both keys in new TPM contexts using only the
+returned blobs and SRK input template, checks their profiles, and uses empty
+authorization:
 
 ```sh
 cargo test -p device-identity --lib test_create_identity_returns_reloadable_key_blobs -- --ignored
@@ -145,3 +144,18 @@ Negative hardware tests intentionally provoke TPM errors, so TSS warnings are ex
 
 The EK certificate fixtures in `fixtures/` are synthetic, self-signed RSA and ECC
 certificates used only to test public-key matching. They are not trust anchors.
+
+## Linux possession proof
+
+```sh
+cargo test -p device-identity --test contract test_possession_proof_binds_the_exact_data_and_registered_key -- --ignored
+cargo test -p device-identity --test contract test_creating_another_identity_preserves_the_existing_identity -- --ignored
+cargo test -p device-identity --test contract test_tpm_possession_needs_no_ek_or_ak_and_rejects_damaged_identity -- --ignored
+```
+
+Possession restores only the SRK and identity key and signs SHA-256 of the unchanged
+challenge bytes. The unrestricted identity key accepts a software-computed digest
+with a null hash-validation ticket. The ECDSA signature uses ASN.1 DER. EK and AK
+data are not needed after attestation. Tests independently verify the signature,
+reject changed data, signatures and keys, and confirm that damaged stored key data
+does not replace the identity or prevent subsequent use of the original blobs.
