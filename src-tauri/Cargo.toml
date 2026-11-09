@@ -35,7 +35,7 @@ serde_with = "3.23"
 sqlx = { version = "0.9", features = ["chrono", "json", "runtime-tokio", "sqlite", "uuid", "macros"] }
 struct-patch = "0.12"
 strum = { version = "0.28", features = ["derive"] }
-sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }
+sysinfo = { version = "0.40", default-features = false, features = ["apple-app-store", "system"] }
 tempfile = "3"
 thiserror = "2.0"
 time = { version = "0.3", features = ["formatting", "macros"] }

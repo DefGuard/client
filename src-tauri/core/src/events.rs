@@ -31,6 +31,7 @@ pub enum EventKey {
     MfaConfigFido2Touch,
     TunnelsDisabled,
     TunnelsEnabled,
+    SystemExtensionRequired,
 }
 
 impl From<EventKey> for &'static str {
@@ -65,6 +66,7 @@ impl From<EventKey> for &'static str {
             EventKey::MfaConfigFido2Touch => "mfa-config-fido2-touch",
             EventKey::TunnelsDisabled => "tunnel-disabled-by-policy",
             EventKey::TunnelsEnabled => "tunnel-enabled-by-policy",
+            EventKey::SystemExtensionRequired => "system-extension-required",
         }
     }
 }

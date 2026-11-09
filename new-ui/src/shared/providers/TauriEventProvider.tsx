@@ -8,11 +8,12 @@ import { runConfigureFactorsRequest } from '../../pages/full/ConfigureMfaPage/ho
 import { mfaMethodToConnectModalView } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import {
-  findRouteConflicts,
   handleFullViewConnectError,
   openRouteConflictModal,
+  preflightConnect,
   type RouteConflictPayload,
 } from '../components/LocationCard/api/connectError';
+import { openSystemExtensionModal } from '../components/LocationCard/api/systemExtension';
 import { WindowId } from '../consts';
 import { useAppData } from '../providers/AppDataContext';
 import { api } from '../rust-api/api';
@@ -118,13 +119,16 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
               connection_type: ConnectionType.Location,
               active: false,
             };
-            void findRouteConflicts(location).then((conflicts) =>
-              conflicts.length > 0
-                ? openRouteConflictModal(location, conflicts, () =>
-                    openMfaModalOrLog(location),
-                  )
-                : openMfaModalOrLog(location),
-            );
+            void preflightConnect(location).then((conflicts) => {
+              if (!conflicts) return;
+              if (conflicts.length > 0) {
+                openRouteConflictModal(location, conflicts, () =>
+                  openMfaModalOrLog(location),
+                );
+              } else {
+                openMfaModalOrLog(location);
+              }
+            });
           }
         },
       ),
@@ -136,6 +140,11 @@ export const TauriEventProvider = ({ children }: PropsWithChildren) => {
         );
         if (getCurrentWindow().label !== WindowId.FullView) return;
         void runConfigureFactorsRequest(event.payload, { navigate });
+      }),
+
+      listen(TauriEvent.SystemExtensionRequired, () => {
+        if (getCurrentWindow().label !== WindowId.FullView) return;
+        void navigate({ to: '/full/overview' }).then(openSystemExtensionModal);
       }),
 
       listen<RouteConflictPayload>(TauriEvent.RouteConflict, (event) => {

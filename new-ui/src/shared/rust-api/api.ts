@@ -66,8 +66,11 @@ const setLocationMfaStepPlan = (args: SetLocationMfaStepPlanArgs): Promise<void>
 const connect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Connect, args);
 
-const checkRouteConflict = (locationId: number): Promise<void> =>
-  invoke(TauriCommand.CheckRouteConflict, { locationId });
+const checkCanConnect = (locationId: number): Promise<void> =>
+  invoke(TauriCommand.CheckCanConnect, { locationId });
+
+const openSystemExtensionSettings = (): Promise<void> =>
+  invoke(TauriCommand.OpenSystemExtensionSettings);
 
 const disconnect = (args: ConnectionArgs): Promise<void> =>
   invoke(TauriCommand.Disconnect, args);
@@ -355,7 +358,8 @@ export const api = {
   setLocationMfaStepPlan,
   // Connections
   connect,
-  checkRouteConflict,
+  checkCanConnect,
+  openSystemExtensionSettings,
   disconnect,
   getLastConnection,
   getConnectionHistory,

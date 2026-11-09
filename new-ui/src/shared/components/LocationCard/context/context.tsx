@@ -27,7 +27,7 @@ import {
 } from '../../../utils/mfa';
 import { IconKind } from '../../Icon';
 import { MfaRetry, type MfaRetryValue, mfaErrorToCard } from '../api/cardError';
-import { findRouteConflicts, openRouteConflictInFullView } from '../api/connectError';
+import { openRouteConflictInFullView, preflightConnect } from '../api/connectError';
 import {
   type LocationCardError,
   LocationCardViews,
@@ -154,7 +154,8 @@ export const LocationCardProvider = ({
 
   const startMfa = useCallback(async () => {
     try {
-      const conflicts = await findRouteConflicts(location);
+      const conflicts = await preflightConnect(location);
+      if (!conflicts) return;
       if (conflicts.length > 0) {
         await openRouteConflictInFullView({ location, conflicts });
         return;

@@ -122,7 +122,8 @@ export const TauriCommand = {
   SetLocationMfaStepPlan: 'set_location_mfa_step_plan',
   // Connections
   Connect: 'connect',
-  CheckRouteConflict: 'check_route_conflict',
+  CheckCanConnect: 'check_can_connect',
+  OpenSystemExtensionSettings: 'open_system_extension_settings',
   Disconnect: 'disconnect',
   LastConnection: 'last_connection',
   AllConnections: 'all_connections',
@@ -199,6 +200,7 @@ export const TauriEvent = {
   TunnelsEnabled: 'tunnel-enabled-by-policy',
   // The compact view emits this event to the full view.
   RouteConflict: 'route-conflict',
+  SystemExtensionRequired: 'system-extension-required',
 } as const;
 
 export type TauriEventValue = (typeof TauriEvent)[keyof typeof TauriEvent];

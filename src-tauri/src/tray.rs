@@ -13,13 +13,15 @@ use tauri::{
 
 use crate::{
     appstate::AppState,
-    commands::{all_instances, all_locations, connect, disconnect, LocationInfo},
+    commands::{all_instances, all_locations, connect, disconnect, ConnectError, LocationInfo},
     database::{
         models::{instance::Instance, location::Location},
         DB_POOL,
     },
     error::Error,
-    window_manager::{show_tray_or_full_view, trigger_mfa, COMPACT_WINDOW_ID},
+    window_manager::{
+        show_system_extension_required, show_tray_or_full_view, trigger_mfa, COMPACT_WINDOW_ID,
+    },
     ConnectionType,
 };
 
@@ -349,6 +351,9 @@ async fn handle_location_tray_menu(id: String, app: &AppHandle) {
                             connect(location_id, ConnectionType::Location, app.clone()).await
                         {
                             info!("Unable to connect location with ID {id}, error: {err:?}");
+                            if matches!(err, ConnectError::SystemExtensionDisabled { .. }) {
+                                show_system_extension_required(app);
+                            }
                         }
                     }
                 }

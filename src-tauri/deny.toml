@@ -70,39 +70,12 @@ feature-depth = 1
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "Unmaintained proc-macro-error dependency" },
     { id = "RUSTSEC-2024-0436", reason = "Unmaintained netlink dependency" },
-    { id = "RUSTSEC-2026-0194", reason = "quick-xml <0.41 pulled by Tauri/plist; no compatible upstream update yet" },
-    { id = "RUSTSEC-2026-0195", reason = "quick-xml <0.41 pulled by Tauri/plist; no compatible upstream update yet" },
-    { id = "RUSTSEC-2026-0346", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; client session store Debug leak, not used" },
-    { id = "RUSTSEC-2026-0347", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; ECH not used" },
-    { id = "RUSTSEC-2026-0348", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; brotli cert compression feature not enabled" },
-    { id = "RUSTSEC-2026-0349", reason = "rustls <0.23.46 pulled by reqwest/hyper-rustls; PQ key exchange downgrade, no key compromise" },
-    { id = "RUSTSEC-2026-0381", reason = "webpki-roots <1.0.10 pulled by hyper-rustls; bundles distrusted emSign root" },
-    { id = "RUSTSEC-2026-0382", reason = "rustls-webpki <0.103.16 pulled by rustls; may accept distrusted emSign intermediates" },
-    { id = "RUSTSEC-2026-0383", reason = "webpki-root-certs <1.0.10 pulled by rustls-platform-verifier; bundles distrusted emSign root" },
-    { id = "RUSTSEC-2026-0418", reason = "expires 2026-11-30, libz-sys <1.1.31 pulled by vergen-git2 build dependency via git2/libgit2-sys, already on latest" },
-    # The "unmaintained" advisories below stem from our use of Tauri v2, which
-    # depends on GTK3 bindings that are no longer maintained.
-    { id = "RUSTSEC-2024-0370", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0411", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0412", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0413", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0415", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0416", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0414", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0417", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0418", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0419", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2024-0420", reason = "Tauri v2 GTK3 dependency (unmaintained)" },
-    { id = "RUSTSEC-2025-0052", reason = "Discontinued, but dark-light v2.0.0 needs it" },
-    { id = "RUSTSEC-2025-0075", reason = "Tauri v2 dependency (unmaintained)" },
-    { id = "RUSTSEC-2025-0080", reason = "Tauri v2 dependency (unmaintained)" },
-    { id = "RUSTSEC-2025-0081", reason = "Tauri v2 dependency (unmaintained)" },
-    { id = "RUSTSEC-2025-0098", reason = "Tauri v2 dependency (unmaintained)" },
-    { id = "RUSTSEC-2025-0100", reason = "Tauri v2 dependency (unmaintained)" },
     { id = "RUSTSEC-2026-0370", reason = "zvariant merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
+    { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys security vulnerability" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
