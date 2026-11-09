@@ -325,7 +325,6 @@ pub async fn mfa_start(
         }
         MfaContract::MultiStep => {
             let request = MfaFlowStartRequest {
-                possession_response: None,
                 location_id: request.location_id,
                 pubkey: request.pubkey,
                 posture_data: request.posture_data,
@@ -385,11 +384,6 @@ pub async fn mfa_start(
                         .collect::<Vec<_>>();
                     return Err(MfaError::MfaRejected {
                         message: messages.join(" "),
-                    });
-                }
-                Some(mfa_flow_start_response::Outcome::PossessionChallenge(_)) => {
-                    return Err(MfaError::Other {
-                        message: "Device identity possession challenge is not supported yet".into(),
                     });
                 }
                 None => {
