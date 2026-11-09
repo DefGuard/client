@@ -3,6 +3,7 @@ use std::{
     time::Duration,
 };
 
+use defguard_client_core::connection::apple::PLUGIN_BUNDLE_ID;
 use dispatch2::{DispatchQoS, DispatchQueue, GlobalQueueIdentifier};
 use objc2::{
     define_class, msg_send,
@@ -15,7 +16,7 @@ use objc2_system_extensions::{
     OSSystemExtensionManager, OSSystemExtensionProperties, OSSystemExtensionReplacementAction,
     OSSystemExtensionRequest, OSSystemExtensionRequestDelegate, OSSystemExtensionRequestResult,
 };
-use tokio::sync::oneshot;
+use tokio::{sync::oneshot, time::timeout};
 
 const PROPERTIES_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -47,7 +48,7 @@ define_class!(
         #[unsafe(method(requestNeedsUserApproval:))]
         fn request_needs_user_approval(&self, _request: &OSSystemExtensionRequest) {
             info!(
-                "VPN system extension requires user approval — open System Settings > General > \
+                "VPN system extension requires user approval: open System Settings > General > \
                 Login Items & Extensions > Network Extensions to enable it."
             );
         }
@@ -221,7 +222,7 @@ pub async fn system_extension_state(bundle_id: &str) -> Option<SystemExtensionSt
         OSSystemExtensionManager::sharedManager().submitRequest(&request);
     }
 
-    let state = match tokio::time::timeout(PROPERTIES_TIMEOUT, receiver).await {
+    let state = match timeout(PROPERTIES_TIMEOUT, receiver).await {
         Ok(Ok(Ok(state))) => Some(state),
         Ok(Ok(Err(err))) => {
             warn!("Failed to query the state of system extension {bundle_id}: {err}");
@@ -254,8 +255,6 @@ pub fn settings_url() -> &'static str {
 
 /// Re-requests activation if the extension is not installed. An unknown state counts as ready.
 pub async fn vpn_extension_ready() -> bool {
-    use defguard_client_core::connection::apple::PLUGIN_BUNDLE_ID;
-
     match system_extension_state(PLUGIN_BUNDLE_ID).await {
         None | Some(SystemExtensionState::Enabled) => true,
         Some(SystemExtensionState::NotInstalled) => {
