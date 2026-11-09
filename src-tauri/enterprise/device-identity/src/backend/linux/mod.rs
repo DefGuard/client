@@ -55,7 +55,7 @@ fn tcti_configuration() -> Result<TctiNameConf, DeviceIdentityError> {
 }
 
 /// Reads TPM capabilities and checks key profiles with TPM2_TestParms.
-/// Attestation support requires the ECDSA P-256/SHA-256 profile used for identity creation.
+/// Attestation support requires both ECDSA signing and ECC storage-key parameters.
 fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
     let configuration = tcti_configuration()?;
     // The wrapper's ESYS pointer is private, so raw inventory uses its own short-lived context
@@ -65,19 +65,28 @@ fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
         .into_iter()
         .map(|profile| check_profile(&mut context, profile))
         .collect::<Result<_, _>>()?;
-    let attestation_method = details
-        .profiles
-        .iter()
-        .any(|profile| {
-            profile.profile == ProfileId::EcdsaP256Sha256
-                && profile.support == SupportStatus::Supported
-        })
-        .then_some(AttestationMethod::TpmKeyAttestation);
+    let srk_support = check_parameters(
+        &mut context,
+        PublicParameters::Ecc(srk_parameters().map_err(tpm_error)?),
+    )?;
+    let attestation_method = select_attestation_method(&details.profiles, srk_support);
     Ok(Capabilities {
         backend: BackendKind::Tpm,
         attestation_method,
         details: PlatformCapabilities::Tpm(details),
     })
+}
+
+fn select_attestation_method(
+    profiles: &[ProfileSupport],
+    srk_support: SupportStatus,
+) -> Option<AttestationMethod> {
+    (srk_support == SupportStatus::Supported
+        && profiles.iter().any(|profile| {
+            profile.profile == ProfileId::EcdsaP256Sha256
+                && profile.support == SupportStatus::Supported
+        }))
+    .then_some(AttestationMethod::TpmKeyAttestation)
 }
 
 /// Checks the profile's parameter combination with TPM2_TestParms.
@@ -101,6 +110,15 @@ fn check_profile(
             RsaExponent::ZERO_EXPONENT,
         )),
     };
+    let support = check_parameters(context, parameters)?;
+    Ok(ProfileSupport { profile, support })
+}
+
+/// Tests parameter combinations and separates unsupported parameters from TPM failures.
+fn check_parameters(
+    context: &mut Context,
+    parameters: PublicParameters,
+) -> Result<SupportStatus, DeviceIdentityError> {
     let support = match context.test_parms(parameters) {
         Ok(()) => SupportStatus::Supported,
         Err(Error::Tss2Error(code))
@@ -125,7 +143,16 @@ fn check_profile(
         }
         Err(_) => return Err(DeviceIdentityError::BackendFailure),
     };
-    Ok(ProfileSupport { profile, support })
+    Ok(support)
+}
+
+/// Builds the ECC storage parameters shared by capability checks and SRK creation.
+fn srk_parameters() -> Result<PublicEccParameters, Error> {
+    PublicEccParametersBuilder::new_restricted_decryption_key(
+        SymmetricDefinitionObject::AES_128_CFB,
+        EccCurve::NistP256,
+    )
+    .build()
 }
 
 /// Builds the ECC P-256 storage template used to recreate the same parent later.
@@ -145,13 +172,7 @@ fn srk_template() -> Result<Public, Error> {
         .with_public_algorithm(PublicAlgorithm::Ecc)
         .with_name_hashing_algorithm(HashingAlgorithm::Sha256)
         .with_object_attributes(attributes)
-        .with_ecc_parameters(
-            PublicEccParametersBuilder::new_restricted_decryption_key(
-                SymmetricDefinitionObject::AES_128_CFB,
-                EccCurve::NistP256,
-            )
-            .build()?,
-        )
+        .with_ecc_parameters(srk_parameters()?)
         .with_ecc_unique_identifier(Default::default())
         .build()
 }

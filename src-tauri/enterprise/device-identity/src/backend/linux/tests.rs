@@ -374,3 +374,59 @@ async fn test_prove_possession_rejects_another_backend_and_invalid_template_with
         Err(DeviceIdentityError::IdentityLost)
     );
 }
+
+#[test]
+fn test_attestation_requires_supported_signing_and_storage_parameters() {
+    use crate::{AttestationMethod, ProfileId, ProfileSupport, SupportStatus};
+    for (signing, storage, expected) in [
+        (
+            SupportStatus::Supported,
+            SupportStatus::Supported,
+            Some(AttestationMethod::TpmKeyAttestation),
+        ),
+        (SupportStatus::Supported, SupportStatus::Unsupported, None),
+        (SupportStatus::Supported, SupportStatus::NotChecked, None),
+        (SupportStatus::Unsupported, SupportStatus::Supported, None),
+        (SupportStatus::NotChecked, SupportStatus::Supported, None),
+    ] {
+        let profiles = [ProfileSupport {
+            profile: ProfileId::EcdsaP256Sha256,
+            support: signing,
+        }];
+        assert_eq!(
+            super::select_attestation_method(&profiles, storage),
+            expected
+        );
+    }
+    let rsa_only = [ProfileSupport {
+        profile: ProfileId::RsaSsa2048Sha256,
+        support: SupportStatus::Supported,
+    }];
+    assert_eq!(
+        super::select_attestation_method(&rsa_only, SupportStatus::Supported),
+        None
+    );
+    assert_eq!(
+        super::select_attestation_method(&[], SupportStatus::Supported),
+        None
+    );
+}
+
+#[test]
+fn test_srk_capability_parameters_match_the_creation_template() {
+    let expected = super::srk_parameters().unwrap();
+    let Public::Ecc { parameters, .. } = srk_template().unwrap() else {
+        panic!("expected an ECC SRK");
+    };
+    assert_eq!(parameters, expected);
+    assert_eq!(expected.ecc_curve(), EccCurve::NistP256);
+    assert_eq!(
+        expected.symmetric_definition_object(),
+        SymmetricDefinitionObject::AES_128_CFB
+    );
+    assert_eq!(expected.ecc_scheme(), EccScheme::Null);
+    assert_eq!(
+        expected.key_derivation_function_scheme(),
+        KeyDerivationFunctionScheme::Null
+    );
+}
