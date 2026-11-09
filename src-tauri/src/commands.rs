@@ -34,11 +34,15 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
+#[cfg(all(target_os = "macos", feature = "macos_installer"))]
+use tauri_plugin_opener::OpenerExt;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
+#[cfg(all(target_os = "macos", feature = "macos_installer"))]
+use crate::system_extension::{settings_url, vpn_extension_ready};
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
     appstate::{AppState, Ceremony},
@@ -107,10 +111,6 @@ fn system_extension_disabled() -> ConnectError {
 pub fn open_system_extension_settings(app: AppHandle) -> Result<(), Error> {
     #[cfg(all(target_os = "macos", feature = "macos_installer"))]
     {
-        use tauri_plugin_opener::OpenerExt;
-
-        use crate::system_extension::settings_url;
-
         app.opener()
             .open_url(settings_url(), None::<&str>)
             .map_err(|err| Error::CommandError(err.to_string()))?;
@@ -294,8 +294,6 @@ pub async fn connect(
     debug!("Received a command to connect to a {connection_type} with ID {location_id}");
     #[cfg(all(target_os = "macos", feature = "macos_installer"))]
     {
-        use crate::system_extension::vpn_extension_ready;
-
         if !vpn_extension_ready().await {
             warn!("Refusing to connect: the VPN system extension is not enabled");
             return Err(system_extension_disabled());
@@ -360,8 +358,6 @@ pub async fn connect(
 pub async fn check_can_connect(location_id: Id) -> Result<(), ConnectError> {
     #[cfg(all(target_os = "macos", feature = "macos_installer"))]
     {
-        use crate::system_extension::vpn_extension_ready;
-
         if !vpn_extension_ready().await {
             return Err(system_extension_disabled());
         }
