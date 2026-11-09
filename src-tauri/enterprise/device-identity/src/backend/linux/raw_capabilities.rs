@@ -99,7 +99,8 @@ impl Drop for Context {
     }
 }
 
-/// Returns no partial inventory if a capability page fails or cannot advance safely.
+/// Reads all capability pages while preserving raw TPM identifiers.
+/// Failed pages and invalid pagination return an error.
 pub(super) fn read(configuration: &TctiNameConf) -> Result<TpmCapabilities, DeviceIdentityError> {
     let mut context = Context::new(configuration)?;
     let mut details = TpmCapabilities::default();

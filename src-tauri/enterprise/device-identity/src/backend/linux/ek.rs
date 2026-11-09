@@ -32,7 +32,7 @@ fn select_profile(
     Ok((ECC_PROFILE, None))
 }
 
-/// Checks public-key equality only, not the certificate signature, validity or trust.
+/// Compares the TPM public key with the certificate's SubjectPublicKeyInfo.
 /// Malformed DER returns a backend error rather than a key mismatch.
 pub(super) fn certificate_matches(
     public: &Public,

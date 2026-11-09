@@ -1,4 +1,4 @@
-//! Identity data is owned and persisted by the caller, not the library.
+//! The caller owns and persists identity data.
 //! Backends must run blocking platform calls outside async executor threads.
 
 use thiserror::Error;
@@ -43,7 +43,7 @@ pub struct Capabilities {
     pub details: PlatformCapabilities,
 }
 
-/// Backend-specific capability details without forcing a shared hardware model
+/// Backend-specific capability details
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlatformCapabilities {
     /// Capabilities queried from TPM 2.0
@@ -157,21 +157,20 @@ pub struct ProfileSupport {
 }
 
 /// Caller-owned data needed to reuse an identity across operations and restarts.
-/// The library does not persist it or send it to Core.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Identity {
     Tpm(TpmIdentity),
     AppleAppAttest { key_id: String },
 }
 
-/// Caller-owned material for reloading keys, not transferable to another TPM.
+/// Caller-owned material for reloading keys on the TPM that created them.
 /// Linux keys have empty authorization, so protect the stored blobs from other local users.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TpmIdentity {
     pub ek: TpmEndorsementKey,
-    /// Marshalled input TPMT_PUBLIC for CreatePrimary, not its generated public area.
+    /// Marshalled input TPMT_PUBLIC used to recreate the SRK with CreatePrimary.
     pub srk_template: Vec<u8>,
-    /// Restricted signing key used to certify the identity key, not arbitrary application data.
+    /// Restricted signing key used to certify the identity key.
     pub ak: TpmKeyBlobs,
     /// Unrestricted signing key that accepts software-computed challenge digests.
     pub identity_key: TpmKeyBlobs,
@@ -189,12 +188,11 @@ pub struct TpmEndorsementKey {
 }
 
 /// Both blobs are required to reload a key under its original SRK.
-/// Neither blob is a persistent TPM handle or an exported plaintext private key.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TpmKeyBlobs {
     /// Marshalled TPMT_PUBLIC for loading the key.
     pub public: Vec<u8>,
-    /// Parent-protected TPM2B_PRIVATE contents without the outer size field, not a raw private key.
+    /// Parent-protected TPM2B_PRIVATE contents without the outer size field.
     pub private: Vec<u8>,
 }
 
@@ -226,11 +224,12 @@ pub struct TpmAttestationIdentity {
 pub struct CredentialChallenge {
     /// TPM2B_ID_OBJECT contents from MakeCredential, without the outer size field.
     pub credential_blob: Vec<u8>,
-    /// TPM2B_ENCRYPTED_SECRET contents without the outer size field, not the plaintext seed.
+    /// TPM2B_ENCRYPTED_SECRET contents without the outer size field.
     pub encrypted_secret: Vec<u8>,
 }
 
-/// Expiry and single-use nonce checks belong to Core, not this stateless backend.
+/// Carries Core-encoded challenge data for signing with the identity key.
+/// Core verifies expiry and consumes the nonce after successful verification.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PossessionChallenge {
     /// Opaque Core-encoded bytes containing nonce, session and operation binding.
@@ -362,8 +361,8 @@ pub enum DeviceIdentityError {
     BackendFailure,
 }
 
-/// On Linux, profile support does not confirm hierarchy authorization or EK certificate availability.
-/// Inventory failures return an error, not a successful report of unsupported hardware.
+/// Queries platform capabilities and checks support for the library's key profiles.
+/// Inventory failures are returned as errors.
 pub async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     backend::capabilities().await
 }
@@ -381,8 +380,7 @@ pub async fn create_identity() -> Result<Identity, DeviceIdentityError> {
     backend::create_identity().await
 }
 
-/// Returns public enrollment data from the supplied identity without accessing hardware.
-/// The returned data is not itself proof of hardware origin.
+/// Returns the supplied identity's public attestation data for enrollment with Core.
 pub async fn attestation_identity(
     identity: &Identity,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {

@@ -36,7 +36,7 @@ pub(super) fn identity_error(error: Error) -> DeviceIdentityError {
     }
 }
 
-/// Loads caller-owned key blobs under the recreated SRK without replacing lost keys.
+/// Loads caller-owned key blobs under the recreated SRK using empty authorization.
 /// The context owns the returned transient handle and cleans it up on failure.
 pub(super) fn load_key(
     context: &mut Context,

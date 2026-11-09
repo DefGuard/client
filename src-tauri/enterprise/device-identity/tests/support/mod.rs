@@ -19,7 +19,7 @@ pub fn check(condition: bool, message: &str) -> TestResult<()> {
     }
 }
 
-/// Deliberately not a production Core encoding, backends must treat these bytes as opaque.
+/// Builds opaque test input containing a purpose marker and a fresh random nonce.
 pub fn challenge_data(purpose: &str) -> Vec<u8> {
     let mut nonce = [0u8; 32];
     OsRng.fill_bytes(&mut nonce);
@@ -64,7 +64,7 @@ pub enum IdentityVerifier {
 }
 
 impl IdentityVerifier {
-    /// Successful Apple verification advances the counter, TPM verification has no mutable state.
+    /// Verifies a proof against the attested key and advances the Apple replay counter on success.
     pub fn verify_proof(&mut self, data: &[u8], proof: &PossessionProof) -> TestResult<()> {
         match (self, proof) {
             (Self::Tpm(key), PossessionProof::Signature(signature)) => {
@@ -82,7 +82,7 @@ impl IdentityVerifier {
     }
 }
 
-/// TPM checks omit EK manufacturer trust policy, this fixture is not a production Core verifier.
+/// Verifies challenge binding and attestation evidence using the independent test verifiers.
 pub fn verify_attestation(
     metadata: &AttestationIdentity,
     request: &AttestationRequest,

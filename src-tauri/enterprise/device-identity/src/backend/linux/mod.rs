@@ -54,8 +54,8 @@ fn tcti_configuration() -> Result<TctiNameConf, DeviceIdentityError> {
         .map_err(|_| DeviceIdentityError::BackendFailure)
 }
 
-/// RSA support alone does not enable attestation, identity creation requires the ECC profile.
-/// Parameter checks do not provision keys or test hierarchy authorization.
+/// Reads TPM capabilities and checks key profiles with TPM2_TestParms.
+/// Attestation support requires the ECDSA P-256/SHA-256 profile used for identity creation.
 fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
     let configuration = tcti_configuration()?;
     // The wrapper's ESYS pointer is private, so raw inventory uses its own short-lived context
@@ -129,7 +129,7 @@ fn check_profile(
 }
 
 /// Builds the ECC P-256 storage template used to recreate the same parent later.
-/// The caller retains this input template, not the generated SRK public area.
+/// The caller retains the input template to reproduce the SRK in later contexts.
 fn srk_template() -> Result<Public, Error> {
     let attributes = ObjectAttributesBuilder::new()
         .with_fixed_tpm(true)
@@ -156,8 +156,8 @@ fn srk_template() -> Result<Public, Error> {
         .build()
 }
 
-/// Assumes empty Owner authorization and leaves the SRK's authorization empty.
-/// The caller must flush the transient key handle after use.
+/// Creates a transient SRK in the Owner hierarchy using the supplied template and empty authorization.
+/// The caller must flush the returned key handle after use.
 fn create_srk(context: &mut Context, template: Public) -> Result<CreatePrimaryKeyResult, Error> {
     context.execute_with_nullauth_session(|ctx| {
         ctx.create_primary(Hierarchy::Owner, template, None, None, None, None)
@@ -261,7 +261,7 @@ pub(super) async fn create_identity() -> Result<Identity, DeviceIdentityError> {
     .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
-/// Copies the supplied EK and AK public data without accessing the TPM.
+/// Extracts the stored EK and AK public data for enrollment with Core.
 /// Rejects identities from other backends.
 pub(super) async fn attestation_identity(
     identity: &Identity,
