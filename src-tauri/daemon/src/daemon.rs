@@ -29,6 +29,8 @@ use defguard_client_service_locations::reconciler::{run_reconciler, ReconcileSig
 use defguard_client_service_locations::ServiceLocationError;
 #[cfg(any(windows, target_os = "linux"))]
 use defguard_client_service_locations::{validate_instance_id, ServiceLocationManager};
+#[cfg(target_os = "linux")]
+use defguard_wireguard_rs::net::IpAddrMask;
 #[cfg(not(target_os = "macos"))]
 use defguard_wireguard_rs::Kernel;
 #[cfg(target_os = "macos")]
@@ -52,12 +54,11 @@ use tonic::{
 use tracing::warn;
 use tracing::{debug, error, info, info_span, Instrument};
 
-use crate::{config::Config, VERSION};
+#[cfg(any(windows, target_os = "linux"))]
+use crate::ipv6_block::Ipv6Block;
 #[cfg(windows)]
-use crate::{
-    ipv6_block::Ipv6Block,
-    named_pipe::{get_named_pipe_server_stream, PIPE_NAME},
-};
+use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
+use crate::{config::Config, VERSION};
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -71,6 +72,18 @@ pub(super) const DAEMON_SOCKET_GROUP: &str = "defguard";
 /// On Linux nothing wakes it, so this is the only trigger and sets the worst-case recovery time.
 #[cfg(any(windows, target_os = "linux"))]
 pub(crate) const SERVICE_LOCATION_RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
+#[cfg(target_os = "linux")]
+fn should_block_ipv6<'a>(
+    allowed_ips: impl IntoIterator<Item = &'a IpAddrMask>,
+    addresses: &[IpAddrMask],
+) -> bool {
+    !addresses.iter().any(|address| address.address.is_ipv6())
+        && allowed_ips.into_iter().any(|allowed_ip| {
+            allowed_ip.address.is_ipv6()
+                && allowed_ip.address.is_unspecified()
+                && allowed_ip.cidr == 0
+        })
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum DaemonError {
@@ -102,7 +115,7 @@ pub(crate) struct DaemonService {
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
     stat_tasks: Arc<Mutex<HashMap<IfName, JoinHandle<()>>>>,
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     ipv6_blocks: Arc<Mutex<HashMap<IfName, Ipv6Block>>>,
     #[cfg(any(windows, target_os = "linux"))]
     service_location_manager: Arc<RwLock<ServiceLocationManager>>,
@@ -120,10 +133,44 @@ impl DaemonService {
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux"))]
             ipv6_blocks: Arc::new(Mutex::new(HashMap::new())),
             #[cfg(any(windows, target_os = "linux"))]
             service_location_manager,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn configure_ipv6_block(&self, ifname: &str, config: &InterfaceConfiguration, wgapi: &WG) {
+        match self.ipv6_blocks.lock() {
+            Ok(mut blocks) => {
+                blocks.remove(ifname);
+                if should_block_ipv6(
+                    config.peers.iter().flat_map(|peer| &peer.allowed_ips),
+                    &config.addresses,
+                ) {
+                    match wgapi.read_interface_data() {
+                        Ok(host) => match host.fwmark {
+                            Some(fwmark) if fwmark != 0 => match Ipv6Block::new(fwmark) {
+                                Ok(block) => {
+                                    blocks.insert(ifname.to_owned(), block);
+                                    debug!("Blocked IPv6 connections for interface {ifname}");
+                                }
+                                Err(err) => {
+                                    error!("Failed to block IPv6 on interface {ifname}: {err}")
+                                }
+                            },
+                            _ => warn!(
+                                "Cannot block IPv6 on interface {ifname}: WireGuard fwmark is missing or zero"
+                            ),
+                        },
+                        Err(err) => {
+                            error!("Failed to read WireGuard data for interface {ifname}: {err}")
+                        }
+                    }
+                }
+            }
+            Err(err) => error!("Failed to lock IPv6 blocks for interface {ifname}: {err}"),
         }
     }
 }
@@ -373,6 +420,8 @@ impl DesktopDaemonService for DaemonService {
             }
         }
 
+        #[cfg(target_os = "linux")]
+        self.configure_ipv6_block(&ifname, &config, wgapi);
         debug!("Finished creating a new interface {ifname}");
         Ok(Response::new(()))
     }
@@ -433,6 +482,10 @@ impl DesktopDaemonService for DaemonService {
             Status::new(Code::Internal, msg)
         })?;
 
+        #[cfg(target_os = "linux")]
+        if let Ok(mut blocks) = self.ipv6_blocks.lock() {
+            blocks.remove(&ifname);
+        }
         debug!("Finished removing interface {ifname}");
         Ok(Response::new(()))
     }
@@ -710,4 +763,46 @@ pub(crate) async fn run_server(
         .await?;
 
     Ok(())
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    use defguard_wireguard_rs::net::IpAddrMask;
+
+    use super::should_block_ipv6;
+
+    fn test_ip(address: IpAddr, cidr: u8) -> IpAddrMask {
+        IpAddrMask::new(address, cidr)
+    }
+
+    #[test]
+    fn test_ipv6_default_without_ipv6_address_blocks() {
+        let allowed_ips = [test_ip(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)];
+
+        assert!(should_block_ipv6(allowed_ips.iter(), &[]));
+    }
+
+    #[test]
+    fn test_assigned_ipv6_address_disables_block() {
+        let allowed_ips = [test_ip(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)];
+        let addresses = [test_ip(IpAddr::V6(Ipv6Addr::LOCALHOST), 128)];
+
+        assert!(!should_block_ipv6(allowed_ips.iter(), &addresses));
+    }
+
+    #[test]
+    fn test_without_ipv6_default_does_not_block() {
+        let allowed_ips = [test_ip(IpAddr::V6(Ipv6Addr::LOCALHOST), 128)];
+
+        assert!(!should_block_ipv6(allowed_ips.iter(), &[]));
+    }
+
+    #[test]
+    fn test_ipv4_default_does_not_block_ipv6() {
+        let allowed_ips = [test_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)];
+
+        assert!(!should_block_ipv6(allowed_ips.iter(), &[]));
+    }
 }

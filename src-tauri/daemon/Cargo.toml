@@ -26,6 +26,11 @@ tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+netlink-packet-core = "0.9"
+netlink-packet-route = "0.33"
+netlink-sys = "0.9"
+
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["fs", "user"] }
 
