@@ -3,7 +3,8 @@ mod support;
 use device_identity::{
     attest_identity, attestation_identity, capabilities, create_identity, prove_possession,
     AttestationChallenge, AttestationIdentity, AttestationMethod, AttestationResponse, BackendKind,
-    PlatformCapabilities, PossessionChallenge, PossessionProof, ProfileId, SupportStatus,
+    DeviceIdentityError, Identity, PlatformCapabilities, PossessionChallenge, PossessionProof,
+    ProfileId, SupportStatus,
 };
 use support::{challenge_data, enroll, prepare_attestation, verify_attestation};
 
@@ -64,11 +65,10 @@ async fn test_capabilities_report_the_platform_backend_and_required_profile() {
 }
 
 #[tokio::test]
-#[ignore = "Requires persistent TPM key storage or a configured App Attest host"]
+#[ignore = "Requires TPM key creation or a configured App Attest host"]
 async fn test_created_identity_has_stable_public_enrollment_data() {
     let _hardware = HARDWARE.lock().await;
     let identity = create_identity().await.expect("create an identity");
-    assert!(!identity.id.is_empty());
     let first = attestation_identity(&identity)
         .await
         .expect("read public identity data");
@@ -79,12 +79,31 @@ async fn test_created_identity_has_stable_public_enrollment_data() {
     match first {
         AttestationIdentity::Tpm(metadata) => {
             assert_eq!(expected_backend(), BackendKind::Tpm);
+            let Identity::Tpm(stored) = &identity else {
+                panic!("expected TPM identity data");
+            };
+            assert!(!stored.ek.template.is_empty());
+            assert_eq!(stored.ek.public, metadata.ek_public);
+            assert_eq!(
+                stored.ek.certificate_chain_der,
+                metadata.ek_certificate_chain_der
+            );
+            assert!(!stored.srk_template.is_empty());
+            assert!(!stored.ak.private.is_empty());
+            assert!(!stored.identity_key.private.is_empty());
+            assert_eq!(stored.ak.public, metadata.ak_public);
+            support::tpm::signing_key(&stored.identity_key.public, false)
+                .expect("identity must be an unrestricted TPM-generated ECDSA P-256/SHA-256 key");
             assert!(!metadata.ek_public.is_empty());
             support::tpm::signing_key(&metadata.ak_public, true)
                 .expect("AK must be a restricted TPM-generated ECDSA P-256/SHA-256 key");
         }
         AttestationIdentity::AppleAppAttest { key_id } => {
             assert_eq!(expected_backend(), BackendKind::AppleAppAttest);
+            let Identity::AppleAppAttest { key_id: stored } = &identity else {
+                panic!("expected App Attest identity data");
+            };
+            assert_eq!(&key_id, stored);
             use base64::Engine;
             let key_id = base64::engine::general_purpose::STANDARD
                 .decode(key_id)
@@ -182,7 +201,7 @@ async fn test_possession_proof_binds_the_exact_data_and_registered_key() {
 }
 
 #[tokio::test]
-#[ignore = "Requires persistent hardware key storage and a verified identity"]
+#[ignore = "Requires hardware key creation and a verified identity"]
 async fn test_creating_another_identity_preserves_the_existing_identity() {
     let _hardware = HARDWARE.lock().await;
     let (first, mut verifier) = enroll().await;
@@ -217,18 +236,110 @@ async fn test_tpm_rejects_a_corrupted_credential_challenge() {
     let metadata = attestation_identity(&identity)
         .await
         .expect("read EK and AK");
-    let (request, _) = prepare_attestation(&metadata);
+    let (request, secret) = prepare_attestation(&metadata);
     let mut bad_blob = request.clone();
     let AttestationChallenge::Tpm(credential) = &mut bad_blob.challenge else {
         panic!("expected TPM challenge");
     };
     credential.credential_blob[0] ^= 1;
-    assert!(attest_identity(&identity, &bad_blob).await.is_err());
+    assert_eq!(
+        attest_identity(&identity, &bad_blob).await.err(),
+        Some(DeviceIdentityError::InvalidChallenge)
+    );
 
-    let mut bad_seed = request;
+    let mut bad_seed = request.clone();
     let AttestationChallenge::Tpm(credential) = &mut bad_seed.challenge else {
         panic!("expected TPM challenge");
     };
     credential.encrypted_secret[0] ^= 1;
-    assert!(attest_identity(&identity, &bad_seed).await.is_err());
+    assert_eq!(
+        attest_identity(&identity, &bad_seed).await.err(),
+        Some(DeviceIdentityError::InvalidChallenge)
+    );
+    let response = attest_identity(&identity, &request)
+        .await
+        .expect("attest after rejected challenges");
+    verify_attestation(&metadata, &request, secret.as_ref(), &response)
+        .expect("verify attestation after failed activation attempts");
+}
+
+#[cfg(any(target_os = "linux", windows))]
+#[tokio::test]
+#[ignore = "Requires a TPM with empty Owner and Endorsement authorization"]
+async fn test_attestation_rejects_damaged_identity_without_replacing_keys() {
+    let _hardware = HARDWARE.lock().await;
+    let identity = create_identity().await.expect("create an identity");
+    let metadata = attestation_identity(&identity)
+        .await
+        .expect("read enrollment data");
+    let (request, secret) = prepare_attestation(&metadata);
+    for damaged in 0..4 {
+        let mut changed = identity.clone();
+        let Identity::Tpm(stored) = &mut changed else {
+            panic!("expected TPM identity data")
+        };
+        match damaged {
+            0 => stored.ek.public[0] ^= 1,
+            1 => stored.srk_template = vec![0],
+            2 => stored.ak.private[0] ^= 1,
+            3 => stored.identity_key.private[0] ^= 1,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            attest_identity(&changed, &request).await.err(),
+            Some(DeviceIdentityError::IdentityLost)
+        );
+    }
+    let response = attest_identity(&identity, &request)
+        .await
+        .expect("use the original identity after failures");
+    verify_attestation(&metadata, &request, secret.as_ref(), &response)
+        .expect("verify the original keys after failed attempts");
+}
+
+#[cfg(any(target_os = "linux", windows))]
+#[tokio::test]
+#[ignore = "Requires a TPM with empty Owner and Endorsement authorization"]
+async fn test_tpm_possession_needs_no_ek_or_ak_and_rejects_damaged_identity() {
+    let _hardware = HARDWARE.lock().await;
+    let (mut identity, mut verifier) = enroll().await;
+    let Identity::Tpm(stored) = &mut identity else {
+        panic!("expected TPM identity")
+    };
+    stored.ek.template.clear();
+    stored.ek.public.clear();
+    stored.ek.certificate_chain_der.clear();
+    stored.ak.public.clear();
+    stored.ak.private.clear();
+    let challenge = PossessionChallenge {
+        data: challenge_data("possession-without-attestation-keys"),
+    };
+    let proof = prove_possession(&identity, &challenge)
+        .await
+        .expect("sign without EK or AK data");
+    verifier
+        .verify_proof(&challenge.data, &proof)
+        .expect("verify the identity key signature");
+    for damaged in 0..3 {
+        let mut changed = identity.clone();
+        let Identity::Tpm(stored) = &mut changed else {
+            unreachable!()
+        };
+        match damaged {
+            0 => stored.srk_template = vec![0],
+            1 => stored.identity_key.public = vec![0],
+            2 => stored.identity_key.private[0] ^= 1,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            prove_possession(&changed, &challenge).await.err(),
+            Some(DeviceIdentityError::IdentityLost)
+        );
+    }
+    let proof = prove_possession(&identity, &challenge)
+        .await
+        .expect("sign after rejected identity data");
+    verifier
+        .verify_proof(&challenge.data, &proof)
+        .expect("verify the original key after failures");
 }

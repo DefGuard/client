@@ -11,6 +11,13 @@ version.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+picky-asn1 = "0.10"
+picky-asn1-der = "0.5"
+picky-asn1-x509 = "0.15"
+sha2 = "0.10"
+tss-esapi = "7.7"
+
 [lints]
 workspace = true
 

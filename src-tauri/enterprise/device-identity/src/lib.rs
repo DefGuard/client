@@ -1,9 +1,10 @@
+//! The caller owns and persists identity data.
 //! Backends must run blocking platform calls outside async executor threads.
 
 use thiserror::Error;
 
 #[cfg(target_os = "linux")]
-#[path = "backend/linux.rs"]
+#[path = "backend/linux/mod.rs"]
 mod backend;
 #[cfg(target_os = "macos")]
 #[path = "backend/macos.rs"]
@@ -42,7 +43,7 @@ pub struct Capabilities {
     pub details: PlatformCapabilities,
 }
 
-/// Backend-specific capability details without forcing a shared hardware model
+/// Backend-specific capability details
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlatformCapabilities {
     /// Capabilities queried from TPM 2.0
@@ -155,11 +156,44 @@ pub struct ProfileSupport {
     pub support: SupportStatus,
 }
 
-/// Reference to a locally managed identity
+/// Caller-owned data needed to reuse an identity across operations and restarts.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct IdentityRef {
-    /// Local storage identifier
-    pub id: String,
+pub enum Identity {
+    Tpm(TpmIdentity),
+    AppleAppAttest { key_id: String },
+}
+
+/// Caller-owned material for reloading keys on the TPM that created them.
+/// Linux keys have empty authorization, so protect the stored blobs from other local users.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TpmIdentity {
+    pub ek: TpmEndorsementKey,
+    /// Marshalled input TPMT_PUBLIC used to recreate the SRK with CreatePrimary.
+    pub srk_template: Vec<u8>,
+    /// Restricted signing key used to certify the identity key.
+    pub ak: TpmKeyBlobs,
+    /// Unrestricted signing key that accepts software-computed challenge digests.
+    pub identity_key: TpmKeyBlobs,
+}
+
+/// Public EK data and the parameters needed to recreate it in the TPM.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TpmEndorsementKey {
+    /// Marshalled input TPMT_PUBLIC for CreatePrimary in the Endorsement hierarchy.
+    pub template: Vec<u8>,
+    /// Marshalled TPMT_PUBLIC returned by the TPM.
+    pub public: Vec<u8>,
+    /// Available DER certificates starting with the EK certificate, possibly empty or incomplete.
+    pub certificate_chain_der: Vec<Vec<u8>>,
+}
+
+/// Both blobs are required to reload a key under its original SRK.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TpmKeyBlobs {
+    /// Marshalled TPMT_PUBLIC for loading the key.
+    pub public: Vec<u8>,
+    /// Parent-protected TPM2B_PRIVATE contents without the outer size field.
+    pub private: Vec<u8>,
 }
 
 /// Public backend data supplied to Core before generating attestation challenges
@@ -188,13 +222,14 @@ pub struct TpmAttestationIdentity {
 /// Credential activation challenge prepared by Core for a specific EK and AK
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CredentialChallenge {
-    /// Contents of the TPM2B_ID_OBJECT produced by MakeCredential
+    /// TPM2B_ID_OBJECT contents from MakeCredential, without the outer size field.
     pub credential_blob: Vec<u8>,
-    /// Contents of TPM2B_ENCRYPTED_SECRET carrying the encrypted protection seed
+    /// TPM2B_ENCRYPTED_SECRET contents without the outer size field.
     pub encrypted_secret: Vec<u8>,
 }
 
-/// Core-encoded challenge for a proof of identity key possession
+/// Carries Core-encoded challenge data for signing with the identity key.
+/// Core verifies expiry and consumes the nonce after successful verification.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PossessionChallenge {
     /// Opaque Core-encoded bytes containing nonce, session and operation binding.
@@ -326,27 +361,28 @@ pub enum DeviceIdentityError {
     BackendFailure,
 }
 
-/// Returns client-reported backend capabilities.
+/// Queries platform capabilities and checks support for the library's key profiles.
+/// Inventory failures are returned as errors.
 pub async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
     backend::capabilities().await
 }
 
 /// Creates a hardware-backed identity for attestation and possession proofs.
-/// TPM uses ECDSA NIST P-256 with SHA-256. Apple uses an App Attest key.
+/// TPM signing keys use ECDSA NIST P-256 with SHA-256. Apple uses an App Attest key.
 ///
 /// TPM backends must generate a non-restricted signing key with fixedTPM,
 /// fixedParent and sensitiveDataOrigin set, plus an AK for key certification.
 /// Apple backends must generate an App Attest key bound to the Secure Enclave.
 ///
-/// Returns a local reference for later attestation and possession proofs.
-/// Returns Unsupported when the required profile or mechanism is unavailable.
-pub async fn create_identity() -> Result<IdentityRef, DeviceIdentityError> {
+/// Returns all client-owned data needed for later attestation and possession proofs.
+/// The caller must retain the complete identity. Unsupported profiles return Unsupported.
+pub async fn create_identity() -> Result<Identity, DeviceIdentityError> {
     backend::create_identity().await
 }
 
-/// Returns the identity's public attestation data for enrollment with Core.
+/// Returns the supplied identity's public attestation data for enrollment with Core.
 pub async fn attestation_identity(
-    identity: &IdentityRef,
+    identity: &Identity,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {
     backend::attestation_identity(identity).await
 }
@@ -354,16 +390,16 @@ pub async fn attestation_identity(
 /// Processes the backend challenge and generates evidence bound to the exact Core-encoded data.
 /// TPM returns the activation secret and certification, while Apple returns App Attest evidence.
 pub async fn attest_identity(
-    identity: &IdentityRef,
+    identity: &Identity,
     request: &AttestationRequest,
 ) -> Result<AttestationResponse, DeviceIdentityError> {
     backend::attest_identity(identity, request).await
 }
 
-/// Produces a proof bound to Core's challenge using the referenced identity.
+/// Produces a proof bound to Core's challenge using the supplied identity data.
 /// Core must verify it against the previously attested key.
 pub async fn prove_possession(
-    identity: &IdentityRef,
+    identity: &Identity,
     challenge: &PossessionChallenge,
 ) -> Result<PossessionProof, DeviceIdentityError> {
     backend::prove_possession(identity, challenge).await
