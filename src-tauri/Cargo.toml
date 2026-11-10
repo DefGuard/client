@@ -55,7 +55,7 @@ edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
 rust-version = "1.95"
-version = "2.1.2"
+version = "2.1.3"
 
 [package]
 name = "defguard-client"
@@ -94,7 +94,6 @@ defguard-client-config-sync.path = "enterprise/config-sync"
 defguard-client-service-locations.path = "enterprise/service-locations"
 defguard-client-provisioning.path = "enterprise/provisioning"
 defguard-client-common.path = "common"
-dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 hyper-util = "0.1"

@@ -3,7 +3,7 @@ pub mod daemon;
 pub mod error;
 pub mod utils;
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 mod ipv6_block;
 #[cfg(windows)]
 pub mod named_pipe;
