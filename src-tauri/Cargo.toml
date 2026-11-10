@@ -94,7 +94,6 @@ defguard-client-config-sync.path = "enterprise/config-sync"
 defguard-client-service-locations.path = "enterprise/service-locations"
 defguard-client-provisioning.path = "enterprise/provisioning"
 defguard-client-common.path = "common"
-dark-light = "2.0"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }
 dirs-next.workspace = true
 hyper-util = "0.1"
