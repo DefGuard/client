@@ -10,7 +10,7 @@ mod backend;
 #[path = "backend/macos.rs"]
 mod backend;
 #[cfg(windows)]
-#[path = "backend/windows.rs"]
+#[path = "backend/windows/mod.rs"]
 mod backend;
 
 /// Platform mechanism used to protect the device identity

@@ -3,8 +3,12 @@ use crate::{
     DeviceIdentityError, Identity, PossessionChallenge, PossessionProof,
 };
 
+mod tpm;
+
 pub(super) async fn capabilities() -> Result<Capabilities, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    tokio::task::spawn_blocking(tpm::read_capabilities)
+        .await
+        .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
 
 pub(super) async fn create_identity() -> Result<Identity, DeviceIdentityError> {
