@@ -605,6 +605,18 @@ async fn refresh_instance_config(instance_id: Id, handle: &AppHandle) -> Result<
     Ok(())
 }
 
+async fn save_instance_and_refresh_ui(
+    instance: &mut Instance<Id>,
+    handle: &AppHandle,
+) -> Result<(), Error> {
+    instance.save(&*DB_POOL).await?;
+    reload_tray_menu(handle).await;
+    handle
+        .emit(EventKey::InstanceUpdate.into(), ())
+        .map_err(tauri_err_to_app_err)?;
+    Ok(())
+}
+
 #[derive(Serialize)]
 pub struct SaveDeviceConfigResponse {
     locations: Vec<Location<Id>>,
@@ -2797,6 +2809,7 @@ fn get_mfa_config_session(state: &AppState, session_id: &str) -> Result<MfaConfi
 pub async fn mfa_config_start(
     instance_id: Id,
     state: State<'_, AppState>,
+    handle: AppHandle,
 ) -> Result<MfaConfigStartResult, String> {
     debug!("Starting MFA configuration for instance {instance_id}");
     let instance = Instance::find_by_id(&*DB_POOL, instance_id)
@@ -2831,10 +2844,25 @@ pub async fn mfa_config_start(
         .into_iter()
         .map(LocationMfaMethod::from)
         .collect();
-    let configured_methods = mfa_config::session_methods(&response)
+    let configured_methods: Vec<_> = mfa_config::session_methods(&response)
         .into_iter()
         .map(LocationMfaMethod::from)
         .collect();
+    let update_result = match Instance::find_by_id(&*DB_POOL, instance_id).await {
+        Ok(Some(mut instance)) => {
+            if instance.merge_mfa_configured_methods(&configured_methods) {
+                save_instance_and_refresh_ui(&mut instance, &handle).await
+            } else {
+                Ok(())
+            }
+        }
+        Ok(None) => Err(Error::NotFound),
+        Err(err) => Err(err.into()),
+    };
+    if let Err(err) = update_result {
+        warn!("Failed to save MFA configuration state for instance {instance_id}: {err}");
+    }
+
     let session = MfaConfigSession {
         instance_id,
         proxy_url,
@@ -3087,6 +3115,24 @@ pub async fn mfa_config_setup_finish(
     .await
     .map_err(err_to_json)?;
 
+    let update_result = match Instance::find_by_id(&*DB_POOL, session.instance_id).await {
+        Ok(Some(mut instance)) => {
+            if instance.add_mfa_configured_method(method.into()) {
+                save_instance_and_refresh_ui(&mut instance, &handle).await
+            } else {
+                Ok(())
+            }
+        }
+        Ok(None) => Err(Error::NotFound),
+        Err(err) => Err(err.into()),
+    };
+    if let Err(err) = update_result {
+        warn!(
+            "Failed to save configured MFA method for instance {}: {err}",
+            session.instance_id
+        );
+    }
+
     // Best effort, a stale `configured` flag must not cost the user their recovery codes.
     if let Err(err) = refresh_instance_config(session.instance_id, &handle).await {
         warn!(
@@ -3195,6 +3241,24 @@ pub async fn mfa_config_setup_fido2(
     // The cancel lost the race, and there is nothing to undo the registration with.
     if ceremony.is_cancelled() {
         warn!("Security key was registered before the cancellation arrived");
+    }
+
+    let update_result = match Instance::find_by_id(&*DB_POOL, session.instance_id).await {
+        Ok(Some(mut instance)) => {
+            if instance.add_mfa_configured_method(LocationMfaMethod::Fido2) {
+                save_instance_and_refresh_ui(&mut instance, &handle).await
+            } else {
+                Ok(())
+            }
+        }
+        Ok(None) => Err(Error::NotFound),
+        Err(err) => Err(err.into()),
+    };
+    if let Err(err) = update_result {
+        warn!(
+            "Failed to save configured MFA method for instance {}: {err}",
+            session.instance_id
+        );
     }
 
     // Best effort, a stale `configured` flag must not cost the user their recovery codes.

@@ -88,7 +88,56 @@ pub fn mfa_capabilities(
         })
 }
 
+fn is_mfa_config_response_authoritative_for_method(method: LocationMfaMethod) -> bool {
+    crate::mfa_config::AUTHORIZING_METHODS.contains(&method.into())
+}
+
 impl<I> Instance<I> {
+    /// Core's MFA config response reports current TOTP, email, FIDO2, and OIDC status.
+    /// Preserve all other saved MFA methods.
+    pub fn merge_mfa_configured_methods(&mut self, reported_methods: &[LocationMfaMethod]) -> bool {
+        let Some(mut methods) = self
+            .mfa_configured_methods
+            .as_ref()
+            .map(|json| json.0.clone())
+        else {
+            return false;
+        };
+
+        methods.retain(|method| !is_mfa_config_response_authoritative_for_method(*method));
+        methods.extend(
+            reported_methods
+                .iter()
+                .copied()
+                .filter(|method| is_mfa_config_response_authoritative_for_method(*method)),
+        );
+        methods.sort_unstable();
+        methods.dedup();
+
+        if self
+            .mfa_configured_methods
+            .as_ref()
+            .is_some_and(|saved| saved.0 == methods)
+        {
+            return false;
+        }
+
+        self.mfa_configured_methods = Some(Json(methods));
+        true
+    }
+
+    pub fn add_mfa_configured_method(&mut self, method: LocationMfaMethod) -> bool {
+        let Some(methods) = self.mfa_configured_methods.as_mut().map(|json| &mut json.0) else {
+            return false;
+        };
+        if methods.contains(&method) {
+            return false;
+        }
+        methods.push(method);
+        methods.sort_unstable();
+        true
+    }
+
     /// Returns whether any MFA field changed, factor availability included.
     pub fn sync_mfa_state(&mut self, instance_info: &proto::client_types::InstanceInfo) -> bool {
         let configured_methods = mfa_configured_methods(instance_info);
@@ -536,6 +585,82 @@ mod tests {
             smtp_configured: None,
             openid_available: None,
         }
+    }
+
+    #[test]
+    fn test_merge_mfa_configured_methods_replaces_empty_state() {
+        let mut instance = new_instance();
+        instance.mfa_configured_methods = Some(Json(vec![]));
+
+        assert!(instance.merge_mfa_configured_methods(&[LocationMfaMethod::Totp]));
+        assert_eq!(
+            instance.mfa_configured_methods.unwrap().0,
+            vec![LocationMfaMethod::Totp]
+        );
+    }
+
+    #[test]
+    fn test_merge_mfa_configured_methods_removes_stale_methods() {
+        let mut instance = new_instance();
+        instance.mfa_configured_methods = Some(Json(vec![
+            LocationMfaMethod::Totp,
+            LocationMfaMethod::Email,
+            LocationMfaMethod::Biometric,
+        ]));
+
+        assert!(instance.merge_mfa_configured_methods(&[LocationMfaMethod::Totp]));
+        assert_eq!(
+            instance.mfa_configured_methods.unwrap().0,
+            vec![LocationMfaMethod::Totp, LocationMfaMethod::Biometric]
+        );
+    }
+
+    #[test]
+    fn test_merge_mfa_configured_methods_keeps_other_factors() {
+        let mut instance = new_instance();
+        instance.mfa_configured_methods = Some(Json(vec![
+            LocationMfaMethod::Biometric,
+            LocationMfaMethod::MobileApprove,
+        ]));
+
+        assert!(instance.merge_mfa_configured_methods(&[LocationMfaMethod::Totp]));
+        assert_eq!(
+            instance.mfa_configured_methods.unwrap().0,
+            vec![
+                LocationMfaMethod::Totp,
+                LocationMfaMethod::Biometric,
+                LocationMfaMethod::MobileApprove,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_merge_mfa_configured_methods_leaves_unreported_state_untouched() {
+        let mut instance = new_instance();
+
+        assert!(!instance.merge_mfa_configured_methods(&[LocationMfaMethod::Totp]));
+        assert!(instance.mfa_configured_methods.is_none());
+    }
+
+    #[test]
+    fn test_add_mfa_configured_method_sorts_and_does_not_duplicate() {
+        let mut instance = new_instance();
+        instance.mfa_configured_methods = Some(Json(vec![LocationMfaMethod::Fido2]));
+
+        assert!(instance.add_mfa_configured_method(LocationMfaMethod::Totp));
+        assert_eq!(
+            instance.mfa_configured_methods.as_ref().unwrap().0,
+            vec![LocationMfaMethod::Totp, LocationMfaMethod::Fido2]
+        );
+        assert!(!instance.add_mfa_configured_method(LocationMfaMethod::Fido2));
+    }
+
+    #[test]
+    fn test_add_mfa_configured_method_leaves_unreported_state_untouched() {
+        let mut instance = new_instance();
+
+        assert!(!instance.add_mfa_configured_method(LocationMfaMethod::Totp));
+        assert!(instance.mfa_configured_methods.is_none());
     }
 
     #[sqlx::test(migrations = "../migrations")]

@@ -265,6 +265,10 @@ fn ensure_can_configure(
 /// a newer Core cannot break an older client.
 #[must_use]
 pub fn session_methods(response: &MfaConfigStartResponse) -> Vec<MfaMethod> {
+    if response.email_fallback {
+        return Vec::new();
+    }
+
     response
         .available_methods
         .iter()
