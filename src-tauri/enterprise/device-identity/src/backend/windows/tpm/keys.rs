@@ -1,0 +1,193 @@
+use super::{marshal, with_primary, Transport};
+#[cfg(test)]
+use super::{password_auth, with_transient_response};
+#[cfg(test)]
+use crate::TpmIdentity;
+use crate::{DeviceIdentityError, TpmKeyBlobs};
+use tpm2_protocol::{
+    basic::{TpmHandle, TpmUint16},
+    data::{
+        Tpm2bData, Tpm2bDigest, Tpm2bPublic, Tpm2bSensitiveCreate, TpmAlgId, TpmEccCurve, TpmRh,
+        TpmaObject, TpmlPcrSelection, TpmsEccParms, TpmsEccPoint, TpmsSchemeHash,
+        TpmsSensitiveCreate, TpmtEccScheme, TpmtKdfScheme, TpmtPublic, TpmtSymDef,
+        TpmtSymDefObject, TpmuAsymScheme, TpmuPublicId, TpmuPublicParms, TpmuSymKeyBits,
+        TpmuSymMode,
+    },
+    frame::{TpmCreateCommand, TpmCreateResponse},
+};
+#[cfg(test)]
+use tpm2_protocol::{
+    data::Tpm2bPrivate,
+    frame::{TpmLoadCommand, TpmLoadResponse},
+    TpmUnmarshal,
+};
+
+fn aes_128_cfb() -> TpmtSymDefObject {
+    TpmtSymDef {
+        algorithm: TpmAlgId::Aes,
+        key_bits: TpmuSymKeyBits::Aes(TpmUint16::from(128)),
+        mode: TpmuSymMode::Aes(TpmAlgId::Cfb),
+    }
+}
+
+fn null_symmetric() -> TpmtSymDef {
+    TpmtSymDef {
+        algorithm: TpmAlgId::Null,
+        key_bits: TpmuSymKeyBits::Null,
+        mode: TpmuSymMode::Null,
+    }
+}
+
+fn storage_template() -> TpmtPublic {
+    TpmtPublic {
+        object_type: TpmAlgId::Ecc,
+        name_alg: TpmAlgId::Sha256,
+        object_attributes: TpmaObject::FIXED_TPM
+            | TpmaObject::FIXED_PARENT
+            | TpmaObject::SENSITIVE_DATA_ORIGIN
+            | TpmaObject::USER_WITH_AUTH
+            | TpmaObject::NO_DA
+            | TpmaObject::RESTRICTED
+            | TpmaObject::DECRYPT,
+        auth_policy: Tpm2bDigest::new(),
+        parameters: TpmuPublicParms::Ecc(TpmsEccParms {
+            symmetric: aes_128_cfb(),
+            scheme: TpmtEccScheme::default(),
+            curve_id: TpmEccCurve::NistP256,
+            kdf: TpmtKdfScheme::default(),
+        }),
+        unique: TpmuPublicId::Ecc(TpmsEccPoint::default()),
+    }
+}
+
+fn signing_template(restricted: bool) -> TpmtPublic {
+    let mut attributes = TpmaObject::FIXED_TPM
+        | TpmaObject::FIXED_PARENT
+        | TpmaObject::SENSITIVE_DATA_ORIGIN
+        | TpmaObject::USER_WITH_AUTH
+        | TpmaObject::NO_DA
+        | TpmaObject::SIGN_ENCRYPT;
+    if restricted {
+        attributes |= TpmaObject::RESTRICTED;
+    }
+    TpmtPublic {
+        object_type: TpmAlgId::Ecc,
+        name_alg: TpmAlgId::Sha256,
+        object_attributes: attributes,
+        auth_policy: Tpm2bDigest::new(),
+        parameters: TpmuPublicParms::Ecc(TpmsEccParms {
+            symmetric: null_symmetric(),
+            scheme: TpmtEccScheme {
+                scheme: TpmAlgId::Ecdsa,
+                details: TpmuAsymScheme::Hash(TpmsSchemeHash {
+                    hash_alg: TpmAlgId::Sha256,
+                }),
+            },
+            curve_id: TpmEccCurve::NistP256,
+            kdf: TpmtKdfScheme::default(),
+        }),
+        unique: TpmuPublicId::Ecc(TpmsEccPoint::default()),
+    }
+}
+
+pub(super) fn create(
+    transport: &mut impl Transport,
+) -> Result<(Vec<u8>, TpmKeyBlobs, TpmKeyBlobs), DeviceIdentityError> {
+    let template = storage_template();
+    let srk_template = marshal(&template)?;
+    let (ak, identity_key) =
+        with_primary(transport, TpmRh::Owner, template, |transport, parent| {
+            let ak = create_signing_key(transport, parent, true)?;
+            let identity_key = create_signing_key(transport, parent, false)?;
+            Ok((ak, identity_key))
+        })?;
+    Ok((srk_template, ak, identity_key))
+}
+
+fn create_signing_key(
+    transport: &mut impl Transport,
+    parent: TpmHandle,
+    restricted: bool,
+) -> Result<TpmKeyBlobs, DeviceIdentityError> {
+    let command = TpmCreateCommand {
+        handles: [parent],
+        in_sensitive: Tpm2bSensitiveCreate {
+            inner: TpmsSensitiveCreate::default(),
+        },
+        in_public: Tpm2bPublic {
+            inner: signing_template(restricted),
+        },
+        outside_info: Tpm2bData::new(),
+        creation_pcr: TpmlPcrSelection::default(),
+    };
+    let response: TpmCreateResponse = super::send_authenticated(transport, &command)?;
+    Ok(TpmKeyBlobs {
+        public: marshal(&response.out_public.inner)?,
+        private: response.out_private.as_ref().to_vec(),
+    })
+}
+
+#[cfg(test)]
+pub(super) fn reload(
+    transport: &mut impl Transport,
+    identity: &TpmIdentity,
+) -> Result<(), DeviceIdentityError> {
+    let template = decode_public(&identity.srk_template)?;
+    with_primary(transport, TpmRh::Owner, template, |transport, parent| {
+        load_key(transport, parent, &identity.ak)?;
+        load_key(transport, parent, &identity.identity_key)
+    })
+}
+
+#[cfg(test)]
+fn load_key(
+    transport: &mut impl Transport,
+    parent: TpmHandle,
+    blobs: &TpmKeyBlobs,
+) -> Result<(), DeviceIdentityError> {
+    let public = decode_public(&blobs.public)?;
+    let private = Tpm2bPrivate::try_from(blobs.private.as_slice())
+        .map_err(|_| DeviceIdentityError::IdentityLost)?;
+    let command = TpmLoadCommand {
+        handles: [parent],
+        in_private: private,
+        in_public: Tpm2bPublic { inner: public },
+    };
+    with_transient_response::<_, _, TpmLoadResponse, _>(
+        transport,
+        &command,
+        &[password_auth()],
+        |_, _, _| Ok(()),
+    )
+}
+
+#[cfg(test)]
+fn decode_public(bytes: &[u8]) -> Result<TpmtPublic, DeviceIdentityError> {
+    let (public, remaining) =
+        TpmtPublic::unmarshal(bytes).map_err(|_| DeviceIdentityError::IdentityLost)?;
+    if !remaining.is_empty() {
+        return Err(DeviceIdentityError::IdentityLost);
+    }
+    Ok(public)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn encoded_attributes(template: &TpmtPublic) -> u32 {
+        let bytes = marshal(template).expect("marshal public template");
+        u32::from_be_bytes(bytes[4..8].try_into().expect("four attribute bytes"))
+    }
+
+    #[test]
+    fn test_storage_template_has_expected_attributes() {
+        assert_eq!(encoded_attributes(&storage_template()), 0x0003_0472);
+    }
+
+    #[test]
+    fn test_signing_templates_have_expected_attributes() {
+        assert_eq!(encoded_attributes(&signing_template(true)), 0x0005_0472);
+        assert_eq!(encoded_attributes(&signing_template(false)), 0x0004_0472);
+    }
+}

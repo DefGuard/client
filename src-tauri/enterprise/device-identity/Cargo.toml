@@ -12,8 +12,14 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 
 [target.'cfg(windows)'.dependencies]
+picky-asn1 = "0.10"
+picky-asn1-der = "0.5"
+picky-asn1-x509 = "0.15"
 tpm2-protocol = "1.2.3"
-windows-sys = { workspace = true, features = ["Win32_System_TpmBaseServices"] }
+windows-sys = { workspace = true, features = [
+    "Win32_Security_Cryptography",
+    "Win32_System_TpmBaseServices",
+] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 picky-asn1 = "0.10"

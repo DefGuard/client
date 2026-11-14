@@ -1,6 +1,6 @@
 use crate::{
     AttestationIdentity, AttestationRequest, AttestationResponse, Capabilities,
-    DeviceIdentityError, Identity, PossessionChallenge, PossessionProof,
+    DeviceIdentityError, Identity, PossessionChallenge, PossessionProof, TpmAttestationIdentity,
 };
 
 mod tpm;
@@ -12,13 +12,23 @@ pub(super) async fn capabilities() -> Result<Capabilities, DeviceIdentityError> 
 }
 
 pub(super) async fn create_identity() -> Result<Identity, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    tokio::task::spawn_blocking(tpm::create_identity)
+        .await
+        .map_err(|_| DeviceIdentityError::BackendFailure)?
+        .map(Identity::Tpm)
 }
 
 pub(super) async fn attestation_identity(
-    _identity: &Identity,
+    identity: &Identity,
 ) -> Result<AttestationIdentity, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    let Identity::Tpm(identity) = identity else {
+        return Err(DeviceIdentityError::Unsupported);
+    };
+    Ok(AttestationIdentity::Tpm(TpmAttestationIdentity {
+        ek_public: identity.ek.public.clone(),
+        ek_certificate_chain_der: identity.ek.certificate_chain_der.clone(),
+        ak_public: identity.ak.public.clone(),
+    }))
 }
 
 pub(super) async fn attest_identity(
