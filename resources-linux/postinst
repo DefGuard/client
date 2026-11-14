@@ -37,14 +37,42 @@ get_installing_user() {
     return 1
 }
 
+ensure_local_group_entry() {
+    # Fedora Atomic systems can provide system groups from /usr/lib/group.
+    # usermod may report success for those groups without persisting members
+    # in /etc/group, so create a matching local entry before adding users.
+    if getent -s files group "$GROUP_NAME" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    group_gid=""
+    group_entry=$(getent group "$GROUP_NAME" 2>/dev/null || true)
+    if [ -n "$group_entry" ]; then
+        group_gid=$(printf '%s\n' "$group_entry" | cut -d: -f3)
+        if ! groupadd --system --force --non-unique --gid "$group_gid" "$GROUP_NAME"; then
+            return 1
+        fi
+    elif ! groupadd --system "$GROUP_NAME"; then
+        return 1
+    fi
+
+    local_group_entry=$(getent -s files group "$GROUP_NAME" 2>/dev/null || true)
+    [ -n "$local_group_entry" ] &&
+        { [ -z "$group_gid" ] || [ "$(printf '%s\n' "$local_group_entry" | cut -d: -f3)" = "$group_gid" ]; }
+}
+
+is_group_member() {
+    id -Gn "$1" | tr ' ' '\n' | grep -Fxq "$GROUP_NAME"
+}
+
 case "$1" in
     1|configure)
-        # Create the group if it doesn't exist
-        if ! getent group "$GROUP_NAME" >/dev/null; then
-            groupadd --system "$GROUP_NAME"
-            echo "Created group $GROUP_NAME"
+        if ensure_local_group_entry; then
+            LOCAL_GROUP_READY=1
+            echo "Group $GROUP_NAME is ready for local membership changes."
         else
-            echo "Group $GROUP_NAME exists already."
+            LOCAL_GROUP_READY=0
+            echo "Warning: Could not create a local group entry for $GROUP_NAME."
         fi
 
         # Determine target user. get_installing_user() may legitimately find
@@ -57,10 +85,10 @@ case "$1" in
         # Add user to group if we found a valid target
         if [ -n "$TARGET_USER" ]; then
             if getent passwd "$TARGET_USER" >/dev/null; then
-                # Try to add user to group and check if it succeeded
-                if usermod -a -G "$GROUP_NAME" "$TARGET_USER"; then
-                    echo "Added user $TARGET_USER to group $GROUP_NAME"
-
+                if ensure_local_group_entry &&
+                    usermod -a -G "$GROUP_NAME" "$TARGET_USER" &&
+                    is_group_member "$TARGET_USER"; then
+                    echo "Verified user $TARGET_USER is a member of group $GROUP_NAME."
                     # Only show reboot message if user was actually added
                     echo "================================================"
                     echo "  IMPORTANT: Reboot or Re-login Required"
@@ -70,12 +98,18 @@ case "$1" in
                     echo "group membership changes to take effect."
                     echo "================================================"
                 else
-                    echo "Warning: Failed to add user $TARGET_USER to group $GROUP_NAME"
-                    exit 1
+                    echo "Warning: Could not verify that user $TARGET_USER is a member of group $GROUP_NAME."
+                    echo "The package is installed, but this user may need to be added to the group manually."
                 fi
             fi
         else
-            echo "User $TARGET_USER is not a valid target. Not adding the user to group $GROUP_NAME"
+            echo "No installing user was detected."
+            if [ "$LOCAL_GROUP_READY" -eq 1 ]; then
+                echo "To grant access later, run: sudo usermod -aG $GROUP_NAME <your-username>"
+                echo "Then sign out and back in before using Defguard."
+            else
+                echo "The user who will run Defguard must be added to group $GROUP_NAME before using the client."
+            fi
         fi
 
         # Handle systemd service
