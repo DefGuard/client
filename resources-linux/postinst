@@ -17,14 +17,23 @@ get_installing_user() {
         return 0
     fi
 
-    # Method 2: Check loginctl for latest session
-    SESSION_ID=$(loginctl show-seat seat0 -p ActiveSession --value)
-    username=$(loginctl show-session "$SESSION_ID" -p Name --value)
-    if [ -n "$username" ]; then
-        echo "$username"
-        return 0
+    # Method 2: Check loginctl for latest session.
+    # Only attempt this if systemd is actually running (PID 1) - during
+    # rpm-ostree deployment construction (e.g. on Fedora Atomic / Bazzite)
+    # the package scriptlets run in a bwrap container with no systemd/dbus,
+    # so loginctl would fail and - combined with `set -e` - abort the whole
+    # rpm-ostree transaction.
+    if [ -d /run/systemd/system ]; then
+        SESSION_ID=$(loginctl show-seat seat0 -p ActiveSession --value 2>/dev/null) || SESSION_ID=""
+        if [ -n "$SESSION_ID" ]; then
+            username=$(loginctl show-session "$SESSION_ID" -p Name --value 2>/dev/null) || username=""
+            if [ -n "$username" ]; then
+                echo "$username"
+                return 0
+            fi
+        fi
     fi
-    
+
     return 1
 }
 
@@ -38,8 +47,11 @@ case "$1" in
             echo "Group $GROUP_NAME exists already."
         fi
 
-        # Determine target user
-        TARGET_USER=$(get_installing_user)
+        # Determine target user. get_installing_user() may legitimately find
+        # no user (e.g. unattended/offline installs such as rpm-ostree
+        # deployment construction), so don't let `set -e` abort the script
+        # when it returns a non-zero status.
+        TARGET_USER=$(get_installing_user) || TARGET_USER=""
         echo "Installation triggered by user $TARGET_USER"
 
         # Add user to group if we found a valid target
