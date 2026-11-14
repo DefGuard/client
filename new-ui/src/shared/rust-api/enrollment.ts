@@ -18,6 +18,16 @@ const updateInstanceRecord = (args: {
   instanceId: number;
   response: CreateDeviceResponse;
 }): Promise<void> => invoke(TauriCommand.UpdateInstance, args);
+export const refreshEnrollmentInstance = async (
+  sessionId: string,
+  instanceUuid: string,
+): Promise<void> => {
+  const instance = (await getInstances()).find(({ uuid }) => uuid === instanceUuid);
+  if (!instance) throw new Error('Enrollment instance was not found');
+
+  const response = await api.enrollmentNetworkInfo(sessionId, instance.pubkey);
+  await updateInstanceRecord({ instanceId: instance.id, response });
+};
 const saveDeviceConfig = (args: {
   privateKey: string;
   response: CreateDeviceResponse;
