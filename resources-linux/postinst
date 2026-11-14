@@ -3,6 +3,9 @@ set -e
 
 GROUP_NAME="defguard"
 SERVICE_NAME="defguard-service"
+STATE_DIR="/var/lib/defguard-client"
+GROUP_CREATED_MARKER="$STATE_DIR/defguard-group-created"
+ADDED_USERS_FILE="$STATE_DIR/defguard-group-members"
 
 # Get the name of user who is installing the client
 get_installing_user() {
@@ -41,6 +44,7 @@ ensure_local_group_entry() {
     # Fedora Atomic systems can provide system groups from /usr/lib/group.
     # usermod may report success for those groups without persisting members
     # in /etc/group, so create a matching local entry before adding users.
+    GROUP_ENTRY_CREATED=0
     if getent -s files group "$GROUP_NAME" >/dev/null 2>&1; then
         return 0
     fi
@@ -57,18 +61,36 @@ ensure_local_group_entry() {
     fi
 
     local_group_entry=$(getent -s files group "$GROUP_NAME" 2>/dev/null || true)
-    [ -n "$local_group_entry" ] &&
-        { [ -z "$group_gid" ] || [ "$(printf '%s\n' "$local_group_entry" | cut -d: -f3)" = "$group_gid" ]; }
+    if [ -n "$local_group_entry" ] &&
+        { [ -z "$group_gid" ] || [ "$(printf '%s\n' "$local_group_entry" | cut -d: -f3)" = "$group_gid" ]; }; then
+        GROUP_ENTRY_CREATED=1
+        return 0
+    fi
+    return 1
 }
 
 is_group_member() {
     id -Gn "$1" | tr ' ' '\n' | grep -Fxq "$GROUP_NAME"
 }
 
+record_added_user() {
+    umask 077
+    mkdir -p "$STATE_DIR" || return 1
+    if ! grep -Fxq "$1" "$ADDED_USERS_FILE" 2>/dev/null; then
+        printf '%s\n' "$1" >> "$ADDED_USERS_FILE" || return 1
+    fi
+}
+
 case "$1" in
     1|configure)
         if ensure_local_group_entry; then
             LOCAL_GROUP_READY=1
+            if [ "$GROUP_ENTRY_CREATED" -eq 1 ]; then
+                umask 077
+                mkdir -p "$STATE_DIR" &&
+                    : > "$GROUP_CREATED_MARKER" ||
+                    echo "Warning: Could not record ownership of the local $GROUP_NAME group entry."
+            fi
             echo "Group $GROUP_NAME is ready for local membership changes."
         else
             LOCAL_GROUP_READY=0
@@ -85,21 +107,29 @@ case "$1" in
         # Add user to group if we found a valid target
         if [ -n "$TARGET_USER" ]; then
             if getent passwd "$TARGET_USER" >/dev/null; then
-                if ensure_local_group_entry &&
-                    usermod -a -G "$GROUP_NAME" "$TARGET_USER" &&
-                    is_group_member "$TARGET_USER"; then
-                    echo "Verified user $TARGET_USER is a member of group $GROUP_NAME."
-                    # Only show reboot message if user was actually added
-                    echo "================================================"
-                    echo "  IMPORTANT: Reboot or Re-login Required"
-                    echo "================================================"
-                    echo "The user has been added to the defguard group."
-                    echo "Please reboot or log out and back in for the"
-                    echo "group membership changes to take effect."
-                    echo "================================================"
+                if is_group_member "$TARGET_USER"; then
+                    echo "User $TARGET_USER is already a member of group $GROUP_NAME."
                 else
-                    echo "Warning: Could not verify that user $TARGET_USER is a member of group $GROUP_NAME."
-                    echo "The package is installed, but this user may need to be added to the group manually."
+                    if ensure_local_group_entry &&
+                        usermod -a -G "$GROUP_NAME" "$TARGET_USER" &&
+                        is_group_member "$TARGET_USER"; then
+                        if record_added_user "$TARGET_USER"; then
+                            echo "Verified and recorded user $TARGET_USER as a member of group $GROUP_NAME."
+                        else
+                            echo "Warning: User membership was added but could not be recorded for uninstall cleanup."
+                        fi
+                        # Only show reboot message if user was actually added
+                        echo "================================================"
+                        echo "  IMPORTANT: Reboot or Re-login Required"
+                        echo "================================================"
+                        echo "The user has been added to the defguard group."
+                        echo "Please reboot or log out and back in for the"
+                        echo "group membership changes to take effect."
+                        echo "================================================"
+                    else
+                        echo "Warning: Could not verify that user $TARGET_USER is a member of group $GROUP_NAME."
+                        echo "The package is installed, but this user may need to be added to the group manually."
+                    fi
                 fi
             fi
         else
