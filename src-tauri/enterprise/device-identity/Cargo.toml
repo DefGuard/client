@@ -15,6 +15,7 @@ tokio = { workspace = true, features = ["macros"] }
 picky-asn1 = "0.10"
 picky-asn1-der = "0.5"
 picky-asn1-x509 = "0.15"
+sha2 = "0.10"
 tpm2-protocol = "1.2.3"
 windows-sys = { workspace = true, features = [
     "Win32_Security_Cryptography",

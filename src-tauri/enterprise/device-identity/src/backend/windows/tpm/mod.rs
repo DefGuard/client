@@ -1,4 +1,6 @@
-use crate::{Capabilities, DeviceIdentityError, TpmIdentity};
+use crate::{
+    AttestationResponse, Capabilities, CredentialChallenge, DeviceIdentityError, TpmIdentity,
+};
 use tpm2_protocol::{
     basic::TpmHandle,
     constant::TPM_MAX_COMMAND_SIZE,
@@ -11,7 +13,10 @@ use tpm2_protocol::{
     TpmMarshal, TpmResult, TpmSized, TpmUnmarshal, TpmWriter,
 };
 
+mod activation;
 mod capabilities;
+mod certify;
+mod der;
 mod ek;
 mod keys;
 mod tbs;
@@ -34,6 +39,13 @@ pub(super) fn create_identity() -> Result<TpmIdentity, DeviceIdentityError> {
         ak,
         identity_key,
     })
+}
+pub(super) fn attest_identity(
+    identity: TpmIdentity,
+    data: Vec<u8>,
+    challenge: CredentialChallenge,
+) -> Result<AttestationResponse, DeviceIdentityError> {
+    activation::attest(identity, data, challenge)
 }
 
 pub(super) trait Transport {
@@ -148,12 +160,19 @@ fn decode_frame<R: TpmUnmarshalBody>(
     bytes: &[u8],
     expected_tag: TpmSt,
 ) -> Result<R, DeviceIdentityError> {
+    decode_frame_with_mapper(bytes, expected_tag, map_tpm_rc)
+}
+fn decode_frame_with_mapper<R: TpmUnmarshalBody>(
+    bytes: &[u8],
+    expected_tag: TpmSt,
+    map_response_code: fn(TpmRc) -> DeviceIdentityError,
+) -> Result<R, DeviceIdentityError> {
     let response = TpmResponse::cast(bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
     let response_code = response
         .rc()
         .map_err(|_| DeviceIdentityError::BackendFailure)?;
     if response_code != TpmRc::Fmt0(TpmRcBase::Success) {
-        return Err(map_tpm_rc(response_code));
+        return Err(map_response_code(response_code));
     }
     if response
         .tag()
@@ -170,17 +189,27 @@ pub(super) fn send_frame<C: TpmFrame, R: TpmUnmarshalBody>(
     transport: &mut impl Transport,
     command: &C,
 ) -> Result<R, DeviceIdentityError> {
-    decode_frame(&submit_frame(transport, command, &[])?, TpmSt::NoSessions)
+    send_with_sessions_and_mapper(transport, command, &[], map_tpm_rc)
 }
 pub(super) fn send_authenticated<C: TpmFrame, R: TpmUnmarshalBody>(
     transport: &mut impl Transport,
     command: &C,
 ) -> Result<R, DeviceIdentityError> {
-    let sessions = [password_auth()];
-    decode_frame(
-        &submit_frame(transport, command, &sessions)?,
-        TpmSt::Sessions,
-    )
+    send_with_sessions_and_mapper(transport, command, &[password_auth()], map_tpm_rc)
+}
+pub(super) fn send_with_sessions_and_mapper<C: TpmFrame, R: TpmUnmarshalBody>(
+    transport: &mut impl Transport,
+    command: &C,
+    sessions: &[TpmsAuthCommand],
+    map_response_code: fn(TpmRc) -> DeviceIdentityError,
+) -> Result<R, DeviceIdentityError> {
+    let tag = if sessions.is_empty() {
+        TpmSt::NoSessions
+    } else {
+        TpmSt::Sessions
+    };
+    let bytes = submit_frame(transport, command, sessions)?;
+    decode_frame_with_mapper(&bytes, tag, map_response_code)
 }
 pub(super) fn send_allow_missing_handle<C: TpmFrame, R: TpmUnmarshalBody>(
     transport: &mut impl Transport,
@@ -199,6 +228,15 @@ pub(super) fn with_primary<T: Transport, R>(
     public: tpm2_protocol::data::TpmtPublic,
     operation: impl FnOnce(&mut T, TpmHandle) -> Result<R, DeviceIdentityError>,
 ) -> Result<R, DeviceIdentityError> {
+    with_primary_with_mapper(transport, hierarchy, public, map_tpm_rc, operation)
+}
+pub(super) fn with_primary_with_mapper<T: Transport, R>(
+    transport: &mut T,
+    hierarchy: TpmRh,
+    public: tpm2_protocol::data::TpmtPublic,
+    map_response_code: fn(TpmRc) -> DeviceIdentityError,
+    operation: impl FnOnce(&mut T, TpmHandle) -> Result<R, DeviceIdentityError>,
+) -> Result<R, DeviceIdentityError> {
     use tpm2_protocol::{
         data::{
             Tpm2bData, Tpm2bPublic, Tpm2bSensitiveCreate, TpmlPcrSelection, TpmsSensitiveCreate,
@@ -215,10 +253,11 @@ pub(super) fn with_primary<T: Transport, R>(
         outside_info: Tpm2bData::new(),
         creation_pcr: TpmlPcrSelection::default(),
     };
-    with_transient_response::<T, _, TpmCreatePrimaryResponse, _>(
+    with_transient_response_with_mapper::<T, _, TpmCreatePrimaryResponse, _>(
         transport,
         &command,
         &[password_auth()],
+        map_response_code,
         |transport, handle, _| operation(transport, handle),
     )
 }
@@ -226,6 +265,23 @@ pub(super) fn with_transient_response<T: Transport, C: TpmFrame, R: TpmUnmarshal
     transport: &mut T,
     command: &C,
     sessions: &[TpmsAuthCommand],
+    operation: impl FnOnce(&mut T, TpmHandle, R) -> Result<O, DeviceIdentityError>,
+) -> Result<O, DeviceIdentityError>
+where
+    R: TpmHeader,
+{
+    with_transient_response_with_mapper(transport, command, sessions, map_tpm_rc, operation)
+}
+pub(super) fn with_transient_response_with_mapper<
+    T: Transport,
+    C: TpmFrame,
+    R: TpmUnmarshalBody,
+    O,
+>(
+    transport: &mut T,
+    command: &C,
+    sessions: &[TpmsAuthCommand],
+    map_response_code: fn(TpmRc) -> DeviceIdentityError,
     operation: impl FnOnce(&mut T, TpmHandle, R) -> Result<O, DeviceIdentityError>,
 ) -> Result<O, DeviceIdentityError>
 where
@@ -244,7 +300,7 @@ where
         let response_code = response
             .rc()
             .map_err(|_| DeviceIdentityError::BackendFailure)?;
-        return Err(map_tpm_rc(response_code));
+        return Err(map_response_code(response_code));
     }
     let handle_bytes = bytes
         .get(TPM_HEADER_SIZE..TPM_HEADER_SIZE + TpmHandle::SIZE)
@@ -255,13 +311,14 @@ where
         return Err(DeviceIdentityError::BackendFailure);
     }
     with_transient(transport, handle, |transport, handle| {
-        let response = decode_frame::<R>(
+        let response = decode_frame_with_mapper::<R>(
             &bytes,
             if sessions.is_empty() {
                 TpmSt::NoSessions
             } else {
                 TpmSt::Sessions
             },
+            map_response_code,
         )?;
         operation(transport, handle, response)
     })
@@ -310,6 +367,42 @@ fn receive<T: TpmUnmarshal>(bytes: &[u8]) -> Result<T, DeviceIdentityError> {
     Ok(value)
 }
 
+pub(super) fn map_identity_rc(response_code: TpmRc) -> DeviceIdentityError {
+    match response_code {
+        TpmRc::Fmt1(code)
+            if matches!(
+                code.base,
+                TpmRcBase::Integrity
+                    | TpmRcBase::Binding
+                    | TpmRcBase::Parent
+                    | TpmRcBase::Key
+                    | TpmRcBase::Sensitive
+                    | TpmRcBase::Size
+                    | TpmRcBase::Value
+            ) =>
+        {
+            DeviceIdentityError::IdentityLost
+        }
+        other => map_tpm_rc(other),
+    }
+}
+pub(super) fn map_activation_rc(response_code: TpmRc) -> DeviceIdentityError {
+    match response_code {
+        TpmRc::Fmt1(code)
+            if matches!(
+                code.base,
+                TpmRcBase::Integrity
+                    | TpmRcBase::Value
+                    | TpmRcBase::Size
+                    | TpmRcBase::EccPoint
+                    | TpmRcBase::Insufficient
+            ) =>
+        {
+            DeviceIdentityError::InvalidChallenge
+        }
+        other => map_tpm_rc(other),
+    }
+}
 fn map_tpm_rc(response_code: TpmRc) -> DeviceIdentityError {
     match response_code {
         TpmRc::Warn(TpmRcBase::Retry | TpmRcBase::Yielded | TpmRcBase::Lockout) => {

@@ -1,24 +1,20 @@
-use super::{marshal, with_primary, Transport};
-#[cfg(test)]
-use super::{password_auth, with_transient_response};
+use super::{
+    map_identity_rc, marshal, password_auth, with_primary, with_transient_response_with_mapper,
+    Transport,
+};
 #[cfg(test)]
 use crate::TpmIdentity;
 use crate::{DeviceIdentityError, TpmKeyBlobs};
 use tpm2_protocol::{
     basic::{TpmHandle, TpmUint16},
     data::{
-        Tpm2bData, Tpm2bDigest, Tpm2bPublic, Tpm2bSensitiveCreate, TpmAlgId, TpmEccCurve, TpmRh,
-        TpmaObject, TpmlPcrSelection, TpmsEccParms, TpmsEccPoint, TpmsSchemeHash,
-        TpmsSensitiveCreate, TpmtEccScheme, TpmtKdfScheme, TpmtPublic, TpmtSymDef,
+        Tpm2bData, Tpm2bDigest, Tpm2bPrivate, Tpm2bPublic, Tpm2bSensitiveCreate, TpmAlgId,
+        TpmEccCurve, TpmRh, TpmaObject, TpmlPcrSelection, TpmsEccParms, TpmsEccPoint,
+        TpmsSchemeHash, TpmsSensitiveCreate, TpmtEccScheme, TpmtKdfScheme, TpmtPublic, TpmtSymDef,
         TpmtSymDefObject, TpmuAsymScheme, TpmuPublicId, TpmuPublicParms, TpmuSymKeyBits,
         TpmuSymMode,
     },
-    frame::{TpmCreateCommand, TpmCreateResponse},
-};
-#[cfg(test)]
-use tpm2_protocol::{
-    data::Tpm2bPrivate,
-    frame::{TpmLoadCommand, TpmLoadResponse},
+    frame::{TpmCreateCommand, TpmCreateResponse, TpmLoadCommand, TpmLoadResponse},
     TpmUnmarshal,
 };
 
@@ -134,17 +130,18 @@ pub(super) fn reload(
 ) -> Result<(), DeviceIdentityError> {
     let template = decode_public(&identity.srk_template)?;
     with_primary(transport, TpmRh::Owner, template, |transport, parent| {
-        load_key(transport, parent, &identity.ak)?;
-        load_key(transport, parent, &identity.identity_key)
+        with_loaded_key(transport, parent, &identity.ak, |transport, _| {
+            with_loaded_key(transport, parent, &identity.identity_key, |_, _| Ok(()))
+        })
     })
 }
 
-#[cfg(test)]
-fn load_key(
-    transport: &mut impl Transport,
+pub(super) fn with_loaded_key<T: Transport, R>(
+    transport: &mut T,
     parent: TpmHandle,
     blobs: &TpmKeyBlobs,
-) -> Result<(), DeviceIdentityError> {
+    operation: impl FnOnce(&mut T, TpmHandle) -> Result<R, DeviceIdentityError>,
+) -> Result<R, DeviceIdentityError> {
     let public = decode_public(&blobs.public)?;
     let private = Tpm2bPrivate::try_from(blobs.private.as_slice())
         .map_err(|_| DeviceIdentityError::IdentityLost)?;
@@ -153,16 +150,16 @@ fn load_key(
         in_private: private,
         in_public: Tpm2bPublic { inner: public },
     };
-    with_transient_response::<_, _, TpmLoadResponse, _>(
+    with_transient_response_with_mapper::<T, _, TpmLoadResponse, _>(
         transport,
         &command,
         &[password_auth()],
-        |_, _, _| Ok(()),
+        map_identity_rc,
+        |transport, handle, _| operation(transport, handle),
     )
 }
 
-#[cfg(test)]
-fn decode_public(bytes: &[u8]) -> Result<TpmtPublic, DeviceIdentityError> {
+pub(super) fn decode_public(bytes: &[u8]) -> Result<TpmtPublic, DeviceIdentityError> {
     let (public, remaining) =
         TpmtPublic::unmarshal(bytes).map_err(|_| DeviceIdentityError::IdentityLost)?;
     if !remaining.is_empty() {
