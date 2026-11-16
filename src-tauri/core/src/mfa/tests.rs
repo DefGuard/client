@@ -223,6 +223,33 @@ async fn test_mfa_start_selects_multi_step_route_from_contract() {
 }
 
 #[tokio::test]
+async fn test_mfa_start_rejects_unimplemented_possession_challenge() {
+    let server = MockServer::start().await;
+    let response = MfaFlowStartResponse {
+        outcome: Some(mfa_flow_start_response::Outcome::PossessionChallenge(
+            defguard_client_proto::defguard::device_identity::v2::PossessionChallenge {
+                challenge_id: "proof-required".into(),
+                data: vec![1, 2, 3],
+                expires_at: 1_800_000_000,
+            },
+        )),
+    };
+    Mock::given(method("POST"))
+        .and(path("/api/v1/mfa-flow/start"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(serde_json::to_value(response).unwrap()),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let result = super::mfa_start(MfaContract::MultiStep, mock_url(&server), start_request()).await;
+    assert!(
+        matches!(result, Err(MfaError::Other { message }) if message.contains("possession challenges are not supported"))
+    );
+    server.verify().await;
+}
+
+#[tokio::test]
 async fn test_mfa_step_start_returns_typed_fido2_challenge() {
     let server = MockServer::start().await;
     let body = serde_json::to_value(MfaFlowStepStartResponse {

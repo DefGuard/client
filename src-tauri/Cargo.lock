@@ -1809,6 +1809,7 @@ dependencies = [
  "defguard-client-proto",
  "defguard-client-service-locations",
  "defguard_wireguard_rs",
+ "device-identity",
  "futures-core",
  "nix",
  "thiserror 2.0.21",

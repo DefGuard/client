@@ -17,10 +17,12 @@ use defguard_client_proto::{
     defguard::{
         client::v1::{
             desktop_daemon_service_server::{DesktopDaemonService, DesktopDaemonServiceServer},
-            CreateInterfaceRequest, DeleteServiceLocationsRequest, InterfaceData,
-            ListInterfacesResponse, ManagedInterfaceData, ReadInterfaceDataRequest,
-            RemoveInterfaceRequest, SaveServiceLocationsRequest,
+            AttestDeviceIdentityRequest, CreateDeviceIdentityResponse, CreateInterfaceRequest,
+            DeleteServiceLocationsRequest, InterfaceData, ListInterfacesResponse,
+            ManagedInterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
+            SaveServiceLocationsRequest,
         },
+        device_identity::v2::AttestationChallengeSolution,
         enterprise::posture::v2::DevicePostureData,
     },
 };
@@ -59,7 +61,7 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 #[cfg(windows)]
 use crate::named_pipe::{get_named_pipe_server_stream, PIPE_NAME};
-use crate::{config::Config, VERSION};
+use crate::{config::Config, device_identity::DeviceIdentityService, VERSION};
 
 #[cfg(unix)]
 pub(super) const DAEMON_SOCKET_PATH: &str = "/var/run/defguard.socket";
@@ -100,6 +102,7 @@ type WG = WGApi<Userspace>;
 
 #[derive(Default)]
 pub(crate) struct DaemonService {
+    device_identity: DeviceIdentityService,
     // Map of running `WGApi`s; key is interface name.
     wgapis: Arc<RwLock<HashMap<IfName, WG>>>,
     stats_period: Duration,
@@ -117,6 +120,7 @@ impl DaemonService {
         >,
     ) -> Self {
         Self {
+            device_identity: DeviceIdentityService::default(),
             wgapis: Arc::new(RwLock::new(HashMap::new())),
             stats_period: Duration::from_secs(config.stats_period),
             stat_tasks: Arc::new(Mutex::new(HashMap::new())),
@@ -236,6 +240,25 @@ pub(crate) fn setup_wgapi(ifname: &str) -> Result<WG, Status> {
 #[tonic::async_trait]
 impl DesktopDaemonService for DaemonService {
     type ReadInterfaceDataStream = InterfaceDataStream;
+
+    #[tracing::instrument(skip_all)]
+    async fn create_device_identity(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<CreateDeviceIdentityResponse>, Status> {
+        self.device_identity.create().await.map(Response::new)
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn attest_device_identity(
+        &self,
+        request: tonic::Request<AttestDeviceIdentityRequest>,
+    ) -> Result<Response<AttestationChallengeSolution>, Status> {
+        self.device_identity
+            .attest(request.into_inner())
+            .await
+            .map(Response::new)
+    }
 
     #[cfg(not(any(windows, target_os = "linux")))]
     async fn save_service_locations(

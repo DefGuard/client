@@ -3,7 +3,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tonic_prost_build::configure()
         // These types contain sensitive data.
-        .skip_debug(["SaveServiceLocationsRequest"])
+        .skip_debug([
+            "SaveServiceLocationsRequest",
+            "DeviceIdentityMaterial",
+            "TpmIdentityMaterial",
+            "TpmKeyBlobs",
+            "CreateDeviceIdentityResponse",
+            "AttestDeviceIdentityRequest",
+            "AttestationChallengeSolution",
+            "TpmAttestationResponse",
+            "AttestationFinishRequest",
+        ])
         // Enable optional fields.
         .protoc_arg("--experimental_allow_proto3_optional")
         // Make sure empty DNS is deserialized correctly as `None`.
