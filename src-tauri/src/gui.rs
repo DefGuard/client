@@ -216,6 +216,7 @@ pub fn run_app() {
             disconnect_locations,
             enrollment_start,
             enrollment_create_device,
+            enrollment_attest_device,
             enrollment_activate_user,
             enrollment_register_mfa_start,
             enrollment_register_mfa_finish,

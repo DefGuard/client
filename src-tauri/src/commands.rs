@@ -1773,6 +1773,16 @@ pub async fn enrollment_create_device(
 }
 
 #[tauri::command(async)]
+pub async fn enrollment_attest_device(
+    session_id: String,
+    instance_id: Id,
+    state: State<'_, AppState>,
+) -> Result<enrollment::attestation::AttestationOutcome, String> {
+    let session = get_enrollment_session(&state, &session_id)?;
+    Ok(enrollment::attestation::attest_device(&session, &DB_POOL, instance_id).await)
+}
+
+#[tauri::command(async)]
 pub async fn enrollment_activate_user(
     session_id: String,
     password: Option<String>,

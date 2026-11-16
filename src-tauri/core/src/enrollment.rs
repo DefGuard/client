@@ -4,7 +4,10 @@
 //! starting enrollment, creating a device, activating the user, registering
 //! MFA, and finishing the enrollment.
 
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use defguard_client_proto::defguard::client_types::{
     CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
@@ -19,6 +22,8 @@ use crate::{
     proxy::{construct_platform_header, read_error_message},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
+
+pub mod attestation;
 
 // generous because self-hosted instances can sit behind slow or distant links
 const ENROLLMENT_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -47,12 +52,12 @@ pub enum EnrollmentError {
     Other { message: String },
 }
 
-/// Holds the enrollment session state.
 #[derive(Clone, Debug)]
 pub struct EnrollmentSession {
     pub cookie: String,
     pub proxy_url: Url,
     pub client: Client,
+    created_device: Arc<Mutex<Option<attestation::CreatedDevice>>>,
 }
 
 /// Send a JSON POST request to an enrollment endpoint with the session
@@ -173,6 +178,7 @@ pub async fn enrollment_start(
         cookie,
         proxy_url,
         client,
+        created_device: Arc::default(),
     };
 
     Ok((session, body))
@@ -195,9 +201,11 @@ pub async fn enrollment_create_device(
     )
     .await?;
 
-    response.json().await.map_err(|e| EnrollmentError::Other {
+    let config = response.json().await.map_err(|e| EnrollmentError::Other {
         message: format!("Failed to parse create_device response: {e}"),
-    })
+    })?;
+    attestation::remember_created_device(&session, &config, &pubkey);
+    Ok(config)
 }
 
 /// Activate the user account during enrollment.
@@ -480,6 +488,7 @@ mod tests {
             cookie: "defguard_proxy=test-session-cookie".into(),
             proxy_url: mock_url(server),
             client: Client::new(),
+            created_device: Arc::default(),
         }
     }
 
@@ -527,11 +536,12 @@ mod tests {
             .await;
 
         let session = make_session(&server);
-        let result = enrollment_create_device(session, "my-device".into(), "pk".into())
+        let result = enrollment_create_device(session.clone(), "my-device".into(), "pk".into())
             .await
             .unwrap();
 
         assert_eq!(result.configs[0].config, "wg0");
+        assert!(session.created_device.lock().unwrap().is_some());
     }
 
     #[tokio::test]
