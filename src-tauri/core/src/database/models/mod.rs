@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod connection;
+pub mod device_identity;
 pub mod instance;
 pub mod location;
 pub mod location_stats;
