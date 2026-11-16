@@ -73,10 +73,12 @@ export const enrollmentCreateDevice = async (
   try {
     const { publicKey, privateKey } = generateWGKeys();
     const deviceResponse = await api.enrollmentCreateDevice(sessionId, name, publicKey);
-    await saveDeviceConfig({
+    const saved = await saveDeviceConfig({
       privateKey,
       response: deviceResponse,
     });
+    // attestation failure must not turn a persisted registration into an enrollment error
+    await api.enrollmentAttestDevice(sessionId, saved.instance.id).catch(() => {});
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };

@@ -9,6 +9,7 @@ import type {
   Connection,
   ConnectionArgs,
   CreateDeviceResponse,
+  EnrollmentAttestationOutcomeValue,
   EnrollmentStartResult,
   InitiateConfigureFactorScreenArgs,
   InstanceInfo,
@@ -184,6 +185,12 @@ const enrollmentCreateDevice = (
   pubkey: string,
 ): Promise<CreateDeviceResponse> =>
   invoke(TauriCommand.EnrollmentCreateDevice, { sessionId, name, pubkey });
+
+const enrollmentAttestDevice = (
+  sessionId: string,
+  instanceId: number,
+): Promise<EnrollmentAttestationOutcomeValue> =>
+  invoke(TauriCommand.EnrollmentAttestDevice, { sessionId, instanceId });
 
 const enrollmentActivateUser = (
   sessionId: string,
@@ -403,6 +410,7 @@ export const api = {
   // Enrollment
   enrollmentStart,
   enrollmentCreateDevice,
+  enrollmentAttestDevice,
   enrollmentActivateUser,
   enrollmentRegisterMfaStart,
   enrollmentRegisterMfaFinish,

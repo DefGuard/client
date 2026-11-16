@@ -85,6 +85,7 @@ export const TauriCommand = {
   // Enrollment
   EnrollmentStart: 'enrollment_start',
   EnrollmentCreateDevice: 'enrollment_create_device',
+  EnrollmentAttestDevice: 'enrollment_attest_device',
   EnrollmentActivateUser: 'enrollment_activate_user',
   EnrollmentRegisterMfaStart: 'enrollment_register_mfa_start',
   EnrollmentRegisterMfaFinish: 'enrollment_register_mfa_finish',
@@ -445,6 +446,15 @@ export type CreateDeviceResponse = {
   configs: DeviceConfig[];
   instance: InstanceInfo;
 };
+
+export const EnrollmentAttestationOutcome = {
+  Attested: 'attested',
+  Skipped: 'skipped',
+  Failed: 'failed',
+} as const;
+
+export type EnrollmentAttestationOutcomeValue =
+  (typeof EnrollmentAttestationOutcome)[keyof typeof EnrollmentAttestationOutcome];
 
 export type SaveDeviceConfigResponse = {
   instance: InstanceInfo;
