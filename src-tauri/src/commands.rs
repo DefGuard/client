@@ -846,6 +846,7 @@ pub(crate) fn build_location_info(
     location: Location<Id>,
     connected_location_ids: &[Id],
 ) -> LocationInfo {
+    let mfa_steps = location.effective_mfa_steps();
     LocationInfo {
         id: location.id,
         instance_id: location.instance_id,
@@ -860,7 +861,7 @@ pub(crate) fn build_location_info(
         location_mfa_mode: location.location_mfa_mode,
         posture_check_required: location.posture_check_required,
         mfa_method: location.mfa_method,
-        mfa_steps: location.mfa_steps.0,
+        mfa_steps,
         mfa_step_plan: location.mfa_step_plan.0,
     }
 }
