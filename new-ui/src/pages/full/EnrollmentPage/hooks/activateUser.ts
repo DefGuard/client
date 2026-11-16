@@ -4,11 +4,13 @@ import { refreshEnrollmentInstance } from '../../../../shared/rust-api/enrollmen
 import { useEnrollmentStore } from './useEnrollmentStore';
 
 /**
- * Activate the enrolling user by calling the enrollment Tauri command.
+ * Activate the enrolling user by calling the enrollment Tauri command, then refresh the saved
+ * instance from Core so MFA set up during enrollment is recognised without config polling, which
+ * Core refuses without a business license. A failed refresh is only logged.
  *
- * Reads sessionId, skipPassword, and userPassword from the store via
- * {@linkcode useEnrollmentStore.getState} so every invocation uses the latest
- * values (no stale-closure risk after in-flight {@linkcode setState} updates).
+ * Reads the session from the store via {@linkcode useEnrollmentStore.getState} so every
+ * invocation uses the latest values (no stale-closure risk after in-flight
+ * {@linkcode setState} updates).
  *
  * When `skipPassword` is true the `password` key is omitted from the request
  * body instead of sending `null` or an empty string.
@@ -16,14 +18,13 @@ import { useEnrollmentStore } from './useEnrollmentStore';
 export const activateUser = async () => {
   const { sessionId, skipPassword, userPassword, startResponse } =
     useEnrollmentStore.getState();
+  if (!sessionId) throw new Error('Enrollment session is missing');
   const password = skipPassword ? null : (userPassword ?? '');
-  // biome-ignore lint/style/noNonNullAssertion: sessionId is set in start(), called before this
-  await api.enrollmentActivateUser(sessionId!, password, null);
+  await api.enrollmentActivateUser(sessionId, password, null);
 
   try {
     if (!startResponse) throw new Error('Enrollment start response is missing');
-    // biome-ignore lint/style/noNonNullAssertion: sessionId is set in start(), called before this
-    await refreshEnrollmentInstance(sessionId!, startResponse.instance.id);
+    await refreshEnrollmentInstance(sessionId, startResponse.instance.id);
   } catch (err) {
     void error(`Failed to refresh instance after enrollment activation: ${String(err)}`);
   }

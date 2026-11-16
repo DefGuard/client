@@ -93,8 +93,9 @@ fn is_mfa_config_response_authoritative_for_method(method: LocationMfaMethod) ->
 }
 
 impl<I> Instance<I> {
-    /// Core's MFA config response reports current TOTP, email, FIDO2, and OIDC status.
-    /// Preserve all other saved MFA methods.
+    /// An MFA configuration session reports current state only for
+    /// [`AUTHORIZING_METHODS`](crate::mfa_config::AUTHORIZING_METHODS), so saved methods outside
+    /// that list are kept.
     pub fn merge_mfa_configured_methods(&mut self, reported_methods: &[LocationMfaMethod]) -> bool {
         let Some(mut methods) = self
             .mfa_configured_methods
@@ -250,6 +251,35 @@ impl Instance<Id> {
         )
         .execute(executor)
         .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Writes only the configured methods, so a concurrent poll's other changes survive.
+    pub async fn update_mfa_configured_methods<'e, E>(
+        executor: E,
+        id: Id,
+        mfa_configured_methods: Option<&Json<Vec<LocationMfaMethod>>>,
+    ) -> Result<bool, sqlx::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let result = query!(
+            "UPDATE instance SET mfa_configured_methods = $1 WHERE id = $2;",
+            mfa_configured_methods,
+            id
+        )
+        .execute(executor)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn update_token<'e, E>(executor: E, id: Id, token: &str) -> Result<bool, sqlx::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let result = query!("UPDATE instance SET token = $1 WHERE id = $2;", token, id)
+            .execute(executor)
+            .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -728,6 +758,55 @@ mod tests {
                 .await
                 .unwrap()
         );
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_update_mfa_configured_methods_keeps_concurrent_changes(pool: SqlitePool) {
+        let mut stale = new_instance().save(&pool).await.unwrap();
+        stale.mfa_configured_methods = Some(Json(Vec::new()));
+        stale.save(&pool).await.unwrap();
+
+        let mut polled = Instance::find_by_id(&pool, stale.id)
+            .await
+            .unwrap()
+            .unwrap();
+        polled.proxy_url = "https://polled-proxy.example".into();
+        polled.save(&pool).await.unwrap();
+
+        assert!(stale.add_mfa_configured_method(LocationMfaMethod::Totp));
+        assert!(Instance::update_mfa_configured_methods(
+            &pool,
+            stale.id,
+            stale.mfa_configured_methods.as_ref()
+        )
+        .await
+        .unwrap());
+
+        let updated = Instance::find_by_id(&pool, stale.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            updated.mfa_configured_methods.map(|json| json.0),
+            Some(vec![LocationMfaMethod::Totp])
+        );
+        assert_eq!(updated.proxy_url, "https://polled-proxy.example");
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_update_token_changes_only_token(pool: SqlitePool) {
+        let instance = new_instance().save(&pool).await.unwrap();
+
+        assert!(Instance::update_token(&pool, instance.id, "rotated-token")
+            .await
+            .unwrap());
+        let updated = Instance::find_by_id(&pool, instance.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.token.as_deref(), Some("rotated-token"));
+        assert_eq!(updated.proxy_url, instance.proxy_url);
+        assert_eq!(updated.mfa_contract, instance.mfa_contract);
     }
 
     #[sqlx::test(migrations = "../migrations")]
