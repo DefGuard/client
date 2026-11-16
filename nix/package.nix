@@ -38,6 +38,7 @@
       pango
       webkitgtk_4_1
       openssl
+      sqlite
       libayatana-appindicator
       libayatana-indicator
       ayatana-ido

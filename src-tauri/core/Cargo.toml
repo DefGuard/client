@@ -40,6 +40,7 @@ x25519-dalek.workspace = true
 [dev-dependencies]
 futures-util.workspace = true
 tempfile.workspace = true
+tokio-stream.workspace = true
 tokio-tungstenite.workspace = true
 wiremock.workspace = true
 

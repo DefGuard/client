@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use defguard_client_proto::defguard::{
-    client::v1::AttestDeviceIdentityRequest,
+    client::v1::{
+        desktop_daemon_service_client::DesktopDaemonServiceClient, AttestDeviceIdentityRequest,
+    },
     client_types::{AttestationFinishResponse, AttestationStartResponse, DeviceConfigResponse},
     device_identity::v2::{
         attestation_challenge_solution, attestation_identity, AttestationChallenge,
@@ -11,18 +13,18 @@ use defguard_client_proto::defguard::{
 use serde::Serialize;
 use serde_json::json;
 use sqlx::SqlitePool;
-use tonic::{Code, Status};
+use tonic::{transport::Channel, Code, Status};
 
 use super::{enrollment_post, EnrollmentError, EnrollmentSession};
-use crate::{
-    connection::daemon_client::DAEMON_CLIENT,
-    database::models::{
-        device_identity::DeviceIdentity, instance::Instance, wireguard_keys::WireguardKeys, Id,
-    },
+use crate::database::models::{
+    device_identity::DeviceIdentity, instance::Instance, wireguard_keys::WireguardKeys, Id,
 };
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+mod integration_tests;
 
 const DAEMON_OPERATION_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -89,11 +91,12 @@ pub async fn attest_device(
     session: &EnrollmentSession,
     pool: &SqlitePool,
     instance_id: Id,
+    daemon: DesktopDaemonServiceClient<Channel>,
 ) -> AttestationOutcome {
     if !cfg!(target_os = "linux") {
         return AttestationOutcome::Skipped;
     }
-    match attest(session, pool, instance_id).await {
+    match attest(session, pool, instance_id, daemon).await {
         Ok(outcome) => outcome,
         Err(stage) => {
             // proxy and daemon error messages can contain the submitted evidence
@@ -107,6 +110,7 @@ async fn attest(
     session: &EnrollmentSession,
     pool: &SqlitePool,
     instance_id: Id,
+    mut daemon: DesktopDaemonServiceClient<Channel>,
 ) -> Result<AttestationOutcome, Failure> {
     let registration = session
         .created_device
@@ -135,7 +139,6 @@ async fn attest(
         return Ok(AttestationOutcome::Skipped);
     }
 
-    let mut daemon = DAEMON_CLIENT.clone();
     let created =
         match tokio::time::timeout(DAEMON_OPERATION_TIMEOUT, daemon.create_device_identity(()))
             .await

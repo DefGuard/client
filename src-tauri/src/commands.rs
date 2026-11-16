@@ -1779,7 +1779,13 @@ pub async fn enrollment_attest_device(
     state: State<'_, AppState>,
 ) -> Result<enrollment::attestation::AttestationOutcome, String> {
     let session = get_enrollment_session(&state, &session_id)?;
-    Ok(enrollment::attestation::attest_device(&session, &DB_POOL, instance_id).await)
+    Ok(enrollment::attestation::attest_device(
+        &session,
+        &DB_POOL,
+        instance_id,
+        defguard_client_core::connection::daemon_client::DAEMON_CLIENT.clone(),
+    )
+    .await)
 }
 
 #[tauri::command(async)]

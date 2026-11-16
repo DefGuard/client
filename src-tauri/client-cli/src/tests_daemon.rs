@@ -55,6 +55,28 @@ struct MockDaemon {
 impl DesktopDaemonService for MockDaemon {
     type ReadInterfaceDataStream = ReceiverStream<StreamItem>;
 
+    async fn create_device_identity(
+        &self,
+        _req: Request<()>,
+    ) -> Result<
+        Response<defguard_client_proto::defguard::client::v1::CreateDeviceIdentityResponse>,
+        Status,
+    > {
+        Err(Status::unimplemented("not mocked"))
+    }
+
+    async fn attest_device_identity(
+        &self,
+        _req: Request<defguard_client_proto::defguard::client::v1::AttestDeviceIdentityRequest>,
+    ) -> Result<
+        Response<
+            defguard_client_proto::defguard::device_identity::v2::AttestationChallengeSolution,
+        >,
+        Status,
+    > {
+        Err(Status::unimplemented("not mocked"))
+    }
+
     async fn create_interface(
         &self,
         _req: Request<CreateInterfaceRequest>,

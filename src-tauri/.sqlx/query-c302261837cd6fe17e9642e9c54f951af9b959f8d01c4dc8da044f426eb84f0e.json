@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO device_identity (instance_id, core_device_id, material_version, material) VALUES ($1, $2, $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "c302261837cd6fe17e9642e9c54f951af9b959f8d01c4dc8da044f426eb84f0e"
+}
