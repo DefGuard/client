@@ -4,6 +4,7 @@ import { activateUser } from './activateUser';
 
 const mocks = vi.hoisted(() => ({
   error: vi.fn(),
+  info: vi.fn(),
   enrollmentActivateUser: vi.fn(),
   enrollmentNetworkInfo: vi.fn(),
   invoke: vi.fn(),
@@ -18,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
-vi.mock('@tauri-apps/plugin-log', () => ({ error: mocks.error }));
+vi.mock('@tauri-apps/plugin-log', () => ({ error: mocks.error, info: mocks.info }));
 vi.mock('../../../../shared/rust-api/api', () => ({
   api: {
     enrollmentActivateUser: mocks.enrollmentActivateUser,
@@ -38,6 +39,7 @@ const networkInfoResponse = { mfa_configured_methods: ['totp'] };
 describe('activateUser', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.state.startResponse = { instance: { id: 'server-instance' } };
     mocks.enrollmentActivateUser.mockResolvedValue(undefined);
     mocks.enrollmentNetworkInfo.mockResolvedValue(networkInfoResponse);
     mocks.invoke.mockResolvedValue(instances);
@@ -46,6 +48,15 @@ describe('activateUser', () => {
   it('refreshes the matching instance after activation', async () => {
     await expect(activateUser()).resolves.toBeUndefined();
 
+    expect(mocks.info).toHaveBeenNthCalledWith(
+      1,
+      'Enrollment activation succeeded; starting instance refresh',
+    );
+    expect(mocks.info).toHaveBeenCalledWith(
+      'Enrollment instance lookup matched a saved instance',
+    );
+    expect(mocks.info).toHaveBeenCalledWith('Calling enrollment network info command');
+    expect(mocks.info).toHaveBeenCalledWith('Enrollment instance refresh completed');
     expect(mocks.enrollmentActivateUser).toHaveBeenCalledWith(
       'session-1',
       'password',
@@ -78,6 +89,20 @@ describe('activateUser', () => {
       'Failed to refresh instance after enrollment activation: Error: offline',
     );
     expect(mocks.invoke).toHaveBeenCalledOnce();
+  });
+
+  it('logs when no saved instance matches the enrollment UUID', async () => {
+    mocks.invoke.mockResolvedValueOnce([]);
+
+    await expect(activateUser()).resolves.toBeUndefined();
+
+    expect(mocks.info).toHaveBeenCalledWith(
+      'Enrollment instance lookup did not match a saved instance',
+    );
+    expect(mocks.enrollmentNetworkInfo).not.toHaveBeenCalled();
+    expect(mocks.error).toHaveBeenCalledWith(
+      'Failed to refresh instance after enrollment activation: Error: Enrollment instance was not found',
+    );
   });
 
   it('logs when the enrollment start response is missing', async () => {

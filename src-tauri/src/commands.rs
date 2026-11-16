@@ -1873,7 +1873,7 @@ pub async fn enrollment_network_info(
     pubkey: String,
     state: State<'_, AppState>,
 ) -> Result<DeviceConfigResponse, String> {
-    debug!("Fetching network info");
+    info!("Fetching network info");
     let session = get_enrollment_session(&state, &session_id)?;
     enrollment::enrollment_network_info(session, pubkey)
         .await

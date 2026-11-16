@@ -1,4 +1,4 @@
-import { error } from '@tauri-apps/plugin-log';
+import { error, info } from '@tauri-apps/plugin-log';
 import { api } from '../../../../shared/rust-api/api';
 import { refreshEnrollmentInstance } from '../../../../shared/rust-api/enrollment';
 import { useEnrollmentStore } from './useEnrollmentStore';
@@ -21,6 +21,7 @@ export const activateUser = async () => {
   if (!sessionId) throw new Error('Enrollment session is missing');
   const password = skipPassword ? null : (userPassword ?? '');
   await api.enrollmentActivateUser(sessionId, password, null);
+  void info('Enrollment activation succeeded; starting instance refresh');
 
   try {
     if (!startResponse) throw new Error('Enrollment start response is missing');
