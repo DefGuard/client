@@ -225,6 +225,11 @@ impl<I> Location<I> {
             self.mfa_steps.0.clone()
         }
     }
+
+    #[must_use]
+    pub fn mfa_enabled(&self) -> bool {
+        !self.effective_mfa_steps().is_empty()
+    }
 }
 
 impl fmt::Display for Location<Id> {
@@ -429,14 +434,6 @@ impl Location<Id> {
         .execute(executor)
         .await?;
         Ok(())
-    }
-
-    #[must_use]
-    pub fn mfa_enabled(&self) -> bool {
-        match self.location_mfa_mode {
-            LocationMfaMode::Disabled => false,
-            LocationMfaMode::Internal | LocationMfaMode::External => true,
-        }
     }
 
     pub async fn effective_route_all_traffic(
@@ -818,6 +815,29 @@ mod tests {
         location.location_mfa_mode = LocationMfaMode::Internal;
         location.mfa_steps = Json(saved_steps.clone());
         assert_eq!(location.effective_mfa_steps(), saved_steps);
+    }
+    #[test]
+    fn test_mfa_enabled_uses_effective_mfa_steps() {
+        let mut location = new_location(1);
+        location.location_mfa_mode = LocationMfaMode::Internal;
+        assert!(location.mfa_enabled());
+        location.location_mfa_mode = LocationMfaMode::External;
+        assert!(location.mfa_enabled());
+        location.location_mfa_mode = LocationMfaMode::Disabled;
+        assert!(!location.mfa_enabled());
+
+        location.mfa_steps = Json(vec![LocationMfaStep {
+            methods: vec![LocationMfaStepMethod {
+                method: LocationMfaMethod::Totp,
+                configured: false,
+            }],
+        }]);
+        location.location_mfa_mode = LocationMfaMode::Internal;
+        assert!(location.mfa_enabled());
+        location.location_mfa_mode = LocationMfaMode::External;
+        assert!(location.mfa_enabled());
+        location.location_mfa_mode = LocationMfaMode::Disabled;
+        assert!(location.mfa_enabled());
     }
 
     #[sqlx::test(migrations = "../migrations")]
