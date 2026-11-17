@@ -97,6 +97,8 @@ pub struct MfaConfigSession {
     pub session_token: String,
     pub deadline_timestamp: i64,
     pub capabilities: MfaCapabilities,
+    /// Authorizing such a session with an email code is what enables email on Core.
+    pub email_fallback: bool,
 }
 
 impl MfaConfigSession {
@@ -262,9 +264,14 @@ fn ensure_can_configure(
 
 /// Every factor Core reported for the account, including ones this instance cannot authorize
 /// with, so the wizard does not offer them for setup again. Unknown method numbers are dropped so
-/// a newer Core cannot break an older client.
+/// a newer Core cannot break an older client. Core offers the email fallback only to an account
+/// with no authorizing factor, so a fallback session reports none.
 #[must_use]
 pub fn session_methods(response: &MfaConfigStartResponse) -> Vec<MfaMethod> {
+    if response.email_fallback {
+        return Vec::new();
+    }
+
     response
         .available_methods
         .iter()

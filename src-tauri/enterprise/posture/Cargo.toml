@@ -27,3 +27,6 @@ wmi = { version = "0.18", default-features = false }
 [dev-dependencies]
 tokio.workspace = true
 wiremock.workspace = true
+
+[lints]
+workspace = true

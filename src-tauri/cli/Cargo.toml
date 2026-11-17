@@ -30,3 +30,6 @@ tracing-subscriber.workspace = true
 # Dummy feature to let tauri build the release.
 [features]
 custom-protocol = []
+
+[lints]
+workspace = true
