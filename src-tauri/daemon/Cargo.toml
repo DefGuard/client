@@ -30,7 +30,6 @@ nix.workspace = true
 [target.'cfg(windows)'.dependencies]
 async-stream.workspace = true
 futures-core.workspace = true
-windows-core.workspace = true
 windows-service.workspace = true
 windows-sys.workspace = true
 
