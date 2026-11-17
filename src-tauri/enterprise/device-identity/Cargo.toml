@@ -9,13 +9,13 @@ version.workspace = true
 
 [dependencies]
 thiserror.workspace = true
-tokio = { workspace = true, features = ["macros"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 picky-asn1 = "0.10"
 picky-asn1-der = "0.5"
 picky-asn1-x509 = "0.15"
 sha2 = "0.10"
+tokio = { workspace = true, features = ["macros"] }
 tss-esapi = "7.7"
 
 [lints]
@@ -32,4 +32,5 @@ rand_core = { version = "0.6", features = ["getrandom"] }
 rsa = "0.9"
 sha2 = { version = "0.10", features = ["oid"] }
 tempfile.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 x509-parser = "0.18"

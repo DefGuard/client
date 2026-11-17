@@ -33,3 +33,6 @@ windows = "0.62"
 windows-acl = "0.3"
 windows-service = "0.8"
 windows-sys = "0.61"
+
+[lints]
+workspace = true

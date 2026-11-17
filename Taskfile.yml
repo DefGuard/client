@@ -3,6 +3,9 @@ version: '3'
 env:
   SQLX_OFFLINE: 'true'
 
+vars:
+  TRIVY_ARGS: fs --scanners vuln --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --exit-code 1 --show-suppressed --ignorefile {{.ROOT_DIR}}/.trivyignore.yaml
+
 includes:
   rust:
     taskfile: ./src-tauri/Taskfile.yml
@@ -47,6 +50,19 @@ tasks:
     desc: Lint new-ui with biome, prettier, stylelint and tsc.
     dir: new-ui
     cmd: pnpm lint
+
+  audit:
+    desc: Audit new-ui and the Rust workspace dependencies.
+    cmds:
+      - task: audit-web
+      - task: rust:audit
+
+  audit-web:
+    desc: Audit new-ui dependencies with pnpm audit and trivy.
+    dir: new-ui
+    cmds:
+      - pnpm audit
+      - trivy {{.TRIVY_ARGS}} .
 
   test-rust:
     desc: Run the Rust workspace tests in src-tauri with nextest. Extra args go after --.

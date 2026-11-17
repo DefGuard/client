@@ -70,7 +70,6 @@ windows = { version = "0.62", features = [
     "Win32_Foundation",
 ] }
 windows-acl = "0.3"
-windows-core = "0.100"
 windows-service = "0.8"
 windows-sys = { version = "0.61", features = [
     # Core Win32 types
@@ -112,7 +111,6 @@ default-run = "defguard-client"
 autobins = false
 authors.workspace = true
 edition.workspace = true
-homepage.workspace = true
 license-file.workspace = true
 rust-version.workspace = true
 version.workspace = true
@@ -196,7 +194,6 @@ nix.workspace = true
 tokio-stream.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-async-stream.workspace = true
 futures-core.workspace = true
 known-folders.workspace = true
 windows.workspace = true
@@ -222,3 +219,6 @@ codegen-units = 1
 lto = "thin"
 panic = "abort"
 strip = true
+
+[lints]
+workspace = true
