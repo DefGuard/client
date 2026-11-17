@@ -8,7 +8,8 @@ use windows::Win32::{
 };
 
 use crate::{
-    appstate::AppState,
+    appstate::{AppState, TrayIconRect},
+    tray::TRAY_ICON_ID,
     window_manager::{
         hide_shown_windows,
         placement::{pick_display, place_tray_window, DisplayArea, PhysicalRect, TaskbarPosition},
@@ -60,16 +61,23 @@ fn rect_from_win32(rect: RECT) -> PhysicalRect {
 }
 
 fn tray_anchor(app: &tauri::AppHandle) -> Option<(i32, i32)> {
-    app.state::<AppState>()
-        .tray_icon_rect
+    let current = app
+        .tray_by_id(TRAY_ICON_ID)
+        .and_then(|tray| tray.rect().ok().flatten())
+        .map(|rect| TrayIconRect::from_rect(&rect));
+    let rect = current.or_else(|| *app.state::<AppState>().tray_icon_rect.lock().unwrap());
+    rect.map(|rect| rect.center())
+}
+
+fn set_tray_window_position(window: &WebviewWindow, (x, y): (i32, i32)) -> tauri::Result<()> {
+    let position = PhysicalPosition::new(x, y);
+    // stored before moving so the Moved handler in gui.rs recognizes this move as ours
+    *window
+        .state::<AppState>()
+        .tray_window_position
         .lock()
-        .unwrap()
-        .map(|rect| {
-            (
-                (rect.position.x + rect.size.width / 2.0) as i32,
-                (rect.position.y + rect.size.height / 2.0) as i32,
-            )
-        })
+        .unwrap() = Some(position);
+    window.set_position(position)
 }
 
 // Windows rescales a window after it moves onto a monitor with another DPI, which can push it
@@ -94,7 +102,7 @@ fn keep_tray_window_inside(
     }
     let (x, y) = place_tray_window(anchor, (current.width, current.height), gap, display);
     debug!("Tray window at {current:?} left its work area, moving it to ({x}, {y})");
-    if let Err(err) = window.set_position(PhysicalPosition::new(x, y)) {
+    if let Err(err) = set_tray_window_position(window, (x, y)) {
         warn!("Failed to move tray window back into its work area: {err}");
     }
 }
@@ -224,8 +232,7 @@ impl WindowManager {
                 (COMPACT_WINDOW_WIDTH * display.scale_factor) as i32,
                 (COMPACT_WINDOW_HEIGHT * display.scale_factor) as i32,
             );
-            let (x, y) = place_tray_window(anchor, size, gap, &display);
-            window.set_position(PhysicalPosition::new(x, y))?;
+            set_tray_window_position(&window, place_tray_window(anchor, size, gap, &display))?;
             keep_tray_window_inside(&window, anchor, gap, &display);
         } else {
             warn!("No monitors found, tray window keeps its previous position");

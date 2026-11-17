@@ -10,7 +10,7 @@ use defguard_client_core::{
 use defguard_client_provisioning::ProvisioningConfig;
 use tauri::{
     async_runtime::{spawn, JoinHandle},
-    PhysicalPosition, PhysicalSize,
+    PhysicalPosition, PhysicalSize, Rect,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -38,6 +38,25 @@ pub struct TrayIconRect {
     pub size: PhysicalSize<f64>,
 }
 
+impl TrayIconRect {
+    #[must_use]
+    pub fn from_rect(rect: &Rect) -> Self {
+        Self {
+            position: rect.position.to_physical(1.0),
+            size: rect.size.to_physical(1.0),
+        }
+    }
+
+    #[cfg(windows)]
+    #[must_use]
+    pub fn center(&self) -> (i32, i32) {
+        (
+            (self.position.x + self.size.width / 2.0) as i32,
+            (self.position.y + self.size.height / 2.0) as i32,
+        )
+    }
+}
+
 pub struct AppState {
     pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
     pub mfa_config_sessions: Mutex<HashMap<Uuid, MfaConfigSession>>,
@@ -48,6 +67,7 @@ pub struct AppState {
     pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
     pub tray_icon_rect: Mutex<Option<TrayIconRect>>,
+    pub tray_window_position: Mutex<Option<PhysicalPosition<i32>>>,
     location_stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>,
     pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
     pub provisioning_instance_id: Mutex<Option<String>>,
@@ -67,6 +87,7 @@ impl AppState {
             mfa_tasks: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
             tray_icon_rect: Mutex::new(None),
+            tray_window_position: Mutex::new(None),
             location_stat_threads: Mutex::new(HashMap::new()),
             provisioning_config: Mutex::new(provisioning_config),
             provisioning_instance_id: Mutex::new(None),

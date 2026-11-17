@@ -27,7 +27,7 @@ const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
 const JOIN_COMMUNITY_LINK: &str = "https://github.com/DefGuard/defguard/discussions/new/choose";
 const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
 
-const TRAY_ICON_ID: &str = "tray";
+pub(crate) const TRAY_ICON_ID: &str = "tray";
 
 const TRAY_EVENT_QUIT: &str = "quit";
 const TRAY_EVENT_SHOW: &str = "show";
@@ -43,10 +43,8 @@ fn store_tray_icon_rect(app: &AppHandle, event: &TrayIconEvent) {
         ..
     } = event
     {
-        *app.state::<AppState>().tray_icon_rect.lock().unwrap() = Some(TrayIconRect {
-            position: rect.position.to_physical(1.0),
-            size: rect.size.to_physical(1.0),
-        });
+        *app.state::<AppState>().tray_icon_rect.lock().unwrap() =
+            Some(TrayIconRect::from_rect(rect));
     }
 }
 
