@@ -3287,6 +3287,36 @@ mod tests {
         assert!(ensure_fido2_supported(MfaContract::Legacy).is_err());
         assert!(ensure_fido2_supported(MfaContract::MultiStep).is_ok());
     }
+    #[test]
+    fn test_build_location_info_uses_effective_mfa_steps() {
+        let location = Location {
+            id: 1,
+            instance_id: 2,
+            network_id: 3,
+            name: "loc".into(),
+            address: "10.0.0.2/24".into(),
+            pubkey: "pk".into(),
+            endpoint: "1.2.3.4:51820".into(),
+            allowed_ips: "0.0.0.0/0".into(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: LocationMfaMode::Internal,
+            service_location_mode: crate::database::models::location::ServiceLocationMode::Disabled,
+            mfa_method: Some(LocationMfaMethod::Totp),
+            posture_check_required: false,
+            mfa_steps: Default::default(),
+            mfa_step_plan: Default::default(),
+            client_mtu: None,
+        };
+
+        assert!(location.mfa_steps.0.is_empty());
+        let info = build_location_info(location, &[]);
+        let expected = defguard_client_core::database::models::location::legacy_mfa_steps(
+            LocationMfaMode::Internal,
+        );
+        assert_eq!(info.mfa_steps, expected);
+    }
 
     fn mock_url(server: &MockServer) -> Url {
         Url::parse(&server.uri()).expect("MockServer URI should be valid")

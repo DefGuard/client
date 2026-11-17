@@ -737,7 +737,7 @@ impl From<Location<Id>> for Location {
 
 #[cfg(test)]
 mod tests {
-    use sqlx::{migrate::Migrator, SqlitePool};
+    use sqlx::SqlitePool;
 
     use super::*;
     use crate::{
@@ -788,65 +788,6 @@ mod tests {
             mfa_step_plan: Default::default(),
             client_mtu: None,
         }
-    }
-
-    async fn stored_mfa_steps(pool: &SqlitePool, location_id: Id) -> Vec<LocationMfaStep> {
-        let value: String = sqlx::query_scalar("SELECT mfa_steps FROM location WHERE id = ?")
-            .bind(location_id)
-            .fetch_one(pool)
-            .await
-            .unwrap();
-        serde_json::from_str(&value).unwrap()
-    }
-
-    #[sqlx::test(migrations = false)]
-    async fn test_location_mfa_steps_backfill_migration(pool: SqlitePool) {
-        const BACKFILL_VERSION: i64 = 20261116120000;
-
-        let prior_migrations = sqlx::migrate!("../migrations")
-            .iter()
-            .filter(|migration| migration.version < BACKFILL_VERSION)
-            .cloned()
-            .collect();
-        Migrator::with_migrations(prior_migrations)
-            .run(&pool)
-            .await
-            .unwrap();
-
-        let instance = new_instance().save(&pool).await.unwrap();
-        let mut internal = new_location(instance.id);
-        internal.location_mfa_mode = LocationMfaMode::Internal;
-        let internal = internal.save(&pool).await.unwrap();
-        let mut external = new_location(instance.id);
-        external.location_mfa_mode = LocationMfaMode::External;
-        let external = external.save(&pool).await.unwrap();
-        let disabled = new_location(instance.id).save(&pool).await.unwrap();
-        let saved_steps = vec![LocationMfaStep {
-            methods: vec![LocationMfaStepMethod {
-                method: LocationMfaMethod::Totp,
-                configured: false,
-            }],
-        }];
-        let mut saved = new_location(instance.id);
-        saved.location_mfa_mode = LocationMfaMode::Internal;
-        saved.mfa_steps = Json(saved_steps.clone());
-        let saved = saved.save(&pool).await.unwrap();
-
-        sqlx::migrate!("../migrations").run(&pool).await.unwrap();
-
-        assert_eq!(
-            stored_mfa_steps(&pool, internal.id).await,
-            legacy_mfa_steps(LocationMfaMode::Internal)
-        );
-        assert_eq!(
-            stored_mfa_steps(&pool, external.id).await,
-            legacy_mfa_steps(LocationMfaMode::External)
-        );
-        assert_eq!(
-            stored_mfa_steps(&pool, disabled.id).await,
-            Vec::<LocationMfaStep>::new()
-        );
-        assert_eq!(stored_mfa_steps(&pool, saved.id).await, saved_steps);
     }
 
     #[test]
