@@ -28,22 +28,25 @@ pub enum DiskEncryptionTarget {
 
 /// Returns the operating system name.
 fn os_name() -> Result<String, UnavailableReason> {
-    System::name().ok_or(UnavailableReason::DetectionFailed)
+    System::name().map_err(|_| UnavailableReason::DetectionFailed)
 }
 
 /// Returns the operating system version.
 fn os_version() -> Result<String, UnavailableReason> {
     #[cfg(windows)]
     {
+        let version = System::os_version().map_err(|_| UnavailableReason::DetectionFailed)?;
         // Windows can report versions like "11 (26200)"; core expects a parseable major.
-        System::os_version()
-            .and_then(|version| version.split_whitespace().next().map(ToString::to_string))
+        version
+            .split_whitespace()
+            .next()
+            .map(ToString::to_string)
             .ok_or(UnavailableReason::DetectionFailed)
     }
 
     #[cfg(not(windows))]
     {
-        System::os_version().ok_or(UnavailableReason::DetectionFailed)
+        System::os_version().map_err(|_| UnavailableReason::DetectionFailed)
     }
 }
 
@@ -51,7 +54,7 @@ fn os_version() -> Result<String, UnavailableReason> {
 fn linux_kernel_version() -> Result<String, UnavailableReason> {
     #[cfg(target_os = "linux")]
     {
-        System::kernel_version().ok_or(UnavailableReason::DetectionFailed)
+        System::kernel_version().map_err(|_| UnavailableReason::DetectionFailed)
     }
 
     #[cfg(not(target_os = "linux"))]
