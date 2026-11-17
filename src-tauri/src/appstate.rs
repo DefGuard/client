@@ -10,7 +10,7 @@ use defguard_client_core::{
 use defguard_client_provisioning::ProvisioningConfig;
 use tauri::{
     async_runtime::{spawn, JoinHandle},
-    PhysicalPosition,
+    PhysicalPosition, PhysicalSize,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -32,6 +32,12 @@ pub struct Ceremony {
     pub token: CancellationToken,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct TrayIconRect {
+    pub position: PhysicalPosition<f64>,
+    pub size: PhysicalSize<f64>,
+}
+
 pub struct AppState {
     pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
     pub mfa_config_sessions: Mutex<HashMap<Uuid, MfaConfigSession>>,
@@ -41,8 +47,8 @@ pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
-    pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
-    stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
+    pub tray_icon_rect: Mutex<Option<TrayIconRect>>,
+    location_stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>,
     pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
     pub provisioning_instance_id: Mutex<Option<String>>,
     pub pending_add_instance: Mutex<Option<AddInstancePayload>>,
@@ -60,8 +66,8 @@ impl AppState {
             log_watchers: Mutex::new(HashMap::new()),
             mfa_tasks: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
-            tray_click_position: Mutex::new(None),
-            stat_threads: Mutex::new(HashMap::new()),
+            tray_icon_rect: Mutex::new(None),
+            location_stat_threads: Mutex::new(HashMap::new()),
             provisioning_config: Mutex::new(provisioning_config),
             provisioning_instance_id: Mutex::new(None),
             pending_add_instance: Mutex::new(None),
@@ -94,7 +100,7 @@ impl AppState {
         #[cfg(not(target_os = "macos"))]
         let handle = spawn(stats_handler(ifname, connection_type));
         let Some(old_handle) = self
-            .stat_threads
+            .location_stat_threads
             .lock()
             .unwrap()
             .insert(location_id, handle)
@@ -118,9 +124,12 @@ impl AppState {
     ) -> Option<ActiveConnection> {
         debug!("Removing active connection for location ID: {location_id}");
 
-        // Stop statistics thread
         {
-            let handle = self.stat_threads.lock().unwrap().remove(&location_id);
+            let handle = self
+                .location_stat_threads
+                .lock()
+                .unwrap()
+                .remove(&location_id);
             if let Some(handle) = handle {
                 debug!("Stopping network statistics thread for location ID {location_id}");
                 handle.abort();
