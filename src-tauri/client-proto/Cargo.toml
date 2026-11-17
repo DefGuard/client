@@ -14,7 +14,6 @@ tonic-prost-build.workspace = true
 [dependencies]
 prost.workspace = true
 serde.workspace = true
-serde_with = "3.11"
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing.workspace = true
@@ -26,3 +25,6 @@ wmi = { version = "0.18", default-features = false }
 
 [dev-dependencies]
 x25519-dalek = { workspace = true, features = ["getrandom", "static_secrets"] }
+
+[lints]
+workspace = true

@@ -25,3 +25,6 @@ http.workspace = true
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 tonic.workspace = true
+
+[lints]
+workspace = true
