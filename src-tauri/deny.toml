@@ -99,6 +99,7 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant merged into zbus 6; pulled by zbus 5" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names merged into zbus 6; pulled by zbus 5" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive merged into zbus 6; pulled by zbus 5" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
