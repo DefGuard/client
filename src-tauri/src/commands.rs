@@ -593,12 +593,9 @@ fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uui
         Err(_) => warn!("Failed to clear in-memory provisioning config"),
     }
 
-    let mut provisioning_instance_id = match app_state.provisioning_instance_id.lock() {
-        Ok(provisioning_instance_id) => provisioning_instance_id,
-        Err(_) => {
-            warn!("Failed to check provisioning instance id");
-            return;
-        }
+    let Ok(mut provisioning_instance_id) = app_state.provisioning_instance_id.lock() else {
+        warn!("Failed to check provisioning instance id");
+        return;
     };
     if provisioning_instance_id.as_deref() == Some(saved_instance_uuid) {
         match handle.path().app_data_dir() {
