@@ -11,6 +11,7 @@ on:
       - "*.md"
       - "LICENSE"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - dev
@@ -30,6 +31,7 @@ env:
 
 jobs:
   check:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:
