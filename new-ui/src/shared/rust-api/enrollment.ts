@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { info } from '@tauri-apps/plugin-log';
 import { generateWGKeys } from '../utils/generateWGKeys';
 import { api } from './api';
 import type {
@@ -18,6 +19,24 @@ const updateInstanceRecord = (args: {
   instanceId: number;
   response: CreateDeviceResponse;
 }): Promise<void> => invoke(TauriCommand.UpdateInstance, args);
+export const refreshEnrollmentInstance = async (
+  sessionId: string,
+  instanceUuid: string,
+): Promise<void> => {
+  const instances = await getInstances();
+  const instance = instances.find(({ uuid }) => uuid === instanceUuid);
+  void info(
+    instance
+      ? 'Enrollment instance lookup matched a saved instance'
+      : 'Enrollment instance lookup did not match a saved instance',
+  );
+  if (!instance) throw new Error('Enrollment instance was not found');
+
+  void info('Calling enrollment network info command');
+  const response = await api.enrollmentNetworkInfo(sessionId, instance.pubkey);
+  await updateInstanceRecord({ instanceId: instance.id, response });
+  void info('Enrollment instance refresh completed');
+};
 const saveDeviceConfig = (args: {
   privateKey: string;
   response: CreateDeviceResponse;

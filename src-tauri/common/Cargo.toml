@@ -14,3 +14,6 @@ vergen-git2.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true, features = ["net"] }
+
+[lints]
+workspace = true

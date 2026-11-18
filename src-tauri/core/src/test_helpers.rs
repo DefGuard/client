@@ -53,14 +53,12 @@ pub async fn start_ws_stub() -> WebSocketStub {
 
     tokio::spawn(async move {
         // Accept a single connection.
-        let (stream, _peer) = match listener.accept().await {
-            Ok(conn) => conn,
-            Err(_) => return,
+        let Ok((stream, _peer)) = listener.accept().await else {
+            return;
         };
 
-        let ws_stream = match accept_async(stream).await {
-            Ok(ws) => ws,
-            Err(_) => return,
+        let Ok(ws_stream) = accept_async(stream).await else {
+            return;
         };
 
         let (mut write, mut _read) = ws_stream.split();

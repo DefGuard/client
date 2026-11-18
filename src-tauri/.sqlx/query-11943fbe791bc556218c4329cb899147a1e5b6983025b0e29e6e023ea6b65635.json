@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE instance SET mfa_configured_methods = $1 WHERE id = $2;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "11943fbe791bc556218c4329cb899147a1e5b6983025b0e29e6e023ea6b65635"
+}

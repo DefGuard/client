@@ -1085,11 +1085,12 @@ fn test_authorizing_methods_drops_unknown_and_non_authorizing_entries() {
 fn test_authorizing_methods_is_empty_for_the_email_fallback() {
     let response = MfaConfigStartResponse {
         session_token: SESSION_TOKEN.into(),
-        available_methods: Vec::new(),
+        available_methods: vec![MfaMethod::Totp as i32],
         email_fallback: true,
         deadline_timestamp: 0,
     };
 
+    assert!(session_methods(&response).is_empty());
     assert!(authorizing_methods(&response, &ALL_CAPABILITIES).is_empty());
 }
 

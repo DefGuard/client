@@ -15,7 +15,6 @@ tonic-prost-build.workspace = true
 defguard_wireguard_rs.workspace = true
 prost.workspace = true
 serde.workspace = true
-serde_with.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing.workspace = true
@@ -25,3 +24,6 @@ wmi.workspace = true
 
 [dev-dependencies]
 x25519-dalek = { workspace = true, features = ["getrandom", "static_secrets"] }
+
+[lints]
+workspace = true

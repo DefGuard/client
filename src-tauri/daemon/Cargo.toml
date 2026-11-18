@@ -36,3 +36,6 @@ windows-sys.workspace = true
 [[bin]]
 name = "defguard-service"
 path = "src/bin/defguard-service.rs"
+
+[lints]
+workspace = true
