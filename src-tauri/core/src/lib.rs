@@ -7,10 +7,7 @@ use std::{
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use database::models::{
-    location::{
-        infer_mfa_method, legacy_mfa_steps, Location, LocationMfaMode, LocationMfaStep,
-        ServiceLocationMode,
-    },
+    location::{infer_mfa_method, Location, LocationMfaMode, LocationMfaStep, ServiceLocationMode},
     Id,
 };
 use defguard_client_proto::defguard::client_types::DeviceConfig;
@@ -216,7 +213,7 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
         None => SLocationMode::Disabled,
     };
 
-    Location {
+    let mut location = Location {
         id: NoId,
         instance_id,
         network_id: dev_config.network_id,
@@ -232,18 +229,20 @@ pub fn into_location(dev_config: DeviceConfig, instance_id: Id) -> Location<NoId
         service_location_mode,
         mfa_method: infer_mfa_method(location_mfa_mode, None),
         posture_check_required: dev_config.posture_check_required.unwrap_or_default(),
-        mfa_steps: Json(if dev_config.steps.is_empty() {
-            legacy_mfa_steps(location_mfa_mode)
-        } else {
+        mfa_steps: Json(
             dev_config
                 .steps
                 .into_iter()
                 .map(LocationMfaStep::from)
-                .collect::<Vec<_>>()
-        }),
+                .collect::<Vec<_>>(),
+        ),
         mfa_step_plan: Json::default(),
         client_mtu: dev_config.mtu,
+    };
+    if location.mfa_steps.0.is_empty() {
+        location.mfa_steps = Json(location.effective_mfa_steps());
     }
+    location
 }
 
 #[cfg(test)]

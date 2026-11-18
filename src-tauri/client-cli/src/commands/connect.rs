@@ -78,7 +78,7 @@ pub async fn handle(
         ResolvedTarget::Location(location) => {
             // Multi-step locations choose one method per step; single-step
             // locations keep the legacy method selection.
-            let multistep = location.mfa_steps.len() > 1;
+            let multistep = location.effective_mfa_steps().len() > 1;
             if multistep || location.mfa_enabled() {
                 let (plan, interacted) = if multistep {
                     if mfa_method.is_some() {

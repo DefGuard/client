@@ -250,6 +250,12 @@ pub fn show_tray_or_full_view(app: &AppHandle) {
     }
 }
 
+fn mfa_trigger_payload(location: &Location<Id>) -> Location<Id> {
+    let mut payload = location.clone();
+    payload.mfa_steps.0 = location.effective_mfa_steps();
+    payload
+}
+
 /// Surface the window that should host the MFA flow, and emit `MfaTrigger` targeted at that window.
 pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
     let target = if prefers_full_view(app) {
@@ -266,7 +272,8 @@ pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
         show_tray_window(app);
         COMPACT_WINDOW_ID
     };
-    let _ = app.emit_to(target, EventKey::MfaTrigger.into(), location);
+    let payload = mfa_trigger_payload(location);
+    let _ = app.emit_to(target, EventKey::MfaTrigger.into(), &payload);
 }
 
 /// Show the full view with the "enable system extension" modal.
@@ -416,3 +423,6 @@ pub fn swap_to_tray(app: AppHandle) {
         error!("swap_to_tray task: Failed to emit window swapped event: {err:?}");
     }
 }
+
+#[cfg(test)]
+mod tests;
