@@ -92,13 +92,13 @@ jobs:
       - name: Prepare e2e environment
         run: |
           cp e2e/.env.example e2e/.env
-          echo "CORE_URL=${{ secrets.E2E_CORE_URL }}" >> e2e/.env
-          echo "PROXY_URL=${{ secrets.E2E_PROXY_URL }}" >> e2e/.env
-          echo "CORE_ADMIN_PASSWORD=${{ secrets.E2E_CORE_ADMIN_PASSWORD }}" >> e2e/.env
-          echo "NETWORK_ENDPOINT=${{ secrets.E2E_NETWORK_ENDPOINT }}" >> e2e/.env
+          echo "CORE_URL=${{ secrets.E2E_21_CORE_URL }}" >> e2e/.env
+          echo "PROXY_URL=${{ secrets.E2E_21_PROXY_URL }}" >> e2e/.env
+          echo "CORE_ADMIN_PASSWORD=${{ secrets.E2E_21_CORE_ADMIN_PASSWORD }}" >> e2e/.env
+          echo "NETWORK_ENDPOINT=${{ secrets.E2E_21_NETWORK_ENDPOINT }}" >> e2e/.env
 
       - name: Check deployment is reachable
-        run: curl -sf --max-time 15 "${{ secrets.E2E_CORE_URL }}/api/v1/health"
+        run: curl -sf --max-time 15 "${{ secrets.E2E_21_CORE_URL }}/api/v1/health"
 
       - name: Stub resolvconf
         run: |
