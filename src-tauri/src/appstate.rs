@@ -42,7 +42,7 @@ pub struct AppState {
     pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
     pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
-    stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
+    stat_threads: Mutex<HashMap<(Id, ConnectionType), JoinHandle<()>>>,
     pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
     pub provisioning_instance_id: Mutex<Option<String>>,
     pub pending_add_instance: Mutex<Option<AddInstancePayload>>,
@@ -88,25 +88,39 @@ impl AppState {
         trace!("Current active connections: {connections:?}");
         drop(connections);
 
-        debug!("Spawning thread for network statistics for location ID {location_id}");
+        debug!("Spawning thread for network statistics for {connection_type} ID {location_id}");
         #[cfg(target_os = "macos")]
         let handle = spawn(stats_handler(location_id, connection_type));
         #[cfg(not(target_os = "macos"))]
         let handle = spawn(stats_handler(ifname, connection_type));
-        let Some(old_handle) = self
-            .stat_threads
-            .lock()
-            .unwrap()
-            .insert(location_id, handle)
+        let Some(old_handle) = self.replace_stat_thread((location_id, connection_type), handle)
         else {
-            debug!("Added new network statistics thread for location ID {location_id}");
+            debug!("Added new network statistics thread for {connection_type} ID {location_id}");
             return;
         };
-        warn!("Something went wrong: old network statistics thread still exists");
+        warn!(
+            "Something went wrong: old network statistics thread for {connection_type} ID \
+            {location_id} still exists"
+        );
         old_handle.abort();
         if let Err(err) = old_handle.await {
-            debug!("Old network statistics thread for location ID {location_id} returned {err}");
+            debug!(
+                "Old network statistics thread for {connection_type} ID {location_id} returned \
+                {err}"
+            );
         }
+    }
+
+    fn replace_stat_thread(
+        &self,
+        key: (Id, ConnectionType),
+        handle: JoinHandle<()>,
+    ) -> Option<JoinHandle<()>> {
+        self.stat_threads.lock().unwrap().insert(key, handle)
+    }
+
+    fn take_stat_thread(&self, key: (Id, ConnectionType)) -> Option<JoinHandle<()>> {
+        self.stat_threads.lock().unwrap().remove(&key)
     }
 
     /// Try to remove a connection from the list of active connections.
@@ -116,19 +130,16 @@ impl AppState {
         location_id: Id,
         connection_type: ConnectionType,
     ) -> Option<ActiveConnection> {
-        debug!("Removing active connection for location ID: {location_id}");
+        debug!("Removing active connection for {connection_type} ID: {location_id}");
 
-        // Stop statistics thread
-        {
-            let handle = self.stat_threads.lock().unwrap().remove(&location_id);
-            if let Some(handle) = handle {
-                debug!("Stopping network statistics thread for location ID {location_id}");
-                handle.abort();
-                if let Err(err) = handle.await {
-                    debug!(
-                        "Network statistics thread for location ID {location_id} returned {err}"
-                    );
-                }
+        if let Some(handle) = self.take_stat_thread((location_id, connection_type)) {
+            debug!("Stopping network statistics thread for {connection_type} ID {location_id}");
+            handle.abort();
+            if let Err(err) = handle.await {
+                debug!(
+                    "Network statistics thread for {connection_type} ID {location_id} returned \
+                    {err}"
+                );
             }
         }
 
@@ -136,13 +147,44 @@ impl AppState {
         if let Some(index) = connections.iter().position(|conn| {
             conn.location_id == location_id && conn.connection_type == connection_type
         }) {
-            // Found a connection with the specified location_id
             let removed_connection = connections.remove(index);
             debug!("Active connection has been removed from the active connections list.");
             Some(removed_connection)
         } else {
-            debug!("No active connection found with location ID: {location_id}");
+            debug!("No active connection found with {connection_type} ID: {location_id}");
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::future::pending;
+
+    use super::*;
+
+    #[test]
+    fn location_and_tunnel_with_same_id_keep_separate_stat_threads() {
+        let state = AppState::new(AppConfig::default(), None);
+        let location_key = (1, ConnectionType::Location);
+        let tunnel_key = (1, ConnectionType::Tunnel);
+
+        assert!(state
+            .replace_stat_thread(location_key, spawn(pending()))
+            .is_none());
+        assert!(state
+            .replace_stat_thread(tunnel_key, spawn(pending()))
+            .is_none());
+
+        state
+            .take_stat_thread(tunnel_key)
+            .expect("tunnel stats thread should be tracked")
+            .abort();
+
+        let location_handle = state
+            .take_stat_thread(location_key)
+            .expect("location stats thread should survive tunnel removal");
+        assert!(!location_handle.inner().is_finished());
+        location_handle.abort();
     }
 }

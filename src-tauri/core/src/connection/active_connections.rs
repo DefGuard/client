@@ -97,7 +97,10 @@ pub async fn active_connections(instance: &Instance<Id>) -> Result<Vec<ActiveCon
         .lock()
         .await
         .iter()
-        .filter(|connection| locations.contains(&connection.location_id))
+        .filter(|connection| {
+            connection.connection_type == ConnectionType::Location
+                && locations.contains(&connection.location_id)
+        })
         .cloned()
         .collect())
 }
