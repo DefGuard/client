@@ -1,5 +1,6 @@
 use crate::{
-    AttestationResponse, Capabilities, CredentialChallenge, DeviceIdentityError, TpmIdentity,
+    AttestationResponse, Capabilities, CredentialChallenge, DeviceIdentityError, PossessionProof,
+    TpmIdentity, TpmKeyBlobs,
 };
 use tpm2_protocol::{
     basic::TpmHandle,
@@ -19,6 +20,7 @@ mod certify;
 mod der;
 mod ek;
 mod keys;
+mod sign;
 mod tbs;
 
 const TPM_HEADER_SIZE: usize = 10;
@@ -46,6 +48,15 @@ pub(super) fn attest_identity(
     challenge: CredentialChallenge,
 ) -> Result<AttestationResponse, DeviceIdentityError> {
     activation::attest(identity, data, challenge)
+}
+
+pub(super) fn prove_possession(
+    srk_template: Vec<u8>,
+    identity_key: TpmKeyBlobs,
+    data: Vec<u8>,
+) -> Result<PossessionProof, DeviceIdentityError> {
+    let mut transport = tbs::TbsTransport::open()?;
+    sign::prove(&mut transport, &srk_template, &identity_key, &data)
 }
 
 pub(super) trait Transport {

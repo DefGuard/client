@@ -51,8 +51,16 @@ pub(super) async fn attest_identity(
 }
 
 pub(super) async fn prove_possession(
-    _identity: &Identity,
-    _challenge: &PossessionChallenge,
+    identity: &Identity,
+    challenge: &PossessionChallenge,
 ) -> Result<PossessionProof, DeviceIdentityError> {
-    Err(DeviceIdentityError::Unsupported)
+    let Identity::Tpm(identity) = identity else {
+        return Err(DeviceIdentityError::Unsupported);
+    };
+    let srk_template = identity.srk_template.clone();
+    let identity_key = identity.identity_key.clone();
+    let data = challenge.data.clone();
+    tokio::task::spawn_blocking(move || tpm::prove_possession(srk_template, identity_key, data))
+        .await
+        .map_err(|_| DeviceIdentityError::BackendFailure)?
 }
