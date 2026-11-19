@@ -6,7 +6,6 @@ on:
       - dev
       - 'release/**'
       - 'stable/**'
-      - 'windows-tpm-device-identity' # Remove after verifying the workflow before merge.
     paths-ignore:
       - '*.md'
       - 'LICENSE'
