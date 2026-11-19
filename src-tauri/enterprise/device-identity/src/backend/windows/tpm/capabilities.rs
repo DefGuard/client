@@ -243,14 +243,6 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
         |bank| u32::from(bank.hash_algorithm.0),
     )?;
 
-    let permanent = variable_properties
-        .iter()
-        .find(|property| property.id == TpmPt::Permanent.value())
-        .ok_or(DeviceIdentityError::BackendFailure)?;
-    if permanent.value & (OWNER_AUTH_SET | ENDORSEMENT_AUTH_SET) != 0 {
-        return Err(DeviceIdentityError::Unsupported);
-    }
-
     let has_algorithm = |id| algorithms.iter().any(|algorithm| algorithm.id.0 == id);
     let ecdsa_supported = has_algorithm(TpmAlgId::Ecc.value())
         && has_algorithm(TpmAlgId::Ecdsa.value())
@@ -286,6 +278,21 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
         attestation_method: ecdsa_supported.then_some(AttestationMethod::TpmKeyAttestation),
         details: PlatformCapabilities::Tpm(details),
     })
+}
+
+pub(super) fn check_hierarchy_auth(capabilities: &Capabilities) -> Result<(), DeviceIdentityError> {
+    let PlatformCapabilities::Tpm(details) = &capabilities.details else {
+        return Err(DeviceIdentityError::BackendFailure);
+    };
+    let permanent = details
+        .variable_properties
+        .iter()
+        .find(|property| property.id == TpmPt::Permanent.value())
+        .ok_or(DeviceIdentityError::BackendFailure)?;
+    if permanent.value & (OWNER_AUTH_SET | ENDORSEMENT_AUTH_SET) != 0 {
+        return Err(DeviceIdentityError::Unsupported);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -353,7 +360,7 @@ mod tests {
                     false,
                     TpmCap::TpmProperties,
                     1,
-                    &[0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00],
+                    &[0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03],
                 ),
                 response_with_payload(false, TpmCap::Commands, 0, &[]),
                 response_with_payload(false, TpmCap::Pcrs, 0, &[]),
@@ -364,6 +371,10 @@ mod tests {
         assert_eq!(
             capabilities.attestation_method,
             Some(AttestationMethod::TpmKeyAttestation)
+        );
+        assert_eq!(
+            check_hierarchy_auth(&capabilities),
+            Err(DeviceIdentityError::Unsupported)
         );
         let PlatformCapabilities::Tpm(details) = capabilities.details else {
             panic!("TPM details expected");

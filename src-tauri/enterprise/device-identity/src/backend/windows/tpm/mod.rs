@@ -13,6 +13,7 @@ use tpm2_protocol::{
     },
     TpmMarshal, TpmResult, TpmSized, TpmUnmarshal, TpmWriter,
 };
+use tracing::warn;
 
 mod activation;
 mod capabilities;
@@ -32,7 +33,8 @@ pub(super) fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
 
 pub(super) fn create_identity() -> Result<TpmIdentity, DeviceIdentityError> {
     let mut transport = tbs::TbsTransport::open()?;
-    capabilities::read(&mut transport)?;
+    let capabilities = capabilities::read(&mut transport)?;
+    capabilities::check_hierarchy_auth(&capabilities)?;
     let ek = ek::read(&mut transport)?;
     let (srk_template, ak, identity_key) = keys::create(&mut transport)?;
     Ok(TpmIdentity {
@@ -341,12 +343,12 @@ pub(super) fn with_transient<T: Transport, R>(
 ) -> Result<R, DeviceIdentityError> {
     let result = operation(transport, handle);
     let flush_result = flush_context(transport, handle);
+    if let Err(ref flush_error) = flush_result {
+        warn!(?flush_error, "Failed to flush TPM transient object");
+    }
     match result {
         Ok(value) => flush_result.map(|()| value),
-        Err(error) => {
-            let _ = flush_result;
-            Err(error)
-        }
+        Err(error) => Err(error),
     }
 }
 fn flush_context(
@@ -419,10 +421,20 @@ fn map_tpm_rc(response_code: TpmRc) -> DeviceIdentityError {
         TpmRc::Warn(TpmRcBase::Retry | TpmRcBase::Yielded | TpmRcBase::Lockout) => {
             DeviceIdentityError::TemporarilyUnavailable
         }
+        TpmRc::Fmt1(code) if matches!(code.base, TpmRcBase::AuthFail | TpmRcBase::BadAuth) => {
+            DeviceIdentityError::PermissionDenied
+        }
         TpmRc::Fmt1(code)
             if matches!(
                 code.base,
-                TpmRcBase::Hash | TpmRcBase::Curve | TpmRcBase::Scheme | TpmRcBase::KeySize
+                TpmRcBase::Hash
+                    | TpmRcBase::Curve
+                    | TpmRcBase::Scheme
+                    | TpmRcBase::KeySize
+                    | TpmRcBase::Asymmetric
+                    | TpmRcBase::Symmetric
+                    | TpmRcBase::Kdf
+                    | TpmRcBase::Mode
             ) =>
         {
             DeviceIdentityError::Unsupported
@@ -495,6 +507,12 @@ mod tests {
 
         for (raw_code, expected) in [
             (0x0000_0083, DeviceIdentityError::Unsupported),
+            (0x0000_008e, DeviceIdentityError::PermissionDenied),
+            (0x0000_00a2, DeviceIdentityError::PermissionDenied),
+            (0x0000_0081, DeviceIdentityError::Unsupported),
+            (0x0000_0096, DeviceIdentityError::Unsupported),
+            (0x0000_008c, DeviceIdentityError::Unsupported),
+            (0x0000_0089, DeviceIdentityError::Unsupported),
             (0x0000_0101, DeviceIdentityError::BackendFailure),
             (0x0000_0922, DeviceIdentityError::TemporarilyUnavailable),
             (0x0000_0921, DeviceIdentityError::TemporarilyUnavailable),

@@ -12,6 +12,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 
 [target.'cfg(windows)'.dependencies]
+tracing.workspace = true
 picky-asn1 = "0.10"
 picky-asn1-der = "0.5"
 picky-asn1-x509 = "0.15"

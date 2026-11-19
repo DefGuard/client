@@ -33,6 +33,8 @@ pub(super) fn attest(
     let srk_template = super::keys::decode_public(&identity.srk_template)?;
     let ek_template = super::keys::decode_public(&identity.ek.template)?;
     let mut transport = super::tbs::TbsTransport::open()?;
+    let capabilities = super::capabilities::read(&mut transport)?;
+    super::capabilities::check_hierarchy_auth(&capabilities)?;
 
     let (activation_secret, evidence) = super::with_primary_with_mapper(
         &mut transport,

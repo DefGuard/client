@@ -1,4 +1,5 @@
 use core::{ffi::c_void, ptr::null_mut};
+use tracing::debug;
 use windows_sys::Win32::{
     Foundation::{
         TBS_E_ACCESS_DENIED, TBS_E_SERVICE_DISABLED, TBS_E_SERVICE_NOT_RUNNING,
@@ -35,6 +36,10 @@ impl TbsTransport {
             )
         };
         if status != TBS_SUCCESS {
+            debug!(
+                status = format_args!("{status:#010x}"),
+                "TBS context creation failed"
+            );
             return Err(map_tbs_error(status));
         }
         if context.is_null() {
@@ -62,7 +67,16 @@ impl Transport for TbsTransport {
                 &mut response_len,
             )
         };
+        let command_code = command
+            .get(6..10)
+            .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
+            .map(u32::from_be_bytes);
         if status != TBS_SUCCESS {
+            debug!(
+                status = format_args!("{status:#010x}"),
+                ?command_code,
+                "TBS command failed"
+            );
             return Err(map_tbs_error(status));
         }
 
@@ -79,6 +93,13 @@ impl Transport for TbsTransport {
                 .try_into()
                 .map_err(|_| DeviceIdentityError::BackendFailure)?,
         );
+        if response_code != 0 {
+            debug!(
+                response_code = format_args!("{response_code:#010x}"),
+                ?command_code,
+                "TPM command returned an error"
+            );
+        }
         if response_code == TPM_E_COMMAND_BLOCKED as u32 {
             return Err(DeviceIdentityError::PermissionDenied);
         }

@@ -1,4 +1,5 @@
 use std::{mem::size_of, ptr::null_mut, slice};
+use tracing::debug;
 
 use crate::{DeviceIdentityError, TpmEndorsementKey};
 use picky_asn1::{bit_string::BitString, wrapper::IntegerAsn1};
@@ -93,8 +94,11 @@ fn select_profile(
     {
         return Ok((Profile::EccP256, vec![certificate]));
     }
-    let cached_certificates = read_cached_certificates()?;
-    let ecc_certificates = find_profile_certificates(&cached_certificates, Profile::EccP256)?;
+    let cached_certificates = read_cached_certificates().unwrap_or_else(|error| {
+        debug!(?error, "Could not read cached EK certificates");
+        Vec::new()
+    });
+    let ecc_certificates = find_profile_certificates(&cached_certificates, Profile::EccP256);
     if !ecc_certificates.is_empty() {
         return Ok((Profile::EccP256, ecc_certificates));
     }
@@ -102,7 +106,7 @@ fn select_profile(
     {
         return Ok((Profile::Rsa2048, vec![certificate]));
     }
-    let rsa_certificates = find_profile_certificates(&cached_certificates, Profile::Rsa2048)?;
+    let rsa_certificates = find_profile_certificates(&cached_certificates, Profile::Rsa2048);
     if !rsa_certificates.is_empty() {
         return Ok((Profile::Rsa2048, rsa_certificates));
     }
@@ -154,17 +158,16 @@ fn read_nv_certificate(
     Ok(Some(certificate))
 }
 
-fn find_profile_certificates(
-    certificates: &[Vec<u8>],
-    profile: Profile,
-) -> Result<Vec<Vec<u8>>, DeviceIdentityError> {
+fn find_profile_certificates(certificates: &[Vec<u8>], profile: Profile) -> Vec<Vec<u8>> {
     let mut matching = Vec::new();
     for der in certificates {
-        if certificate_has_profile(der, profile)? {
-            matching.push(der.clone());
+        match certificate_has_profile(der, profile) {
+            Ok(true) => matching.push(der.clone()),
+            Ok(false) => {}
+            Err(error) => debug!(?error, "Could not parse cached EK certificate"),
         }
     }
-    Ok(matching)
+    matching
 }
 
 fn certificate_has_profile(der: &[u8], profile: Profile) -> Result<bool, DeviceIdentityError> {
@@ -368,5 +371,18 @@ fn subject_public_key_info(
             ))
         }
         _ => Err(DeviceIdentityError::BackendFailure),
+    }
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+
+    #[test]
+    fn ignores_unparseable_cached_certificates() {
+        let certificates = vec![vec![1, 2, 3]];
+        for profile in [Profile::EccP256, Profile::Rsa2048] {
+            assert!(find_profile_certificates(&certificates, profile).is_empty());
+        }
     }
 }
