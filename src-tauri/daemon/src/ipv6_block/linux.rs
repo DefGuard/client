@@ -1,7 +1,8 @@
 use std::{io, net::Ipv6Addr};
 
 use netlink_packet_core::{
-    NetlinkMessage, NetlinkPayload, NLM_F_ACK, NLM_F_CREATE, NLM_F_REPLACE, NLM_F_REQUEST,
+    NetlinkMessage, NetlinkPayload, NLM_F_ACK, NLM_F_CREATE, NLM_F_DUMP, NLM_F_DUMP_INTR,
+    NLM_F_REPLACE, NLM_F_REQUEST,
 };
 use netlink_packet_route::{
     route::{
@@ -14,16 +15,14 @@ use netlink_sys::{constants::NETLINK_ROUTE, Socket, SocketAddr};
 use tracing::error;
 
 const SOCKET_BUFFER_LENGTH: usize = 12_288;
+// Linux assigns this metric to the reject route when no metric is supplied.
+const DEFAULT_IPV6_ROUTE_METRIC: u32 = 1024;
 // IPv6 route deletion ignores the route type but matches the protocol, so a protocol of our own
 // keeps Drop from deleting the tunnel's `::/0` route. 77 is not assigned by the kernel or iproute2.
 const ROUTE_PROTOCOL: RouteProtocol = RouteProtocol::Other(77);
 
-/// Makes IPv6 connections fail immediately on a tunnel that has no IPv6 address.
-///
-/// wireguard-rs routes unmarked traffic through the routing table numbered after the interface
-/// fwmark. This replaces the tunnel's `::/0` route in that table with an unreachable route, which
-/// is deleted again when this value is dropped. The route is not tied to the interface, so it
-/// outlives it unless deleted.
+/// Owns the IPv6 reject route in the interface's fwmark table.
+/// Drop attempts to remove it; the kernel does not remove it when the interface or daemon exits.
 pub(crate) struct Ipv6Block {
     fwmark: u32,
 }
@@ -47,19 +46,7 @@ impl Ipv6Block {
     /// this block already occupies the slot, so deleting the block would leave the table without
     /// an IPv6 default and let IPv6 fall through to the main table. On failure the block is kept.
     pub(crate) fn into_tunnel_route(self, ifname: &str) -> Result<(), (Self, io::Error)> {
-        let index = match nix::net::if_::if_nametoindex(ifname) {
-            Ok(index) => index,
-            Err(err) => return Err((self, err.into())),
-        };
-        let mut message = route_message(self.fwmark);
-        message.header.protocol = RouteProtocol::Boot;
-        message.header.scope = RouteScope::Link;
-        message.header.kind = RouteType::Unicast;
-        message.attributes.push(RouteAttribute::Oif(index));
-        if let Err(err) = netlink_request(
-            RouteNetlinkMessage::NewRoute(message),
-            NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE | NLM_F_REPLACE,
-        ) {
+        if let Err(err) = replace_tunnel_route(self.fwmark, ifname, false) {
             return Err((self, err));
         }
         // The route now belongs to the tunnel, so it must survive this block.
@@ -86,6 +73,74 @@ impl Drop for Ipv6Block {
     }
 }
 
+/// Restores the tunnel's IPv6 default after a daemon restart, but only if the fwmark table's
+/// sole IPv6 default is Defguard's reject route.
+pub(crate) fn recover_stale_route(fwmark: u32, ifname: &str) -> Result<(), io::Error> {
+    let mut request = RouteMessage::default();
+    request.header.address_family = AddressFamily::Inet6;
+    let routes = netlink_routes(
+        RouteNetlinkMessage::GetRoute(request),
+        NLM_F_REQUEST | NLM_F_DUMP,
+    )?;
+    let defaults: Vec<_> = routes
+        .iter()
+        .filter(|route| {
+            let table = route
+                .attributes
+                .iter()
+                .find_map(|attribute| match attribute {
+                    RouteAttribute::Table(table) => Some(*table),
+                    _ => None,
+                })
+                .unwrap_or(u32::from(route.header.table));
+            route.header.address_family == AddressFamily::Inet6
+                && route.header.destination_prefix_length == 0
+                && route.header.source_prefix_length == 0
+                && table == fwmark
+        })
+        .collect();
+    if let [route] = defaults.as_slice() {
+        let metric = route
+            .attributes
+            .iter()
+            .find_map(|attribute| match attribute {
+                RouteAttribute::Priority(metric) => Some(*metric),
+                _ => None,
+            });
+        if route.header.protocol == ROUTE_PROTOCOL
+            && route.header.kind == RouteType::Unreachable
+            && metric == Some(DEFAULT_IPV6_ROUTE_METRIC)
+        {
+            replace_tunnel_route(fwmark, ifname, true)?;
+        }
+    } else if defaults.len() > 1 {
+        return Err(io::Error::other(
+            "multiple IPv6 default routes in fwmark table",
+        ));
+    }
+    Ok(())
+}
+
+/// Installs the tunnel route without deleting the reject first. If `existing_only` is true,
+/// the route at the expected metric must already exist.
+fn replace_tunnel_route(fwmark: u32, ifname: &str, existing_only: bool) -> Result<(), io::Error> {
+    let index = nix::net::if_::if_nametoindex(ifname)?;
+    let mut message = route_message(fwmark);
+    message.header.protocol = RouteProtocol::Boot;
+    message.header.scope = RouteScope::Link;
+    message.header.kind = RouteType::Unicast;
+    message.attributes.push(RouteAttribute::Oif(index));
+    let mut flags = NLM_F_REQUEST | NLM_F_ACK | NLM_F_REPLACE;
+    if existing_only {
+        message
+            .attributes
+            .push(RouteAttribute::Priority(DEFAULT_IPV6_ROUTE_METRIC));
+    } else {
+        flags |= NLM_F_CREATE;
+    }
+    netlink_request(RouteNetlinkMessage::NewRoute(message), flags)
+}
+
 fn route_message(fwmark: u32) -> RouteMessage {
     let mut message = RouteMessage::default();
     message.header = RouteHeader {
@@ -105,6 +160,14 @@ fn route_message(fwmark: u32) -> RouteMessage {
 }
 
 fn netlink_request(message: RouteNetlinkMessage, flags: u16) -> Result<(), io::Error> {
+    netlink_routes(message, flags).map(|_| ())
+}
+
+fn netlink_routes(
+    message: RouteNetlinkMessage,
+    flags: u16,
+) -> Result<Vec<RouteMessage>, io::Error> {
+    let mut routes = Vec::new();
     let mut request = NetlinkMessage::from(message);
     request.header.flags = flags;
     request.finalize();
@@ -132,6 +195,9 @@ fn netlink_request(message: RouteNetlinkMessage, flags: u16) -> Result<(), io::E
                 &receive_buffer[offset..received],
             )
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+            if response.header.flags & NLM_F_DUMP_INTR != 0 {
+                return Err(io::Error::other("netlink route dump interrupted"));
+            }
             let message_length = response.header.length as usize;
             if message_length == 0 || message_length > received - offset {
                 return Err(io::Error::new(
@@ -141,10 +207,16 @@ fn netlink_request(message: RouteNetlinkMessage, flags: u16) -> Result<(), io::E
             }
 
             match response.payload {
-                NetlinkPayload::Error(message) if message.code.is_none() => return Ok(()),
+                NetlinkPayload::Error(message) if message.code.is_none() => return Ok(routes),
                 NetlinkPayload::Error(message) => return Err(message.to_io()),
-                NetlinkPayload::Done(_) => return Ok(()),
+                NetlinkPayload::Done(message) if message.code == 0 => return Ok(routes),
+                NetlinkPayload::Done(message) => {
+                    return Err(io::Error::from_raw_os_error(message.code.saturating_neg()))
+                }
                 NetlinkPayload::Overrun(_) => return Err(io::Error::other("netlink overrun")),
+                NetlinkPayload::InnerMessage(RouteNetlinkMessage::NewRoute(route)) => {
+                    routes.push(route)
+                }
                 NetlinkPayload::Noop | NetlinkPayload::InnerMessage(_) => {}
                 _ => {
                     return Err(io::Error::new(

@@ -9,6 +9,8 @@ use std::{
 #[cfg(unix)]
 use std::{fs, path::Path};
 
+#[cfg(target_os = "linux")]
+use crate::ipv6_block::recover_stale_route;
 use defguard_client_common::dns_borrow;
 #[cfg(windows)]
 use defguard_client_posture::inspector::{device_posture_data, DiskEncryptionTarget};
@@ -84,11 +86,12 @@ fn should_block_ipv6<'a>(
     addresses: &[IpAddrMask],
 ) -> bool {
     !addresses.iter().any(|address| address.address.is_ipv6())
-        && allowed_ips.into_iter().any(|allowed_ip| {
-            allowed_ip.address.is_ipv6()
-                && allowed_ip.address.is_unspecified()
-                && allowed_ip.cidr == 0
-        })
+        && allowed_ips.into_iter().any(is_ipv6_default)
+}
+
+#[cfg(target_os = "linux")]
+fn is_ipv6_default(ip: &IpAddrMask) -> bool {
+    ip.address.is_ipv6() && ip.address.is_unspecified() && ip.cidr == 0
 }
 
 #[cfg(target_os = "linux")]
@@ -100,8 +103,8 @@ enum Ipv6BlockChange {
     Remove,
 }
 
-/// A block in the interface's current fwmark table is never deleted: wireguard-rs did not add
-/// its own `::/0` route there, so deleting ours would let IPv6 leak through the main table.
+/// Keep or replace the reject route while the interface's fwmark rule can still select its table.
+/// Deleting it first can let IPv6 fall through to the main table.
 #[cfg(target_os = "linux")]
 fn ipv6_block_change(block_fwmark: Option<u32>, fwmark: u32, block_ipv6: bool) -> Ipv6BlockChange {
     match (block_fwmark == Some(fwmark), block_ipv6) {
@@ -180,7 +183,18 @@ impl DaemonService {
             config.peers.iter().flat_map(|peer| &peer.allowed_ips),
             &config.addresses,
         );
-        if !block_ipv6 && !blocks.contains_key(ifname) {
+        let recover_route = !block_ipv6
+            && !blocks.contains_key(ifname)
+            && config
+                .addresses
+                .iter()
+                .any(|address| address.address.is_ipv6())
+            && config
+                .peers
+                .iter()
+                .flat_map(|peer| &peer.allowed_ips)
+                .any(is_ipv6_default);
+        if !block_ipv6 && !blocks.contains_key(ifname) && !recover_route {
             return;
         }
         // Without the fwmark it is unknown which table an existing block protects, so keep it.
@@ -200,6 +214,12 @@ impl DaemonService {
             return;
         };
 
+        if recover_route {
+            if let Err(err) = recover_stale_route(fwmark, ifname) {
+                error!("Failed to recover IPv6 route for interface {ifname}: {err}");
+            }
+            return;
+        }
         let block = blocks.remove(ifname);
         match ipv6_block_change(block.as_ref().map(Ipv6Block::fwmark), fwmark, block_ipv6) {
             Ipv6BlockChange::Keep => {
@@ -277,6 +297,7 @@ impl DaemonService {
                 .unwrap_or_else(|err| err.into_inner());
             for (ifname, block) in blocks.drain() {
                 error!("Retaining IPv6 unreachable route for {ifname}: interface teardown was not confirmed");
+                // Skip Drop because a surviving fwmark rule could still select this table.
                 std::mem::forget(block);
             }
         }
@@ -964,11 +985,184 @@ mod tests {
         }
     }
 
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::{
+        net::{IpAddr, Ipv4Addr, Ipv6Addr},
+        process::Command,
+    };
 
     use defguard_wireguard_rs::net::IpAddrMask;
 
     use super::{ipv6_block_change, should_block_ipv6, Ipv6BlockChange};
+
+    #[test]
+    #[ignore = "run only in a disposable network namespace with NET_ADMIN"]
+    fn test_recovers_stale_ipv6_block_after_restart() {
+        let namespace = std::fs::read_link("/proc/self/ns/net").unwrap();
+        if let Some(parent_namespace) = std::env::var_os("DEFGUARD_IPV6_TEST_NAMESPACE") {
+            assert_ne!(
+                namespace.as_os_str(),
+                parent_namespace,
+                "network namespace did not change"
+            );
+        } else {
+            let status = Command::new("unshare")
+                .args(["-Urn"])
+                .arg(std::env::current_exe().unwrap())
+                .args([
+                    "--ignored",
+                    "--exact",
+                    "daemon::tests::test_recovers_stale_ipv6_block_after_restart",
+                ])
+                .env("DEFGUARD_IPV6_TEST_NAMESPACE", &namespace)
+                .status()
+                .unwrap();
+            assert!(status.success());
+            return;
+        }
+
+        fn run(program: &str, args: &[&str]) -> String {
+            let output = Command::new(program).args(args).output().unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout).unwrap()
+        }
+
+        run("ip", &["link", "add", "wgrecover", "type", "wireguard"]);
+        run("wg", &["set", "wgrecover", "fwmark", "51820"]);
+        run("ip", &["link", "set", "wgrecover", "up"]);
+        run(
+            "ip",
+            &[
+                "-6",
+                "route",
+                "add",
+                "unreachable",
+                "default",
+                "table",
+                "51820",
+                "proto",
+                "77",
+            ],
+        );
+        let service = DaemonService::default();
+        let wgapi = setup_wgapi("wgrecover").unwrap();
+        let mut config = InterfaceConfiguration {
+            name: "wgrecover".into(),
+            prvkey: String::new(),
+            addresses: vec![IpAddrMask::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 128)],
+            port: 0,
+            peers: vec![defguard_wireguard_rs::peer::Peer {
+                allowed_ips: vec![IpAddrMask::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)],
+                ..Default::default()
+            }],
+            mtu: None,
+            fwmark: None,
+        };
+        assert_eq!(wgapi.read_interface_data().unwrap().fwmark, Some(51820));
+        wgapi.configure_peer_routing(&config.peers).unwrap();
+        assert!(run("ip", &["-6", "route", "show", "table", "51820"]).contains("proto 77"));
+        service.configure_ipv6_block("wgrecover", &config, &wgapi);
+        let routes = run("ip", &["-6", "route", "show", "table", "51820"]);
+        assert!(routes.contains("default dev wgrecover"), "{routes}");
+        assert!(!routes.contains("unreachable"), "{routes}");
+
+        run(
+            "ip",
+            &[
+                "-6",
+                "route",
+                "replace",
+                "unreachable",
+                "default",
+                "table",
+                "51820",
+                "proto",
+                "77",
+            ],
+        );
+        config.peers[0].allowed_ips.clear();
+        service.configure_ipv6_block("wgrecover", &config, &wgapi);
+        assert!(run("ip", &["-6", "route", "show", "table", "51820"]).contains("unreachable"));
+
+        config.peers[0]
+            .allowed_ips
+            .push(IpAddrMask::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0));
+        run(
+            "ip",
+            &[
+                "-6",
+                "route",
+                "replace",
+                "unreachable",
+                "default",
+                "table",
+                "51820",
+                "proto",
+                "78",
+            ],
+        );
+        service.configure_ipv6_block("wgrecover", &config, &wgapi);
+        assert!(run("ip", &["-6", "route", "show", "table", "51820"]).contains("proto 78"));
+
+        run(
+            "ip",
+            &[
+                "-6",
+                "route",
+                "replace",
+                "unreachable",
+                "default",
+                "table",
+                "51820",
+                "proto",
+                "77",
+            ],
+        );
+        run(
+            "ip",
+            &[
+                "-6",
+                "route",
+                "add",
+                "unreachable",
+                "default",
+                "table",
+                "51820",
+                "proto",
+                "78",
+                "metric",
+                "2048",
+            ],
+        );
+        let before = run("ip", &["-6", "route", "show", "table", "51820"]);
+        service.configure_ipv6_block("wgrecover", &config, &wgapi);
+        assert_eq!(
+            before,
+            run("ip", &["-6", "route", "show", "table", "51820"])
+        );
+        run(
+            "ip",
+            &[
+                "-6",
+                "route",
+                "del",
+                "unreachable",
+                "default",
+                "table",
+                "51820",
+                "proto",
+                "78",
+                "metric",
+                "2048",
+            ],
+        );
+        run("ip", &["link", "set", "wgrecover", "down"]);
+        service.configure_ipv6_block("wgrecover", &config, &wgapi);
+        assert!(run("ip", &["-6", "route", "show", "table", "51820"]).contains("proto 77"));
+    }
 
     #[test]
     fn test_ipv6_default_without_ipv6_address_blocks() {

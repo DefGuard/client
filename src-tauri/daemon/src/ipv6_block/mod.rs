@@ -4,6 +4,6 @@ mod linux;
 mod windows;
 
 #[cfg(target_os = "linux")]
-pub(crate) use linux::Ipv6Block;
+pub(crate) use linux::{recover_stale_route, Ipv6Block};
 #[cfg(windows)]
 pub(crate) use windows::Ipv6Block;
