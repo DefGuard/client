@@ -11,6 +11,7 @@ on:
       - "*.md"
       - "LICENSE"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - dev
@@ -20,12 +21,17 @@ on:
       - "*.md"
       - "LICENSE"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: "1"
 
 jobs:
   check:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:

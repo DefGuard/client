@@ -6,6 +6,7 @@ on:
     branches: [main, dev, 'release/**', 'stable/**']
     paths-ignore: ['*.md', 'LICENSE']
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main, dev, 'release/**', 'stable/**']
     paths-ignore: ['*.md', 'LICENSE']
 
@@ -15,6 +16,7 @@ concurrency:
 
 jobs:
   e2e:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: [self-hosted, Linux, X64]
     concurrency:
       group: desktop-e2e
