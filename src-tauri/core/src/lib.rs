@@ -62,7 +62,7 @@ pub fn set_perms(path: &std::path::Path) {
 }
 
 /// Location type used in commands to check if we use tunnel or location
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ConnectionType {
     Tunnel,
     Location,
