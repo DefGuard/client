@@ -36,8 +36,9 @@ pub(super) fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
 pub(super) fn create_identity() -> Result<TpmIdentity, DeviceIdentityError> {
     let mut transport = tbs::TbsTransport::open()?;
     let capabilities = raw_capabilities::read(&mut transport)?;
+    let nv_buffer_max = raw_capabilities::nv_buffer_max(&capabilities);
     raw_capabilities::check_hierarchy_auth(&capabilities)?;
-    let ek = ek::read(&mut transport)?;
+    let ek = ek::read(&mut transport, nv_buffer_max)?;
     let keys::CreatedKeys {
         srk_template,
         ak,

@@ -281,6 +281,16 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
     })
 }
 
+pub(super) fn nv_buffer_max(capabilities: &Capabilities) -> Option<u32> {
+    let PlatformCapabilities::Tpm(details) = &capabilities.details else {
+        return None;
+    };
+    details
+        .fixed_properties
+        .iter()
+        .find(|property| property.id == TpmPt::NvBufferMax.value())
+        .map(|property| property.value)
+}
 pub(super) fn check_hierarchy_auth(capabilities: &Capabilities) -> Result<(), DeviceIdentityError> {
     let PlatformCapabilities::Tpm(details) = &capabilities.details else {
         return Err(DeviceIdentityError::BackendFailure);
@@ -354,8 +364,11 @@ mod tests {
                 response_with_payload(
                     false,
                     TpmCap::TpmProperties,
-                    1,
-                    &[0x00, 0x00, 0x01, 0x00, 0x31, 0x2e, 0x30, 0x00],
+                    2,
+                    &[
+                        0x00, 0x00, 0x01, 0x00, 0x31, 0x2e, 0x30, 0x00, 0x00, 0x00, 0x01, 0x2c,
+                        0x00, 0x00, 0x02, 0x00,
+                    ],
                 ),
                 response_with_payload(
                     false,
@@ -377,14 +390,16 @@ mod tests {
             check_hierarchy_auth(&capabilities),
             Err(DeviceIdentityError::Unsupported)
         );
+        assert_eq!(nv_buffer_max(&capabilities), Some(512));
         let PlatformCapabilities::Tpm(details) = capabilities.details else {
             panic!("TPM details expected");
         };
-        assert_eq!(details.fixed_properties.len(), 1);
+        assert_eq!(details.fixed_properties.len(), 2);
         assert_eq!(
             details.fixed_properties[0].id,
             TpmPt::FamilyIndicator.value()
         );
+        assert_eq!(details.fixed_properties[1].id, TpmPt::NvBufferMax.value());
         assert_eq!(details.variable_properties.len(), 1);
         assert_eq!(details.variable_properties[0].id, TpmPt::Permanent.value());
         assert!(details.profiles.iter().any(|profile| {
