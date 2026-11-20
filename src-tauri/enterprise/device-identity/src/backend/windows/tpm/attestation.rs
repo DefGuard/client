@@ -31,7 +31,7 @@ pub(super) fn attest(
     let encrypted_secret = Tpm2bEncryptedSecret::try_from(challenge.encrypted_secret.as_slice())
         .map_err(|_| DeviceIdentityError::InvalidChallenge)?;
     let srk_template = super::keys::decode_public(&identity.srk_template)?;
-    let ek_template = super::keys::decode_public(&identity.ek.template)?;
+    let ek_template = super::ek::decode_stored_template(&identity.ek.template)?;
     let mut transport = super::tbs::TbsTransport::open()?;
     let capabilities = super::raw_capabilities::read(&mut transport)?;
     super::raw_capabilities::check_hierarchy_auth(&capabilities)?;

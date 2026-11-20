@@ -165,13 +165,6 @@ fn submit_frame<C: TpmFrame>(
     transport.submit(&command_buffer[..command_len])
 }
 
-fn decode_frame<R: TpmUnmarshalBody>(
-    bytes: &[u8],
-    expected_tag: TpmSt,
-) -> Result<R, DeviceIdentityError> {
-    decode_frame_with_mapper(bytes, expected_tag, map_tpm_rc)
-}
-
 fn decode_frame_with_mapper<R: TpmUnmarshalBody>(
     bytes: &[u8],
     expected_tag: TpmSt,
@@ -229,16 +222,20 @@ pub(super) fn send_with_sessions_and_mapper<C: TpmFrame, R: TpmUnmarshalBody>(
     decode_frame_with_mapper(&bytes, tag, map_response_code)
 }
 
-pub(super) fn send_allow_missing_handle<C: TpmFrame, R: TpmUnmarshalBody>(
+pub(super) fn send_with_sessions_and_tpm_error<C: TpmFrame, R: TpmUnmarshalBody>(
     transport: &mut impl Transport,
     command: &C,
-) -> Result<Option<R>, DeviceIdentityError> {
-    let bytes = submit_frame(transport, command, &[])?;
+    sessions: &[TpmsAuthCommand],
+) -> Result<Result<R, TpmRc>, DeviceIdentityError> {
+    let bytes = submit_frame(transport, command, sessions)?;
     let response = TpmResponse::cast(&bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
-    if matches!(response.rc(), Ok(TpmRc::Fmt1(code)) if code.base == TpmRcBase::Handle) {
-        return Ok(None);
+    let response_code = response
+        .rc()
+        .map_err(|_| DeviceIdentityError::BackendFailure)?;
+    if response_code != TpmRc::Fmt0(TpmRcBase::Success) {
+        return Ok(Err(response_code));
     }
-    decode_frame(&bytes, TpmSt::NoSessions).map(Some)
+    decode_frame_with_mapper(&bytes, session_tag(sessions), map_tpm_rc).map(Ok)
 }
 
 pub(super) fn with_primary<T: Transport, R>(

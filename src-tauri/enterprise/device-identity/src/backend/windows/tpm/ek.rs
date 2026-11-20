@@ -7,10 +7,10 @@ use picky_asn1_x509::{
 use tpm2_protocol::{
     basic::{TpmHandle, TpmUint16, TpmUint32},
     data::{
-        Tpm2bDigest, Tpm2bEccParameter, Tpm2bPublicKeyRsa, TpmAlgId, TpmEccCurve, TpmPt, TpmRh,
-        TpmaObject, TpmsEccParms, TpmsEccPoint, TpmsRsaParms, TpmtEccScheme, TpmtKdfScheme,
-        TpmtPublic, TpmtRsaScheme, TpmtSymDefObject, TpmuAsymScheme, TpmuPublicId, TpmuPublicParms,
-        TpmuSymKeyBits, TpmuSymMode,
+        Tpm2bDigest, Tpm2bEccParameter, Tpm2bPublicKeyRsa, TpmAlgId, TpmEccCurve, TpmPt, TpmRc,
+        TpmRcBase, TpmRh, TpmaObject, TpmsEccParms, TpmsEccPoint, TpmsRsaParms, TpmtEccScheme,
+        TpmtKdfScheme, TpmtPublic, TpmtRsaScheme, TpmtSymDefObject, TpmuAsymScheme, TpmuPublicId,
+        TpmuPublicParms, TpmuSymKeyBits, TpmuSymMode,
     },
     frame::{
         TpmNvReadCommand, TpmNvReadPublicCommand, TpmNvReadPublicResponse, TpmNvReadResponse,
@@ -33,6 +33,7 @@ use crate::{DeviceIdentityError, TpmEndorsementKey};
 const ECC_EK_CERTIFICATE_INDEX: u32 = 0x01c0_000a;
 const RSA_EK_CERTIFICATE_INDEX: u32 = 0x01c0_0002;
 const MAX_NV_READ_SIZE: usize = 1024;
+const MIN_NV_BUFFER_MAX: u32 = 256;
 const EK_AUTH_POLICY_SHA256: [u8; 32] = [
     0x83, 0x71, 0x97, 0x67, 0x44, 0x84, 0xb3, 0xf8, 0x1a, 0x90, 0xcc, 0x8d, 0x46, 0xa5, 0xd7, 0x24,
     0xfd, 0x52, 0xd7, 0x6e, 0x06, 0x52, 0x0b, 0x64, 0xf2, 0xa1, 0xda, 0x1b, 0x33, 0x14, 0x69, 0xaa,
@@ -57,7 +58,12 @@ pub(super) fn read(
     transport: &mut impl super::Transport,
     nv_buffer_max: Option<u32>,
 ) -> Result<TpmEndorsementKey, DeviceIdentityError> {
-    let (profile, certificates) = select_profile(transport, nv_buffer_max)?;
+    let (profile, certificates) = select_profile(transport, nv_buffer_max, || {
+        read_cached_certificates().unwrap_or_else(|error| {
+            debug!(?error, "Could not read cached EK certificates");
+            Vec::new()
+        })
+    })?;
     let template = ek_template(profile)?;
     let template_bytes = super::marshal(&template)?;
     let public_bytes = super::with_primary(
@@ -90,9 +96,33 @@ pub(super) fn read(
     })
 }
 
+fn allow_unreadable_nv_error<T>(
+    result: Result<Result<T, TpmRc>, DeviceIdentityError>,
+    read_public: bool,
+) -> Result<Option<T>, DeviceIdentityError> {
+    match result? {
+        Ok(response) => Ok(Some(response)),
+        Err(TpmRc::Fmt1(code)) if code.base == TpmRcBase::Handle => Ok(None),
+        Err(TpmRc::Fmt0(
+            TpmRcBase::NvLocked | TpmRcBase::NvAuthorization | TpmRcBase::NvUninitialized,
+        )) if !read_public => Ok(None),
+        Err(TpmRc::Fmt1(code))
+            if !read_public
+                && matches!(
+                    code.base,
+                    TpmRcBase::AuthFail | TpmRcBase::BadAuth | TpmRcBase::PolicyFail
+                ) =>
+        {
+            Ok(None)
+        }
+        Err(response_code) => Err(super::map_tpm_rc(response_code)),
+    }
+}
+
 fn select_profile(
     transport: &mut impl super::Transport,
     nv_buffer_max: Option<u32>,
+    load_cached_certificates: impl FnOnce() -> Vec<Vec<u8>>,
 ) -> Result<(Profile, Vec<Vec<u8>>), DeviceIdentityError> {
     if let Some(certificate) = read_nv_certificate(
         transport,
@@ -101,10 +131,7 @@ fn select_profile(
     )? {
         return Ok((Profile::EccP256, vec![certificate]));
     }
-    let cached_certificates = read_cached_certificates().unwrap_or_else(|error| {
-        debug!(?error, "Could not read cached EK certificates");
-        Vec::new()
-    });
+    let cached_certificates = load_cached_certificates();
     let ecc_certificates = find_profile_certificates(&cached_certificates, Profile::EccP256);
     if !ecc_certificates.is_empty() {
         return Ok((Profile::EccP256, ecc_certificates));
@@ -132,8 +159,10 @@ fn read_nv_certificate(
     let public_command = TpmNvReadPublicCommand {
         handles: [index_handle],
     };
-    let Some(public): Option<TpmNvReadPublicResponse> =
-        super::send_allow_missing_handle(transport, &public_command)?
+    let Some(public): Option<TpmNvReadPublicResponse> = allow_unreadable_nv_error(
+        super::send_with_sessions_and_tpm_error(transport, &public_command, &[]),
+        true,
+    )?
     else {
         return Ok(None);
     };
@@ -145,11 +174,12 @@ fn read_nv_certificate(
     if data_size == 0 {
         return Err(DeviceIdentityError::BackendFailure);
     }
-    let Some(nv_buffer_max) = nv_buffer_max.filter(|value| *value != 0) else {
+    let Some(nv_buffer_max) = nv_buffer_max.filter(|value| *value >= MIN_NV_BUFFER_MAX) else {
         debug!(
             property = format_args!("{:#010x}", TpmPt::NvBufferMax.value()),
             value = ?nv_buffer_max.map(|value| format!("{value:#010x}")),
-            "TPM_PT_NV_BUFFER_MAX is missing or zero"
+            minimum = MIN_NV_BUFFER_MAX,
+            "TPM_PT_NV_BUFFER_MAX is missing or below minimum"
         );
         return Err(DeviceIdentityError::BackendFailure);
     };
@@ -169,7 +199,13 @@ fn read_nv_certificate(
                 u16::try_from(offset).map_err(|_| DeviceIdentityError::BackendFailure)?,
             ),
         };
-        let response: TpmNvReadResponse = super::send_authenticated(transport, &command)?;
+        let Some(response): Option<TpmNvReadResponse> = allow_unreadable_nv_error(
+            super::send_with_sessions_and_tpm_error(transport, &command, &[super::password_auth()]),
+            false,
+        )?
+        else {
+            return Ok(None);
+        };
         let bytes = response.data.as_ref();
         if bytes.len() != read_size {
             return Err(DeviceIdentityError::BackendFailure);
@@ -349,6 +385,18 @@ fn ek_template(profile: Profile) -> Result<TpmtPublic, DeviceIdentityError> {
     })
 }
 
+pub(super) fn decode_stored_template(bytes: &[u8]) -> Result<TpmtPublic, DeviceIdentityError> {
+    let template = super::keys::decode_public(bytes)?;
+    let template_bytes = super::marshal(&template)?;
+    let ecc_template = super::marshal(&ek_template(Profile::EccP256)?)?;
+    let rsa_template = super::marshal(&ek_template(Profile::Rsa2048)?)?;
+    if template_bytes == ecc_template || template_bytes == rsa_template {
+        Ok(template)
+    } else {
+        Err(DeviceIdentityError::IdentityLost)
+    }
+}
+
 fn certificate_matches(
     public_bytes: &[u8],
     certificate_der: &[u8],
@@ -398,16 +446,25 @@ fn subject_public_key_info(
 
 #[cfg(test)]
 mod nv_read_tests {
+    use std::collections::VecDeque;
+
     use super::*;
     use tpm2_protocol::data::TpmCc;
     const INDEX: u32 = ECC_EK_CERTIFICATE_INDEX;
     struct FakeTransport {
         certificate: Vec<u8>,
         commands: Vec<u32>,
+        indexes: Vec<u32>,
         reads: Vec<(u16, u16)>,
+        public_error_codes: VecDeque<Option<u32>>,
+        read_error_codes: VecDeque<Option<u32>>,
+        transport_error: Option<DeviceIdentityError>,
     }
     impl super::super::Transport for FakeTransport {
         fn submit(&mut self, command: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
+            if let Some(error) = self.transport_error.take() {
+                return Err(error);
+            }
             let command_code = u32::from_be_bytes(
                 command
                     .get(6..10)
@@ -415,16 +472,20 @@ mod nv_read_tests {
                     .try_into()
                     .map_err(|_| DeviceIdentityError::BackendFailure)?,
             );
+            let index = u32::from_be_bytes(
+                command
+                    .get(10..14)
+                    .ok_or(DeviceIdentityError::BackendFailure)?
+                    .try_into()
+                    .map_err(|_| DeviceIdentityError::BackendFailure)?,
+            );
             self.commands.push(command_code);
+            self.indexes.push(index);
             if command_code == TpmCc::NvReadPublic.value() {
-                let index = u32::from_be_bytes(
-                    command
-                        .get(10..14)
-                        .ok_or(DeviceIdentityError::BackendFailure)?
-                        .try_into()
-                        .map_err(|_| DeviceIdentityError::BackendFailure)?,
-                );
-                if index != INDEX {
+                if let Some(code) = self.public_error_codes.pop_front().flatten() {
+                    return Ok(error_response(code));
+                }
+                if index != ECC_EK_CERTIFICATE_INDEX && index != RSA_EK_CERTIFICATE_INDEX {
                     return Err(DeviceIdentityError::BackendFailure);
                 }
                 return Ok(nv_read_public_response(
@@ -434,6 +495,9 @@ mod nv_read_tests {
             }
             if command_code != TpmCc::NvRead.value() {
                 panic!("unexpected TPM command: {command_code:#010x}");
+            }
+            if let Some(code) = self.read_error_codes.pop_front().flatten() {
+                return Ok(error_response(code));
             }
             let parameters = command
                 .get(command.len().saturating_sub(4)..)
@@ -482,6 +546,24 @@ mod nv_read_tests {
         bytes.extend_from_slice(body);
         bytes
     }
+    fn error_response(response_code: u32) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(10);
+        bytes.extend_from_slice(&0x8001_u16.to_be_bytes());
+        bytes.extend_from_slice(&10_u32.to_be_bytes());
+        bytes.extend_from_slice(&response_code.to_be_bytes());
+        bytes
+    }
+    fn fake_transport(certificate: Vec<u8>) -> FakeTransport {
+        FakeTransport {
+            certificate,
+            commands: Vec::new(),
+            indexes: Vec::new(),
+            reads: Vec::new(),
+            public_error_codes: VecDeque::new(),
+            read_error_codes: VecDeque::new(),
+            transport_error: None,
+        }
+    }
     fn session_response(parameters: &[u8]) -> Vec<u8> {
         let parameter_size = u32::try_from(parameters.len()).expect("TPM test response size");
         let total_size = 10 + 4 + parameters.len() + 5;
@@ -501,11 +583,7 @@ mod nv_read_tests {
     #[test]
     fn test_read_nv_certificate_chunks_at_nv_buffer_max() {
         let certificate: Vec<_> = (0..1100).map(|byte| (byte % 251) as u8).collect();
-        let mut transport = FakeTransport {
-            certificate: certificate.clone(),
-            commands: Vec::new(),
-            reads: Vec::new(),
-        };
+        let mut transport = fake_transport(certificate.clone());
         let result =
             read_nv_certificate(&mut transport, INDEX, Some(512)).expect("read the NV certificate");
         assert_eq!(result, Some(certificate));
@@ -522,12 +600,8 @@ mod nv_read_tests {
     }
     #[test]
     fn test_read_nv_certificate_rejects_missing_or_zero_nv_buffer_max() {
-        for nv_buffer_max in [None, Some(0)] {
-            let mut transport = FakeTransport {
-                certificate: vec![0; 8],
-                commands: Vec::new(),
-                reads: Vec::new(),
-            };
+        for nv_buffer_max in [None, Some(0), Some(MIN_NV_BUFFER_MAX - 1)] {
+            let mut transport = fake_transport(vec![0; 8]);
             assert_eq!(
                 read_nv_certificate(&mut transport, INDEX, nv_buffer_max),
                 Err(DeviceIdentityError::BackendFailure)
@@ -535,6 +609,112 @@ mod nv_read_tests {
             assert_eq!(transport.commands, [TpmCc::NvReadPublic.value()]);
             assert!(transport.reads.is_empty());
         }
+    }
+
+    #[test]
+    fn test_read_nv_certificate_accepts_minimum_nv_buffer_max() {
+        let certificate = vec![1, 2, 3, 4];
+        let mut transport = fake_transport(certificate.clone());
+
+        assert_eq!(
+            read_nv_certificate(&mut transport, INDEX, Some(MIN_NV_BUFFER_MAX)),
+            Ok(Some(certificate))
+        );
+        assert_eq!(transport.reads, [(4, 0)]);
+    }
+
+    #[test]
+    fn test_unreadable_nv_certificate_errors_are_absent() {
+        let mut public_transport = fake_transport(vec![1, 2, 3, 4]);
+        public_transport.public_error_codes = VecDeque::from([Some(0x0000_018b)]);
+        assert_eq!(
+            read_nv_certificate(&mut public_transport, INDEX, Some(512)),
+            Ok(None)
+        );
+        assert_eq!(public_transport.commands, [TpmCc::NvReadPublic.value()]);
+
+        for response_code in [0x0000_0148, 0x0000_0149, 0x0000_014a, 0x0000_098e] {
+            let mut read_transport = fake_transport(vec![1, 2, 3, 4]);
+            read_transport.read_error_codes = VecDeque::from([Some(response_code)]);
+            assert_eq!(
+                read_nv_certificate(&mut read_transport, INDEX, Some(512)),
+                Ok(None),
+                "response code {response_code:#010x}"
+            );
+            assert_eq!(
+                read_transport.commands,
+                [TpmCc::NvReadPublic.value(), TpmCc::NvRead.value()]
+            );
+        }
+    }
+
+    #[test]
+    fn test_unreadable_ecc_certificate_falls_back_to_rsa() {
+        let certificate = vec![1, 2, 3, 4];
+        let mut transport = fake_transport(certificate.clone());
+        transport.read_error_codes = VecDeque::from([Some(0x0000_014a), None]);
+
+        let (profile, certificates) =
+            select_profile(&mut transport, Some(512), Vec::new).expect("select RSA EK");
+
+        assert!(matches!(profile, Profile::Rsa2048));
+        assert_eq!(certificates, [certificate]);
+        assert_eq!(
+            transport.indexes,
+            [
+                ECC_EK_CERTIFICATE_INDEX,
+                ECC_EK_CERTIFICATE_INDEX,
+                RSA_EK_CERTIFICATE_INDEX,
+                RSA_EK_CERTIFICATE_INDEX
+            ]
+        );
+    }
+
+    #[test]
+    fn test_unreadable_ek_certificates_fall_back_to_empty_ecc_chain() {
+        let mut transport = fake_transport(vec![1, 2, 3, 4]);
+        transport.public_error_codes = VecDeque::from([Some(0x0000_018b), Some(0x0000_018b)]);
+
+        let (profile, certificates) =
+            select_profile(&mut transport, Some(512), Vec::new).expect("select empty ECC EK");
+
+        assert!(matches!(profile, Profile::EccP256));
+        assert!(certificates.is_empty());
+        assert_eq!(
+            transport.indexes,
+            [ECC_EK_CERTIFICATE_INDEX, RSA_EK_CERTIFICATE_INDEX]
+        );
+    }
+
+    #[test]
+    fn test_nv_certificate_propagates_temporary_and_transport_errors() {
+        let mut temporary_tpm_error = fake_transport(vec![1, 2, 3, 4]);
+        temporary_tpm_error.public_error_codes = VecDeque::from([Some(0x0000_0922)]);
+        assert_eq!(
+            read_nv_certificate(&mut temporary_tpm_error, INDEX, Some(512)),
+            Err(DeviceIdentityError::TemporarilyUnavailable)
+        );
+
+        let mut general_tpm_error = fake_transport(vec![1, 2, 3, 4]);
+        general_tpm_error.read_error_codes = VecDeque::from([Some(0x0000_0101)]);
+        assert_eq!(
+            read_nv_certificate(&mut general_tpm_error, INDEX, Some(512)),
+            Err(DeviceIdentityError::BackendFailure)
+        );
+
+        let mut public_auth_error = fake_transport(vec![1, 2, 3, 4]);
+        public_auth_error.public_error_codes = VecDeque::from([Some(0x0000_098e)]);
+        assert_eq!(
+            read_nv_certificate(&mut public_auth_error, INDEX, Some(512)),
+            Err(DeviceIdentityError::PermissionDenied)
+        );
+
+        let mut transport_error = fake_transport(vec![1, 2, 3, 4]);
+        transport_error.transport_error = Some(DeviceIdentityError::BackendFailure);
+        assert_eq!(
+            read_nv_certificate(&mut transport_error, INDEX, Some(512)),
+            Err(DeviceIdentityError::BackendFailure)
+        );
     }
 }
 #[cfg(test)]
@@ -547,5 +727,31 @@ mod cache_tests {
         for profile in [Profile::EccP256, Profile::Rsa2048] {
             assert!(find_profile_certificates(&certificates, profile).is_empty());
         }
+    }
+}
+
+#[cfg(test)]
+mod template_tests {
+    use super::*;
+
+    #[test]
+    fn test_decode_stored_template_accepts_default_ek_templates() {
+        for profile in [Profile::EccP256, Profile::Rsa2048] {
+            let template = ek_template(profile).expect("build default EK template");
+            let bytes = super::super::marshal(&template).expect("marshal default EK template");
+            assert!(decode_stored_template(&bytes).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_decode_stored_template_rejects_changed_template() {
+        let mut template = ek_template(Profile::EccP256).expect("build default ECC EK template");
+        template.name_alg = TpmAlgId::Null;
+        let bytes = super::super::marshal(&template).expect("marshal changed EK template");
+
+        assert_eq!(
+            decode_stored_template(&bytes).map(|_| ()),
+            Err(DeviceIdentityError::IdentityLost)
+        );
     }
 }

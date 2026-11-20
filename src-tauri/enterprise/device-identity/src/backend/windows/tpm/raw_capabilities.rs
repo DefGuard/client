@@ -14,6 +14,8 @@ use crate::{
 
 const CAPABILITY_PAGE_SIZE: u32 = 64;
 const MAX_CAPABILITY_PAGES: usize = 64;
+const TPM_PT_GROUP: u32 = 0x100;
+const TPMA_CC_V: u32 = 1 << 29;
 const OWNER_AUTH_SET: u32 = 1 << 0;
 const ENDORSEMENT_AUTH_SET: u32 = 1 << 1;
 
@@ -114,8 +116,10 @@ fn read_pages<T>(
     mut property: u32,
     mut parse_item: impl for<'a> FnMut(&mut Reader<'a>) -> Result<T, DeviceIdentityError>,
     item_property: impl Fn(&T) -> u32,
+    item_group_size: Option<u32>,
 ) -> Result<Vec<T>, DeviceIdentityError> {
     let mut entries = Vec::new();
+    let start = property;
     for _ in 0..MAX_CAPABILITY_PAGES {
         let page = read_page(transport, capability, property, &mut parse_item)?;
         let mut previous = None;
@@ -126,14 +130,24 @@ fn read_pages<T>(
             }
             previous = Some(current);
         }
-        entries.extend(page.entries);
-        if !page.more_data {
+        let crossed_group = item_group_size.is_some_and(|size| {
+            page.entries
+                .iter()
+                .any(|entry| item_property(entry) / size != property / size)
+        });
+        entries.extend(page.entries.into_iter().filter(|entry| {
+            item_group_size.map_or(true, |size| item_property(entry) / size == property / size)
+        }));
+        if crossed_group || !page.more_data {
             return Ok(entries);
         }
         let last_property = previous.ok_or(DeviceIdentityError::BackendFailure)?;
         property = last_property
             .checked_add(1)
             .ok_or(DeviceIdentityError::BackendFailure)?;
+        if item_group_size.is_some_and(|size| property / size != start / size) {
+            return Ok(entries);
+        }
     }
     Err(DeviceIdentityError::BackendFailure)
 }
@@ -183,6 +197,7 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
             })
         },
         |algorithm| u32::from(algorithm.id.0),
+        None,
     )?;
     let ecc_curves = read_pages(
         transport,
@@ -190,6 +205,7 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
         0,
         |reader| Ok(EccCurveId(reader.u16()?)),
         |curve| u32::from(curve.0),
+        None,
     )?;
     let fixed_properties = read_pages(
         transport,
@@ -202,6 +218,7 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
             })
         },
         |property| property.id,
+        Some(TPM_PT_GROUP),
     )?;
     let variable_properties = read_pages(
         transport,
@@ -214,6 +231,7 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
             })
         },
         |property| property.id,
+        Some(TPM_PT_GROUP),
     )?;
     let commands = read_pages(
         transport,
@@ -224,7 +242,8 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
                 attributes: reader.u32()?,
             })
         },
-        |command| command.attributes & 0x0000_FFFF,
+        |command| command.attributes & (TPMA_CC_V | 0x0000_FFFF),
+        None,
     )?;
     let pcr_banks = read_pages(
         transport,
@@ -242,6 +261,7 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
             })
         },
         |bank| u32::from(bank.hash_algorithm.0),
+        None,
     )?;
 
     let has_algorithm = |id| algorithms.iter().any(|algorithm| algorithm.id.0 == id);
@@ -314,10 +334,17 @@ mod tests {
 
     struct FakeTransport {
         responses: VecDeque<Vec<u8>>,
+        requested_properties: Vec<u32>,
     }
 
     impl Transport for FakeTransport {
-        fn submit(&mut self, _command: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
+        fn submit(&mut self, command: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
+            let property = command
+                .get(14..18)
+                .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
+                .map(u32::from_be_bytes)
+                .ok_or(DeviceIdentityError::BackendFailure)?;
+            self.requested_properties.push(property);
             self.responses
                 .pop_front()
                 .ok_or(DeviceIdentityError::BackendFailure)
@@ -379,6 +406,7 @@ mod tests {
                 response_with_payload(false, TpmCap::Commands, 0, &[]),
                 response_with_payload(false, TpmCap::Pcrs, 0, &[]),
             ]),
+            requested_properties: Vec::new(),
         };
 
         let capabilities = read(&mut transport).expect("complete capability inventory");
@@ -416,6 +444,7 @@ mod tests {
                 response(true, TpmCap::Algs, &[[0x00, 0x01, 0, 0, 0, 1]]),
                 response(false, TpmCap::Algs, &[[0xff, 0xff, 0xde, 0xad, 0xbe, 0xef]]),
             ]),
+            requested_properties: Vec::new(),
         };
 
         let algorithms = read_pages(
@@ -429,6 +458,7 @@ mod tests {
                 })
             },
             |algorithm| u32::from(algorithm.id.0),
+            None,
         )
         .expect("valid capability pages");
 
@@ -436,6 +466,124 @@ mod tests {
         assert_eq!(algorithms[0].flags, 1);
         assert_eq!(algorithms[1].id, AlgorithmId(0xffff));
         assert_eq!(algorithms[1].flags, 0xdead_beef);
+    }
+
+    #[test]
+    fn test_read_pages_keeps_vendor_bit_in_command_paging_key() {
+        let standard_commands: Vec<_> = (1_u32..=CAPABILITY_PAGE_SIZE)
+            .flat_map(|command| command.to_be_bytes())
+            .collect();
+        let vendor_command_1 = (TPMA_CC_V | 1).to_be_bytes();
+        let vendor_command_2 = (TPMA_CC_V | 2).to_be_bytes();
+        let mut transport = FakeTransport {
+            responses: VecDeque::from([
+                response(false, TpmCap::Algs, &[]),
+                response_with_payload(false, TpmCap::EccCurves, 0, &[]),
+                response_with_payload(false, TpmCap::TpmProperties, 0, &[]),
+                response_with_payload(false, TpmCap::TpmProperties, 0, &[]),
+                response_with_payload(
+                    true,
+                    TpmCap::Commands,
+                    CAPABILITY_PAGE_SIZE,
+                    &standard_commands,
+                ),
+                response_with_payload(true, TpmCap::Commands, 1, &vendor_command_1),
+                response_with_payload(false, TpmCap::Commands, 1, &vendor_command_2),
+                response_with_payload(false, TpmCap::Pcrs, 0, &[]),
+            ]),
+            requested_properties: Vec::new(),
+        };
+
+        let capabilities = read(&mut transport).expect("page standard and vendor commands");
+        let PlatformCapabilities::Tpm(details) = capabilities.details else {
+            panic!("TPM details expected");
+        };
+        let commands = details.commands;
+
+        assert_eq!(commands.len(), 66);
+        assert_eq!(commands[64].attributes, TPMA_CC_V | 1);
+        assert_eq!(commands[65].attributes, TPMA_CC_V | 2);
+        assert_eq!(
+            transport.requested_properties,
+            [0, 0, 0x100, 0x200, 0, 65, TPMA_CC_V | 2, 0]
+        );
+    }
+
+    #[test]
+    fn test_read_pages_filters_properties_from_another_group() {
+        let mut transport = FakeTransport {
+            responses: VecDeque::from([response_with_payload(
+                true,
+                TpmCap::TpmProperties,
+                2,
+                &[
+                    0x00, 0x00, 0x01, 0xff, 0, 0, 0, 1, 0x00, 0x00, 0x02, 0x00, 0, 0, 0, 2,
+                ],
+            )]),
+            requested_properties: Vec::new(),
+        };
+
+        let properties = read_pages(
+            &mut transport,
+            TpmCap::TpmProperties,
+            TpmPt::FamilyIndicator.value(),
+            |reader| {
+                Ok(TpmProperty {
+                    id: reader.u32()?,
+                    value: reader.u32()?,
+                })
+            },
+            |property| property.id,
+            Some(TPM_PT_GROUP),
+        )
+        .expect("fixed property page");
+
+        assert_eq!(
+            properties
+                .iter()
+                .map(|property| property.id)
+                .collect::<Vec<_>>(),
+            [0x1ff]
+        );
+        assert_eq!(
+            transport.requested_properties,
+            [TpmPt::FamilyIndicator.value()]
+        );
+        assert!(transport.responses.is_empty());
+    }
+
+    #[test]
+    fn test_read_pages_stops_when_next_property_leaves_group() {
+        let mut transport = FakeTransport {
+            responses: VecDeque::from([response_with_payload(
+                true,
+                TpmCap::TpmProperties,
+                1,
+                &[0x00, 0x00, 0x01, 0xff, 0, 0, 0, 1],
+            )]),
+            requested_properties: Vec::new(),
+        };
+        let properties = read_pages(
+            &mut transport,
+            TpmCap::TpmProperties,
+            TpmPt::FamilyIndicator.value(),
+            |reader| {
+                Ok(TpmProperty {
+                    id: reader.u32()?,
+                    value: reader.u32()?,
+                })
+            },
+            |property| property.id,
+            Some(TPM_PT_GROUP),
+        )
+        .expect("stop at group boundary");
+
+        assert_eq!(properties.len(), 1);
+        assert_eq!(properties[0].id, 0x1ff);
+        assert_eq!(
+            transport.requested_properties,
+            [TpmPt::FamilyIndicator.value()]
+        );
     }
 
     #[test]
@@ -449,6 +597,7 @@ mod tests {
         ] {
             let mut transport = FakeTransport {
                 responses: VecDeque::from(pages),
+                requested_properties: Vec::new(),
             };
             let result = read_pages(
                 &mut transport,
@@ -461,6 +610,7 @@ mod tests {
                     })
                 },
                 |algorithm| u32::from(algorithm.id.0),
+                None,
             );
             assert_eq!(result, Err(DeviceIdentityError::BackendFailure));
         }
