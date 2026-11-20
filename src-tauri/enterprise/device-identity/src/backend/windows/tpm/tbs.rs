@@ -1,4 +1,5 @@
 use core::{ffi::c_void, ptr::null_mut};
+
 use tracing::debug;
 use windows_sys::Win32::{
     Foundation::{
@@ -136,8 +137,9 @@ fn map_tbs_error(status: u32) -> DeviceIdentityError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tpm2_protocol::{data::TpmCc, TpmResult, TpmUnmarshal};
+
+    use super::*;
 
     struct ResponseBody(Vec<u8>);
 

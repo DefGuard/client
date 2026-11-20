@@ -33,17 +33,17 @@ pub(super) fn attest(
     let srk_template = super::keys::decode_public(&identity.srk_template)?;
     let ek_template = super::keys::decode_public(&identity.ek.template)?;
     let mut transport = super::tbs::TbsTransport::open()?;
-    let capabilities = super::capabilities::read(&mut transport)?;
-    super::capabilities::check_hierarchy_auth(&capabilities)?;
+    let capabilities = super::raw_capabilities::read(&mut transport)?;
+    super::raw_capabilities::check_hierarchy_auth(&capabilities)?;
 
-    let (activation_secret, evidence) = super::with_primary_with_mapper(
+    let (activation_secret, evidence) = super::with_primary(
         &mut transport,
         TpmRh::Owner,
         srk_template,
         super::map_identity_rc,
         |transport, srk| {
             super::keys::with_loaded_key(transport, srk, &identity.ak, |transport, ak| {
-                let activation_secret = super::with_primary_with_mapper(
+                let activation_secret = super::with_primary(
                     transport,
                     TpmRh::Endorsement,
                     ek_template,
@@ -103,6 +103,7 @@ fn activate_credential(
         transport,
         &command,
         &[],
+        super::map_tpm_rc,
         |transport, policy_session, _| {
             let command = TpmPolicySecretCommand {
                 handles: [TpmHandle::from(TpmRh::Endorsement.value()), policy_session],

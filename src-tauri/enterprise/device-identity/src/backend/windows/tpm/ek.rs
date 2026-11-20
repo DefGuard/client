@@ -1,7 +1,5 @@
 use std::{mem::size_of, ptr::null_mut, slice};
-use tracing::debug;
 
-use crate::{DeviceIdentityError, TpmEndorsementKey};
 use picky_asn1::{bit_string::BitString, wrapper::IntegerAsn1};
 use picky_asn1_x509::{
     oids, AlgorithmIdentifierParameters, Certificate, EcParameters, PublicKey, SubjectPublicKeyInfo,
@@ -20,6 +18,7 @@ use tpm2_protocol::{
     },
     TpmUnmarshal,
 };
+use tracing::debug;
 use windows_sys::Win32::{
     Foundation::{GetLastError, SetLastError, CRYPT_E_NOT_FOUND, NTE_NOT_FOUND},
     Security::Cryptography::{
@@ -28,6 +27,8 @@ use windows_sys::Win32::{
         MS_PLATFORM_CRYPTO_PROVIDER, NCRYPT_PCP_EKCERT_PROPERTY, NCRYPT_PROV_HANDLE,
     },
 };
+
+use crate::{DeviceIdentityError, TpmEndorsementKey};
 
 const ECC_EK_CERTIFICATE_INDEX: u32 = 0x01c0_000a;
 const RSA_EK_CERTIFICATE_INDEX: u32 = 0x01c0_0002;
@@ -62,6 +63,7 @@ pub(super) fn read(
         transport,
         TpmRh::Endorsement,
         template,
+        super::map_tpm_rc,
         |transport, handle| {
             let command = TpmReadPublicCommand { handles: [handle] };
             let response: TpmReadPublicResponse = super::send_frame(transport, &command)?;

@@ -1,10 +1,3 @@
-use super::{
-    map_identity_rc, marshal, password_auth, with_primary, with_transient_response_with_mapper,
-    Transport,
-};
-#[cfg(test)]
-use crate::TpmIdentity;
-use crate::{DeviceIdentityError, TpmKeyBlobs};
 use tpm2_protocol::{
     basic::{TpmHandle, TpmUint16},
     data::{
@@ -17,6 +10,11 @@ use tpm2_protocol::{
     frame::{TpmCreateCommand, TpmCreateResponse, TpmLoadCommand, TpmLoadResponse},
     TpmUnmarshal,
 };
+
+use super::{
+    map_identity_rc, marshal, password_auth, with_primary, with_transient_response, Transport,
+};
+use crate::{DeviceIdentityError, TpmKeyBlobs};
 
 fn aes_128_cfb() -> TpmtSymDefObject {
     TpmtSymDef {
@@ -86,18 +84,31 @@ fn signing_template(restricted: bool) -> TpmtPublic {
     }
 }
 
-pub(super) fn create(
-    transport: &mut impl Transport,
-) -> Result<(Vec<u8>, TpmKeyBlobs, TpmKeyBlobs), DeviceIdentityError> {
+pub(super) struct CreatedKeys {
+    pub(super) srk_template: Vec<u8>,
+    pub(super) ak: TpmKeyBlobs,
+    pub(super) identity_key: TpmKeyBlobs,
+}
+
+pub(super) fn create(transport: &mut impl Transport) -> Result<CreatedKeys, DeviceIdentityError> {
     let template = storage_template();
     let srk_template = marshal(&template)?;
-    let (ak, identity_key) =
-        with_primary(transport, TpmRh::Owner, template, |transport, parent| {
+    let (ak, identity_key) = with_primary(
+        transport,
+        TpmRh::Owner,
+        template,
+        super::map_tpm_rc,
+        |transport, parent| {
             let ak = create_signing_key(transport, parent, true)?;
             let identity_key = create_signing_key(transport, parent, false)?;
             Ok((ak, identity_key))
-        })?;
-    Ok((srk_template, ak, identity_key))
+        },
+    )?;
+    Ok(CreatedKeys {
+        srk_template,
+        ak,
+        identity_key,
+    })
 }
 
 fn create_signing_key(
@@ -126,14 +137,20 @@ fn create_signing_key(
 #[cfg(test)]
 pub(super) fn reload(
     transport: &mut impl Transport,
-    identity: &TpmIdentity,
+    identity: &crate::TpmIdentity,
 ) -> Result<(), DeviceIdentityError> {
     let template = decode_public(&identity.srk_template)?;
-    with_primary(transport, TpmRh::Owner, template, |transport, parent| {
-        with_loaded_key(transport, parent, &identity.ak, |transport, _| {
-            with_loaded_key(transport, parent, &identity.identity_key, |_, _| Ok(()))
-        })
-    })
+    with_primary(
+        transport,
+        TpmRh::Owner,
+        template,
+        super::map_tpm_rc,
+        |transport, parent| {
+            with_loaded_key(transport, parent, &identity.ak, |transport, _| {
+                with_loaded_key(transport, parent, &identity.identity_key, |_, _| Ok(()))
+            })
+        },
+    )
 }
 
 pub(super) fn with_loaded_key<T: Transport, R>(
@@ -150,7 +167,7 @@ pub(super) fn with_loaded_key<T: Transport, R>(
         in_private: private,
         in_public: Tpm2bPublic { inner: public },
     };
-    with_transient_response_with_mapper::<T, _, TpmLoadResponse, _>(
+    with_transient_response::<T, _, TpmLoadResponse, _>(
         transport,
         &command,
         &[password_auth()],

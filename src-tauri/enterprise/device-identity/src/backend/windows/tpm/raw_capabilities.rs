@@ -1,14 +1,15 @@
-use super::{marshal, send, Transport};
-use crate::{
-    AlgorithmCapability, AlgorithmId, AttestationMethod, BackendKind, Capabilities,
-    CommandCapability, DeviceIdentityError, EccCurveId, PcrBankCapability, PlatformCapabilities,
-    ProfileId, ProfileSupport, SupportStatus, TpmCapabilities, TpmProperty,
-};
 use tpm2_protocol::{
     basic::{TpmUint16, TpmUint32, TpmUint8},
     constant::TPM_PCR_SELECT_MAX,
     data::{TpmAlgId, TpmCap, TpmCc, TpmEccCurve, TpmPt, TpmiYesNo},
     TpmMarshal, TpmResult, TpmSized, TpmUnmarshal, TpmWriter,
+};
+
+use super::{marshal, send, Transport};
+use crate::{
+    AlgorithmCapability, AlgorithmId, AttestationMethod, BackendKind, Capabilities,
+    CommandCapability, DeviceIdentityError, EccCurveId, PcrBankCapability, PlatformCapabilities,
+    ProfileId, ProfileSupport, SupportStatus, TpmCapabilities, TpmProperty,
 };
 
 const CAPABILITY_PAGE_SIZE: u32 = 64;

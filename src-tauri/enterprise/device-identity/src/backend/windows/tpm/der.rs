@@ -27,8 +27,9 @@ pub(super) fn encode_signature(signature: TpmtSignature) -> Result<Signature, De
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tpm2_protocol::data::{Tpm2bEccParameter, TpmsSignatureEcc};
+
+    use super::*;
 
     #[test]
     fn test_ecdsa_signature_der_handles_high_bit_and_leading_zero() {

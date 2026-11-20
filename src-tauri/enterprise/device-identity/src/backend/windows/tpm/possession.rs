@@ -5,8 +5,7 @@ use tpm2_protocol::{
 };
 
 use super::{
-    der::encode_signature, keys, map_identity_rc, send_authenticated, with_primary_with_mapper,
-    Transport,
+    der::encode_signature, keys, map_identity_rc, send_authenticated, with_primary, Transport,
 };
 use crate::{DeviceIdentityError, PossessionProof, TpmKeyBlobs};
 
@@ -21,7 +20,7 @@ pub(super) fn prove(
     let digest =
         Tpm2bDigest::try_from(&digest[..]).map_err(|_| DeviceIdentityError::BackendFailure)?;
 
-    with_primary_with_mapper(
+    with_primary(
         transport,
         TpmRh::Owner,
         template,
