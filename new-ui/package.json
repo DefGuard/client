@@ -19,9 +19,9 @@
     "@stablelib/base64": "^2.0.2",
     "@stablelib/x25519": "^2.0.1",
     "@tanstack/react-form": "^1.33.5",
-    "@tanstack/react-query": "^5.107.1",
+    "@tanstack/react-query": "^5.108.0",
     "@tanstack/react-router": "^1.170.46",
-    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/api": "^2.12.5",
     "@tauri-apps/plugin-clipboard-manager": "^2.5.0",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-fs": "^2.7.1",
@@ -70,6 +70,6 @@
     "stylelint-scss": "^7.5.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.8",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }

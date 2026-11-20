@@ -1185,6 +1185,18 @@ pub async fn update_location_routing(
             handle
                 .emit(EventKey::LocationUpdate.into(), ())
                 .map_err(tauri_err_to_app_err)?;
+            // System Settings connects use the stored profile as-is.
+            #[cfg(target_os = "macos")]
+            if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
+                let mtu = handle.state::<AppState>().mtu();
+                let saved = location
+                    .tunnel_configuration(None, mtu, None)
+                    .await
+                    .and_then(|config| config.save());
+                if let Err(err) = saved {
+                    warn!("Failed to update system VPN profile for {name}: {err}");
+                }
+            }
             Ok(())
         }
         ConnectionType::Tunnel => {
@@ -1195,6 +1207,16 @@ pub async fn update_location_routing(
                 handle
                     .emit(EventKey::LocationUpdate.into(), ())
                     .map_err(tauri_err_to_app_err)?;
+                #[cfg(target_os = "macos")]
+                {
+                    let mtu = handle.state::<AppState>().mtu();
+                    let saved = tunnel
+                        .tunnel_configuration(mtu, None)
+                        .and_then(|config| config.save());
+                    if let Err(err) = saved {
+                        warn!("Failed to update system VPN profile for {name}: {err}");
+                    }
+                }
                 Ok(())
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
