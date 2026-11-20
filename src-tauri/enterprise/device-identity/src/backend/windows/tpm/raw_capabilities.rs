@@ -136,7 +136,7 @@ fn read_pages<T>(
                 .any(|entry| item_property(entry) / size != property / size)
         });
         entries.extend(page.entries.into_iter().filter(|entry| {
-            item_group_size.map_or(true, |size| item_property(entry) / size == property / size)
+            item_group_size.is_none_or(|size| item_property(entry) / size == property / size)
         }));
         if crossed_group || !page.more_data {
             return Ok(entries);

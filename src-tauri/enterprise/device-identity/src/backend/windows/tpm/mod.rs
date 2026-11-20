@@ -146,7 +146,7 @@ fn submit_frame<C: TpmFrame>(
     sessions: &[TpmsAuthCommand],
 ) -> Result<Vec<u8>, DeviceIdentityError> {
     let tag = session_tag(sessions);
-    let mut command_buffer = vec![0; TPM_MAX_COMMAND_SIZE as usize];
+    let mut command_buffer = vec![0; TPM_MAX_COMMAND_SIZE];
     let command_len = {
         let mut writer = TpmWriter::new(&mut command_buffer);
         tpm_marshal_command(command, tag, sessions, &mut writer)
@@ -166,11 +166,11 @@ fn decode_frame_with_mapper<R: TpmUnmarshalBody>(
         .map_err(|_| DeviceIdentityError::BackendFailure)
 }
 
-fn checked_response<'a>(
-    bytes: &'a [u8],
+fn checked_response(
+    bytes: &[u8],
     expected_tag: TpmSt,
     map_response_code: fn(TpmRc) -> DeviceIdentityError,
-) -> Result<&'a TpmResponse, DeviceIdentityError> {
+) -> Result<&TpmResponse, DeviceIdentityError> {
     let response = TpmResponse::cast(bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
     let response_code = response
         .rc()
@@ -261,16 +261,18 @@ pub(super) fn with_primary<T: Transport, R>(
     )
 }
 
-pub(super) fn with_transient_response<T: Transport, C: TpmFrame, R: TpmUnmarshalBody, O>(
+pub(super) fn with_transient_response<
+    T: Transport,
+    C: TpmFrame,
+    R: TpmUnmarshalBody + TpmHeader,
+    O,
+>(
     transport: &mut T,
     command: &C,
     sessions: &[TpmsAuthCommand],
     map_response_code: fn(TpmRc) -> DeviceIdentityError,
     operation: impl FnOnce(&mut T, TpmHandle, R) -> Result<O, DeviceIdentityError>,
-) -> Result<O, DeviceIdentityError>
-where
-    R: TpmHeader,
-{
+) -> Result<O, DeviceIdentityError> {
     if R::HANDLES != 1 {
         return Err(DeviceIdentityError::BackendFailure);
     }
