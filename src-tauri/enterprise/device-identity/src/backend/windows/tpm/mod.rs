@@ -11,10 +11,7 @@ use tpm2_protocol::{
 };
 use tracing::warn;
 
-use crate::{
-    AttestationResponse, Capabilities, CredentialChallenge, DeviceIdentityError, PossessionProof,
-    TpmIdentity, TpmKeyBlobs,
-};
+use crate::{Capabilities, DeviceIdentityError, PossessionProof, TpmIdentity, TpmKeyBlobs};
 
 mod attestation;
 mod certify;
@@ -25,8 +22,10 @@ mod possession;
 mod raw_capabilities;
 mod tbs;
 
+pub(super) use attestation::attest as attest_identity;
+
 const TPM_HEADER_SIZE: usize = 10;
-const TPM_RESPONSE_CODE_OFFSET: usize = 6;
+const TPM_HEADER_CODE_OFFSET: usize = 6;
 
 pub(super) fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
     let mut transport = tbs::TbsTransport::open()?;
@@ -50,14 +49,6 @@ pub(super) fn create_identity() -> Result<TpmIdentity, DeviceIdentityError> {
         ak,
         identity_key,
     })
-}
-
-pub(super) fn attest_identity(
-    identity: TpmIdentity,
-    data: Vec<u8>,
-    challenge: CredentialChallenge,
-) -> Result<AttestationResponse, DeviceIdentityError> {
-    attestation::attest(identity, data, challenge)
 }
 
 pub(super) struct PossessionKey {
@@ -285,7 +276,7 @@ where
     }
     let bytes = submit_frame(transport, command, sessions)?;
     let response_code_bytes = bytes
-        .get(TPM_RESPONSE_CODE_OFFSET..TPM_HEADER_SIZE)
+        .get(TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE)
         .ok_or(DeviceIdentityError::BackendFailure)?;
     if response_code_bytes != [0; 4] {
         let response =
@@ -357,6 +348,7 @@ fn receive<T: TpmUnmarshal>(bytes: &[u8]) -> Result<T, DeviceIdentityError> {
     Ok(value)
 }
 
+// TPM rejection of stored identity material or its binding means the identity is no longer usable.
 pub(super) fn map_identity_rc(response_code: TpmRc) -> DeviceIdentityError {
     match response_code {
         TpmRc::Fmt1(code)
@@ -377,6 +369,7 @@ pub(super) fn map_identity_rc(response_code: TpmRc) -> DeviceIdentityError {
     }
 }
 
+// These integrity and parameter errors indicate malformed or incompatible challenge material.
 pub(super) fn map_activation_rc(response_code: TpmRc) -> DeviceIdentityError {
     match response_code {
         TpmRc::Fmt1(code)

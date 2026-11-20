@@ -5,10 +5,11 @@ use tpm2_protocol::{
     frame::{TpmCertifyCommand, TpmCertifyResponse},
 };
 
+use super::{der, map_tpm_rc, marshal, password_auth, send_with_sessions_and_mapper, Transport};
 use crate::{DeviceIdentityError, TpmEvidence, TpmIdentity};
 
 pub(super) fn certify(
-    transport: &mut impl super::Transport,
+    transport: &mut impl Transport,
     identity_key: TpmHandle,
     ak: TpmHandle,
     identity: &TpmIdentity,
@@ -22,16 +23,16 @@ pub(super) fn certify(
         qualifying_data,
         in_scheme: TpmtSigScheme::default(),
     };
-    let sessions = [super::password_auth(), super::password_auth()];
+    let sessions = [password_auth(), password_auth()];
     let response: TpmCertifyResponse =
-        super::send_with_sessions_and_mapper(transport, &command, &sessions, super::map_tpm_rc)?;
+        send_with_sessions_and_mapper(transport, &command, &sessions, map_tpm_rc)?;
 
     Ok(TpmEvidence {
         ek_public: identity.ek.public.clone(),
         ek_certificate_chain_der: identity.ek.certificate_chain_der.clone(),
         ak_public: identity.ak.public.clone(),
         identity_public: identity.identity_key.public.clone(),
-        attest: super::marshal(&response.certify_info.inner)?,
-        signature: super::der::encode_signature(response.signature)?,
+        attest: marshal(&response.certify_info.inner)?,
+        signature: der::encode_signature(response.signature)?,
     })
 }

@@ -13,7 +13,7 @@ use windows_sys::Win32::{
     },
 };
 
-use super::{Transport, TPM_HEADER_SIZE};
+use super::{Transport, TPM_HEADER_CODE_OFFSET, TPM_HEADER_SIZE};
 use crate::DeviceIdentityError;
 
 const TPM_RESPONSE_BUFFER_SIZE: usize = 8192;
@@ -69,7 +69,7 @@ impl Transport for TbsTransport {
             )
         };
         let command_code = command
-            .get(6..10)
+            .get(TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE)
             .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
             .map(u32::from_be_bytes);
         if status != TBS_SUCCESS {
@@ -90,7 +90,7 @@ impl Transport for TbsTransport {
 
         // TBS can report command blocking in the response while returning TBS_SUCCESS.
         let response_code = u32::from_be_bytes(
-            response[6..TPM_HEADER_SIZE]
+            response[TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE]
                 .try_into()
                 .map_err(|_| DeviceIdentityError::BackendFailure)?,
         );
@@ -139,6 +139,7 @@ fn map_tbs_error(status: u32) -> DeviceIdentityError {
 mod tests {
     use tpm2_protocol::{data::TpmCc, TpmResult, TpmUnmarshal};
 
+    use super::super::send;
     use super::*;
 
     struct ResponseBody(Vec<u8>);
@@ -158,9 +159,8 @@ mod tests {
             0, 0, 0, 0, // first algorithm
             0, 0, 0, 1, // one result
         ];
-        let response: ResponseBody =
-            super::super::send(&mut transport, TpmCc::GetCapability, &parameters)
-                .expect("submit GetCapability through TBS");
+        let response: ResponseBody = send(&mut transport, TpmCc::GetCapability, &parameters)
+            .expect("submit GetCapability through TBS");
 
         assert!(response.0.len() >= 9);
         assert!(response.0[0] <= 1);

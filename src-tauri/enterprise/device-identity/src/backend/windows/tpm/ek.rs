@@ -9,8 +9,7 @@ use tpm2_protocol::{
     data::{
         Tpm2bDigest, Tpm2bEccParameter, Tpm2bPublicKeyRsa, TpmAlgId, TpmEccCurve, TpmPt, TpmRc,
         TpmRcBase, TpmRh, TpmaObject, TpmsEccParms, TpmsEccPoint, TpmsRsaParms, TpmtEccScheme,
-        TpmtKdfScheme, TpmtPublic, TpmtRsaScheme, TpmtSymDefObject, TpmuAsymScheme, TpmuPublicId,
-        TpmuPublicParms, TpmuSymKeyBits, TpmuSymMode,
+        TpmtKdfScheme, TpmtPublic, TpmtRsaScheme, TpmuAsymScheme, TpmuPublicId, TpmuPublicParms,
     },
     frame::{
         TpmNvReadCommand, TpmNvReadPublicCommand, TpmNvReadPublicResponse, TpmNvReadResponse,
@@ -28,12 +27,17 @@ use windows_sys::Win32::{
     },
 };
 
+use super::{
+    keys, map_tpm_rc, marshal, password_auth, send_frame, send_with_sessions_and_tpm_error,
+    with_primary, Transport,
+};
 use crate::{DeviceIdentityError, TpmEndorsementKey};
 
 const ECC_EK_CERTIFICATE_INDEX: u32 = 0x01c0_000a;
 const RSA_EK_CERTIFICATE_INDEX: u32 = 0x01c0_0002;
 const MAX_NV_READ_SIZE: usize = 1024;
 const MIN_NV_BUFFER_MAX: u32 = 256;
+// This is the SHA-256 authorization policy from the TCG default EK template.
 const EK_AUTH_POLICY_SHA256: [u8; 32] = [
     0x83, 0x71, 0x97, 0x67, 0x44, 0x84, 0xb3, 0xf8, 0x1a, 0x90, 0xcc, 0x8d, 0x46, 0xa5, 0xd7, 0x24,
     0xfd, 0x52, 0xd7, 0x6e, 0x06, 0x52, 0x0b, 0x64, 0xf2, 0xa1, 0xda, 0x1b, 0x33, 0x14, 0x69, 0xaa,
@@ -55,7 +59,7 @@ impl Profile {
 }
 
 pub(super) fn read(
-    transport: &mut impl super::Transport,
+    transport: &mut impl Transport,
     nv_buffer_max: Option<u32>,
 ) -> Result<TpmEndorsementKey, DeviceIdentityError> {
     let (profile, certificates) = select_profile(transport, nv_buffer_max, || {
@@ -65,16 +69,16 @@ pub(super) fn read(
         })
     })?;
     let template = ek_template(profile)?;
-    let template_bytes = super::marshal(&template)?;
-    let public_bytes = super::with_primary(
+    let template_bytes = marshal(&template)?;
+    let public_bytes = with_primary(
         transport,
         TpmRh::Endorsement,
         template,
-        super::map_tpm_rc,
+        map_tpm_rc,
         |transport, handle| {
             let command = TpmReadPublicCommand { handles: [handle] };
-            let response: TpmReadPublicResponse = super::send_frame(transport, &command)?;
-            super::marshal(&response.out_public.inner)
+            let response: TpmReadPublicResponse = send_frame(transport, &command)?;
+            marshal(&response.out_public.inner)
         },
     )?;
     let certificate_chain_der = if certificates.is_empty() {
@@ -115,12 +119,13 @@ fn allow_unreadable_nv_error<T>(
         {
             Ok(None)
         }
-        Err(response_code) => Err(super::map_tpm_rc(response_code)),
+        Err(response_code) => Err(map_tpm_rc(response_code)),
     }
 }
 
+// Prefer ECC over RSA, checking TPM NV before cache for each; default to ECC without a certificate.
 fn select_profile(
-    transport: &mut impl super::Transport,
+    transport: &mut impl Transport,
     nv_buffer_max: Option<u32>,
     load_cached_certificates: impl FnOnce() -> Vec<Vec<u8>>,
 ) -> Result<(Profile, Vec<Vec<u8>>), DeviceIdentityError> {
@@ -151,7 +156,7 @@ fn select_profile(
 }
 
 fn read_nv_certificate(
-    transport: &mut impl super::Transport,
+    transport: &mut impl Transport,
     index: u32,
     nv_buffer_max: Option<u32>,
 ) -> Result<Option<Vec<u8>>, DeviceIdentityError> {
@@ -160,7 +165,7 @@ fn read_nv_certificate(
         handles: [index_handle],
     };
     let Some(public): Option<TpmNvReadPublicResponse> = allow_unreadable_nv_error(
-        super::send_with_sessions_and_tpm_error(transport, &public_command, &[]),
+        send_with_sessions_and_tpm_error(transport, &public_command, &[]),
         true,
     )?
     else {
@@ -200,7 +205,7 @@ fn read_nv_certificate(
             ),
         };
         let Some(response): Option<TpmNvReadResponse> = allow_unreadable_nv_error(
-            super::send_with_sessions_and_tpm_error(transport, &command, &[super::password_auth()]),
+            send_with_sessions_and_tpm_error(transport, &command, &[password_auth()]),
             false,
         )?
         else {
@@ -255,19 +260,22 @@ fn certificate_has_profile(der: &[u8], profile: Profile) -> Result<bool, DeviceI
 }
 
 fn read_cached_certificates() -> Result<Vec<Vec<u8>>, DeviceIdentityError> {
-    unsafe {
-        let mut provider = NCRYPT_PROV_HANDLE::default();
-        let status = NCryptOpenStorageProvider(&mut provider, MS_PLATFORM_CRYPTO_PROVIDER, 0);
-        if status == NTE_NOT_FOUND {
-            return Ok(Vec::new());
-        }
-        if status != 0 {
-            return Err(DeviceIdentityError::BackendFailure);
-        }
-        let provider = ProviderHandle(provider);
-        let mut store: HCERTSTORE = null_mut();
-        let mut returned = 0;
-        let status = NCryptGetProperty(
+    let mut provider = NCRYPT_PROV_HANDLE::default();
+    // SAFETY: `provider` is a valid output pointer and the provider name is a static Windows string.
+    let status =
+        unsafe { NCryptOpenStorageProvider(&mut provider, MS_PLATFORM_CRYPTO_PROVIDER, 0) };
+    if status == NTE_NOT_FOUND {
+        return Ok(Vec::new());
+    }
+    if status != 0 {
+        return Err(DeviceIdentityError::BackendFailure);
+    }
+    let provider = ProviderHandle(provider);
+    let mut store: HCERTSTORE = null_mut();
+    let mut returned = 0;
+    // SAFETY: the provider is live and the output pointers refer to local storage of the supplied size.
+    let status = unsafe {
+        NCryptGetProperty(
             provider.0,
             NCRYPT_PCP_EKCERT_PROPERTY,
             (&mut store as *mut HCERTSTORE).cast(),
@@ -275,45 +283,50 @@ fn read_cached_certificates() -> Result<Vec<Vec<u8>>, DeviceIdentityError> {
                 .map_err(|_| DeviceIdentityError::BackendFailure)?,
             &mut returned,
             0,
-        );
-        if status == NTE_NOT_FOUND {
-            return Ok(Vec::new());
-        }
-        if status != 0 || returned as usize != size_of::<HCERTSTORE>() || store.is_null() {
+        )
+    };
+    if status == NTE_NOT_FOUND {
+        return Ok(Vec::new());
+    }
+    if status != 0 || returned as usize != size_of::<HCERTSTORE>() || store.is_null() {
+        return Err(DeviceIdentityError::BackendFailure);
+    }
+    let store = CertificateStore(store);
+    let mut certificates = Vec::new();
+    let mut previous = null_mut();
+    loop {
+        // SAFETY: this resets the current thread's error state and takes no pointers.
+        unsafe { SetLastError(0) };
+        // SAFETY: the store stays open; enumeration consumes the previous live context and returns one valid until the next call.
+        let current = unsafe { CertEnumCertificatesInStore(store.0, previous) };
+        if current.is_null() {
+            // SAFETY: this reads the current thread's error state immediately after enumeration and takes no pointers.
+            if unsafe { GetLastError() } == CRYPT_E_NOT_FOUND as u32 {
+                break;
+            }
             return Err(DeviceIdentityError::BackendFailure);
         }
-        let store = CertificateStore(store);
-        let mut certificates = Vec::new();
-        let mut previous = null_mut();
-        loop {
-            SetLastError(0);
-            let current = CertEnumCertificatesInStore(store.0, previous);
-            if current.is_null() {
-                if GetLastError() == CRYPT_E_NOT_FOUND as u32 {
-                    break;
-                }
-                return Err(DeviceIdentityError::BackendFailure);
-            }
-            previous = current;
-            let context: &CERT_CONTEXT = &*current;
-            let length = context.cbCertEncoded as usize;
-            if length == 0 || context.pbCertEncoded.is_null() {
-                CertFreeCertificateContext(current);
-                return Err(DeviceIdentityError::BackendFailure);
-            }
-            certificates.push(slice::from_raw_parts(context.pbCertEncoded, length).to_vec());
+        previous = current;
+        // SAFETY: `current` is the non-null context returned by enumeration and remains valid until the next call.
+        let context: &CERT_CONTEXT = unsafe { &*current };
+        let length = context.cbCertEncoded as usize;
+        if length == 0 || context.pbCertEncoded.is_null() {
+            // SAFETY: this live context has not yet been freed by a subsequent enumeration call.
+            unsafe { CertFreeCertificateContext(current) };
+            return Err(DeviceIdentityError::BackendFailure);
         }
-        Ok(certificates)
+        // SAFETY: the context owns this non-empty encoded region until the next call; `to_vec` copies it now.
+        certificates.push(unsafe { slice::from_raw_parts(context.pbCertEncoded, length) }.to_vec());
     }
+    Ok(certificates)
 }
 
 struct ProviderHandle(NCRYPT_PROV_HANDLE);
 
 impl Drop for ProviderHandle {
     fn drop(&mut self) {
-        unsafe {
-            NCryptFreeObject(self.0);
-        }
+        // SAFETY: this wrapper exclusively owns the provider returned by NCryptOpenStorageProvider.
+        unsafe { NCryptFreeObject(self.0) };
     }
 }
 
@@ -321,9 +334,8 @@ struct CertificateStore(HCERTSTORE);
 
 impl Drop for CertificateStore {
     fn drop(&mut self) {
-        unsafe {
-            CertCloseStore(self.0, 0);
-        }
+        // SAFETY: this wrapper exclusively owns the open certificate store.
+        unsafe { CertCloseStore(self.0, 0) };
     }
 }
 
@@ -336,11 +348,7 @@ fn ek_template(profile: Profile) -> Result<TpmtPublic, DeviceIdentityError> {
         | TpmaObject::ADMIN_WITH_POLICY
         | TpmaObject::RESTRICTED
         | TpmaObject::DECRYPT;
-    let symmetric = TpmtSymDefObject {
-        algorithm: TpmAlgId::Aes,
-        key_bits: TpmuSymKeyBits::Aes(TpmUint16::from(128)),
-        mode: TpmuSymMode::Aes(TpmAlgId::Cfb),
-    };
+    let symmetric = keys::aes_128_cfb();
     Ok(match profile {
         Profile::EccP256 => {
             let zero_coordinate = Tpm2bEccParameter::try_from([0; 32].as_slice())
@@ -386,10 +394,10 @@ fn ek_template(profile: Profile) -> Result<TpmtPublic, DeviceIdentityError> {
 }
 
 pub(super) fn decode_stored_template(bytes: &[u8]) -> Result<TpmtPublic, DeviceIdentityError> {
-    let template = super::keys::decode_public(bytes)?;
-    let template_bytes = super::marshal(&template)?;
-    let ecc_template = super::marshal(&ek_template(Profile::EccP256)?)?;
-    let rsa_template = super::marshal(&ek_template(Profile::Rsa2048)?)?;
+    let template = keys::decode_public(bytes)?;
+    let template_bytes = marshal(&template)?;
+    let ecc_template = marshal(&ek_template(Profile::EccP256)?)?;
+    let rsa_template = marshal(&ek_template(Profile::Rsa2048)?)?;
     if template_bytes == ecc_template || template_bytes == rsa_template {
         Ok(template)
     } else {
@@ -460,7 +468,7 @@ mod nv_read_tests {
         read_error_codes: VecDeque<Option<u32>>,
         transport_error: Option<DeviceIdentityError>,
     }
-    impl super::super::Transport for FakeTransport {
+    impl Transport for FakeTransport {
         fn submit(&mut self, command: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
             if let Some(error) = self.transport_error.take() {
                 return Err(error);
@@ -722,7 +730,7 @@ mod cache_tests {
     use super::*;
 
     #[test]
-    fn ignores_unparseable_cached_certificates() {
+    fn test_ignores_unparseable_cached_certificates() {
         let certificates = vec![vec![1, 2, 3]];
         for profile in [Profile::EccP256, Profile::Rsa2048] {
             assert!(find_profile_certificates(&certificates, profile).is_empty());
@@ -738,7 +746,7 @@ mod template_tests {
     fn test_decode_stored_template_accepts_default_ek_templates() {
         for profile in [Profile::EccP256, Profile::Rsa2048] {
             let template = ek_template(profile).expect("build default EK template");
-            let bytes = super::super::marshal(&template).expect("marshal default EK template");
+            let bytes = marshal(&template).expect("marshal default EK template");
             assert!(decode_stored_template(&bytes).is_ok());
         }
     }
@@ -747,7 +755,7 @@ mod template_tests {
     fn test_decode_stored_template_rejects_changed_template() {
         let mut template = ek_template(Profile::EccP256).expect("build default ECC EK template");
         template.name_alg = TpmAlgId::Null;
-        let bytes = super::super::marshal(&template).expect("marshal changed EK template");
+        let bytes = marshal(&template).expect("marshal changed EK template");
 
         assert_eq!(
             decode_stored_template(&bytes).map(|_| ()),

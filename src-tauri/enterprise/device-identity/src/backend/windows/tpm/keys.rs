@@ -12,11 +12,12 @@ use tpm2_protocol::{
 };
 
 use super::{
-    map_identity_rc, marshal, password_auth, with_primary, with_transient_response, Transport,
+    map_identity_rc, map_tpm_rc, marshal, password_auth, send_authenticated, with_primary,
+    with_transient_response, Transport,
 };
 use crate::{DeviceIdentityError, TpmKeyBlobs};
 
-fn aes_128_cfb() -> TpmtSymDefObject {
+pub(super) fn aes_128_cfb() -> TpmtSymDefObject {
     TpmtSymDef {
         algorithm: TpmAlgId::Aes,
         key_bits: TpmuSymKeyBits::Aes(TpmUint16::from(128)),
@@ -24,7 +25,7 @@ fn aes_128_cfb() -> TpmtSymDefObject {
     }
 }
 
-fn null_symmetric() -> TpmtSymDef {
+pub(super) fn null_symmetric() -> TpmtSymDef {
     TpmtSymDef {
         algorithm: TpmAlgId::Null,
         key_bits: TpmuSymKeyBits::Null,
@@ -97,7 +98,7 @@ pub(super) fn create(transport: &mut impl Transport) -> Result<CreatedKeys, Devi
         transport,
         TpmRh::Owner,
         template,
-        super::map_tpm_rc,
+        map_tpm_rc,
         |transport, parent| {
             let ak = create_signing_key(transport, parent, true)?;
             let identity_key = create_signing_key(transport, parent, false)?;
@@ -127,7 +128,7 @@ fn create_signing_key(
         outside_info: Tpm2bData::new(),
         creation_pcr: TpmlPcrSelection::default(),
     };
-    let response: TpmCreateResponse = super::send_authenticated(transport, &command)?;
+    let response: TpmCreateResponse = send_authenticated(transport, &command)?;
     Ok(TpmKeyBlobs {
         public: marshal(&response.out_public.inner)?,
         private: response.out_private.as_ref().to_vec(),
@@ -144,7 +145,7 @@ pub(super) fn reload(
         transport,
         TpmRh::Owner,
         template,
-        super::map_tpm_rc,
+        map_tpm_rc,
         |transport, parent| {
             with_loaded_key(transport, parent, &identity.ak, |transport, _| {
                 with_loaded_key(transport, parent, &identity.identity_key, |_, _| Ok(()))

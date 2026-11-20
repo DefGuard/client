@@ -4,7 +4,7 @@ use tpm2_protocol::{
     basic::{TpmHandle, TpmInt32},
     data::{
         Tpm2bAuth, Tpm2bDigest, Tpm2bEncryptedSecret, Tpm2bIdObject, Tpm2bNonce, TpmAlgId, TpmRh,
-        TpmSe, TpmaSession, TpmsAuthCommand, TpmtSymDefObject, TpmuSymKeyBits, TpmuSymMode,
+        TpmSe, TpmaSession, TpmsAuthCommand,
     },
     frame::{
         TpmActivateCredentialCommand, TpmActivateCredentialResponse, TpmPolicySecretCommand,
@@ -16,9 +16,14 @@ use windows_sys::Win32::Security::Cryptography::{
     BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
 };
 
+use super::{
+    certify, ek, keys, map_activation_rc, map_identity_rc, map_tpm_rc, marshal, password_auth,
+    raw_capabilities, send_authenticated, send_frame, send_with_sessions_and_mapper, tbs,
+    with_primary, with_transient_response, Transport,
+};
 use crate::{AttestationResponse, CredentialChallenge, DeviceIdentityError, TpmIdentity};
 
-pub(super) fn attest(
+pub(in super::super) fn attest(
     identity: TpmIdentity,
     data: Vec<u8>,
     challenge: CredentialChallenge,
@@ -30,40 +35,39 @@ pub(super) fn attest(
         .map_err(|_| DeviceIdentityError::InvalidChallenge)?;
     let encrypted_secret = Tpm2bEncryptedSecret::try_from(challenge.encrypted_secret.as_slice())
         .map_err(|_| DeviceIdentityError::InvalidChallenge)?;
-    let srk_template = super::keys::decode_public(&identity.srk_template)?;
-    let ek_template = super::ek::decode_stored_template(&identity.ek.template)?;
-    let mut transport = super::tbs::TbsTransport::open()?;
-    let capabilities = super::raw_capabilities::read(&mut transport)?;
-    super::raw_capabilities::check_hierarchy_auth(&capabilities)?;
+    let srk_template = keys::decode_public(&identity.srk_template)?;
+    let ek_template = ek::decode_stored_template(&identity.ek.template)?;
+    let mut transport = tbs::TbsTransport::open()?;
+    let capabilities = raw_capabilities::read(&mut transport)?;
+    raw_capabilities::check_hierarchy_auth(&capabilities)?;
 
-    let (activation_secret, evidence) = super::with_primary(
+    let (activation_secret, evidence) = with_primary(
         &mut transport,
         TpmRh::Owner,
         srk_template,
-        super::map_identity_rc,
+        map_identity_rc,
         |transport, srk| {
-            super::keys::with_loaded_key(transport, srk, &identity.ak, |transport, ak| {
-                let activation_secret = super::with_primary(
+            keys::with_loaded_key(transport, srk, &identity.ak, |transport, ak| {
+                let activation_secret = with_primary(
                     transport,
                     TpmRh::Endorsement,
                     ek_template,
-                    super::map_identity_rc,
+                    map_identity_rc,
                     |transport, ek| {
                         let command = TpmReadPublicCommand { handles: [ek] };
-                        let response: TpmReadPublicResponse =
-                            super::send_frame(transport, &command)?;
-                        if super::marshal(&response.out_public.inner)? != identity.ek.public {
+                        let response: TpmReadPublicResponse = send_frame(transport, &command)?;
+                        if marshal(&response.out_public.inner)? != identity.ek.public {
                             return Err(DeviceIdentityError::IdentityLost);
                         }
                         activate_credential(transport, ak, ek, credential_blob, encrypted_secret)
                     },
                 )?;
-                let evidence = super::keys::with_loaded_key(
+                let evidence = keys::with_loaded_key(
                     transport,
                     srk,
                     &identity.identity_key,
                     |transport, identity_key| {
-                        super::certify::certify(transport, identity_key, ak, &identity, &data)
+                        certify::certify(transport, identity_key, ak, &identity, &data)
                     },
                 )?;
                 Ok((activation_secret, evidence))
@@ -78,7 +82,7 @@ pub(super) fn attest(
 }
 
 fn activate_credential(
-    transport: &mut impl super::Transport,
+    transport: &mut impl Transport,
     ak: TpmHandle,
     ek: TpmHandle,
     credential_blob: Tpm2bIdObject,
@@ -92,18 +96,14 @@ fn activate_credential(
         nonce_caller: caller_nonce()?,
         encrypted_salt: Tpm2bEncryptedSecret::new(),
         session_type: TpmSe::Policy,
-        symmetric: TpmtSymDefObject {
-            algorithm: TpmAlgId::Null,
-            key_bits: TpmuSymKeyBits::Null,
-            mode: TpmuSymMode::Null,
-        },
+        symmetric: keys::null_symmetric(),
         auth_hash: TpmAlgId::Sha256,
     };
-    super::with_transient_response::<_, _, TpmStartAuthSessionResponse, _>(
+    with_transient_response::<_, _, TpmStartAuthSessionResponse, _>(
         transport,
         &command,
         &[],
-        super::map_tpm_rc,
+        map_tpm_rc,
         |transport, policy_session, _| {
             let command = TpmPolicySecretCommand {
                 handles: [TpmHandle::from(TpmRh::Endorsement.value()), policy_session],
@@ -112,19 +112,15 @@ fn activate_credential(
                 policy_ref: Tpm2bNonce::new(),
                 expiration: TpmInt32::from(0),
             };
-            let _: TpmPolicySecretResponse = super::send_authenticated(transport, &command)?;
+            let _: TpmPolicySecretResponse = send_authenticated(transport, &command)?;
             let command = TpmActivateCredentialCommand {
                 handles: [ak, ek],
                 credential_blob,
                 secret: encrypted_secret,
             };
             let sessions = [password_auth(), policy_auth(policy_session)];
-            let response: TpmActivateCredentialResponse = super::send_with_sessions_and_mapper(
-                transport,
-                &command,
-                &sessions,
-                super::map_activation_rc,
-            )?;
+            let response: TpmActivateCredentialResponse =
+                send_with_sessions_and_mapper(transport, &command, &sessions, map_activation_rc)?;
             Ok(response.cert_info.as_ref().to_vec())
         },
     )
@@ -144,15 +140,6 @@ fn caller_nonce() -> Result<Tpm2bNonce, DeviceIdentityError> {
         return Err(DeviceIdentityError::BackendFailure);
     }
     Tpm2bNonce::try_from(bytes.as_slice()).map_err(|_| DeviceIdentityError::BackendFailure)
-}
-
-fn password_auth() -> TpmsAuthCommand {
-    TpmsAuthCommand {
-        session_handle: TpmHandle::from(TpmRh::Pw.value()),
-        nonce: Tpm2bNonce::new(),
-        session_attributes: TpmaSession::default(),
-        hmac: Tpm2bAuth::new(),
-    }
 }
 
 fn policy_auth(policy_session: TpmHandle) -> TpmsAuthCommand {
