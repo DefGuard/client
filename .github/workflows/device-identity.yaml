@@ -9,6 +9,8 @@ on:
     paths-ignore:
       - '*.md'
       - 'LICENSE'
+permissions:
+  contents: read
 env:
   CARGO_TERM_COLOR: always
   RUSTC_WRAPPER: "sccache"
