@@ -1,13 +1,14 @@
-#[cfg(not(windows))]
-use std::os::unix::fs::PermissionsExt;
 use std::{
     fmt,
-    fs::{create_dir_all, OpenOptions},
+    fs::{create_dir_all, File, OpenOptions},
+    io::{self, Write},
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
     time::Duration,
 };
+#[cfg(unix)]
+use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
@@ -77,7 +78,7 @@ impl fmt::Debug for CliConfig {
         f.debug_struct("CliConfig")
             .field("private_key", &"<HIDDEN>")
             .field("device", &self.device)
-            .field("device_config", &self.device_config)
+            .field("device_config", &redact_device_config(&self.device_config))
             .field("instance_info", &self.instance_info)
             .field("token", &self.token)
             .finish()
@@ -103,54 +104,44 @@ impl CliConfig {
         }
     }
 
-    /// Save configuration to a file at `path`.
+    /// Save configuration to a file at `path`, replacing it only after a complete write.
     fn save(&self, path: &Path) -> Result<(), CliError> {
-        let file = match OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)
-        {
-            Ok(file) => file,
-            Err(err) => {
-                return Err(CliError::ConfigSave(
-                    path.to_string_lossy().to_string(),
-                    format!("Failed to open configuration file for saving: {err}"),
-                ));
-            }
-        };
-        #[cfg(not(windows))]
-        {
-            debug!("Setting config file permissions.");
-            match file.metadata() {
-                Ok(meta) => {
-                    let mut perms = meta.permissions();
-                    perms.set_mode(0o600);
-                    if let Err(err) = file.set_permissions(perms) {
-                        warn!("Failed to set permissions for the configuration file: {err}");
-                    }
-                }
-                Err(err) => {
-                    warn!("Failed to set permissions for the configuration file: {err}");
-                }
-            }
-            debug!("Config file permissions have been set.");
-        }
-        match serde_json::to_writer(file, &self) {
-            Ok(()) => debug!(
-                "Configuration file has been saved to {}",
-                path.to_string_lossy()
-            ),
-            Err(err) => {
-                return Err(CliError::ConfigSave(
-                    path.to_string_lossy().to_string(),
-                    err.to_string(),
-                ));
-            }
-        }
+        let json = serde_json::to_vec(self).map_err(|err| {
+            CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
+        })?;
+        write_atomically(path, |file| file.write_all(&json)).map_err(|err| {
+            CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
+        })?;
+        debug!(
+            "Configuration file has been saved to {}",
+            path.to_string_lossy()
+        );
 
         Ok(())
     }
+}
+
+/// Write to a temporary file next to `path`, then rename it over `path`.
+/// On any failure `path` is left untouched and the temporary file is removed.
+fn write_atomically(
+    path: &Path,
+    write: impl FnOnce(&mut File) -> io::Result<()>,
+) -> io::Result<()> {
+    let dir = path
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    #[cfg(unix)]
+    let mut temp_file = tempfile::Builder::new()
+        .permissions(Permissions::from_mode(0o600))
+        .tempfile_in(dir)?;
+    #[cfg(not(unix))]
+    let mut temp_file = tempfile::NamedTempFile::new_in(dir)?;
+    write(temp_file.as_file_mut())?;
+    temp_file.as_file().sync_all()?;
+    temp_file.persist(path).map_err(|err| err.error)?;
+
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -175,19 +166,69 @@ enum CliError {
     ConfigSave(String, String),
     #[error("Failed to find free TCP port")]
     FreeTCPPort,
+    #[error("Invalid gateway public key: {0}")]
+    InvalidPublicKey(String),
+    #[error("Invalid preshared key: {0}")]
+    InvalidPresharedKey(String),
 }
 
-/// Connect to Defguard Gateway.
+fn parse_ip_addr_mask(addr: &str) -> Option<IpAddrMask> {
+    let ipaddrmask = addr.parse::<IpAddrMask>();
+    if let Err(err) = &ipaddrmask {
+        error!(
+            "Error parsing IP address `{addr}` while setting up interface: {err}. \
+            Trying to parse the remaining addresses if any."
+        );
+    }
+    ipaddrmask.ok()
+}
+
+fn build_peer(device_config: &DeviceConfig) -> Result<Peer, CliError> {
+    let peer_key = Key::from_str(&device_config.pubkey)
+        .map_err(|err| CliError::InvalidPublicKey(err.to_string()))?;
+    let mut peer = Peer::new(peer_key);
+    peer.set_endpoint(&device_config.endpoint)?;
+    peer.persistent_keepalive_interval = Some(25);
+
+    if let Some(preshared_key) = &device_config.preshared_key {
+        debug!(
+            "Using preshared key for network {}.",
+            device_config.network_name
+        );
+        let preshared_key = Key::from_str(preshared_key)
+            .map_err(|err| CliError::InvalidPresharedKey(err.to_string()))?;
+        peer.preshared_key = Some(preshared_key);
+    }
+
+    peer.allowed_ips = device_config
+        .allowed_ips
+        .split(',')
+        .filter_map(parse_ip_addr_mask)
+        .collect();
+    debug!("Parsed allowed IPs: {:?}", peer.allowed_ips);
+
+    Ok(peer)
+}
+
+fn redact_device_config(device_config: &DeviceConfig) -> DeviceConfig {
+    let mut device_config = device_config.clone();
+    if device_config.preshared_key.is_some() {
+        device_config.preshared_key = Some("<HIDDEN>".to_owned());
+    }
+    device_config
+}
+
 async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Result<(), CliError> {
     let network_name = config.device_config.network_name.clone();
     debug!("Connecting to network {network_name}.");
+
+    let peer = build_peer(&config.device_config)?;
 
     #[cfg(not(target_os = "macos"))]
     let mut wgapi = WGApi::<Kernel>::new(ifname.clone()).expect("Failed to setup WireGuard API");
     #[cfg(target_os = "macos")]
     let mut wgapi = WGApi::<Userspace>::new(ifname.clone()).expect("Failed to setup WireGuard API");
 
-    // Create new interface.
     debug!("Creating new interface {ifname}");
     wgapi
         .create_interface()
@@ -200,48 +241,11 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         "DNS configuration for interface {ifname}: DNS: {dns:?}, Search domains: \
         {search_domains:?}"
     );
-    let peer_key = Key::from_str(&config.device_config.pubkey).unwrap();
-
-    let mut peer = Peer::new(peer_key);
-    peer.set_endpoint(&config.device_config.endpoint).unwrap();
-    peer.persistent_keepalive_interval = Some(25);
-    // TODO:
-    // if let Some(psk) = preshared_key {
-    //     debug!("Decoding location {location} preshared key.");
-    //     let peer_psk = Key::from_str(&psk)?;
-    //     info!("Location {location} preshared key decoded.");
-    //     peer.preshared_key = Some(peer_psk);
-    // }
-
-    let ip_addr_parser = |addr: &str| {
-        let ipaddrmask = addr.parse::<IpAddrMask>();
-        if let Err(err) = &ipaddrmask {
-            error!(
-                "Error parsing IP address `{addr}` while setting up interface: {err}. \
-                Trying to parse the remaining addresses if any."
-            );
-        }
-        ipaddrmask.ok()
-    };
-
-    peer.allowed_ips =
-        //if location.route_all_traffic {
-        //     eprintln!("Using all traffic routing for location {location}: {DEFAULT_ROUTE_IPV4} {DEFAULT_ROUTE_IPV6}");
-        //     vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
-        // } else {
-        config
-            .device_config
-            .allowed_ips
-            .split(',')
-            .filter_map(ip_addr_parser)
-            .collect::<Vec<_>>();
-    debug!("Parsed allowed IPs: {:?}", peer.allowed_ips);
-
     let addresses = config
         .device_config
         .assigned_ip
         .split(',')
-        .filter_map(ip_addr_parser)
+        .filter_map(parse_ip_addr_mask)
         .collect::<Vec<_>>();
     debug!("Parsed assigned IPs: {addresses:?}");
 
@@ -250,7 +254,7 @@ async fn connect(config: CliConfig, ifname: String, trigger: Arc<Notify>) -> Res
         prvkey: config.private_key.to_string(),
         addresses,
         port: find_free_tcp_port().ok_or(CliError::FreeTCPPort)?,
-        peers: vec![peer.clone()],
+        peers: vec![peer],
         mtu: None,
         fwmark: None,
     };
@@ -446,7 +450,6 @@ async fn fetch_config(client: &Client, url: Url, token: String) -> Result<Device
 /// Exit when `DeviceConfig` differs from the current one.
 async fn poll_config(config: &mut CliConfig) {
     debug!("Starting the configuration polling task.");
-    // sanity check
     let Some(token) = config.clone().token else {
         debug!(
             "No polling token found in the CLI configuration. Make sure you are using the latest \
@@ -482,8 +485,9 @@ async fn poll_config(config: &mut CliConfig) {
                 if config.device_config != device_config {
                     debug!("Network configuration has changed, re-configuring.");
                     trace!(
-                        "Old configuration: {:?}. New configuration: {device_config:?}.",
-                        config.device_config,
+                        "Old configuration: {:?}. New configuration: {:?}.",
+                        redact_device_config(&config.device_config),
+                        redact_device_config(&device_config),
                     );
                     config.device_config = device_config;
                     debug!("New configuration has been successfully applied.");
@@ -714,15 +718,128 @@ async fn main() {
                 () = poll_config(&mut config), if config.token.is_some() => {
                     info!("Location configuration has changed, re-configuring and resetting the \
                         connection.");
+                    if let Err(err) = config.save(&config_path) {
+                        warn!("Failed to save the updated configuration: {err}");
+                    }
                     trigger.notify_one();
                     trigger.notified().await;
                 },
-                Err(err) = task => {
-                    error!("Failed to operate: {err}");
+                result = task => {
+                    match result {
+                        Ok(Ok(())) => debug!("Connection task has finished."),
+                        Ok(Err(err)) => error!("Failed to operate: {err}"),
+                        Err(err) => error!("Connection task failed: {err}"),
+                    }
                     trigger.notify_one();
                     break;
                 },
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn device_config(preshared_key: Option<String>) -> DeviceConfig {
+        DeviceConfig {
+            network_name: "test".to_owned(),
+            pubkey: Key::generate().public_key().to_string(),
+            endpoint: "127.0.0.1:51820".to_owned(),
+            allowed_ips: "10.0.0.0/24".to_owned(),
+            preshared_key,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn build_peer_sets_preshared_key() {
+        let preshared_key = Key::generate();
+        let peer = build_peer(&device_config(Some(preshared_key.to_string()))).unwrap();
+        assert_eq!(peer.preshared_key, Some(preshared_key));
+    }
+
+    #[test]
+    fn build_peer_without_preshared_key() {
+        let peer = build_peer(&device_config(None)).unwrap();
+        assert_eq!(peer.preshared_key, None);
+    }
+
+    #[test]
+    fn build_peer_rejects_invalid_preshared_key() {
+        let result = build_peer(&device_config(Some("not-a-key".to_owned())));
+        assert!(matches!(result, Err(CliError::InvalidPresharedKey(_))));
+    }
+
+    #[test]
+    fn config_without_preshared_key_field_loads() {
+        let mut json = serde_json::to_value(CliConfig::default()).unwrap();
+        json["device_config"]
+            .as_object_mut()
+            .unwrap()
+            .remove("preshared_key");
+        let config: CliConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.device_config.preshared_key, None);
+    }
+
+    #[test]
+    fn debug_output_hides_preshared_key() {
+        let preshared_key = Key::generate().to_string();
+        let config = CliConfig {
+            device_config: device_config(Some(preshared_key.clone())),
+            ..Default::default()
+        };
+        assert!(!format!("{config:?}").contains(&preshared_key));
+    }
+
+    #[test]
+    fn save_replaces_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        CliConfig::default().save(&path).unwrap();
+        let config = CliConfig {
+            token: Some("polling-token".to_owned()),
+            ..Default::default()
+        };
+        config.save(&path).unwrap();
+
+        assert_eq!(
+            CliConfig::load(&path).unwrap().token.as_deref(),
+            Some("polling-token")
+        );
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn failed_write_keeps_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let config = CliConfig {
+            token: Some("polling-token".to_owned()),
+            ..Default::default()
+        };
+        config.save(&path).unwrap();
+        let original = std::fs::read(&path).unwrap();
+
+        let result = write_atomically(&path, |file| {
+            file.write_all(b"{\"private_key\":")?;
+            Err(io::Error::new(io::ErrorKind::StorageFull, "disk full"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saved_config_is_owner_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        CliConfig::default().save(&path).unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
     }
 }
