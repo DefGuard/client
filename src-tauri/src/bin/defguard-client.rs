@@ -51,6 +51,6 @@ fn main() {
             let _ = worker.join();
         }
         #[cfg(not(target_os = "macos"))]
-        block_on(defguard_cli::cli_main());
+        let _ = block_on(defguard_cli::cli_main());
     }
 }

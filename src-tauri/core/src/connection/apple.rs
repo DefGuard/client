@@ -358,27 +358,31 @@ pub async fn sync_locations_and_tunnels(mtu: Option<u32>) -> Result<(), sqlx::Er
     let all_locations = Location::all(&*DB_POOL, false).await?;
     for location in &all_locations {
         // For syncing, set `preshred_key` to `None`.
-        let Ok(tunnel_config) = location.tunnel_configuration(None, mtu).await else {
+        let Ok(tunnel_config) = location.tunnel_configuration(None, mtu, None).await else {
             error!(
                 "Failed to convert location {} to tunnel configuration.",
                 location.name
             );
             continue;
         };
-        tunnel_config.save();
+        if let Err(err) = tunnel_config.save() {
+            error!("{err}");
+        }
     }
 
     // Update tunnel settings.
     let all_tunnels = Tunnel::all(&*DB_POOL).await?;
     for tunnel in &all_tunnels {
-        let Ok(tunnel_config) = tunnel.tunnel_configuration(mtu) else {
+        let Ok(tunnel_config) = tunnel.tunnel_configuration(mtu, None) else {
             error!(
                 "Failed to convert tunnel {} to tunnel configuration.",
                 tunnel.name
             );
             continue;
         };
-        tunnel_config.save();
+        if let Err(err) = tunnel_config.save() {
+            error!("{err}");
+        }
     }
 
     debug!("Saved all configurations with system settings.");

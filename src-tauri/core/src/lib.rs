@@ -132,6 +132,11 @@ pub struct CommonConnectionInfo {
 pub const DEFAULT_ROUTE_IPV4: &str = "0.0.0.0/0";
 pub const DEFAULT_ROUTE_IPV6: &str = "::/0";
 
+#[must_use]
+pub fn is_default_route(network: &IpAddrMask) -> bool {
+    network.cidr == 0
+}
+
 /// Skips entries that fail to parse
 #[must_use]
 pub fn routed_networks(
@@ -158,7 +163,7 @@ pub fn networks_conflict(a: &IpAddrMask, b: &IpAddrMask) -> bool {
     if a.address.is_ipv4() != b.address.is_ipv4() {
         return false;
     }
-    if a.cidr == 0 || b.cidr == 0 {
+    if is_default_route(a) || is_default_route(b) {
         return a.cidr == b.cidr;
     }
     let cidr = a.cidr.min(b.cidr);
