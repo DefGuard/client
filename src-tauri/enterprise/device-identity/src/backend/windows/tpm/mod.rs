@@ -2,10 +2,14 @@ use tpm2_protocol::{
     basic::TpmHandle,
     constant::TPM_MAX_COMMAND_SIZE,
     data::{
-        Tpm2bAuth, Tpm2bNonce, TpmCc, TpmRc, TpmRcBase, TpmRh, TpmSt, TpmaSession, TpmsAuthCommand,
+        Tpm2bAuth, Tpm2bData, Tpm2bNonce, Tpm2bPublic, Tpm2bSensitiveCreate, TpmCc, TpmRc,
+        TpmRcBase, TpmRh, TpmSt, TpmaSession, TpmlPcrSelection, TpmsAuthCommand,
+        TpmsSensitiveCreate, TpmtPublic,
     },
     frame::{
-        tpm_marshal_command, TpmFrame, TpmHeader, TpmMarshalBody, TpmResponse, TpmUnmarshalBody,
+        tpm_marshal_command, TpmCreatePrimaryCommand, TpmCreatePrimaryResponse,
+        TpmFlushContextCommand, TpmFlushContextResponse, TpmFrame, TpmHeader, TpmMarshalBody,
+        TpmResponse, TpmUnmarshalBody,
     },
     TpmMarshal, TpmResult, TpmSized, TpmUnmarshal, TpmWriter,
 };
@@ -27,6 +31,17 @@ pub(super) use attestation::attest as attest_identity;
 const TPM_HEADER_SIZE: usize = 10;
 const TPM_HEADER_CODE_OFFSET: usize = 6;
 
+#[cfg(test)]
+pub(super) fn test_response_frame(tag: TpmSt, response_code: u32, body: &[u8]) -> Vec<u8> {
+    let total_size = u32::try_from(TPM_HEADER_SIZE + body.len()).expect("TPM test response size");
+    let mut bytes = vec![0; TPM_HEADER_SIZE];
+    bytes[..2].copy_from_slice(&tag.value().to_be_bytes());
+    bytes[2..TPM_HEADER_CODE_OFFSET].copy_from_slice(&total_size.to_be_bytes());
+    bytes[TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE].copy_from_slice(&response_code.to_be_bytes());
+    bytes.extend_from_slice(body);
+    bytes
+}
+
 pub(super) fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
     let mut transport = tbs::TbsTransport::open()?;
     raw_capabilities::read(&mut transport)
@@ -34,10 +49,9 @@ pub(super) fn read_capabilities() -> Result<Capabilities, DeviceIdentityError> {
 
 pub(super) fn create_identity() -> Result<TpmIdentity, DeviceIdentityError> {
     let mut transport = tbs::TbsTransport::open()?;
-    let capabilities = raw_capabilities::read(&mut transport)?;
-    let nv_buffer_max = raw_capabilities::nv_buffer_max(&capabilities);
-    raw_capabilities::check_hierarchy_auth(&capabilities)?;
-    let ek = ek::read(&mut transport, nv_buffer_max)?;
+    let properties = raw_capabilities::read_properties(&mut transport)?;
+    properties.check_hierarchy_auth()?;
+    let ek = ek::read(&mut transport, properties.nv_buffer_max())?;
     let keys::CreatedKeys {
         srk_template,
         ak,
@@ -51,17 +65,13 @@ pub(super) fn create_identity() -> Result<TpmIdentity, DeviceIdentityError> {
     })
 }
 
-pub(super) struct PossessionKey {
-    pub(super) srk_template: Vec<u8>,
-    pub(super) identity_key: TpmKeyBlobs,
-}
-
 pub(super) fn prove_possession(
-    key: PossessionKey,
-    data: Vec<u8>,
+    srk_template: &[u8],
+    identity_key: &TpmKeyBlobs,
+    data: &[u8],
 ) -> Result<PossessionProof, DeviceIdentityError> {
     let mut transport = tbs::TbsTransport::open()?;
-    possession::prove(&mut transport, &key.srk_template, &key.identity_key, &data)
+    possession::prove(&mut transport, srk_template, identity_key, data)
 }
 
 pub(super) trait Transport {
@@ -146,7 +156,7 @@ fn submit_frame<C: TpmFrame>(
     sessions: &[TpmsAuthCommand],
 ) -> Result<Vec<u8>, DeviceIdentityError> {
     let tag = session_tag(sessions);
-    let mut command_buffer = vec![0; TPM_MAX_COMMAND_SIZE as usize];
+    let mut command_buffer = vec![0; TPM_MAX_COMMAND_SIZE];
     let command_len = {
         let mut writer = TpmWriter::new(&mut command_buffer);
         tpm_marshal_command(command, tag, sessions, &mut writer)
@@ -166,15 +176,27 @@ fn decode_frame_with_mapper<R: TpmUnmarshalBody>(
         .map_err(|_| DeviceIdentityError::BackendFailure)
 }
 
-fn checked_response<'a>(
-    bytes: &'a [u8],
+fn header_code(bytes: &[u8]) -> Option<u32> {
+    let bytes = bytes.get(TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE)?;
+    Some(u32::from_be_bytes(bytes.try_into().ok()?))
+}
+
+fn response_code(bytes: &[u8]) -> Result<TpmRc, DeviceIdentityError> {
+    let code = header_code(bytes).ok_or(DeviceIdentityError::BackendFailure)?;
+    TpmRc::try_from(code).map_err(|_| DeviceIdentityError::BackendFailure)
+}
+
+fn checked_response_code(bytes: &[u8]) -> Result<(&TpmResponse, TpmRc), DeviceIdentityError> {
+    let response = TpmResponse::cast(bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
+    Ok((response, response_code(bytes)?))
+}
+
+fn checked_response(
+    bytes: &[u8],
     expected_tag: TpmSt,
     map_response_code: fn(TpmRc) -> DeviceIdentityError,
-) -> Result<&'a TpmResponse, DeviceIdentityError> {
-    let response = TpmResponse::cast(bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
-    let response_code = response
-        .rc()
-        .map_err(|_| DeviceIdentityError::BackendFailure)?;
+) -> Result<&TpmResponse, DeviceIdentityError> {
+    let (response, response_code) = checked_response_code(bytes)?;
     if response_code != TpmRc::Fmt0(TpmRcBase::Success) {
         return Err(map_response_code(response_code));
     }
@@ -219,10 +241,7 @@ pub(super) fn send_with_sessions_and_tpm_error<C: TpmFrame, R: TpmUnmarshalBody>
     sessions: &[TpmsAuthCommand],
 ) -> Result<Result<R, TpmRc>, DeviceIdentityError> {
     let bytes = submit_frame(transport, command, sessions)?;
-    let response = TpmResponse::cast(&bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
-    let response_code = response
-        .rc()
-        .map_err(|_| DeviceIdentityError::BackendFailure)?;
+    let (_, response_code) = checked_response_code(&bytes)?;
     if response_code != TpmRc::Fmt0(TpmRcBase::Success) {
         return Ok(Err(response_code));
     }
@@ -232,17 +251,10 @@ pub(super) fn send_with_sessions_and_tpm_error<C: TpmFrame, R: TpmUnmarshalBody>
 pub(super) fn with_primary<T: Transport, R>(
     transport: &mut T,
     hierarchy: TpmRh,
-    public: tpm2_protocol::data::TpmtPublic,
+    public: TpmtPublic,
     map_response_code: fn(TpmRc) -> DeviceIdentityError,
     operation: impl FnOnce(&mut T, TpmHandle) -> Result<R, DeviceIdentityError>,
 ) -> Result<R, DeviceIdentityError> {
-    use tpm2_protocol::{
-        data::{
-            Tpm2bData, Tpm2bPublic, Tpm2bSensitiveCreate, TpmlPcrSelection, TpmsSensitiveCreate,
-        },
-        frame::{TpmCreatePrimaryCommand, TpmCreatePrimaryResponse},
-    };
-
     let command = TpmCreatePrimaryCommand {
         handles: [TpmHandle::from(hierarchy.value())],
         in_sensitive: Tpm2bSensitiveCreate {
@@ -261,30 +273,27 @@ pub(super) fn with_primary<T: Transport, R>(
     )
 }
 
-pub(super) fn with_transient_response<T: Transport, C: TpmFrame, R: TpmUnmarshalBody, O>(
+pub(super) fn with_transient_response<
+    T: Transport,
+    C: TpmFrame,
+    R: TpmUnmarshalBody + TpmHeader,
+    O,
+>(
     transport: &mut T,
     command: &C,
     sessions: &[TpmsAuthCommand],
     map_response_code: fn(TpmRc) -> DeviceIdentityError,
     operation: impl FnOnce(&mut T, TpmHandle, R) -> Result<O, DeviceIdentityError>,
-) -> Result<O, DeviceIdentityError>
-where
-    R: TpmHeader,
-{
+) -> Result<O, DeviceIdentityError> {
     if R::HANDLES != 1 {
         return Err(DeviceIdentityError::BackendFailure);
     }
     let bytes = submit_frame(transport, command, sessions)?;
-    let response_code_bytes = bytes
-        .get(TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE)
-        .ok_or(DeviceIdentityError::BackendFailure)?;
-    if response_code_bytes != [0; 4] {
-        let response =
-            TpmResponse::cast(&bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
-        let response_code = response
-            .rc()
-            .map_err(|_| DeviceIdentityError::BackendFailure)?;
-        return Err(map_response_code(response_code));
+    // Check only the response code first: a successful response carries a handle that must be
+    // flushed even if the rest of the frame is malformed.
+    let response_code = response_code(&bytes)?;
+    if response_code != TpmRc::Fmt0(TpmRcBase::Success) {
+        return Err(map_response_code(checked_response_code(&bytes)?.1));
     }
     let handle_bytes = bytes
         .get(TPM_HEADER_SIZE..TPM_HEADER_SIZE + TpmHandle::SIZE)
@@ -321,8 +330,6 @@ fn flush_context(
     transport: &mut impl Transport,
     handle: TpmHandle,
 ) -> Result<(), DeviceIdentityError> {
-    use tpm2_protocol::frame::{TpmFlushContextCommand, TpmFlushContextResponse};
-
     let command = TpmFlushContextCommand {
         handles: [],
         flush_handle: handle,
@@ -351,14 +358,13 @@ fn receive<T: TpmUnmarshal>(bytes: &[u8]) -> Result<T, DeviceIdentityError> {
 // TPM rejection of stored identity material or its binding means the identity is no longer usable.
 pub(super) fn map_identity_rc(response_code: TpmRc) -> DeviceIdentityError {
     match response_code {
+        TpmRc::Fmt0(TpmRcBase::Parent | TpmRcBase::Sensitive) => DeviceIdentityError::IdentityLost,
         TpmRc::Fmt1(code)
             if matches!(
                 code.base,
                 TpmRcBase::Integrity
                     | TpmRcBase::Binding
-                    | TpmRcBase::Parent
                     | TpmRcBase::Key
-                    | TpmRcBase::Sensitive
                     | TpmRcBase::Size
                     | TpmRcBase::Value
             ) =>
@@ -441,13 +447,23 @@ mod tests {
         }
     }
 
+    struct FlushTrackingTransport {
+        commands: Vec<Vec<u8>>,
+        first_response: Option<Vec<u8>>,
+    }
+
+    impl Transport for FlushTrackingTransport {
+        fn submit(&mut self, command: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
+            self.commands.push(command.to_vec());
+            Ok(self
+                .first_response
+                .take()
+                .unwrap_or_else(|| response(0, &[])))
+        }
+    }
+
     fn response(response_code: u32, body: &[u8]) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(TPM_HEADER_SIZE + body.len());
-        bytes.extend_from_slice(&0x8001_u16.to_be_bytes());
-        bytes.extend_from_slice(&((TPM_HEADER_SIZE + body.len()) as u32).to_be_bytes());
-        bytes.extend_from_slice(&response_code.to_be_bytes());
-        bytes.extend_from_slice(body);
-        bytes
+        test_response_frame(TpmSt::NoSessions, response_code, body)
     }
 
     #[test]
@@ -498,6 +514,164 @@ mod tests {
     }
 
     #[test]
+    fn test_identity_and_activation_error_mapping() {
+        for (raw_code, expected) in [
+            (
+                TpmRcBase::Integrity.value(),
+                DeviceIdentityError::IdentityLost,
+            ),
+            (
+                TpmRcBase::Binding.value(),
+                DeviceIdentityError::IdentityLost,
+            ),
+            (TpmRcBase::Parent.value(), DeviceIdentityError::IdentityLost),
+            (TpmRcBase::Key.value(), DeviceIdentityError::IdentityLost),
+            (
+                TpmRcBase::Sensitive.value(),
+                DeviceIdentityError::IdentityLost,
+            ),
+            (TpmRcBase::Size.value(), DeviceIdentityError::IdentityLost),
+            (TpmRcBase::Value.value(), DeviceIdentityError::IdentityLost),
+            (
+                TpmRcBase::AuthFail.value(),
+                DeviceIdentityError::PermissionDenied,
+            ),
+            (TpmRcBase::Hash.value(), DeviceIdentityError::Unsupported),
+            (
+                TpmRcBase::Yielded.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Lockout.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Retry.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Failure.value(),
+                DeviceIdentityError::BackendFailure,
+            ),
+        ] {
+            let response_code = TpmRc::try_from(raw_code).expect("valid TPM response code");
+            assert_eq!(map_identity_rc(response_code), expected, "{raw_code:#010x}");
+        }
+
+        for (raw_code, expected) in [
+            (
+                TpmRcBase::Integrity.value(),
+                DeviceIdentityError::InvalidChallenge,
+            ),
+            (
+                TpmRcBase::Value.value(),
+                DeviceIdentityError::InvalidChallenge,
+            ),
+            (
+                TpmRcBase::Size.value(),
+                DeviceIdentityError::InvalidChallenge,
+            ),
+            (
+                TpmRcBase::EccPoint.value(),
+                DeviceIdentityError::InvalidChallenge,
+            ),
+            (
+                TpmRcBase::Insufficient.value(),
+                DeviceIdentityError::InvalidChallenge,
+            ),
+            (
+                TpmRcBase::AuthFail.value(),
+                DeviceIdentityError::PermissionDenied,
+            ),
+            (TpmRcBase::Hash.value(), DeviceIdentityError::Unsupported),
+            (
+                TpmRcBase::Yielded.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Lockout.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Retry.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Failure.value(),
+                DeviceIdentityError::BackendFailure,
+            ),
+        ] {
+            let response_code = TpmRc::try_from(raw_code).expect("valid TPM response code");
+            assert_eq!(
+                map_activation_rc(response_code),
+                expected,
+                "{raw_code:#010x}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_error_mapping_fallbacks() {
+        for (raw_code, expected) in [
+            (
+                TpmRcBase::Yielded.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Lockout.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::Retry.value(),
+                DeviceIdentityError::TemporarilyUnavailable,
+            ),
+            (
+                TpmRcBase::AuthFail.value(),
+                DeviceIdentityError::PermissionDenied,
+            ),
+            (
+                TpmRcBase::BadAuth.value(),
+                DeviceIdentityError::PermissionDenied,
+            ),
+            (TpmRcBase::Hash.value(), DeviceIdentityError::Unsupported),
+            (TpmRcBase::Curve.value(), DeviceIdentityError::Unsupported),
+            (TpmRcBase::Scheme.value(), DeviceIdentityError::Unsupported),
+            (TpmRcBase::KeySize.value(), DeviceIdentityError::Unsupported),
+            (
+                TpmRcBase::Asymmetric.value(),
+                DeviceIdentityError::Unsupported,
+            ),
+            (
+                TpmRcBase::Symmetric.value(),
+                DeviceIdentityError::Unsupported,
+            ),
+            (TpmRcBase::Kdf.value(), DeviceIdentityError::Unsupported),
+            (TpmRcBase::Mode.value(), DeviceIdentityError::Unsupported),
+            (
+                TpmRcBase::Failure.value(),
+                DeviceIdentityError::BackendFailure,
+            ),
+        ] {
+            let response_code = TpmRc::try_from(raw_code).expect("valid TPM response code");
+            assert_eq!(map_identity_rc(response_code), expected, "{raw_code:#010x}");
+            assert_eq!(
+                map_activation_rc(response_code),
+                expected,
+                "{raw_code:#010x}"
+            );
+        }
+
+        for raw_code in [TpmRcBase::Parent.value(), TpmRcBase::Sensitive.value()] {
+            let response_code = TpmRc::try_from(raw_code).expect("valid TPM response code");
+            assert_eq!(
+                map_activation_rc(response_code),
+                DeviceIdentityError::BackendFailure,
+                "{raw_code:#010x}"
+            );
+        }
+    }
+
+    #[test]
     fn test_with_transient_flushes_after_operation_error() {
         let mut transport = FakeTransport {
             command: Vec::new(),
@@ -513,11 +687,44 @@ mod tests {
     }
 
     #[test]
+    fn test_transient_response_frame_error_still_flushes_handle() {
+        let handle = TpmHandle::from(0x8000_0001);
+        let handle_bytes = u32::from(handle).to_be_bytes();
+        let mut transport = FlushTrackingTransport {
+            commands: Vec::new(),
+            first_response: Some(test_response_frame(TpmSt::Sessions, 0, &handle_bytes)),
+        };
+        let result = with_primary(
+            &mut transport,
+            TpmRh::Owner,
+            keys::storage_template(),
+            map_tpm_rc,
+            |_, _| Ok(()),
+        );
+        assert_eq!(result, Err(DeviceIdentityError::BackendFailure));
+        assert_eq!(transport.commands.len(), 2);
+        let create_primary =
+            TpmCommand::cast(&transport.commands[0]).expect("valid CreatePrimary command");
+        assert_eq!(
+            create_primary.cc().expect("command code"),
+            TpmCc::CreatePrimary
+        );
+        let flush = TpmCommand::cast(&transport.commands[1]).expect("valid flush command");
+        assert_eq!(flush.cc().expect("command code"), TpmCc::FlushContext);
+        assert_eq!(
+            &transport.commands[1][TPM_HEADER_SIZE..TPM_HEADER_SIZE + TpmHandle::SIZE],
+            handle_bytes.as_slice()
+        );
+    }
+
+    #[test]
     fn test_send_rejects_malformed_or_trailing_response_data() {
         let parameters = marshal(&TpmUint32::from(0)).expect("marshal request parameter");
+        let mut malformed_response = response(0, &[]);
+        malformed_response.truncate(TPM_HEADER_SIZE - 1);
         let mut transport = FakeTransport {
             command: Vec::new(),
-            response: vec![0x80, 0x01, 0, 0, 0, TPM_HEADER_SIZE as u8, 0, 0, 0],
+            response: malformed_response,
         };
         let result: Result<TpmUint32, _> = send(&mut transport, TpmCc::GetCapability, &parameters);
         assert_eq!(result, Err(DeviceIdentityError::BackendFailure));

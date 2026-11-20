@@ -4,9 +4,7 @@ use tpm2_protocol::{
     frame::{TpmSignCommand, TpmSignResponse},
 };
 
-use super::{
-    der::encode_signature, keys, map_identity_rc, send_authenticated, with_primary, Transport,
-};
+use super::{der::encode_signature, keys, send_authenticated, Transport};
 use crate::{DeviceIdentityError, PossessionProof, TpmKeyBlobs};
 
 pub(super) fn prove(
@@ -20,26 +18,18 @@ pub(super) fn prove(
     let digest =
         Tpm2bDigest::try_from(&digest[..]).map_err(|_| DeviceIdentityError::BackendFailure)?;
 
-    with_primary(
-        transport,
-        TpmRh::Owner,
-        template,
-        map_identity_rc,
-        |transport, srk| {
-            keys::with_loaded_key(transport, srk, identity_key, |transport, key| {
-                let command = TpmSignCommand {
-                    handles: [key],
-                    digest,
-                    in_scheme: TpmtSigScheme::default(),
-                    validation: TpmtTkHashcheck {
-                        tag: TpmSt::HashCheck,
-                        hierarchy: TpmRh::Null,
-                        digest: Tpm2bDigest::new(),
-                    },
-                };
-                let response: TpmSignResponse = send_authenticated(transport, &command)?;
-                encode_signature(response.signature).map(PossessionProof::Signature)
-            })
-        },
-    )
+    keys::with_key_under_srk(transport, template, identity_key, |transport, _, key| {
+        let command = TpmSignCommand {
+            handles: [key],
+            digest,
+            in_scheme: TpmtSigScheme::default(),
+            validation: TpmtTkHashcheck {
+                tag: TpmSt::HashCheck,
+                hierarchy: TpmRh::Null,
+                digest: Tpm2bDigest::new(),
+            },
+        };
+        let response: TpmSignResponse = send_authenticated(transport, &command)?;
+        encode_signature(response.signature).map(PossessionProof::Signature)
+    })
 }

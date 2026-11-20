@@ -38,40 +38,36 @@ pub(in super::super) fn attest(
     let srk_template = keys::decode_public(&identity.srk_template)?;
     let ek_template = ek::decode_stored_template(&identity.ek.template)?;
     let mut transport = tbs::TbsTransport::open()?;
-    let capabilities = raw_capabilities::read(&mut transport)?;
-    raw_capabilities::check_hierarchy_auth(&capabilities)?;
+    raw_capabilities::read_properties(&mut transport)?.check_hierarchy_auth()?;
 
-    let (activation_secret, evidence) = with_primary(
+    let (activation_secret, evidence) = keys::with_key_under_srk(
         &mut transport,
-        TpmRh::Owner,
         srk_template,
-        map_identity_rc,
-        |transport, srk| {
-            keys::with_loaded_key(transport, srk, &identity.ak, |transport, ak| {
-                let activation_secret = with_primary(
-                    transport,
-                    TpmRh::Endorsement,
-                    ek_template,
-                    map_identity_rc,
-                    |transport, ek| {
-                        let command = TpmReadPublicCommand { handles: [ek] };
-                        let response: TpmReadPublicResponse = send_frame(transport, &command)?;
-                        if marshal(&response.out_public.inner)? != identity.ek.public {
-                            return Err(DeviceIdentityError::IdentityLost);
-                        }
-                        activate_credential(transport, ak, ek, credential_blob, encrypted_secret)
-                    },
-                )?;
-                let evidence = keys::with_loaded_key(
-                    transport,
-                    srk,
-                    &identity.identity_key,
-                    |transport, identity_key| {
-                        certify::certify(transport, identity_key, ak, &identity, &data)
-                    },
-                )?;
-                Ok((activation_secret, evidence))
-            })
+        &identity.ak,
+        |transport, srk, ak| {
+            let activation_secret = with_primary(
+                transport,
+                TpmRh::Endorsement,
+                ek_template,
+                map_identity_rc,
+                |transport, ek| {
+                    let command = TpmReadPublicCommand { handles: [ek] };
+                    let response: TpmReadPublicResponse = send_frame(transport, &command)?;
+                    if marshal(&response.out_public.inner)? != identity.ek.public {
+                        return Err(DeviceIdentityError::IdentityLost);
+                    }
+                    activate_credential(transport, ak, ek, credential_blob, encrypted_secret)
+                },
+            )?;
+            let evidence = keys::with_loaded_key(
+                transport,
+                srk,
+                &identity.identity_key,
+                |transport, identity_key| {
+                    certify::certify(transport, identity_key, ak, &identity, &data)
+                },
+            )?;
+            Ok((activation_secret, evidence))
         },
     )?;
 

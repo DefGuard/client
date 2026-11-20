@@ -8,14 +8,14 @@ use tpm2_protocol::{
     basic::{TpmHandle, TpmUint16, TpmUint32},
     data::{
         Tpm2bDigest, Tpm2bEccParameter, Tpm2bPublicKeyRsa, TpmAlgId, TpmEccCurve, TpmPt, TpmRc,
-        TpmRcBase, TpmRh, TpmaObject, TpmsEccParms, TpmsEccPoint, TpmsRsaParms, TpmtEccScheme,
-        TpmtKdfScheme, TpmtPublic, TpmtRsaScheme, TpmuAsymScheme, TpmuPublicId, TpmuPublicParms,
+        TpmRcBase, TpmRh, TpmaNv, TpmaObject, TpmsEccParms, TpmsEccPoint, TpmsRsaParms,
+        TpmtEccScheme, TpmtKdfScheme, TpmtPublic, TpmtRsaScheme, TpmuAsymScheme, TpmuPublicId,
+        TpmuPublicParms,
     },
     frame::{
         TpmNvReadCommand, TpmNvReadPublicCommand, TpmNvReadPublicResponse, TpmNvReadResponse,
         TpmReadPublicCommand, TpmReadPublicResponse,
     },
-    TpmUnmarshal,
 };
 use tracing::debug;
 use windows_sys::Win32::{
@@ -28,8 +28,8 @@ use windows_sys::Win32::{
 };
 
 use super::{
-    keys, map_tpm_rc, marshal, password_auth, send_frame, send_with_sessions_and_tpm_error,
-    with_primary, Transport,
+    keys, map_tpm_rc, marshal, password_auth, receive, send_frame,
+    send_with_sessions_and_tpm_error, with_primary, Transport,
 };
 use crate::{DeviceIdentityError, TpmEndorsementKey};
 
@@ -100,18 +100,24 @@ pub(super) fn read(
     })
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NvReadStage {
+    Public,
+    Data,
+}
+
 fn allow_unreadable_nv_error<T>(
     result: Result<Result<T, TpmRc>, DeviceIdentityError>,
-    read_public: bool,
+    stage: NvReadStage,
 ) -> Result<Option<T>, DeviceIdentityError> {
     match result? {
         Ok(response) => Ok(Some(response)),
         Err(TpmRc::Fmt1(code)) if code.base == TpmRcBase::Handle => Ok(None),
         Err(TpmRc::Fmt0(
             TpmRcBase::NvLocked | TpmRcBase::NvAuthorization | TpmRcBase::NvUninitialized,
-        )) if !read_public => Ok(None),
+        )) if stage == NvReadStage::Data => Ok(None),
         Err(TpmRc::Fmt1(code))
-            if !read_public
+            if stage == NvReadStage::Data
                 && matches!(
                     code.base,
                     TpmRcBase::AuthFail | TpmRcBase::BadAuth | TpmRcBase::PolicyFail
@@ -123,34 +129,23 @@ fn allow_unreadable_nv_error<T>(
     }
 }
 
-// Prefer ECC over RSA, checking TPM NV before cache for each; default to ECC without a certificate.
+// With no certificate anywhere, use the ECC EK and leave the trust decision to Core.
 fn select_profile(
     transport: &mut impl Transport,
     nv_buffer_max: Option<u32>,
     load_cached_certificates: impl FnOnce() -> Vec<Vec<u8>>,
 ) -> Result<(Profile, Vec<Vec<u8>>), DeviceIdentityError> {
-    if let Some(certificate) = read_nv_certificate(
-        transport,
-        Profile::EccP256.certificate_index(),
-        nv_buffer_max,
-    )? {
-        return Ok((Profile::EccP256, vec![certificate]));
-    }
-    let cached_certificates = load_cached_certificates();
-    let ecc_certificates = find_profile_certificates(&cached_certificates, Profile::EccP256);
-    if !ecc_certificates.is_empty() {
-        return Ok((Profile::EccP256, ecc_certificates));
-    }
-    if let Some(certificate) = read_nv_certificate(
-        transport,
-        Profile::Rsa2048.certificate_index(),
-        nv_buffer_max,
-    )? {
-        return Ok((Profile::Rsa2048, vec![certificate]));
-    }
-    let rsa_certificates = find_profile_certificates(&cached_certificates, Profile::Rsa2048);
-    if !rsa_certificates.is_empty() {
-        return Ok((Profile::Rsa2048, rsa_certificates));
+    let cached_certificates = std::cell::LazyCell::new(load_cached_certificates);
+    for profile in [Profile::EccP256, Profile::Rsa2048] {
+        if let Some(certificate) =
+            read_nv_certificate(transport, profile.certificate_index(), nv_buffer_max)?
+        {
+            return Ok((profile, vec![certificate]));
+        }
+        let certificates = find_profile_certificates(&cached_certificates, profile);
+        if !certificates.is_empty() {
+            return Ok((profile, certificates));
+        }
     }
     Ok((Profile::EccP256, Vec::new()))
 }
@@ -166,7 +161,7 @@ fn read_nv_certificate(
     };
     let Some(public): Option<TpmNvReadPublicResponse> = allow_unreadable_nv_error(
         send_with_sessions_and_tpm_error(transport, &public_command, &[]),
-        true,
+        NvReadStage::Public,
     )?
     else {
         return Ok(None);
@@ -174,6 +169,12 @@ fn read_nv_certificate(
     let nv_public = public.nv_public.inner;
     if nv_public.nv_index != index_handle {
         return Err(DeviceIdentityError::BackendFailure);
+    }
+    if !nv_public
+        .attributes
+        .contains(TpmaNv::AUTHREAD | TpmaNv::NO_DA)
+    {
+        return Ok(None);
     }
     let data_size = usize::from(u16::from(nv_public.data_size));
     if data_size == 0 {
@@ -206,7 +207,7 @@ fn read_nv_certificate(
         };
         let Some(response): Option<TpmNvReadResponse> = allow_unreadable_nv_error(
             send_with_sessions_and_tpm_error(transport, &command, &[password_auth()]),
-            false,
+            NvReadStage::Data,
         )?
         else {
             return Ok(None);
@@ -259,9 +260,24 @@ fn certificate_has_profile(der: &[u8], profile: Profile) -> Result<bool, DeviceI
     })
 }
 
+struct ProviderHandle(NCRYPT_PROV_HANDLE);
+
+impl Drop for ProviderHandle {
+    fn drop(&mut self) {
+        unsafe { NCryptFreeObject(self.0) };
+    }
+}
+
+struct CertificateStore(HCERTSTORE);
+
+impl Drop for CertificateStore {
+    fn drop(&mut self) {
+        unsafe { CertCloseStore(self.0, 0) };
+    }
+}
+
 fn read_cached_certificates() -> Result<Vec<Vec<u8>>, DeviceIdentityError> {
     let mut provider = NCRYPT_PROV_HANDLE::default();
-    // SAFETY: `provider` is a valid output pointer and the provider name is a static Windows string.
     let status =
         unsafe { NCryptOpenStorageProvider(&mut provider, MS_PLATFORM_CRYPTO_PROVIDER, 0) };
     if status == NTE_NOT_FOUND {
@@ -273,7 +289,6 @@ fn read_cached_certificates() -> Result<Vec<Vec<u8>>, DeviceIdentityError> {
     let provider = ProviderHandle(provider);
     let mut store: HCERTSTORE = null_mut();
     let mut returned = 0;
-    // SAFETY: the provider is live and the output pointers refer to local storage of the supplied size.
     let status = unsafe {
         NCryptGetProperty(
             provider.0,
@@ -285,58 +300,42 @@ fn read_cached_certificates() -> Result<Vec<Vec<u8>>, DeviceIdentityError> {
             0,
         )
     };
+    let store = if store.is_null() {
+        None
+    } else {
+        Some(CertificateStore(store))
+    };
     if status == NTE_NOT_FOUND {
         return Ok(Vec::new());
     }
-    if status != 0 || returned as usize != size_of::<HCERTSTORE>() || store.is_null() {
+    if status != 0 || returned as usize != size_of::<HCERTSTORE>() {
         return Err(DeviceIdentityError::BackendFailure);
     }
-    let store = CertificateStore(store);
+    let store = store.ok_or(DeviceIdentityError::BackendFailure)?;
     let mut certificates = Vec::new();
     let mut previous = null_mut();
+    // Each context from CertEnumCertificatesInStore stays valid until it is passed to the next
+    // call, which frees it, so the encoded certificate is copied out before then.
     loop {
-        // SAFETY: this resets the current thread's error state and takes no pointers.
         unsafe { SetLastError(0) };
-        // SAFETY: the store stays open; enumeration consumes the previous live context and returns one valid until the next call.
         let current = unsafe { CertEnumCertificatesInStore(store.0, previous) };
         if current.is_null() {
-            // SAFETY: this reads the current thread's error state immediately after enumeration and takes no pointers.
             if unsafe { GetLastError() } == CRYPT_E_NOT_FOUND as u32 {
                 break;
             }
             return Err(DeviceIdentityError::BackendFailure);
         }
         previous = current;
-        // SAFETY: `current` is the non-null context returned by enumeration and remains valid until the next call.
         let context: &CERT_CONTEXT = unsafe { &*current };
         let length = context.cbCertEncoded as usize;
         if length == 0 || context.pbCertEncoded.is_null() {
-            // SAFETY: this live context has not yet been freed by a subsequent enumeration call.
+            // No further enumeration call will free this context.
             unsafe { CertFreeCertificateContext(current) };
             return Err(DeviceIdentityError::BackendFailure);
         }
-        // SAFETY: the context owns this non-empty encoded region until the next call; `to_vec` copies it now.
         certificates.push(unsafe { slice::from_raw_parts(context.pbCertEncoded, length) }.to_vec());
     }
     Ok(certificates)
-}
-
-struct ProviderHandle(NCRYPT_PROV_HANDLE);
-
-impl Drop for ProviderHandle {
-    fn drop(&mut self) {
-        // SAFETY: this wrapper exclusively owns the provider returned by NCryptOpenStorageProvider.
-        unsafe { NCryptFreeObject(self.0) };
-    }
-}
-
-struct CertificateStore(HCERTSTORE);
-
-impl Drop for CertificateStore {
-    fn drop(&mut self) {
-        // SAFETY: this wrapper exclusively owns the open certificate store.
-        unsafe { CertCloseStore(self.0, 0) };
-    }
 }
 
 fn ek_template(profile: Profile) -> Result<TpmtPublic, DeviceIdentityError> {
@@ -411,11 +410,7 @@ fn certificate_matches(
 ) -> Result<bool, DeviceIdentityError> {
     let certificate: Certificate = picky_asn1_der::from_bytes(certificate_der)
         .map_err(|_| DeviceIdentityError::BackendFailure)?;
-    let (public, remaining) =
-        TpmtPublic::unmarshal(public_bytes).map_err(|_| DeviceIdentityError::BackendFailure)?;
-    if !remaining.is_empty() {
-        return Err(DeviceIdentityError::BackendFailure);
-    }
+    let public: TpmtPublic = receive(public_bytes)?;
     let public = subject_public_key_info(&public)?;
     Ok(certificate.tbs_certificate.subject_public_key_info == public)
 }
@@ -455,12 +450,16 @@ fn subject_public_key_info(
 #[cfg(test)]
 mod nv_read_tests {
     use std::collections::VecDeque;
+    use tpm2_protocol::{data::TpmCc, TpmSized};
 
+    use super::super::{test_response_frame, TpmSt, TPM_HEADER_CODE_OFFSET, TPM_HEADER_SIZE};
     use super::*;
-    use tpm2_protocol::data::TpmCc;
+
     const INDEX: u32 = ECC_EK_CERTIFICATE_INDEX;
+
     struct FakeTransport {
         certificate: Vec<u8>,
+        nv_attributes: TpmaNv,
         commands: Vec<u32>,
         indexes: Vec<u32>,
         reads: Vec<(u16, u16)>,
@@ -468,6 +467,7 @@ mod nv_read_tests {
         read_error_codes: VecDeque<Option<u32>>,
         transport_error: Option<DeviceIdentityError>,
     }
+
     impl Transport for FakeTransport {
         fn submit(&mut self, command: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
             if let Some(error) = self.transport_error.take() {
@@ -475,14 +475,14 @@ mod nv_read_tests {
             }
             let command_code = u32::from_be_bytes(
                 command
-                    .get(6..10)
+                    .get(TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE)
                     .ok_or(DeviceIdentityError::BackendFailure)?
                     .try_into()
                     .map_err(|_| DeviceIdentityError::BackendFailure)?,
             );
             let index = u32::from_be_bytes(
                 command
-                    .get(10..14)
+                    .get(TPM_HEADER_SIZE..TPM_HEADER_SIZE + TpmHandle::SIZE)
                     .ok_or(DeviceIdentityError::BackendFailure)?
                     .try_into()
                     .map_err(|_| DeviceIdentityError::BackendFailure)?,
@@ -499,6 +499,7 @@ mod nv_read_tests {
                 return Ok(nv_read_public_response(
                     index,
                     self.certificate.len() as u16,
+                    self.nv_attributes,
                 ));
             }
             if command_code != TpmCc::NvRead.value() {
@@ -535,35 +536,31 @@ mod nv_read_tests {
             Ok(session_response(&parameters))
         }
     }
-    fn nv_read_public_response(index: u32, data_size: u16) -> Vec<u8> {
+
+    fn nv_read_public_response(index: u32, data_size: u16, attributes: TpmaNv) -> Vec<u8> {
         let mut body = Vec::with_capacity(18);
         body.extend_from_slice(&14_u16.to_be_bytes());
         body.extend_from_slice(&index.to_be_bytes());
         body.extend_from_slice(&0x000b_u16.to_be_bytes());
-        body.extend_from_slice(&0_u32.to_be_bytes());
+        body.extend_from_slice(&attributes.bits().to_be_bytes());
         body.extend_from_slice(&0_u16.to_be_bytes());
         body.extend_from_slice(&data_size.to_be_bytes());
         body.extend_from_slice(&0_u16.to_be_bytes());
         response(&body)
     }
+
     fn response(body: &[u8]) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(10 + body.len());
-        bytes.extend_from_slice(&0x8001_u16.to_be_bytes());
-        bytes.extend_from_slice(&((10 + body.len()) as u32).to_be_bytes());
-        bytes.extend_from_slice(&0_u32.to_be_bytes());
-        bytes.extend_from_slice(body);
-        bytes
+        test_response_frame(TpmSt::NoSessions, 0, body)
     }
+
     fn error_response(response_code: u32) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(10);
-        bytes.extend_from_slice(&0x8001_u16.to_be_bytes());
-        bytes.extend_from_slice(&10_u32.to_be_bytes());
-        bytes.extend_from_slice(&response_code.to_be_bytes());
-        bytes
+        test_response_frame(TpmSt::NoSessions, response_code, &[])
     }
+
     fn fake_transport(certificate: Vec<u8>) -> FakeTransport {
         FakeTransport {
             certificate,
+            nv_attributes: TpmaNv::AUTHREAD | TpmaNv::NO_DA,
             commands: Vec::new(),
             indexes: Vec::new(),
             reads: Vec::new(),
@@ -572,22 +569,16 @@ mod nv_read_tests {
             transport_error: None,
         }
     }
+
     fn session_response(parameters: &[u8]) -> Vec<u8> {
         let parameter_size = u32::try_from(parameters.len()).expect("TPM test response size");
-        let total_size = 10 + 4 + parameters.len() + 5;
-        let mut bytes = Vec::with_capacity(total_size);
-        bytes.extend_from_slice(&0x8002_u16.to_be_bytes());
-        bytes.extend_from_slice(
-            &u32::try_from(total_size)
-                .expect("TPM test response size")
-                .to_be_bytes(),
-        );
-        bytes.extend_from_slice(&0_u32.to_be_bytes());
-        bytes.extend_from_slice(&parameter_size.to_be_bytes());
-        bytes.extend_from_slice(parameters);
-        bytes.extend_from_slice(&[0, 0, 0, 0, 0]);
-        bytes
+        let mut body = Vec::with_capacity(4 + parameters.len() + 5);
+        body.extend_from_slice(&parameter_size.to_be_bytes());
+        body.extend_from_slice(parameters);
+        body.extend_from_slice(&[0; 5]);
+        test_response_frame(TpmSt::Sessions, 0, &body)
     }
+
     #[test]
     fn test_read_nv_certificate_chunks_at_nv_buffer_max() {
         let certificate: Vec<_> = (0..1100).map(|byte| (byte % 251) as u8).collect();
@@ -606,6 +597,21 @@ mod nv_read_tests {
         );
         assert_eq!(transport.reads, [(512, 0), (512, 512), (76, 1024)]);
     }
+
+    #[test]
+    fn test_nv_read_skips_indexes_without_authread_and_no_da() {
+        for attributes in [TpmaNv::AUTHREAD, TpmaNv::NO_DA, TpmaNv::empty()] {
+            let mut transport = fake_transport(vec![1, 2, 3, 4]);
+            transport.nv_attributes = attributes;
+            assert_eq!(
+                read_nv_certificate(&mut transport, INDEX, Some(512)),
+                Ok(None)
+            );
+            assert_eq!(transport.commands, [TpmCc::NvReadPublic.value()]);
+            assert!(transport.reads.is_empty());
+        }
+    }
+
     #[test]
     fn test_read_nv_certificate_rejects_missing_or_zero_nv_buffer_max() {
         for nv_buffer_max in [None, Some(0), Some(MIN_NV_BUFFER_MAX - 1)] {

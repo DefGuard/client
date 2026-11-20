@@ -8,11 +8,10 @@ use tpm2_protocol::{
         TpmuSymMode,
     },
     frame::{TpmCreateCommand, TpmCreateResponse, TpmLoadCommand, TpmLoadResponse},
-    TpmUnmarshal,
 };
 
 use super::{
-    map_identity_rc, map_tpm_rc, marshal, password_auth, send_authenticated, with_primary,
+    map_identity_rc, map_tpm_rc, marshal, password_auth, receive, send_authenticated, with_primary,
     with_transient_response, Transport,
 };
 use crate::{DeviceIdentityError, TpmKeyBlobs};
@@ -33,7 +32,7 @@ pub(super) fn null_symmetric() -> TpmtSymDef {
     }
 }
 
-fn storage_template() -> TpmtPublic {
+pub(super) fn storage_template() -> TpmtPublic {
     TpmtPublic {
         object_type: TpmAlgId::Ecc,
         name_alg: TpmAlgId::Sha256,
@@ -55,14 +54,19 @@ fn storage_template() -> TpmtPublic {
     }
 }
 
-fn signing_template(restricted: bool) -> TpmtPublic {
+pub(super) enum SigningKey {
+    Attestation,
+    Identity,
+}
+
+pub(super) fn signing_template(key: SigningKey) -> TpmtPublic {
     let mut attributes = TpmaObject::FIXED_TPM
         | TpmaObject::FIXED_PARENT
         | TpmaObject::SENSITIVE_DATA_ORIGIN
         | TpmaObject::USER_WITH_AUTH
         | TpmaObject::NO_DA
         | TpmaObject::SIGN_ENCRYPT;
-    if restricted {
+    if matches!(key, SigningKey::Attestation) {
         attributes |= TpmaObject::RESTRICTED;
     }
     TpmtPublic {
@@ -100,8 +104,8 @@ pub(super) fn create(transport: &mut impl Transport) -> Result<CreatedKeys, Devi
         template,
         map_tpm_rc,
         |transport, parent| {
-            let ak = create_signing_key(transport, parent, true)?;
-            let identity_key = create_signing_key(transport, parent, false)?;
+            let ak = create_signing_key(transport, parent, SigningKey::Attestation)?;
+            let identity_key = create_signing_key(transport, parent, SigningKey::Identity)?;
             Ok((ak, identity_key))
         },
     )?;
@@ -115,7 +119,7 @@ pub(super) fn create(transport: &mut impl Transport) -> Result<CreatedKeys, Devi
 fn create_signing_key(
     transport: &mut impl Transport,
     parent: TpmHandle,
-    restricted: bool,
+    key: SigningKey,
 ) -> Result<TpmKeyBlobs, DeviceIdentityError> {
     let command = TpmCreateCommand {
         handles: [parent],
@@ -123,7 +127,7 @@ fn create_signing_key(
             inner: TpmsSensitiveCreate::default(),
         },
         in_public: Tpm2bPublic {
-            inner: signing_template(restricted),
+            inner: signing_template(key),
         },
         outside_info: Tpm2bData::new(),
         creation_pcr: TpmlPcrSelection::default(),
@@ -141,14 +145,26 @@ pub(super) fn reload(
     identity: &crate::TpmIdentity,
 ) -> Result<(), DeviceIdentityError> {
     let template = decode_public(&identity.srk_template)?;
+    with_key_under_srk(transport, template, &identity.ak, |transport, srk, _| {
+        with_loaded_key(transport, srk, &identity.identity_key, |_, _| Ok(()))
+    })
+}
+
+/// The operation receives the SRK handle, then the loaded key handle.
+pub(super) fn with_key_under_srk<T: Transport, R>(
+    transport: &mut T,
+    srk_template: TpmtPublic,
+    blobs: &TpmKeyBlobs,
+    operation: impl FnOnce(&mut T, TpmHandle, TpmHandle) -> Result<R, DeviceIdentityError>,
+) -> Result<R, DeviceIdentityError> {
     with_primary(
         transport,
         TpmRh::Owner,
-        template,
-        map_tpm_rc,
-        |transport, parent| {
-            with_loaded_key(transport, parent, &identity.ak, |transport, _| {
-                with_loaded_key(transport, parent, &identity.identity_key, |_, _| Ok(()))
+        srk_template,
+        map_identity_rc,
+        |transport, srk| {
+            with_loaded_key(transport, srk, blobs, |transport, key| {
+                operation(transport, srk, key)
             })
         },
     )
@@ -178,12 +194,7 @@ pub(super) fn with_loaded_key<T: Transport, R>(
 }
 
 pub(super) fn decode_public(bytes: &[u8]) -> Result<TpmtPublic, DeviceIdentityError> {
-    let (public, remaining) =
-        TpmtPublic::unmarshal(bytes).map_err(|_| DeviceIdentityError::IdentityLost)?;
-    if !remaining.is_empty() {
-        return Err(DeviceIdentityError::IdentityLost);
-    }
-    Ok(public)
+    receive(bytes).map_err(|_| DeviceIdentityError::IdentityLost)
 }
 
 #[cfg(test)]
@@ -202,7 +213,13 @@ mod tests {
 
     #[test]
     fn test_signing_templates_have_expected_attributes() {
-        assert_eq!(encoded_attributes(&signing_template(true)), 0x0005_0472);
-        assert_eq!(encoded_attributes(&signing_template(false)), 0x0004_0472);
+        assert_eq!(
+            encoded_attributes(&signing_template(SigningKey::Attestation)),
+            0x0005_0472
+        );
+        assert_eq!(
+            encoded_attributes(&signing_template(SigningKey::Identity)),
+            0x0004_0472
+        );
     }
 }

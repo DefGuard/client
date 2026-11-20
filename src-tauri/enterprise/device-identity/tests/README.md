@@ -81,12 +81,11 @@ cargo test -p device-identity --lib test_create_identity_returns_reloadable_key_
 
 ## Windows
 
-Run the ignored contract tests from an elevated terminal. The backend
-uses Windows TPM Base Services (TBS) and assumes empty Owner and Endorsement
-authorization. It selects an EK certificate in this order: ECC P-256 from TPM NV,
-ECC P-256 from the Windows cache, RSA-2048 from NV, then RSA-2048 from the Windows
-cache. If none is available it uses ECC P-256 without a certificate. The selected
-certificate must match the EK public key.
+The backend uses Windows TPM Base Services (TBS) and assumes empty Owner and
+Endorsement authorization. It selects an EK certificate in this order: ECC P-256
+from TPM NV, ECC P-256 from the Windows cache, RSA-2048 from NV, then RSA-2048
+from the Windows cache. If none is available it uses ECC P-256 without a
+certificate. The selected certificate must match the EK public key.
 
 From `src-tauri`, run the hardware tests in an elevated PowerShell:
 

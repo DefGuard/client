@@ -1,11 +1,15 @@
 use tpm2_protocol::{
     basic::{TpmUint16, TpmUint32, TpmUint8},
     constant::TPM_PCR_SELECT_MAX,
-    data::{TpmAlgId, TpmCap, TpmCc, TpmEccCurve, TpmPt, TpmiYesNo},
+    data::{
+        TpmAlgId, TpmCap, TpmCc, TpmPt, TpmRc, TpmRcBase, TpmiYesNo, TpmsRsaParms, TpmsSchemeHash,
+        TpmtPublic, TpmtPublicParms, TpmtRsaScheme, TpmuAsymScheme, TpmuPublicParms,
+    },
+    frame::{TpmTestParmsCommand, TpmTestParmsResponse},
     TpmMarshal, TpmResult, TpmSized, TpmUnmarshal, TpmWriter,
 };
 
-use super::{marshal, send, Transport};
+use super::{keys, map_tpm_rc, marshal, send, send_with_sessions_and_tpm_error, Transport};
 use crate::{
     AlgorithmCapability, AlgorithmId, AttestationMethod, BackendKind, Capabilities,
     CommandCapability, DeviceIdentityError, EccCurveId, PcrBankCapability, PlatformCapabilities,
@@ -125,7 +129,9 @@ fn read_pages<T>(
         let mut previous = None;
         for entry in &page.entries {
             let current = item_property(entry);
-            if current < property || previous.is_some_and(|previous| current <= previous) {
+            if capability != TpmCap::Pcrs
+                && (current < property || previous.is_some_and(|previous| current <= previous))
+            {
                 return Err(DeviceIdentityError::BackendFailure);
             }
             previous = Some(current);
@@ -136,7 +142,7 @@ fn read_pages<T>(
                 .any(|entry| item_property(entry) / size != property / size)
         });
         entries.extend(page.entries.into_iter().filter(|entry| {
-            item_group_size.map_or(true, |size| item_property(entry) / size == property / size)
+            item_group_size.is_none_or(|size| item_property(entry) / size == property / size)
         }));
         if crossed_group || !page.more_data {
             return Ok(entries);
@@ -185,6 +191,13 @@ fn read_page<T>(
     })
 }
 
+fn parse_property(reader: &mut Reader<'_>) -> Result<TpmProperty, DeviceIdentityError> {
+    Ok(TpmProperty {
+        id: reader.u32()?,
+        value: reader.u32()?,
+    })
+}
+
 pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, DeviceIdentityError> {
     let algorithms = read_pages(
         transport,
@@ -207,32 +220,7 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
         |curve| u32::from(curve.0),
         None,
     )?;
-    let fixed_properties = read_pages(
-        transport,
-        TpmCap::TpmProperties,
-        TpmPt::FamilyIndicator.value(),
-        |reader| {
-            Ok(TpmProperty {
-                id: reader.u32()?,
-                value: reader.u32()?,
-            })
-        },
-        |property| property.id,
-        Some(TPM_PT_GROUP),
-    )?;
-    let variable_properties = read_pages(
-        transport,
-        TpmCap::TpmProperties,
-        TpmPt::Permanent.value(),
-        |reader| {
-            Ok(TpmProperty {
-                id: reader.u32()?,
-                value: reader.u32()?,
-            })
-        },
-        |property| property.id,
-        Some(TPM_PT_GROUP),
-    )?;
+    let properties = read_properties(transport)?;
     let commands = read_pages(
         transport,
         TpmCap::Commands,
@@ -264,23 +252,17 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
         None,
     )?;
 
-    let has_algorithm = |id| algorithms.iter().any(|algorithm| algorithm.id.0 == id);
-    let ecdsa_supported = has_algorithm(TpmAlgId::Ecc.value())
-        && has_algorithm(TpmAlgId::Ecdsa.value())
-        && has_algorithm(TpmAlgId::Sha256.value())
-        && ecc_curves
-            .iter()
-            .any(|curve| curve.0 == TpmEccCurve::NistP256.value());
-    let ecdsa_status = if ecdsa_supported {
-        SupportStatus::Supported
-    } else {
-        SupportStatus::Unsupported
-    };
+    let ecdsa_status = check_parameters(
+        transport,
+        template_parameters(keys::signing_template(keys::SigningKey::Identity)),
+    )?;
+    let rsa_status = check_parameters(transport, rsa_parameters())?;
+    let srk_status = check_parameters(transport, template_parameters(keys::storage_template()))?;
     let details = TpmCapabilities {
         algorithms,
         ecc_curves,
-        fixed_properties,
-        variable_properties,
+        fixed_properties: properties.fixed,
+        variable_properties: properties.variable,
         commands,
         pcr_banks,
         profiles: vec![
@@ -290,46 +272,132 @@ pub(super) fn read(transport: &mut impl Transport) -> Result<Capabilities, Devic
             },
             ProfileSupport {
                 profile: ProfileId::RsaSsa2048Sha256,
-                support: SupportStatus::NotChecked,
+                support: rsa_status,
             },
         ],
     };
     Ok(Capabilities {
         backend: BackendKind::Tpm,
-        attestation_method: ecdsa_supported.then_some(AttestationMethod::TpmKeyAttestation),
+        attestation_method: (ecdsa_status == SupportStatus::Supported
+            && srk_status == SupportStatus::Supported)
+            .then_some(AttestationMethod::TpmKeyAttestation),
         details: PlatformCapabilities::Tpm(details),
     })
 }
 
-pub(super) fn nv_buffer_max(capabilities: &Capabilities) -> Option<u32> {
-    let PlatformCapabilities::Tpm(details) = &capabilities.details else {
-        return None;
-    };
-    details
-        .fixed_properties
-        .iter()
-        .find(|property| property.id == TpmPt::NvBufferMax.value())
-        .map(|property| property.value)
+pub(super) struct Properties {
+    fixed: Vec<TpmProperty>,
+    variable: Vec<TpmProperty>,
 }
-pub(super) fn check_hierarchy_auth(capabilities: &Capabilities) -> Result<(), DeviceIdentityError> {
-    let PlatformCapabilities::Tpm(details) = &capabilities.details else {
-        return Err(DeviceIdentityError::BackendFailure);
-    };
-    let permanent = details
-        .variable_properties
-        .iter()
-        .find(|property| property.id == TpmPt::Permanent.value())
-        .ok_or(DeviceIdentityError::BackendFailure)?;
-    if permanent.value & (OWNER_AUTH_SET | ENDORSEMENT_AUTH_SET) != 0 {
-        return Err(DeviceIdentityError::Unsupported);
+
+impl Properties {
+    pub(super) fn nv_buffer_max(&self) -> Option<u32> {
+        self.fixed
+            .iter()
+            .find(|property| property.id == TpmPt::NvBufferMax.value())
+            .map(|property| property.value)
     }
-    Ok(())
+
+    pub(super) fn check_hierarchy_auth(&self) -> Result<(), DeviceIdentityError> {
+        let permanent = self
+            .variable
+            .iter()
+            .find(|property| property.id == TpmPt::Permanent.value())
+            .ok_or(DeviceIdentityError::BackendFailure)?;
+        if permanent.value & (OWNER_AUTH_SET | ENDORSEMENT_AUTH_SET) != 0 {
+            return Err(DeviceIdentityError::Unsupported);
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn read_properties(
+    transport: &mut impl Transport,
+) -> Result<Properties, DeviceIdentityError> {
+    let fixed = read_pages(
+        transport,
+        TpmCap::TpmProperties,
+        TpmPt::FamilyIndicator.value(),
+        parse_property,
+        |property| property.id,
+        Some(TPM_PT_GROUP),
+    )?;
+    let variable = read_pages(
+        transport,
+        TpmCap::TpmProperties,
+        TpmPt::Permanent.value(),
+        parse_property,
+        |property| property.id,
+        Some(TPM_PT_GROUP),
+    )?;
+    Ok(Properties { fixed, variable })
+}
+
+fn template_parameters(template: TpmtPublic) -> TpmtPublicParms {
+    TpmtPublicParms {
+        object_type: template.object_type,
+        parameters: template.parameters,
+    }
+}
+
+fn check_parameters(
+    transport: &mut impl Transport,
+    parameters: TpmtPublicParms,
+) -> Result<SupportStatus, DeviceIdentityError> {
+    let result = send_with_sessions_and_tpm_error::<_, TpmTestParmsResponse>(
+        transport,
+        &TpmTestParmsCommand {
+            handles: [],
+            parameters,
+        },
+        &[],
+    )?;
+    match result {
+        Ok(_) => Ok(SupportStatus::Supported),
+        Err(TpmRc::Fmt1(code))
+            if matches!(
+                code.base,
+                TpmRcBase::Asymmetric
+                    | TpmRcBase::Attributes
+                    | TpmRcBase::Hash
+                    | TpmRcBase::Value
+                    | TpmRcBase::KeySize
+                    | TpmRcBase::Mode
+                    | TpmRcBase::Type
+                    | TpmRcBase::Kdf
+                    | TpmRcBase::Scheme
+                    | TpmRcBase::Symmetric
+                    | TpmRcBase::Curve
+            ) =>
+        {
+            Ok(SupportStatus::Unsupported)
+        }
+        Err(code) => Err(map_tpm_rc(code)),
+    }
+}
+
+fn rsa_parameters() -> TpmtPublicParms {
+    TpmtPublicParms {
+        object_type: TpmAlgId::Rsa,
+        parameters: TpmuPublicParms::Rsa(TpmsRsaParms {
+            symmetric: keys::null_symmetric(),
+            scheme: TpmtRsaScheme {
+                scheme: TpmAlgId::Rsassa,
+                details: TpmuAsymScheme::Hash(TpmsSchemeHash {
+                    hash_alg: TpmAlgId::Sha256,
+                }),
+            },
+            key_bits: TpmUint16::from(2048),
+            exponent: TpmUint32::from(0),
+        }),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
 
+    use super::super::{test_response_frame, TpmSt, TPM_HEADER_CODE_OFFSET, TPM_HEADER_SIZE};
     use super::*;
 
     struct FakeTransport {
@@ -339,8 +407,19 @@ mod tests {
 
     impl Transport for FakeTransport {
         fn submit(&mut self, command: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
+            if command.get(TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE)
+                == Some(&TpmCc::TestParms.value().to_be_bytes())
+            {
+                return self
+                    .responses
+                    .pop_front()
+                    .ok_or(DeviceIdentityError::BackendFailure);
+            }
             let property = command
-                .get(14..18)
+                .get(
+                    TPM_HEADER_SIZE + TpmCap::SIZE
+                        ..TPM_HEADER_SIZE + TpmCap::SIZE + TpmUint32::SIZE,
+                )
                 .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
                 .map(u32::from_be_bytes)
                 .ok_or(DeviceIdentityError::BackendFailure)?;
@@ -366,12 +445,84 @@ mod tests {
         body.extend_from_slice(&capability.value().to_be_bytes());
         body.extend_from_slice(&count.to_be_bytes());
         body.extend_from_slice(payload);
-        let mut response = Vec::with_capacity(10 + body.len());
-        response.extend_from_slice(&0x8001_u16.to_be_bytes());
-        response.extend_from_slice(&((10 + body.len()) as u32).to_be_bytes());
-        response.extend_from_slice(&0_u32.to_be_bytes());
-        response.extend_from_slice(&body);
-        response
+        test_response_frame(TpmSt::NoSessions, 0, &body)
+    }
+
+    #[test]
+    fn test_parameter_transport_error_propagates() {
+        struct UnavailableTransport;
+        impl Transport for UnavailableTransport {
+            fn submit(&mut self, _: &[u8]) -> Result<Vec<u8>, DeviceIdentityError> {
+                Err(DeviceIdentityError::TemporarilyUnavailable)
+            }
+        }
+        assert_eq!(
+            check_parameters(&mut UnavailableTransport, rsa_parameters()),
+            Err(DeviceIdentityError::TemporarilyUnavailable)
+        );
+    }
+
+    #[test]
+    fn test_parameter_response_mapping() {
+        const PARAMETER_ONE: u32 = 0x140;
+        for (code, expected) in [
+            (TpmRcBase::Success.value(), Ok(SupportStatus::Supported)),
+            (
+                TpmRcBase::Symmetric.value() | PARAMETER_ONE,
+                Ok(SupportStatus::Unsupported),
+            ),
+            (
+                TpmRcBase::Failure.value(),
+                Err(DeviceIdentityError::BackendFailure),
+            ),
+            (
+                TpmRcBase::Retry.value(),
+                Err(DeviceIdentityError::TemporarilyUnavailable),
+            ),
+        ] {
+            let mut transport = FakeTransport {
+                responses: VecDeque::from([test_response_frame(TpmSt::NoSessions, code, &[])]),
+                requested_properties: Vec::new(),
+            };
+            assert_eq!(
+                check_parameters(&mut transport, rsa_parameters()),
+                expected,
+                "{code:#x}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_attestation_requires_storage_parameters() {
+        for (srk_code, expected) in [
+            (0, Some(AttestationMethod::TpmKeyAttestation)),
+            (0x1d6, None),
+        ] {
+            let mut transport = FakeTransport {
+                responses: VecDeque::from([
+                    response(false, TpmCap::Algs, &[]),
+                    response_with_payload(false, TpmCap::EccCurves, 0, &[]),
+                    response_with_payload(false, TpmCap::TpmProperties, 0, &[]),
+                    response_with_payload(false, TpmCap::TpmProperties, 0, &[]),
+                    response_with_payload(false, TpmCap::Commands, 0, &[]),
+                    response_with_payload(false, TpmCap::Pcrs, 0, &[]),
+                    test_response_frame(TpmSt::NoSessions, 0, &[]),
+                    test_response_frame(TpmSt::NoSessions, 0, &[]),
+                    test_response_frame(TpmSt::NoSessions, srk_code, &[]),
+                ]),
+                requested_properties: Vec::new(),
+            };
+            let capabilities = read(&mut transport).expect("capabilities");
+            assert_eq!(capabilities.attestation_method, expected);
+            let PlatformCapabilities::Tpm(details) = capabilities.details else {
+                panic!("TPM details expected")
+            };
+            assert!(details
+                .profiles
+                .iter()
+                .all(|profile| profile.support == SupportStatus::Supported));
+            assert!(transport.responses.is_empty());
+        }
     }
 
     #[test]
@@ -405,6 +556,9 @@ mod tests {
                 ),
                 response_with_payload(false, TpmCap::Commands, 0, &[]),
                 response_with_payload(false, TpmCap::Pcrs, 0, &[]),
+                test_response_frame(TpmSt::NoSessions, 0, &[]),
+                test_response_frame(TpmSt::NoSessions, 0, &[]),
+                test_response_frame(TpmSt::NoSessions, 0, &[]),
             ]),
             requested_properties: Vec::new(),
         };
@@ -414,11 +568,6 @@ mod tests {
             capabilities.attestation_method,
             Some(AttestationMethod::TpmKeyAttestation)
         );
-        assert_eq!(
-            check_hierarchy_auth(&capabilities),
-            Err(DeviceIdentityError::Unsupported)
-        );
-        assert_eq!(nv_buffer_max(&capabilities), Some(512));
         let PlatformCapabilities::Tpm(details) = capabilities.details else {
             panic!("TPM details expected");
         };
@@ -435,6 +584,54 @@ mod tests {
                 && profile.support == SupportStatus::Supported
         }));
         assert!(transport.responses.is_empty());
+    }
+
+    #[test]
+    fn test_read_properties_skips_parameter_checks() {
+        for (permanent, expected_auth) in [
+            (0, Ok(())),
+            (OWNER_AUTH_SET, Err(DeviceIdentityError::Unsupported)),
+            (ENDORSEMENT_AUTH_SET, Err(DeviceIdentityError::Unsupported)),
+        ] {
+            let mut variable = vec![0x00, 0x00, 0x02, 0x00];
+            variable.extend_from_slice(&permanent.to_be_bytes());
+            let mut transport = FakeTransport {
+                responses: VecDeque::from([
+                    response_with_payload(
+                        false,
+                        TpmCap::TpmProperties,
+                        1,
+                        &[0x00, 0x00, 0x01, 0x2c, 0x00, 0x00, 0x02, 0x00],
+                    ),
+                    response_with_payload(false, TpmCap::TpmProperties, 1, &variable),
+                ]),
+                requested_properties: Vec::new(),
+            };
+
+            let properties = read_properties(&mut transport).expect("property pages");
+            assert_eq!(properties.check_hierarchy_auth(), expected_auth);
+            assert_eq!(properties.nv_buffer_max(), Some(512));
+            assert_eq!(transport.requested_properties, [0x100, 0x200]);
+            assert!(transport.responses.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_read_properties_requires_permanent_property() {
+        let mut transport = FakeTransport {
+            responses: VecDeque::from([
+                response_with_payload(false, TpmCap::TpmProperties, 0, &[]),
+                response_with_payload(false, TpmCap::TpmProperties, 0, &[]),
+            ]),
+            requested_properties: Vec::new(),
+        };
+
+        let properties = read_properties(&mut transport).expect("property pages");
+        assert_eq!(
+            properties.check_hierarchy_auth(),
+            Err(DeviceIdentityError::BackendFailure)
+        );
+        assert_eq!(properties.nv_buffer_max(), None);
     }
 
     #[test]
@@ -469,6 +666,40 @@ mod tests {
     }
 
     #[test]
+    fn test_read_pages_accepts_out_of_order_pcr_banks() {
+        let payload = [
+            0x00, 0x0b, 0x03, 0xff, 0xff, 0xff, 0x00, 0x04, 0x03, 0xff, 0xff, 0xff,
+        ];
+        let mut transport = FakeTransport {
+            responses: VecDeque::from([response_with_payload(false, TpmCap::Pcrs, 2, &payload)]),
+            requested_properties: Vec::new(),
+        };
+        let banks = read_pages(
+            &mut transport,
+            TpmCap::Pcrs,
+            0,
+            |reader| {
+                let hash_algorithm = AlgorithmId(reader.u16()?);
+                let selection_len = usize::from(reader.u8()?);
+                Ok(PcrBankCapability {
+                    hash_algorithm,
+                    selection: reader.bytes(selection_len)?,
+                })
+            },
+            |bank| u32::from(bank.hash_algorithm.0),
+            None,
+        )
+        .expect("valid PCR banks do not require an order");
+        assert_eq!(
+            banks
+                .iter()
+                .map(|bank| bank.hash_algorithm.0)
+                .collect::<Vec<_>>(),
+            [0x000b, 0x0004]
+        );
+    }
+
+    #[test]
     fn test_read_pages_keeps_vendor_bit_in_command_paging_key() {
         let standard_commands: Vec<_> = (1_u32..=CAPABILITY_PAGE_SIZE)
             .flat_map(|command| command.to_be_bytes())
@@ -490,6 +721,9 @@ mod tests {
                 response_with_payload(true, TpmCap::Commands, 1, &vendor_command_1),
                 response_with_payload(false, TpmCap::Commands, 1, &vendor_command_2),
                 response_with_payload(false, TpmCap::Pcrs, 0, &[]),
+                test_response_frame(TpmSt::NoSessions, 0, &[]),
+                test_response_frame(TpmSt::NoSessions, 0, &[]),
+                test_response_frame(TpmSt::NoSessions, 0, &[]),
             ]),
             requested_properties: Vec::new(),
         };

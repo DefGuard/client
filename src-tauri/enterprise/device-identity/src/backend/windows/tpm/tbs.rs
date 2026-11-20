@@ -13,10 +13,12 @@ use windows_sys::Win32::{
     },
 };
 
-use super::{Transport, TPM_HEADER_CODE_OFFSET, TPM_HEADER_SIZE};
+use super::{header_code, Transport, TPM_HEADER_SIZE};
 use crate::DeviceIdentityError;
 
 const TPM_RESPONSE_BUFFER_SIZE: usize = 8192;
+const TBS_REQUEST_RAW: u32 = 1 << 0;
+const TBS_INCLUDE_TPM20: u32 = 1 << 2;
 
 pub(super) struct TbsTransport {
     context: *mut c_void,
@@ -24,12 +26,14 @@ pub(super) struct TbsTransport {
 
 impl TbsTransport {
     pub(super) fn open() -> Result<Self, DeviceIdentityError> {
-        // requestRaw is bit 0 and includeTpm20 is bit 2 in TBS_CONTEXT_PARAMS2.
         let params = TBS_CONTEXT_PARAMS2 {
             version: TBS_CONTEXT_VERSION_TWO,
-            Anonymous: TBS_CONTEXT_PARAMS2_0 { asUINT32: 0b101 },
+            Anonymous: TBS_CONTEXT_PARAMS2_0 {
+                asUINT32: TBS_REQUEST_RAW | TBS_INCLUDE_TPM20,
+            },
         };
         let mut context = null_mut();
+        // The version field tells TBS to read the pointer as TBS_CONTEXT_PARAMS2.
         let status = unsafe {
             Tbsi_Context_Create(
                 (&params as *const TBS_CONTEXT_PARAMS2).cast::<TBS_CONTEXT_PARAMS>(),
@@ -57,6 +61,7 @@ impl Transport for TbsTransport {
         let mut response = vec![0; TPM_RESPONSE_BUFFER_SIZE];
         let mut response_len =
             u32::try_from(response.len()).map_err(|_| DeviceIdentityError::BackendFailure)?;
+        // response_len goes in as the buffer capacity and comes back as the bytes TBS wrote.
         let status = unsafe {
             Tbsip_Submit_Command(
                 self.context,
@@ -68,10 +73,7 @@ impl Transport for TbsTransport {
                 &mut response_len,
             )
         };
-        let command_code = command
-            .get(TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE)
-            .and_then(|bytes| <[u8; 4]>::try_from(bytes).ok())
-            .map(u32::from_be_bytes);
+        let command_code = header_code(command);
         if status != TBS_SUCCESS {
             debug!(
                 status = format_args!("{status:#010x}"),
@@ -89,11 +91,7 @@ impl Transport for TbsTransport {
         response.truncate(response_len);
 
         // TBS can report command blocking in the response while returning TBS_SUCCESS.
-        let response_code = u32::from_be_bytes(
-            response[TPM_HEADER_CODE_OFFSET..TPM_HEADER_SIZE]
-                .try_into()
-                .map_err(|_| DeviceIdentityError::BackendFailure)?,
-        );
+        let response_code = header_code(&response).ok_or(DeviceIdentityError::BackendFailure)?;
         if response_code != 0 {
             debug!(
                 response_code = format_args!("{response_code:#010x}"),
