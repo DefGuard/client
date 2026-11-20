@@ -1,13 +1,14 @@
-#[cfg(not(windows))]
-use std::os::unix::fs::PermissionsExt;
 use std::{
     fmt,
-    fs::{create_dir_all, OpenOptions},
+    fs::{create_dir_all, File, OpenOptions},
+    io::{self, Write},
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
     time::Duration,
 };
+#[cfg(unix)]
+use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 use clap::{builder::FalseyValueParser, command, value_parser, Arg, Command};
 use common::{dns_borrow, find_free_tcp_port, get_interface_name};
@@ -103,54 +104,44 @@ impl CliConfig {
         }
     }
 
-    /// Save configuration to a file at `path`.
+    /// Save configuration to a file at `path`, replacing it only after a complete write.
     fn save(&self, path: &Path) -> Result<(), CliError> {
-        let file = match OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)
-        {
-            Ok(file) => file,
-            Err(err) => {
-                return Err(CliError::ConfigSave(
-                    path.to_string_lossy().to_string(),
-                    format!("Failed to open configuration file for saving: {err}"),
-                ));
-            }
-        };
-        #[cfg(not(windows))]
-        {
-            debug!("Setting config file permissions.");
-            match file.metadata() {
-                Ok(meta) => {
-                    let mut perms = meta.permissions();
-                    perms.set_mode(0o600);
-                    if let Err(err) = file.set_permissions(perms) {
-                        warn!("Failed to set permissions for the configuration file: {err}");
-                    }
-                }
-                Err(err) => {
-                    warn!("Failed to set permissions for the configuration file: {err}");
-                }
-            }
-            debug!("Config file permissions have been set.");
-        }
-        match serde_json::to_writer(file, &self) {
-            Ok(()) => debug!(
-                "Configuration file has been saved to {}",
-                path.to_string_lossy()
-            ),
-            Err(err) => {
-                return Err(CliError::ConfigSave(
-                    path.to_string_lossy().to_string(),
-                    err.to_string(),
-                ));
-            }
-        }
+        let json = serde_json::to_vec(self).map_err(|err| {
+            CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
+        })?;
+        write_atomically(path, |file| file.write_all(&json)).map_err(|err| {
+            CliError::ConfigSave(path.to_string_lossy().to_string(), err.to_string())
+        })?;
+        debug!(
+            "Configuration file has been saved to {}",
+            path.to_string_lossy()
+        );
 
         Ok(())
     }
+}
+
+/// Write to a temporary file next to `path`, then rename it over `path`.
+/// On any failure `path` is left untouched and the temporary file is removed.
+fn write_atomically(
+    path: &Path,
+    write: impl FnOnce(&mut File) -> io::Result<()>,
+) -> io::Result<()> {
+    let dir = path
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    #[cfg(unix)]
+    let mut temp_file = tempfile::Builder::new()
+        .permissions(Permissions::from_mode(0o600))
+        .tempfile_in(dir)?;
+    #[cfg(not(unix))]
+    let mut temp_file = tempfile::NamedTempFile::new_in(dir)?;
+    write(temp_file.as_file_mut())?;
+    temp_file.as_file().sync_all()?;
+    temp_file.persist(path).map_err(|err| err.error)?;
+
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -800,5 +791,55 @@ mod tests {
             ..Default::default()
         };
         assert!(!format!("{config:?}").contains(&preshared_key));
+    }
+
+    #[test]
+    fn save_replaces_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        CliConfig::default().save(&path).unwrap();
+        let config = CliConfig {
+            token: Some("polling-token".to_owned()),
+            ..Default::default()
+        };
+        config.save(&path).unwrap();
+
+        assert_eq!(
+            CliConfig::load(&path).unwrap().token.as_deref(),
+            Some("polling-token")
+        );
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn failed_write_keeps_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let config = CliConfig {
+            token: Some("polling-token".to_owned()),
+            ..Default::default()
+        };
+        config.save(&path).unwrap();
+        let original = std::fs::read(&path).unwrap();
+
+        let result = write_atomically(&path, |file| {
+            file.write_all(b"{\"private_key\":")?;
+            Err(io::Error::new(io::ErrorKind::StorageFull, "disk full"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saved_config_is_owner_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        CliConfig::default().save(&path).unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
     }
 }
