@@ -3,6 +3,47 @@ set -e
 
 GROUP_NAME="defguard"
 SERVICE_NAME="defguard-service"
+STATE_DIR="/var/lib/defguard-client"
+GROUP_CREATED_MARKER="$STATE_DIR/defguard-group-created"
+ADDED_USERS_FILE="$STATE_DIR/defguard-group-members"
+
+is_group_member() {
+    id -Gn "$1" | tr ' ' '\n' | grep -Fxq "$GROUP_NAME"
+}
+
+cleanup_installer_group_changes() {
+    cleanup_failed=0
+
+    if [ -f "$ADDED_USERS_FILE" ]; then
+        while IFS= read -r user; do
+            [ -n "$user" ] || continue
+            if getent passwd "$user" >/dev/null && is_group_member "$user"; then
+                if ! gpasswd -d "$user" "$GROUP_NAME"; then
+                    echo "Warning: Could not remove installer-added group membership for $user."
+                    cleanup_failed=1
+                fi
+            fi
+        done < "$ADDED_USERS_FILE"
+    fi
+
+    if [ "$cleanup_failed" -ne 0 ]; then
+        return 1
+    fi
+
+    if [ -f "$GROUP_CREATED_MARKER" ]; then
+        local_group_entry=$(getent -s files group "$GROUP_NAME" 2>/dev/null || true)
+        local_group_members=$(printf '%s\n' "$local_group_entry" | cut -d: -f4)
+        if [ -n "$local_group_entry" ] && [ -z "$local_group_members" ]; then
+            if ! groupdel "$GROUP_NAME"; then
+                echo "Warning: Could not remove the installer-created local $GROUP_NAME group entry."
+                return 1
+            fi
+        fi
+    fi
+
+    rm -f "$GROUP_CREATED_MARKER" "$ADDED_USERS_FILE"
+    rmdir "$STATE_DIR" 2>/dev/null || true
+}
 
 case "$1" in
     1)
@@ -14,18 +55,14 @@ case "$1" in
         fi
         ;;
 
-    0|remove)
+    0|remove|purge)
         # Service file still exists, just disable it
         if [ -d /run/systemd/system ]; then
             systemctl disable "$SERVICE_NAME" || true
             systemctl daemon-reload
         fi
-        ;;
-
-    0|purge)
-        # Complete removal - clean up group too
-        if getent group "$GROUP_NAME" >/dev/null; then
-            groupdel "$GROUP_NAME" || true
+        if ! cleanup_installer_group_changes; then
+            echo "Warning: Could not fully clean up installer-created $GROUP_NAME group changes."
         fi
         ;;
 esac
