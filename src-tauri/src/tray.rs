@@ -12,7 +12,7 @@ use tauri::{
 };
 
 use crate::{
-    appstate::AppState,
+    appstate::{AppState, TrayIconRect},
     commands::{all_instances, all_locations, connect, disconnect, ConnectError, LocationInfo},
     database::{
         models::{instance::Instance, location::Location},
@@ -29,7 +29,7 @@ const SUBSCRIBE_UPDATES_LINK: &str = "https://defguard.net/newsletter";
 const JOIN_COMMUNITY_LINK: &str = "https://github.com/DefGuard/defguard/discussions/new/choose";
 const FOLLOW_US_LINK: &str = "https://floss.social/@defguard";
 
-const TRAY_ICON_ID: &str = "tray";
+pub(crate) const TRAY_ICON_ID: &str = "tray";
 
 const TRAY_EVENT_QUIT: &str = "quit";
 const TRAY_EVENT_SHOW: &str = "show";
@@ -38,18 +38,15 @@ const TRAY_EVENT_UPDATES: &str = "updates";
 const TRAY_EVENT_COMMUNITY: &str = "community";
 const TRAY_EVENT_FOLLOW: &str = "follow";
 
-fn store_tray_click_position(app: &AppHandle, event: &TrayIconEvent) {
-    let position = match event {
-        TrayIconEvent::Click {
-            button_state: MouseButtonState::Down,
-            rect,
-            ..
-        } => Some(rect.position.to_physical(1.0)),
-        _ => None,
-    };
-
-    if let Some(position) = position {
-        *app.state::<AppState>().tray_click_position.lock().unwrap() = Some(position);
+fn store_tray_icon_rect(app: &AppHandle, event: &TrayIconEvent) {
+    if let TrayIconEvent::Click {
+        button_state: MouseButtonState::Down,
+        rect,
+        ..
+    } = event
+    {
+        *app.state::<AppState>().tray_icon_rect.lock().unwrap() =
+            Some(TrayIconRect::from_rect(rect));
     }
 }
 
@@ -175,14 +172,10 @@ pub async fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(false)
-        // NOTE: on Linux this click handler never fires. The `tray-icon` appindicator
-        // backend (libayatana-appindicator) does not emit tray click events - only the
-        // context menu works (`show_menu_on_left_click` is likewise a no-op on Linux).
-        // So left-click cannot open/toggle the window on Linux; users interact via the
-        // right-click menu's Show/Hide items (handled in `handle_tray_menu_event`).
-        // This is an upstream limitation, not a bug here. Documented in known-issues.
+        // libayatana-appindicator never emits tray click events on Linux,
+        // so there the window opens only from the menu Show/Hide items
         .on_tray_icon_event(|icon, event| {
-            store_tray_click_position(icon.app_handle(), &event);
+            store_tray_icon_rect(icon.app_handle(), &event);
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,

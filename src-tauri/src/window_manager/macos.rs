@@ -63,7 +63,8 @@ fn get_tray_window_position(
     let mut x;
     let mut y;
 
-    if let Some(tray_position) = *app_state.tray_click_position.lock().unwrap() {
+    if let Some(tray_rect) = *app_state.tray_icon_rect.lock().unwrap() {
+        let tray_position = tray_rect.position;
         let monitor = get_monitor_for_position(app, tray_position.x, tray_position.y)?;
 
         let scale_factor = monitor.scale_factor();
