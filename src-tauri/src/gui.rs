@@ -240,6 +240,26 @@ pub fn run_app() {
                     }
                 });
             }
+            #[cfg(windows)]
+            if window.label() == COMPACT_WINDOW_ID && window.is_visible().unwrap_or(false) {
+                let display_changed = match event {
+                    // not draggable, so a move we did not make comes from a display change
+                    WindowEvent::Moved(position) => {
+                        *window
+                            .state::<AppState>()
+                            .tray_window_position
+                            .lock()
+                            .unwrap()
+                            != Some(*position)
+                    }
+                    WindowEvent::ScaleFactorChanged { .. } => true,
+                    _ => false,
+                };
+                if display_changed {
+                    debug!("Display configuration changed, hiding tray window");
+                    let _ = window.hide();
+                }
+            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
                 if label == COMPACT_WINDOW_ID || label == FULL_VIEW_WINDOW_ID {

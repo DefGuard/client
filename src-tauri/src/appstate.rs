@@ -10,7 +10,7 @@ use defguard_client_core::{
 use defguard_client_provisioning::ProvisioningConfig;
 use tauri::{
     async_runtime::{spawn, JoinHandle},
-    PhysicalPosition,
+    PhysicalPosition, PhysicalSize, Rect,
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -32,6 +32,31 @@ pub struct Ceremony {
     pub token: CancellationToken,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct TrayIconRect {
+    pub position: PhysicalPosition<f64>,
+    pub size: PhysicalSize<f64>,
+}
+
+impl TrayIconRect {
+    #[must_use]
+    pub fn from_rect(rect: &Rect) -> Self {
+        Self {
+            position: rect.position.to_physical(1.0),
+            size: rect.size.to_physical(1.0),
+        }
+    }
+
+    #[cfg(windows)]
+    #[must_use]
+    pub fn center(&self) -> (i32, i32) {
+        (
+            (self.position.x + self.size.width / 2.0) as i32,
+            (self.position.y + self.size.height / 2.0) as i32,
+        )
+    }
+}
+
 pub struct AppState {
     pub enrollment_sessions: Mutex<HashMap<Uuid, EnrollmentSession>>,
     pub mfa_config_sessions: Mutex<HashMap<Uuid, MfaConfigSession>>,
@@ -41,7 +66,8 @@ pub struct AppState {
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
     pub app_config: Mutex<AppConfig>,
-    pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
+    pub tray_icon_rect: Mutex<Option<TrayIconRect>>,
+    pub tray_window_position: Mutex<Option<PhysicalPosition<i32>>>,
     stat_threads: Mutex<HashMap<(Id, ConnectionType), JoinHandle<()>>>,
     pub provisioning_config: Mutex<Option<ProvisioningConfig>>,
     pub provisioning_instance_id: Mutex<Option<String>>,
@@ -68,7 +94,8 @@ impl AppState {
             log_watchers: Mutex::new(HashMap::new()),
             mfa_tasks: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
-            tray_click_position: Mutex::new(None),
+            tray_icon_rect: Mutex::new(None),
+            tray_window_position: Mutex::new(None),
             stat_threads: Mutex::new(HashMap::new()),
             provisioning_config: Mutex::new(provisioning_config),
             provisioning_instance_id: Mutex::new(None),

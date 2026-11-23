@@ -1,26 +1,23 @@
 use std::{ffi::OsString, os::windows::ffi::OsStringExt};
 
-use tauri::Manager;
+use tauri::{Manager, PhysicalPosition, WebviewWindow};
 use windows::Win32::{
     Foundation::{LPARAM, RECT},
     Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW},
     UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
 };
 
-use crate::window_manager::{
-    hide_shown_windows, WindowManager, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID,
-    COMPACT_WINDOW_WIDTH, FULL_VIEW_WINDOW_HEIGHT, FULL_VIEW_WINDOW_ID, FULL_VIEW_WINDOW_WIDTH,
-    WELCOME_WINDOW_HEIGHT, WELCOME_WINDOW_ID, WELCOME_WINDOW_WIDTH, WINDOW_GAP,
+use crate::{
+    appstate::{AppState, TrayIconRect},
+    tray::TRAY_ICON_ID,
+    window_manager::{
+        hide_shown_windows,
+        placement::{pick_display, place_tray_window, DisplayArea, PhysicalRect, TaskbarPosition},
+        WindowManager, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID, COMPACT_WINDOW_WIDTH,
+        FULL_VIEW_WINDOW_HEIGHT, FULL_VIEW_WINDOW_ID, FULL_VIEW_WINDOW_WIDTH,
+        WELCOME_WINDOW_HEIGHT, WELCOME_WINDOW_ID, WELCOME_WINDOW_WIDTH, WINDOW_GAP,
+    },
 };
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TaskbarPosition {
-    Bottom,
-    Top,
-    Left,
-    Right,
-    HiddenOrNone,
-}
 
 #[derive(Debug, Clone)]
 pub struct MonitorInfo {
@@ -30,9 +27,84 @@ pub struct MonitorInfo {
     pub physical_y: i32,
     pub physical_width: u32,
     pub physical_height: u32,
+    pub work_area: PhysicalRect,
     pub scale_factor: f64,
     pub taskbar_position: TaskbarPosition,
     pub taskbar_size: u32,
+}
+
+impl MonitorInfo {
+    #[must_use]
+    pub fn display_area(&self) -> DisplayArea {
+        DisplayArea {
+            monitor: PhysicalRect {
+                x: self.physical_x,
+                y: self.physical_y,
+                width: self.physical_width as i32,
+                height: self.physical_height as i32,
+            },
+            work: self.work_area,
+            scale_factor: self.scale_factor,
+            taskbar: self.taskbar_position,
+            is_primary: self.is_primary,
+        }
+    }
+}
+
+fn rect_from_win32(rect: RECT) -> PhysicalRect {
+    PhysicalRect {
+        x: rect.left,
+        y: rect.top,
+        width: rect.right - rect.left,
+        height: rect.bottom - rect.top,
+    }
+}
+
+fn tray_anchor(app: &tauri::AppHandle) -> Option<(i32, i32)> {
+    let current = app
+        .tray_by_id(TRAY_ICON_ID)
+        .and_then(|tray| tray.rect().ok().flatten())
+        .map(|rect| TrayIconRect::from_rect(&rect));
+    let rect = current.or_else(|| *app.state::<AppState>().tray_icon_rect.lock().unwrap());
+    rect.map(|rect| rect.center())
+}
+
+fn set_tray_window_position(window: &WebviewWindow, (x, y): (i32, i32)) -> tauri::Result<()> {
+    let position = PhysicalPosition::new(x, y);
+    // stored before moving so the Moved handler in gui.rs recognizes this move as ours
+    *window
+        .state::<AppState>()
+        .tray_window_position
+        .lock()
+        .unwrap() = Some(position);
+    window.set_position(position)
+}
+
+// Windows rescales a window after it moves onto a monitor with another DPI, which can push it
+// past the work area edge we placed it against
+fn keep_tray_window_inside(
+    window: &WebviewWindow,
+    anchor: Option<(i32, i32)>,
+    gap: i32,
+    display: &DisplayArea,
+) {
+    let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) else {
+        return;
+    };
+    let current = PhysicalRect {
+        x: position.x,
+        y: position.y,
+        width: size.width as i32,
+        height: size.height as i32,
+    };
+    if display.work.contains_rect(&current) {
+        return;
+    }
+    let (x, y) = place_tray_window(anchor, (current.width, current.height), gap, display);
+    debug!("Tray window at {current:?} left its work area, moving it to ({x}, {y})");
+    if let Err(err) = set_tray_window_position(window, (x, y)) {
+        warn!("Failed to move tray window back into its work area: {err}");
+    }
 }
 
 impl WindowManager {
@@ -51,7 +123,6 @@ impl WindowManager {
             info.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
 
             if GetMonitorInfoW(hmonitor, &mut info as *mut _ as *mut _).as_bool() {
-                // Name
                 let name_len = info
                     .szDevice
                     .iter()
@@ -63,7 +134,6 @@ impl WindowManager {
 
                 let is_primary = (info.monitorInfo.dwFlags & 1) != 0;
 
-                // DPI and Scaling
                 let mut dpi_x = 0;
                 let mut dpi_y = 0;
                 let scale_factor = if GetDpiForMonitor(
@@ -88,7 +158,6 @@ impl WindowManager {
                     - info.monitorInfo.rcMonitor.top)
                     .unsigned_abs();
 
-                // Taskbar position and size
                 let mut taskbar_position = TaskbarPosition::HiddenOrNone;
                 let mut taskbar_size = 0;
 
@@ -116,6 +185,7 @@ impl WindowManager {
                     physical_y,
                     physical_width,
                     physical_height,
+                    work_area: rect_from_win32(work),
                     scale_factor,
                     taskbar_position,
                     taskbar_size,
@@ -138,13 +208,11 @@ impl WindowManager {
     }
 
     pub fn open_tray(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWindow> {
-        let state = tauri::Manager::state::<crate::appstate::AppState>(app);
-        let tray_pos = *state.tray_click_position.lock().unwrap();
-        let monitors = Self::get_monitors();
-        let primary = monitors
+        let anchor = tray_anchor(app);
+        let displays: Vec<DisplayArea> = Self::get_monitors()
             .iter()
-            .find(|m| m.is_primary)
-            .unwrap_or(&monitors[0]);
+            .map(MonitorInfo::display_area)
+            .collect();
 
         let window = if let Some(window) = app.get_webview_window(COMPACT_WINDOW_ID) {
             let _ = window.unminimize();
@@ -153,79 +221,31 @@ impl WindowManager {
             Self::build_tray_window(app)?
         };
 
-        let logical_width = COMPACT_WINDOW_WIDTH;
-        let logical_height = COMPACT_WINDOW_HEIGHT;
-
-        let physical_width = (logical_width * primary.scale_factor) as i32;
-        let physical_height = (logical_height * primary.scale_factor) as i32;
-
-        let physical_gap = (WINDOW_GAP * primary.scale_factor) as i32;
-
-        let work_left = primary.physical_x
-            + if primary.taskbar_position == TaskbarPosition::Left {
-                primary.taskbar_size as i32
-            } else {
-                0
-            };
-        let work_top = primary.physical_y
-            + if primary.taskbar_position == TaskbarPosition::Top {
-                primary.taskbar_size as i32
-            } else {
-                0
-            };
-        let work_right = primary.physical_x + primary.physical_width as i32
-            - if primary.taskbar_position == TaskbarPosition::Right {
-                primary.taskbar_size as i32
-            } else {
-                0
-            };
-        let work_bottom = primary.physical_y + primary.physical_height as i32
-            - if primary.taskbar_position == TaskbarPosition::Bottom {
-                primary.taskbar_size as i32
-            } else {
-                0
-            };
-
-        let (final_x, final_y) = if let Some(pos) = tray_pos {
-            let icon_x = pos.x as i32;
-            let icon_y = pos.y as i32;
-            let icon_width = 0;
-            let icon_height = 0;
-
-            let icon_center_x = icon_x + (icon_width / 2);
-            let default_x = icon_center_x - (physical_width / 2);
-            let max_x = work_right - physical_gap - physical_width;
-            let min_x = work_left + physical_gap;
-            let clamped_x = default_x.clamp(min_x, max_x);
-
-            let icon_center_y = icon_y + (icon_height / 2);
-            let default_y = icon_center_y - (physical_height / 2);
-            let max_y = work_bottom - physical_gap - physical_height;
-            let min_y = work_top + physical_gap;
-            let clamped_y = default_y.clamp(min_y, max_y);
-
-            match primary.taskbar_position {
-                TaskbarPosition::Bottom => {
-                    (clamped_x, work_bottom - physical_height - physical_gap)
-                }
-                TaskbarPosition::Top => (clamped_x, work_top + physical_gap),
-                TaskbarPosition::Left => (work_left + physical_gap, clamped_y),
-                TaskbarPosition::Right => (work_right - physical_width - physical_gap, clamped_y),
-                _ => (clamped_x, work_bottom - physical_height - physical_gap),
-            }
-        } else {
-            let x = work_right - physical_width - physical_gap;
-            let y = work_bottom - physical_height - physical_gap;
-            (x, y)
-        };
-
         window.set_always_on_top(true)?;
-        window.set_position(tauri::PhysicalPosition::new(final_x, final_y))?;
+
+        let placement = pick_display(anchor, &displays).copied().map(|display| {
+            let gap = (WINDOW_GAP * display.scale_factor) as i32;
+            (display, gap)
+        });
+        if let Some((display, gap)) = placement {
+            let size = (
+                (COMPACT_WINDOW_WIDTH * display.scale_factor) as i32,
+                (COMPACT_WINDOW_HEIGHT * display.scale_factor) as i32,
+            );
+            set_tray_window_position(&window, place_tray_window(anchor, size, gap, &display))?;
+            keep_tray_window_inside(&window, anchor, gap, &display);
+        } else {
+            warn!("No monitors found, tray window keeps its previous position");
+        }
+
         window.show()?;
 
         let window_focus = window.clone();
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(50));
+            if let Some((display, gap)) = placement {
+                keep_tray_window_inside(&window_focus, anchor, gap, &display);
+            }
             // Toggle always_on_top to force Z-order above the Windows tray overflow popup
             let _ = window_focus.set_always_on_top(false);
             let _ = window_focus.set_always_on_top(true);
