@@ -145,11 +145,14 @@ pub async fn bring_up(
     #[cfg(target_os = "macos")]
     {
         let tunnel_config = match target {
-            ConnectionTarget::Location(loc) => loc.tunnel_configuration(psk, mtu).await,
-            ConnectionTarget::Tunnel(tun) => tun.tunnel_configuration(mtu),
+            ConnectionTarget::Location(loc) => {
+                loc.tunnel_configuration(psk, mtu, route_all_traffic).await
+            }
+            ConnectionTarget::Tunnel(tun) => tun.tunnel_configuration(mtu, route_all_traffic),
         }?;
 
-        tunnel_config.save();
+        // Otherwise the stale profile would start.
+        tunnel_config.save()?;
         sleep(TUNNEL_START_DELAY).await;
         tunnel_config.start_tunnel();
 
