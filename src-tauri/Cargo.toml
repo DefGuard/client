@@ -56,7 +56,7 @@ tower = "0.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
-url = "2"
+url = "2.5.9"
 uuid = { version = "1", features = ["v4"] }
 vergen-git2 = { version = "10.0", features = ["build"] }
 webbrowser = "1.2"
