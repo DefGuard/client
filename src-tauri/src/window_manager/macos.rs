@@ -1,9 +1,10 @@
 use objc2_app_kit::{NSWindow, NSWindowButton, NSWindowStyleMask, NSWindowTitleVisibility};
-use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, Position, Runtime, WebviewWindow,
-};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Position, Runtime, WebviewWindow};
 
-use crate::{appstate::AppState, window_manager::WINDOW_GAP};
+use crate::{
+    appstate::AppState,
+    window_manager::{monitor_for_point, WINDOW_GAP},
+};
 
 pub(crate) fn enable_rounded_corners<R: Runtime>(
     window: &WebviewWindow<R>,
@@ -35,24 +36,11 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(
         .map_err(|err| err.to_string())
 }
 
-/// Try to get monitor at the given position, with a fall back to primary monitor, and then to the
-/// first one on the list of available monitors.
-fn get_monitor_for_position(app: &AppHandle, x: f64, y: f64) -> Option<Monitor> {
-    if let Ok(Some(monitor)) = app.monitor_from_point(x, y) {
-        return Some(monitor);
-    }
-
-    if let Ok(Some(monitor)) = app.primary_monitor() {
-        return Some(monitor);
-    }
-
-    // On macOS, it seems this is the only working method (as of Tauri 2.11), but fortunately it
-    // returns the current monitor as the first one.
-    if let Ok(mut monitors) = app.available_monitors() {
-        monitors.pop()
-    } else {
-        None
-    }
+/// `value.clamp(min, max)` that never panics: when the window is larger than the display
+/// (`min > max`, e.g. "Larger Text" display scaling) `min` wins and the window sticks to the top
+/// or left edge. `f64::clamp` panics there, and with `panic = "abort"` that kills the app.
+fn clamp_pinned(value: f64, min: f64, max: f64) -> f64 {
+    value.min(max).max(min)
 }
 
 fn get_tray_window_position(
@@ -65,7 +53,7 @@ fn get_tray_window_position(
 
     if let Some(tray_rect) = *app_state.tray_icon_rect.lock().unwrap() {
         let tray_position = tray_rect.position;
-        let monitor = get_monitor_for_position(app, tray_position.x, tray_position.y)?;
+        let monitor = monitor_for_point(app, Some(tray_position))?;
 
         let scale_factor = monitor.scale_factor();
         let monitor_position = monitor.position().to_logical::<f64>(scale_factor);
@@ -75,11 +63,13 @@ fn get_tray_window_position(
         x = tray_position.x;
         y = tray_position.y;
 
-        x = x.clamp(
+        x = clamp_pinned(
+            x,
             monitor_position.x,
             monitor_position.x + monitor_size.width - window_size.width,
         );
-        y = y.clamp(
+        y = clamp_pinned(
+            y,
             monitor_position.y,
             monitor_position.y + monitor_size.height - window_size.height,
         );

@@ -1,8 +1,10 @@
 use defguard_client_core::version::mark_welcome_shown;
 use tauri::{
-    async_runtime::block_on, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow,
+    async_runtime::block_on, AppHandle, Emitter, LogicalSize, Manager, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
+#[cfg(not(windows))]
+use tauri::{Monitor, PhysicalPosition};
 
 use crate::{
     appstate::AppState,
@@ -81,6 +83,158 @@ fn hide_shown_windows(app: &AppHandle, skip_label: &str) {
     for (label, window) in app.webview_windows() {
         if label != skip_label && window.is_visible().unwrap_or(false) {
             let _ = window.hide();
+        }
+    }
+}
+
+/// Usable part of a display (without menu bar, Dock or taskbar) in physical pixels, together with
+/// the scale factor needed to turn it into logical (window) units.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct WorkArea {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
+
+impl WorkArea {
+    #[cfg(not(windows))]
+    fn from_monitor(monitor: &Monitor) -> Self {
+        let size = monitor.work_area().size;
+        Self {
+            width: size.width,
+            height: size.height,
+            scale_factor: monitor.scale_factor(),
+        }
+    }
+
+    /// Work area in logical units, `None` when the reported values are unusable.
+    fn logical_size(&self) -> Option<(f64, f64)> {
+        if !self.scale_factor.is_finite()
+            || self.scale_factor <= 0.0
+            || self.width == 0
+            || self.height == 0
+        {
+            return None;
+        }
+        Some((
+            f64::from(self.width) / self.scale_factor,
+            f64::from(self.height) / self.scale_factor,
+        ))
+    }
+}
+
+/// Whether the fixed-size compact (tray) window fits inside `work`. Unusable display data counts as
+/// a fit, so a bad reading never takes the tray away.
+#[must_use]
+pub(crate) fn compact_window_fits(work: WorkArea) -> bool {
+    work.logical_size().is_none_or(|(width, height)| {
+        width >= COMPACT_WINDOW_WIDTH && height >= COMPACT_WINDOW_HEIGHT
+    })
+}
+
+/// Minimum inner size of the full view for the given available logical space: the design minimum,
+/// relaxed on displays too small to hold it so the window can always be shown in full.
+#[must_use]
+pub(crate) fn full_view_min_size((width, height): (f64, f64)) -> (f64, f64) {
+    let relax = |available: f64, default: f64| {
+        if available.is_finite() && available > 0.0 {
+            default.min(available)
+        } else {
+            default
+        }
+    };
+    (
+        relax(width, FULL_VIEW_WINDOW_WIDTH),
+        relax(height, FULL_VIEW_WINDOW_HEIGHT),
+    )
+}
+
+/// Monitor containing `point` (physical), then the primary monitor, then the first one listed.
+#[cfg(not(windows))]
+pub(crate) fn monitor_for_point(
+    app: &AppHandle,
+    point: Option<PhysicalPosition<f64>>,
+) -> Option<Monitor> {
+    if let Some(point) = point {
+        if let Ok(Some(monitor)) = app.monitor_from_point(point.x, point.y) {
+            return Some(monitor);
+        }
+    }
+    if let Ok(Some(monitor)) = app.primary_monitor() {
+        return Some(monitor);
+    }
+    // On macOS this is sometimes the only working method, and it lists the current monitor first.
+    app.available_monitors()
+        .ok()
+        .and_then(|monitors| monitors.into_iter().next())
+}
+
+/// Work area of the display the tray window would open on.
+#[cfg(not(windows))]
+fn tray_work_area(app: &AppHandle) -> Option<WorkArea> {
+    let anchor = app
+        .state::<AppState>()
+        .tray_icon_rect
+        .lock()
+        .unwrap()
+        .map(|rect| rect.position);
+    monitor_for_point(app, anchor).map(|monitor| WorkArea::from_monitor(&monitor))
+}
+
+#[cfg(windows)]
+fn tray_work_area(app: &AppHandle) -> Option<WorkArea> {
+    windows::tray_work_area(app)
+}
+
+/// Whether the compact window fits on the display it would open on. When it can't be determined
+/// the tray is allowed, matching the behavior before this check existed.
+pub(crate) fn tray_window_fits(app: &AppHandle) -> bool {
+    let Some(work) = tray_work_area(app) else {
+        debug!("No display found for the tray window, assuming it fits");
+        return true;
+    };
+    let fits = compact_window_fits(work);
+    if !fits {
+        info!(
+            "Tray window ({COMPACT_WINDOW_WIDTH}x{COMPACT_WINDOW_HEIGHT}) does not fit the display \
+            work area {work:?}, using the full view instead"
+        );
+    }
+    fits
+}
+
+/// Relax the full view's minimum size and shrink it when needed, so it fits inside `work`.
+/// On normal displays this leaves the window as it is.
+pub(crate) fn fit_full_view_to_work_area(window: &WebviewWindow, work: WorkArea) {
+    let Some((work_width, work_height)) = work.logical_size() else {
+        return;
+    };
+    let scale = window
+        .scale_factor()
+        .ok()
+        .filter(|scale| scale.is_finite() && *scale > 0.0)
+        .unwrap_or(work.scale_factor);
+    let (Ok(inner), Ok(outer)) = (window.inner_size(), window.outer_size()) else {
+        return;
+    };
+    let inner = inner.to_logical::<f64>(scale);
+    let outer = outer.to_logical::<f64>(scale);
+    // Decorations (the Linux title bar) take part of the work area too.
+    let available = (
+        (work_width - (outer.width - inner.width).max(0.0)).max(0.0),
+        (work_height - (outer.height - inner.height).max(0.0)).max(0.0),
+    );
+
+    let (min_width, min_height) = full_view_min_size(available);
+    if let Err(err) = window.set_min_size(Some(LogicalSize::new(min_width, min_height))) {
+        warn!("Failed to set full view minimum size: {err}");
+    }
+    if inner.width > available.0 || inner.height > available.1 {
+        let width = inner.width.min(available.0).max(min_width);
+        let height = inner.height.min(available.1).max(min_height);
+        debug!("Shrinking full view to {width}x{height} to fit work area {work:?}");
+        if let Err(err) = window.set_size(LogicalSize::new(width, height)) {
+            warn!("Failed to shrink full view to the work area: {err}");
         }
     }
 }
@@ -183,6 +337,14 @@ impl WindowManager {
         } else {
             Self::build_full_view_window(app)?
         };
+        let monitor = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .or_else(|| monitor_for_point(app, None));
+        if let Some(monitor) = monitor {
+            fit_full_view_to_work_area(&window, WorkArea::from_monitor(&monitor));
+        }
         #[cfg(target_os = "macos")]
         {
             let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
@@ -222,9 +384,20 @@ pub mod windows;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
-// Export tauri commands so they can be registered in main.rs
-pub(crate) fn show_tray_window(app: &AppHandle) {
-    let _ = WindowManager::open_tray(app);
+/// Show the compact (tray) window, or the full view when the compact window does not fit the
+/// display. Returns the label of the window that was shown.
+pub(crate) fn show_tray_window(app: &AppHandle) -> &'static str {
+    if tray_window_fits(app) {
+        if let Err(err) = WindowManager::open_tray(app) {
+            error!("Failed to open tray window: {err}");
+        }
+        COMPACT_WINDOW_ID
+    } else {
+        if let Err(err) = WindowManager::open_full_view(app) {
+            error!("Failed to open full view in place of the tray window: {err}");
+        }
+        FULL_VIEW_WINDOW_ID
+    }
 }
 
 fn prefers_full_view(app: &AppHandle) -> bool {
@@ -236,10 +409,10 @@ fn prefers_full_view(app: &AppHandle) -> bool {
 }
 
 /// Show the compact (tray) window when there is tray content (a non-service
-/// location or a tunnel) and the "open in full window" setting is off,
-/// otherwise fall back to the full view.
+/// location or a tunnel), the "open in full window" setting is off and the
+/// compact window fits the display, otherwise fall back to the full view.
 pub fn show_tray_or_full_view(app: &AppHandle) {
-    if !prefers_full_view(app) && block_on(has_tray_content()) {
+    if !prefers_full_view(app) && block_on(has_tray_content()) && tray_window_fits(app) {
         // Hide the full view if it is open and visible (not minimized) so only the compact window is shown.
         if let Some(full_view) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
             let full_view_visible = full_view.is_visible().ok().unwrap_or(false);
@@ -247,7 +420,9 @@ pub fn show_tray_or_full_view(app: &AppHandle) {
                 let _ = full_view.hide();
             }
         }
-        show_tray_window(app);
+        if let Err(err) = WindowManager::open_tray(app) {
+            error!("Failed to open tray window: {err}");
+        }
     } else {
         let _ = WindowManager::open_full_view(app);
     }
@@ -272,8 +447,7 @@ pub fn trigger_mfa(app: &AppHandle, location: &Location<Id>) {
         let _ = window.set_focus();
         FULL_VIEW_WINDOW_ID
     } else {
-        show_tray_window(app);
-        COMPACT_WINDOW_ID
+        show_tray_window(app)
     };
     let payload = mfa_trigger_payload(location);
     let _ = app.emit_to(target, EventKey::MfaTrigger.into(), &payload);
@@ -389,11 +563,13 @@ pub fn close_tray_window(app: AppHandle) {
 pub fn close_welcome_window(app: AppHandle) {
     info!("close_welcome_window called");
 
-    let config_dir = app
-        .path()
-        .app_data_dir()
-        .expect("Failed to access app data");
-    mark_welcome_shown(&config_dir, &app.package_info().version);
+    match app.path().app_data_dir() {
+        Ok(config_dir) => mark_welcome_shown(&config_dir, &app.package_info().version),
+        Err(err) => error!(
+            "close_welcome_window: Failed to access app data directory, the welcome screen will \
+            show again on next launch: {err}"
+        ),
+    }
 
     show_tray_or_full_view(&app);
 
@@ -416,7 +592,13 @@ pub fn close_welcome_window(app: AppHandle) {
 #[tauri::command]
 pub fn swap_to_tray(app: AppHandle) {
     info!("swap_to_tray called");
-    show_tray_window(&app);
+    if !tray_window_fits(&app) {
+        info!("swap_to_tray: Tray window does not fit the display, keeping the full view");
+        return;
+    }
+    if let Err(err) = WindowManager::open_tray(&app) {
+        error!("swap_to_tray task: Failed to open tray window: {err:?}");
+    }
     if let Some(window) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
         if let Err(err) = window.hide() {
             error!("swap_to_tray task: Failed to hide full-view window: {err:?}");
