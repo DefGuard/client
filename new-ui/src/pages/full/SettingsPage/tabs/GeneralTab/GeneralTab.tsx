@@ -80,7 +80,7 @@ export const GeneralTab = ({ appConfig }: Props) => {
       />
       <Divider spacing={ThemeSpacing.Xl} />
       <Toggle
-        label="Auto start OpenID MFA"
+        label="Open Google, Microsoft, or other sign-in pages automatically during MFA"
         helper="When connecting to a location protected by OpenID MFA, Defguard skips the sign-in prompt and opens your identity provider's login page in the browser right away."
         active={appConfig.auto_start_openid_mfa}
         onClick={() =>
