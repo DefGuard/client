@@ -2,6 +2,7 @@ use core::fmt;
 use std::{collections::HashMap, env, future::Future, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
+use defguard_client_common::{UPDATE_CHECK_PRODUCT, UPDATE_CHECK_URL};
 #[cfg(not(target_os = "macos"))]
 use defguard_client_core::connection::daemon_client::DAEMON_CLIENT;
 use defguard_client_core::{
@@ -36,8 +37,6 @@ use struct_patch::Patch;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
-
-const UPDATE_URL: &str = "https://pkgs.defguard.net/api/update/check";
 
 use crate::{
     app_config::{AppConfig, AppConfigPatch},
@@ -1531,8 +1530,6 @@ pub struct AppVersionInfo {
     pub summary: Option<String>,
 }
 
-const PRODUCT_NAME: &str = "defguard-client";
-
 fn reported_app_version(package_version: &str) -> String {
     defguard_client_core::version::select_reported_app_version(
         package_version,
@@ -1552,7 +1549,7 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
     let operating_system = env::consts::OS;
 
     let mut request_data = HashMap::new();
-    request_data.insert("product", PRODUCT_NAME);
+    request_data.insert("product", UPDATE_CHECK_PRODUCT);
     request_data.insert("client_version", &app_version);
     request_data.insert("operating_system", operating_system);
 
@@ -1562,7 +1559,11 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
     );
 
     let client = reqwest::Client::new();
-    let res = client.post(UPDATE_URL).json(&request_data).send().await;
+    let res = client
+        .post(UPDATE_CHECK_URL)
+        .json(&request_data)
+        .send()
+        .await;
 
     if let Ok(response) = res {
         let response_json = response.json::<AppVersionInfo>().await;
@@ -1582,6 +1583,40 @@ pub async fn get_latest_app_version(handle: AppHandle) -> Result<AppVersionInfo,
         let err = res.err().unwrap();
         error!("Failed to fetch latest application version {err}");
         Err(Error::CommandError(err.to_string()))
+    }
+}
+
+/// Asks the service to install the latest release, then quits so the installer can replace the app.
+///
+/// The service relaunches the app once the update is done.
+#[tauri::command(async)]
+pub async fn start_update(handle: AppHandle) -> Result<String, Error> {
+    #[cfg(windows)]
+    {
+        let version = DAEMON_CLIENT
+            .clone()
+            .start_update(())
+            .await
+            .map_err(|status| {
+                error!("The service failed to start the update: {status}");
+                Error::CommandError(status.message().to_string())
+            })?
+            .into_inner()
+            .version;
+        info!("The service is installing version {version}, quitting the application.");
+        tauri::async_runtime::spawn(async move {
+            // Give the UI a moment to receive the response.
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            handle.exit(0);
+        });
+        Ok(version)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = handle;
+        Err(Error::CommandError(
+            "Automatic updates are only supported on Windows".into(),
+        ))
     }
 }
 

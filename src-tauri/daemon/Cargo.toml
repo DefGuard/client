@@ -30,6 +30,11 @@ nix.workspace = true
 [target.'cfg(windows)'.dependencies]
 async-stream.workspace = true
 futures-core.workspace = true
+known-folders.workspace = true
+reqwest.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 windows-core.workspace = true
 windows-service.workspace = true
 windows-sys.workspace = true

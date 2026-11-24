@@ -132,6 +132,9 @@ const getPlatformHeader = (): Promise<string> => invoke(TauriCommand.GetPlatform
 const getLatestAppVersion = (): Promise<NewAppVersionInfo> =>
   invoke(TauriCommand.GetLatestAppVersion);
 
+// Resolves with the version being installed; the app quits shortly after.
+const startUpdate = (): Promise<string> => invoke(TauriCommand.StartUpdate);
+
 const getClientBuildVersion = (): Promise<string> =>
   invoke(TauriCommand.GetClientBuildVersion);
 
@@ -385,6 +388,7 @@ export const api = {
   takePendingAddInstance,
   getPlatformHeader,
   getLatestAppVersion,
+  startUpdate,
   getClientBuildVersion,
   openLink,
   startGlobalLogWatcher,
