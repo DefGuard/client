@@ -101,7 +101,7 @@ edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
 rust-version = "1.95"
-version = "2.2.1"
+version = "2.2.2"
 
 [package]
 name = "defguard-client"
