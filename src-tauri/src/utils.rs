@@ -538,9 +538,9 @@ pub async fn setup_interface_tunnel(
 ) -> Result<String, Error> {
     debug!("Setting up interface for tunnel: {tunnel}");
 
-    let tunnel_config = tunnel.tunnel_configuration(mtu)?;
+    let tunnel_config = tunnel.tunnel_configuration(mtu, None)?;
 
-    tunnel_config.save();
+    tunnel_config.save()?;
     tokio::time::sleep(TUNNEL_START_DELAY).await;
     tunnel_config.start_tunnel();
 
@@ -687,11 +687,7 @@ pub(crate) async fn handle_connection_for_location(
 ) -> Result<(), Error> {
     debug!("Setting up the connection for location {}", location.name);
     let state = handle.state::<AppState>();
-    let mtu = state
-        .app_config
-        .lock()
-        .expect("failed to lock app state")
-        .mtu();
+    let mtu = state.mtu();
     let interface_name = bring_up(
         ConnectionTarget::Location(location.clone()),
         preshared_key,
@@ -735,11 +731,7 @@ pub(crate) async fn handle_connection_for_tunnel(
     let tunnel_preshared_key = tunnel.preshared_key.clone();
     debug!("Setting up the connection for tunnel: {tunnel_name}");
     let state = handle.state::<AppState>();
-    let mtu = state
-        .app_config
-        .lock()
-        .expect("failed to lock app state")
-        .mtu();
+    let mtu = state.mtu();
     let interface_name = bring_up(
         ConnectionTarget::Tunnel(tunnel),
         tunnel_preshared_key,

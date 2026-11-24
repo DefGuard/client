@@ -102,13 +102,7 @@ async fn startup(app_handle: &AppHandle) {
         let semaphore = Arc::new(AtomicBool::new(false));
         let semaphore_clone = Arc::clone(&semaphore);
 
-        // Retrieve MTU from `AppConfig`.
-        let app_state = app_handle.state::<AppState>();
-        let mtu = app_state
-            .app_config
-            .lock()
-            .expect("failed to lock app state")
-            .mtu();
+        let mtu = app_handle.state::<AppState>().mtu();
         let handle = async_runtime::spawn(async move {
             if let Err(err) = sync_locations_and_tunnels(mtu).await {
                 error!("Failed to sync locations and tunnels: {err}");
@@ -245,6 +239,26 @@ pub fn run_app() {
                         error!("Failed to reconfigure tray icon on theme change: {err}");
                     }
                 });
+            }
+            #[cfg(windows)]
+            if window.label() == COMPACT_WINDOW_ID && window.is_visible().unwrap_or(false) {
+                let display_changed = match event {
+                    // not draggable, so a move we did not make comes from a display change
+                    WindowEvent::Moved(position) => {
+                        *window
+                            .state::<AppState>()
+                            .tray_window_position
+                            .lock()
+                            .unwrap()
+                            != Some(*position)
+                    }
+                    WindowEvent::ScaleFactorChanged { .. } => true,
+                    _ => false,
+                };
+                if display_changed {
+                    debug!("Display configuration changed, hiding tray window");
+                    let _ = window.hide();
+                }
             }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();

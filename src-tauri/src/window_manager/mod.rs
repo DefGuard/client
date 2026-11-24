@@ -213,6 +213,9 @@ impl WindowManager {
     }
 }
 
+#[cfg(any(windows, test))]
+pub mod placement;
+
 #[cfg(windows)]
 pub mod windows;
 

@@ -1,12 +1,4 @@
-use std::{
-    hint::spin_loop,
-    net::IpAddr,
-    str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{net::IpAddr, str::FromStr, sync::mpsc::sync_channel};
 
 use block2::RcBlock;
 use defguard_client_common::dns_owned;
@@ -197,9 +189,8 @@ impl TunnelConfiguration {
     }
 
     /// Create or update system VPN settings with this configuration.
-    pub fn save(&self) {
-        let spinlock = Arc::new(AtomicBool::new(false));
-        let spinlock_clone = Arc::clone(&spinlock);
+    pub fn save(&self) -> Result<(), Error> {
+        let (tx, rx) = sync_channel(1);
         let plugin_bundle_id = ns_string!(PLUGIN_BUNDLE_ID);
 
         let provider_manager = self
@@ -227,19 +218,30 @@ impl TunnelConfiguration {
 
             // Save to system settings.
             let handler = RcBlock::new(move |error_ptr: *mut NSError| {
-                if error_ptr.is_null() {
-                    debug!("Saved tunnel configuration for {name} to system settings");
-                } else {
-                    error!("Failed to save tunnel configuration for: {name} to system settings");
-                }
-                spinlock_clone.store(true, Ordering::Release);
+                let result = match error_ptr.as_ref() {
+                    None => Ok(()),
+                    Some(err) => Err(err.localizedDescription().to_string()),
+                };
+                let _ = tx.send(result);
             });
             provider_manager.saveToPreferencesWithCompletionHandler(Some(&*handler));
         }
 
-        while !spinlock.load(Ordering::Acquire) {
-            spin_loop();
-        }
+        let reason = match rx.recv() {
+            Ok(Ok(())) => {
+                debug!(
+                    "Saved tunnel configuration for {} to system settings",
+                    self.name
+                );
+                return Ok(());
+            }
+            Ok(Err(reason)) => reason,
+            Err(_) => "no completion result".to_string(),
+        };
+        Err(Error::InternalError(format!(
+            "Failed to save tunnel configuration for {} to system settings: {reason}",
+            self.name
+        )))
     }
 
     /// Start tunnel for this configuration.
@@ -277,6 +279,7 @@ impl Location<Id> {
         &self,
         preshared_key: Option<String>,
         mtu: Option<u32>,
+        route_all_traffic: Option<bool>,
     ) -> Result<TunnelConfiguration, Error> {
         debug!("Looking for WireGuard keys for location {self} instance");
         let Some(keys) = WireguardKeys::find_by_instance_id(&*DB_POOL, self.instance_id).await?
@@ -307,7 +310,9 @@ impl Location<Id> {
         }
 
         debug!("Parsing location {self} allowed IPs: {}", self.allowed_ips);
-        let route_all_traffic = self.effective_route_all_traffic(&DB_POOL, None).await?;
+        let route_all_traffic = self
+            .effective_route_all_traffic(&DB_POOL, route_all_traffic)
+            .await?;
         let allowed_ips = if route_all_traffic {
             debug!("Using all traffic routing for location {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
@@ -419,7 +424,11 @@ impl Location<Id> {
 
 impl Tunnel<Id> {
     /// Build [`TunnelConfiguration`] from [`Tunnel`].
-    pub fn tunnel_configuration(&self, mtu: Option<u32>) -> Result<TunnelConfiguration, Error> {
+    pub fn tunnel_configuration(
+        &self,
+        mtu: Option<u32>,
+        route_all_traffic: Option<bool>,
+    ) -> Result<TunnelConfiguration, Error> {
         // prepare peer config
         debug!("Decoding tunnel {self} public key: {}.", self.server_pubkey);
         let peer_key = Key::from_str(&self.server_pubkey)?;
@@ -443,7 +452,7 @@ impl Tunnel<Id> {
         }
 
         debug!("Parsing tunnel {self} allowed ips: {:?}", self.allowed_ips);
-        let allowed_ips = if self.route_all_traffic {
+        let allowed_ips = if self.effective_route_all_traffic(route_all_traffic) {
             debug!("Using all traffic routing for tunnel {self}");
             vec![DEFAULT_ROUTE_IPV4.into(), DEFAULT_ROUTE_IPV6.into()]
         } else {
