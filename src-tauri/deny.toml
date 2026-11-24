@@ -75,7 +75,6 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
-    { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys security vulnerability" },
     { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
