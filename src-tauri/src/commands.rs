@@ -593,13 +593,13 @@ fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uui
         Err(_) => warn!("Failed to clear in-memory provisioning config"),
     }
 
-    let mut provisioning_instance_id = match app_state.provisioning_instance_id.lock() {
-        Ok(provisioning_instance_id) => provisioning_instance_id,
-        Err(_) => {
+    let mut provisioning_instance_id =
+        if let Ok(provisioning_instance_id) = app_state.provisioning_instance_id.lock() {
+            provisioning_instance_id
+        } else {
             warn!("Failed to check provisioning instance id");
             return;
-        }
-    };
+        };
     if provisioning_instance_id.as_deref() == Some(saved_instance_uuid) {
         match handle.path().app_data_dir() {
             Ok(app_data_dir) => {
@@ -1118,6 +1118,18 @@ pub async fn update_location_routing(
             handle
                 .emit(EventKey::LocationUpdate.into(), ())
                 .map_err(tauri_err_to_app_err)?;
+            // System Settings connects use the stored profile as-is.
+            #[cfg(target_os = "macos")]
+            if let Some(location) = Location::find_by_id(&*DB_POOL, location_id).await? {
+                let mtu = handle.state::<AppState>().mtu();
+                let saved = location
+                    .tunnel_configuration(None, mtu, None)
+                    .await
+                    .and_then(|config| config.save());
+                if let Err(err) = saved {
+                    warn!("Failed to update system VPN profile for {name}: {err}");
+                }
+            }
             Ok(auto_connect_disabled)
         }
         ConnectionType::Tunnel => {
@@ -1128,6 +1140,16 @@ pub async fn update_location_routing(
                 handle
                     .emit(EventKey::LocationUpdate.into(), ())
                     .map_err(tauri_err_to_app_err)?;
+                #[cfg(target_os = "macos")]
+                {
+                    let mtu = handle.state::<AppState>().mtu();
+                    let saved = tunnel
+                        .tunnel_configuration(mtu, None)
+                        .and_then(|config| config.save());
+                    if let Err(err) = saved {
+                        warn!("Failed to update system VPN profile for {name}: {err}");
+                    }
+                }
                 Ok(false)
             } else {
                 error!("Couldn't update tunnel routing: tunnel with id {location_id} not found.");
@@ -1519,6 +1541,7 @@ fn reported_app_version(package_version: &str) -> String {
 }
 
 #[tauri::command]
+#[must_use]
 pub fn get_client_build_version() -> String {
     reported_app_version(defguard_client_core::version::PKG_VERSION)
 }
@@ -1696,14 +1719,14 @@ pub async fn enrollment_start(
     state: State<'_, AppState>,
 ) -> Result<EnrollmentStartResult, String> {
     debug!("Starting enrollment at {proxy_url}");
-    let uses_provisioning_token = match state.provisioning_config.lock() {
-        Ok(provisioning_config) => provisioning_config
+    let uses_provisioning_token = if let Ok(provisioning_config) = state.provisioning_config.lock()
+    {
+        provisioning_config
             .as_ref()
-            .is_some_and(|config| config.enrollment_token == token),
-        Err(_) => {
-            warn!("Failed to read in-memory provisioning config");
-            false
-        }
+            .is_some_and(|config| config.enrollment_token == token)
+    } else {
+        warn!("Failed to read in-memory provisioning config");
+        false
     };
     let url = Url::parse(&proxy_url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
     let (session, response) = enrollment::enrollment_start(url, token)

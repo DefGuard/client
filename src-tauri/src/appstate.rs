@@ -51,6 +51,14 @@ pub struct AppState {
 
 impl AppState {
     #[must_use]
+    pub fn mtu(&self) -> Option<u32> {
+        self.app_config
+            .lock()
+            .expect("failed to lock app state")
+            .mtu()
+    }
+
+    #[must_use]
     pub fn new(config: AppConfig, provisioning_config: Option<ProvisioningConfig>) -> Self {
         Self {
             enrollment_sessions: Mutex::new(HashMap::new()),
