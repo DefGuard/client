@@ -51,19 +51,17 @@ impl MonitorInfo {
             is_primary: self.is_primary,
         }
     }
+}
 
-    #[must_use]
-    pub fn work_area_info(&self) -> WorkArea {
-        WorkArea {
-            width: u32::try_from(self.work_area.width).unwrap_or(0),
-            height: u32::try_from(self.work_area.height).unwrap_or(0),
-            scale_factor: self.scale_factor,
-        }
+fn work_area(display: &DisplayArea) -> WorkArea {
+    WorkArea {
+        width: u32::try_from(display.work.width).unwrap_or(0),
+        height: u32::try_from(display.work.height).unwrap_or(0),
+        scale_factor: display.scale_factor,
     }
 }
 
-/// Primary monitor, or the first one when none is flagged primary. `None` when Windows reports no
-/// monitors at all (display sleep, hot-plug, driver reset, RDP session switch).
+// Windows reports no monitors during display sleep, hot-plug, driver reset or RDP session switch
 fn primary_monitor(monitors: &[MonitorInfo]) -> Option<&MonitorInfo> {
     monitors
         .iter()
@@ -71,7 +69,6 @@ fn primary_monitor(monitors: &[MonitorInfo]) -> Option<&MonitorInfo> {
         .or_else(|| monitors.first())
 }
 
-/// Shows and focuses a window we could not position because no monitor was reported.
 fn show_centered(window: &WebviewWindow) -> tauri::Result<()> {
     if let Err(err) = window.center() {
         warn!("Failed to center window without monitor information: {err}");
@@ -98,17 +95,13 @@ fn tray_anchor(app: &tauri::AppHandle) -> Option<(i32, i32)> {
     rect.map(|rect| rect.center())
 }
 
-/// Work area of the display `open_tray` would place the tray window on.
+// must pick the same display as open_tray
 pub(super) fn tray_work_area(app: &tauri::AppHandle) -> Option<WorkArea> {
     let displays: Vec<DisplayArea> = WindowManager::get_monitors()
         .iter()
         .map(MonitorInfo::display_area)
         .collect();
-    pick_display(tray_anchor(app), &displays).map(|display| WorkArea {
-        width: u32::try_from(display.work.width).unwrap_or(0),
-        height: u32::try_from(display.work.height).unwrap_or(0),
-        scale_factor: display.scale_factor,
-    })
+    pick_display(tray_anchor(app), &displays).map(work_area)
 }
 
 fn set_tray_window_position(window: &WebviewWindow, (x, y): (i32, i32)) -> tauri::Result<()> {
@@ -328,7 +321,7 @@ impl WindowManager {
         };
 
         // Shrink before measuring, so the position below is computed for the final size.
-        fit_full_view_to_work_area(&window, primary.work_area_info());
+        fit_full_view_to_work_area(&window, work_area(&primary.display_area()));
 
         info!("open_full_view: Querying outer_size");
         let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {

@@ -87,8 +87,7 @@ fn hide_shown_windows(app: &AppHandle, skip_label: &str) {
     }
 }
 
-/// Usable part of a display (without menu bar, Dock or taskbar) in physical pixels, together with
-/// the scale factor needed to turn it into logical (window) units.
+/// Display area without menu bar, Dock or taskbar, in physical pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct WorkArea {
     pub width: u32,
@@ -107,7 +106,6 @@ impl WorkArea {
         }
     }
 
-    /// Work area in logical units, `None` when the reported values are unusable.
     fn logical_size(&self) -> Option<(f64, f64)> {
         if !self.scale_factor.is_finite()
             || self.scale_factor <= 0.0
@@ -123,8 +121,7 @@ impl WorkArea {
     }
 }
 
-/// Whether the fixed-size compact (tray) window fits inside `work`. Unusable display data counts as
-/// a fit, so a bad reading never takes the tray away.
+/// Unusable display data counts as a fit, so a bad reading never takes the tray away.
 #[must_use]
 pub(crate) fn compact_window_fits(work: WorkArea) -> bool {
     work.logical_size().is_none_or(|(width, height)| {
@@ -132,8 +129,6 @@ pub(crate) fn compact_window_fits(work: WorkArea) -> bool {
     })
 }
 
-/// Minimum inner size of the full view for the given available logical space: the design minimum,
-/// relaxed on displays too small to hold it so the window can always be shown in full.
 #[must_use]
 pub(crate) fn full_view_min_size((width, height): (f64, f64)) -> (f64, f64) {
     let relax = |available: f64, default: f64| {
@@ -149,7 +144,6 @@ pub(crate) fn full_view_min_size((width, height): (f64, f64)) -> (f64, f64) {
     )
 }
 
-/// Monitor containing `point` (physical), then the primary monitor, then the first one listed.
 #[cfg(not(windows))]
 pub(crate) fn monitor_for_point(
     app: &AppHandle,
@@ -169,7 +163,6 @@ pub(crate) fn monitor_for_point(
         .and_then(|monitors| monitors.into_iter().next())
 }
 
-/// Work area of the display the tray window would open on.
 #[cfg(not(windows))]
 fn tray_work_area(app: &AppHandle) -> Option<WorkArea> {
     let anchor = app
@@ -186,8 +179,6 @@ fn tray_work_area(app: &AppHandle) -> Option<WorkArea> {
     windows::tray_work_area(app)
 }
 
-/// Whether the compact window fits on the display it would open on. When it can't be determined
-/// the tray is allowed, matching the behavior before this check existed.
 pub(crate) fn tray_window_fits(app: &AppHandle) -> bool {
     let Some(work) = tray_work_area(app) else {
         debug!("No display found for the tray window, assuming it fits");
@@ -203,8 +194,6 @@ pub(crate) fn tray_window_fits(app: &AppHandle) -> bool {
     fits
 }
 
-/// Relax the full view's minimum size and shrink it when needed, so it fits inside `work`.
-/// On normal displays this leaves the window as it is.
 pub(crate) fn fit_full_view_to_work_area(window: &WebviewWindow, work: WorkArea) {
     let Some((work_width, work_height)) = work.logical_size() else {
         return;
@@ -384,8 +373,7 @@ pub mod windows;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
-/// Show the compact (tray) window, or the full view when the compact window does not fit the
-/// display. Returns the label of the window that was shown.
+/// Opens the full view instead when the tray window does not fit, returns the shown window label.
 pub(crate) fn show_tray_window(app: &AppHandle) -> &'static str {
     if tray_window_fits(app) {
         if let Err(err) = WindowManager::open_tray(app) {
@@ -408,12 +396,8 @@ fn prefers_full_view(app: &AppHandle) -> bool {
         .open_in_full_window
 }
 
-/// Show the compact (tray) window when there is tray content (a non-service
-/// location or a tunnel), the "open in full window" setting is off and the
-/// compact window fits the display, otherwise fall back to the full view.
 pub fn show_tray_or_full_view(app: &AppHandle) {
     if !prefers_full_view(app) && block_on(has_tray_content()) && tray_window_fits(app) {
-        // Hide the full view if it is open and visible (not minimized) so only the compact window is shown.
         if let Some(full_view) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
             let full_view_visible = full_view.is_visible().ok().unwrap_or(false);
             if full_view_visible {

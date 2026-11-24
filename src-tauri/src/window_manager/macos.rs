@@ -36,9 +36,8 @@ pub(crate) fn enable_rounded_corners<R: Runtime>(
         .map_err(|err| err.to_string())
 }
 
-/// `value.clamp(min, max)` that never panics: when the window is larger than the display
-/// (`min > max`, e.g. "Larger Text" display scaling) `min` wins and the window sticks to the top
-/// or left edge. `f64::clamp` panics there, and with `panic = "abort"` that kills the app.
+// f64::clamp panics and aborts the app when min > max (window larger than the display),
+// here min wins so the window sticks to the top or left edge
 fn clamp_pinned(value: f64, min: f64, max: f64) -> f64 {
     value.min(max).max(min)
 }

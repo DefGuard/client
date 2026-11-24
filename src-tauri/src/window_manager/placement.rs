@@ -286,9 +286,7 @@ mod tests {
     fn clamp_axis_pins_oversized_window_to_the_start_edge() {
         // full view (700 tall) on a 512 tall work area starting at y = 0
         assert_eq!(clamp_axis(-200, 0, 512 - 700), 0);
-        // fits: value inside the range is kept
         assert_eq!(clamp_axis(100, 0, 1080 - 700), 100);
-        // fits: value past the far edge is pulled back
         assert_eq!(clamp_axis(500, 0, 1080 - 700), 380);
     }
 
