@@ -11,9 +11,11 @@ use crate::{
     appstate::{AppState, TrayIconRect},
     tray::TRAY_ICON_ID,
     window_manager::{
-        hide_shown_windows,
-        placement::{pick_display, place_tray_window, DisplayArea, PhysicalRect, TaskbarPosition},
-        WindowManager, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID, COMPACT_WINDOW_WIDTH,
+        fit_full_view_to_work_area, hide_shown_windows,
+        placement::{
+            clamp_axis, pick_display, place_tray_window, DisplayArea, PhysicalRect, TaskbarPosition,
+        },
+        WindowManager, WorkArea, COMPACT_WINDOW_HEIGHT, COMPACT_WINDOW_ID, COMPACT_WINDOW_WIDTH,
         FULL_VIEW_WINDOW_HEIGHT, FULL_VIEW_WINDOW_ID, FULL_VIEW_WINDOW_WIDTH,
         WELCOME_WINDOW_HEIGHT, WELCOME_WINDOW_ID, WELCOME_WINDOW_WIDTH, WINDOW_GAP,
     },
@@ -51,6 +53,30 @@ impl MonitorInfo {
     }
 }
 
+fn work_area(display: &DisplayArea) -> WorkArea {
+    WorkArea {
+        width: u32::try_from(display.work.width).unwrap_or(0),
+        height: u32::try_from(display.work.height).unwrap_or(0),
+        scale_factor: display.scale_factor,
+    }
+}
+
+// Windows reports no monitors during display sleep, hot-plug, driver reset or RDP session switch
+fn primary_monitor(monitors: &[MonitorInfo]) -> Option<&MonitorInfo> {
+    monitors
+        .iter()
+        .find(|monitor| monitor.is_primary)
+        .or_else(|| monitors.first())
+}
+
+fn show_centered(window: &WebviewWindow) -> tauri::Result<()> {
+    if let Err(err) = window.center() {
+        warn!("Failed to center window without monitor information: {err}");
+    }
+    window.show()?;
+    window.set_focus()
+}
+
 fn rect_from_win32(rect: RECT) -> PhysicalRect {
     PhysicalRect {
         x: rect.left,
@@ -67,6 +93,15 @@ fn tray_anchor(app: &tauri::AppHandle) -> Option<(i32, i32)> {
         .map(|rect| TrayIconRect::from_rect(&rect));
     let rect = current.or_else(|| *app.state::<AppState>().tray_icon_rect.lock().unwrap());
     rect.map(|rect| rect.center())
+}
+
+// must pick the same display as open_tray
+pub(super) fn tray_work_area(app: &tauri::AppHandle) -> Option<WorkArea> {
+    let displays: Vec<DisplayArea> = WindowManager::get_monitors()
+        .iter()
+        .map(MonitorInfo::display_area)
+        .collect();
+    pick_display(tray_anchor(app), &displays).map(work_area)
 }
 
 fn set_tray_window_position(window: &WebviewWindow, (x, y): (i32, i32)) -> tauri::Result<()> {
@@ -259,14 +294,13 @@ impl WindowManager {
         info!("open_full_view: Getting monitors");
         let monitors = Self::get_monitors();
         info!("open_full_view: Found {} monitors", monitors.len());
-        let primary = monitors
-            .iter()
-            .find(|m| m.is_primary)
-            .unwrap_or(&monitors[0]);
-        info!(
-            "open_full_view: Primary monitor scale factor: {}",
-            primary.scale_factor
-        );
+        let primary = primary_monitor(&monitors);
+        if let Some(primary) = primary {
+            info!(
+                "open_full_view: Primary monitor scale factor: {}",
+                primary.scale_factor
+            );
+        }
 
         info!("open_full_view: Checking if full view window exists");
         let window = if let Some(window) = app.get_webview_window(FULL_VIEW_WINDOW_ID) {
@@ -279,6 +313,15 @@ impl WindowManager {
             info!("open_full_view: full view window built successfully");
             win
         };
+
+        let Some(primary) = primary else {
+            warn!("open_full_view: No monitors found, centering the full view window");
+            show_centered(&window)?;
+            return Ok(window);
+        };
+
+        // Shrink before measuring, so the position below is computed for the final size.
+        fit_full_view_to_work_area(&window, work_area(&primary.display_area()));
 
         info!("open_full_view: Querying outer_size");
         let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
@@ -343,6 +386,16 @@ impl WindowManager {
             _ => {}
         }
 
+        // Keep the top-left corner inside the work area, so a window larger than the display
+        // still has its top edge reachable.
+        let work = primary.work_area;
+        window_x = clamp_axis(
+            window_x,
+            work.x - border_thickness,
+            work.right() + border_thickness - physical_width,
+        );
+        window_y = clamp_axis(window_y, work.y, work.bottom() - visible_height);
+
         info!("open_full_view: Setting position to ({window_x}, {window_y})");
         window.set_position(tauri::PhysicalPosition::new(window_x, window_y))?;
         info!("open_full_view: Position set, showing window");
@@ -356,16 +409,18 @@ impl WindowManager {
         hide_shown_windows(app, WELCOME_WINDOW_ID);
 
         let monitors = Self::get_monitors();
-        let primary = monitors
-            .iter()
-            .find(|m| m.is_primary)
-            .unwrap_or(&monitors[0]);
 
         let window = if let Some(window) = app.get_webview_window(WELCOME_WINDOW_ID) {
             let _ = window.unminimize();
             window
         } else {
             Self::build_welcome_window(app)?
+        };
+
+        let Some(primary) = primary_monitor(&monitors) else {
+            warn!("open_welcome_view: No monitors found, centering the welcome window");
+            show_centered(&window)?;
+            return Ok(window);
         };
 
         let outer_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
@@ -379,8 +434,17 @@ impl WindowManager {
         let center_x = primary.physical_x + (primary.physical_width as i32 / 2);
         let center_y = primary.physical_y + (primary.physical_height as i32 / 2);
 
-        let window_x = center_x - (physical_width / 2);
-        let window_y = center_y - (physical_height / 2);
+        let work = primary.work_area;
+        let window_x = clamp_axis(
+            center_x - (physical_width / 2),
+            work.x,
+            work.right() - physical_width,
+        );
+        let window_y = clamp_axis(
+            center_y - (physical_height / 2),
+            work.y,
+            work.bottom() - physical_height,
+        );
 
         window.set_position(tauri::PhysicalPosition::new(window_x, window_y))?;
         window.show()?;

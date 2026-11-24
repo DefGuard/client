@@ -74,7 +74,7 @@ pub fn pick_display(anchor: Option<(i32, i32)>, displays: &[DisplayArea]) -> Opt
 }
 
 // min wins over max, so a window larger than the work area sticks to its left or top edge
-fn clamp_axis(value: i32, min: i32, max: i32) -> i32 {
+pub(crate) fn clamp_axis(value: i32, min: i32, max: i32) -> i32 {
     value.min(max).max(min)
 }
 
@@ -280,6 +280,14 @@ mod tests {
         )];
         let window = placed_rect((390, 490), (380, 680), &small);
         assert_eq!((window.x, window.y), (100 + GAP, 100 + GAP));
+    }
+
+    #[test]
+    fn clamp_axis_pins_oversized_window_to_the_start_edge() {
+        // full view (700 tall) on a 512 tall work area starting at y = 0
+        assert_eq!(clamp_axis(-200, 0, 512 - 700), 0);
+        assert_eq!(clamp_axis(100, 0, 1080 - 700), 100);
+        assert_eq!(clamp_axis(500, 0, 1080 - 700), 380);
     }
 
     #[test]

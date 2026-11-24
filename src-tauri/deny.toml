@@ -77,6 +77,7 @@ ignore = [
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive merged into zbus 6, Tauri v2 plugins (notification, opener, single-instance) still on zbus 5" },
     { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys security vulnerability" },
     { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained" },
+    { id = "RUSTSEC-2026-0594", reason = "expires 2026-12-24, cookie 0.18.2 is pulled in by reqwest and tauri with no fixed release yet, we never fork or use private cookie jars" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
