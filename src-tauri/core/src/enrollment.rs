@@ -687,4 +687,36 @@ mod tests {
             EnrollmentError::ProxyError { status: 404, .. }
         ));
     }
+
+    #[tokio::test]
+    async fn test_created_registration_is_shared_by_session_clones_but_not_other_sessions() {
+        use defguard_client_proto::defguard::client_types::{Device, InstanceInfo};
+
+        let server = MockServer::start().await;
+        let session = make_session(&server);
+        let clone = session.clone();
+        let config = DeviceConfigResponse {
+            device: Some(Device {
+                id: 42,
+                pubkey: "wg-public".into(),
+                ..Default::default()
+            }),
+            instance: Some(InstanceInfo {
+                id: "core-uuid".into(),
+                username: "alice".into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        session.remember_created_device(&config, "wg-public");
+        let registration = clone.created_device().unwrap().unwrap();
+        assert_eq!(registration.core_device_id, 42);
+        assert_eq!(registration.instance_uuid, "core-uuid");
+        assert_eq!(registration.username, "alice");
+        assert_eq!(registration.wireguard_pubkey, "wg-public");
+        let other_session = make_session(&server);
+        assert!(other_session.created_device().unwrap().is_none());
+        session.remember_created_device(&config, "mismatched-request-key");
+        assert!(clone.created_device().unwrap().is_none());
+    }
 }

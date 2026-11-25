@@ -23,6 +23,12 @@ use defguard_client_core::{
 };
 use log::{debug, warn};
 
+#[cfg(test)]
+mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+mod integration_tests;
+
 const DAEMON_OPERATION_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Serialize, PartialEq, Eq)]

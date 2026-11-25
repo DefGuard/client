@@ -1,29 +1,39 @@
 use defguard_client_proto::defguard::{
-    client_types::{Device, DeviceConfigResponse, InstanceInfo},
+    client_types::{EnrollmentStartResponse, InstanceInfo},
     device_identity::v2::{
         attestation_challenge, CredentialChallenge, IdentityState, TpmAttestationIdentity,
         TpmAttestationResponse,
     },
 };
-use reqwest::Client;
 use wiremock::{
     matchers::{body_json, header, method, path},
     Mock, MockServer, ResponseTemplate,
 };
 
 use super::*;
-use crate::{
+use defguard_client_core::{
     database::models::NoId,
+    enrollment::enrollment_start,
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
-fn session(server: &MockServer) -> EnrollmentSession {
-    EnrollmentSession {
-        cookie: "defguard_proxy=native-session".into(),
-        proxy_url: server.uri().parse().unwrap(),
-        client: Client::new(),
-        created_device: Default::default(),
-    }
+async fn session(server: &MockServer) -> EnrollmentSession {
+    Mock::given(method("POST"))
+        .and(path("/api/v1/enrollment/start"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header(
+                    "Set-Cookie",
+                    "defguard_proxy=native-session; Path=/api/v1/enrollment",
+                )
+                .set_body_json(EnrollmentStartResponse::default()),
+        )
+        .mount(server)
+        .await;
+    enrollment_start(server.uri().parse().unwrap(), "enrollment-token".into())
+        .await
+        .unwrap()
+        .0
 }
 
 fn public() -> AttestationIdentity {
@@ -69,7 +79,7 @@ async fn test_start_uses_only_public_identity_and_native_cookie() {
         .and(header(CLIENT_VERSION_HEADER, PKG_VERSION))
         .and(header(
             CLIENT_PLATFORM_HEADER,
-            crate::proxy::construct_platform_header(),
+            defguard_client_core::proxy::construct_platform_header(),
         ))
         .and(body_json(
             json!({"device_id": 42, "attestation_identity": public()}),
@@ -82,7 +92,7 @@ async fn test_start_uses_only_public_identity_and_native_cookie() {
         .expect(1)
         .mount(&server)
         .await;
-    let received = start(&session(&server), 42, public()).await.unwrap();
+    let received = start(&session(&server).await, 42, public()).await.unwrap();
     assert_eq!(received, expected);
 }
 
@@ -106,7 +116,7 @@ async fn test_finish_preserves_evidence_bytes_and_uses_native_cookie() {
         .expect(1)
         .mount(&server)
         .await;
-    let response = finish(&session(&server), 42, solution).await.unwrap();
+    let response = finish(&session(&server).await, 42, solution).await.unwrap();
     assert_eq!(
         verified_identity_id(&response, true).unwrap(),
         "core-identity"
@@ -128,7 +138,7 @@ async fn test_post_challenge_daemon_failure_is_reported_to_core() {
         .respond_with(ResponseTemplate::new(200).set_body_json(verified()))
         .expect(1)
         .mount(&server).await;
-    let response = finish(&session(&server), 42, solution).await.unwrap();
+    let response = finish(&session(&server).await, 42, solution).await.unwrap();
     assert!(verified_identity_id(&response, false).is_err());
 }
 
@@ -141,14 +151,14 @@ async fn test_start_rejects_missing_challenge_and_core_denial() {
         )
         .mount(&server)
         .await;
-    assert!(start(&session(&server), 42, public()).await.is_err());
+    assert!(start(&session(&server).await, 42, public()).await.is_err());
     server.reset().await;
     Mock::given(path("/api/v1/enrollment/attestation/start"))
         .respond_with(ResponseTemplate::new(403))
         .mount(&server)
         .await;
     assert!(matches!(
-        start(&session(&server), 42, public()).await,
+        start(&session(&server).await, 42, public()).await,
         Err(EnrollmentError::TokenExpired)
     ));
 }
@@ -164,7 +174,7 @@ async fn test_truncated_finish_response_is_not_treated_as_success() {
         "challenge-session",
         Err(Status::deadline_exceeded("timeout")),
     );
-    assert!(finish(&session(&server), 42, solution).await.is_err());
+    assert!(finish(&session(&server).await, 42, solution).await.is_err());
 }
 
 #[test]
@@ -228,27 +238,19 @@ fn test_only_verified_core_state_with_local_evidence_can_be_acknowledged() {
     assert!(verified_identity_id(&response, true).is_err());
 }
 
-#[tokio::test]
-async fn test_created_registration_is_shared_by_session_clones_but_not_other_sessions() {
-    let server = MockServer::start().await;
-    let enrollment_session = session(&server);
-    let clone = enrollment_session.clone();
-    let config = DeviceConfigResponse {
-        device: Some(Device {
-            id: 42,
-            pubkey: "wg-public".into(),
-            ..Default::default()
-        }),
-        instance: Some(InstanceInfo {
-            id: "core-uuid".into(),
-            username: "alice".into(),
-            ..Default::default()
-        }),
-        ..Default::default()
+#[test]
+fn test_registration_matches_only_the_same_instance_user_and_wireguard_keys() {
+    let registration = CreatedDevice {
+        core_device_id: 42,
+        instance_uuid: "core-uuid".into(),
+        username: "alice".into(),
+        wireguard_pubkey: "wg-public".into(),
     };
-    enrollment_session.remember_created_device(&config, "wg-public");
-    let registration = clone.created_device().unwrap().unwrap();
-    let local = Instance::<NoId>::from(config.instance.clone().unwrap());
+    let local = Instance::<NoId>::from(InstanceInfo {
+        id: "core-uuid".into(),
+        username: "alice".into(),
+        ..Default::default()
+    });
     let mut value = serde_json::to_value(local).unwrap();
     value["id"] = json!(7);
     let mut local: Instance<Id> = serde_json::from_value(value).unwrap();
@@ -270,8 +272,4 @@ async fn test_created_registration_is_shared_by_session_clones_but_not_other_ses
     keys.pubkey = "wg-public".into();
     keys.instance_id = 8;
     assert!(!registration_matches(&registration, &local, &keys));
-    let other_session = session(&server);
-    assert!(other_session.created_device().unwrap().is_none());
-    enrollment_session.remember_created_device(&config, "mismatched-request-key");
-    assert!(clone.created_device().unwrap().is_none());
 }

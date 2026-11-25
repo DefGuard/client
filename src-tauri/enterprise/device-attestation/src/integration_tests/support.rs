@@ -34,7 +34,7 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
-use crate::{
+use defguard_client_core::{
     database::models::{
         device_identity::DeviceIdentity, instance::Instance, wireguard_keys::WireguardKeys, Id,
         NoId,

@@ -3,7 +3,7 @@ use tonic::Status;
 use wiremock::ResponseTemplate;
 
 use super::{attest_device, AttestationOutcome};
-use crate::database::models::device_identity::DeviceIdentity;
+use defguard_client_core::database::models::device_identity::DeviceIdentity;
 use defguard_client_proto::defguard::device_identity::v2::{
     attestation_challenge_solution::Result as Proof, AttestationChallengeSolution,
     IdentityErrorCode,
@@ -12,7 +12,7 @@ use defguard_client_proto::defguard::device_identity::v2::{
 mod support;
 use support::*;
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_full_attestation_for_new_and_already_enrolled_users(pool: SqlitePool) {
     for (uuid, enrolled, seed) in [("new-user", false, 1), ("enrolled-user", true, 2)] {
         let registration = Registration::new(&pool, uuid, enrolled).await;
@@ -48,7 +48,7 @@ async fn test_full_attestation_for_new_and_already_enrolled_users(pool: SqlitePo
     }
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_unavailable_or_old_daemon_does_not_start_attestation(pool: SqlitePool) {
     for (uuid, error) in [
         ("unavailable", Status::unavailable("no TPM")),
@@ -85,7 +85,7 @@ async fn test_unavailable_or_old_daemon_does_not_start_attestation(pool: SqliteP
     }
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_failed_material_persistence_prevents_start_and_preserves_device_config(
     pool: SqlitePool,
 ) {
@@ -114,7 +114,7 @@ async fn test_failed_material_persistence_prevents_start_and_preserves_device_co
     assert_eq!(daemon.counts(), (1, 0));
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_core_start_denial_retains_keys_without_invoking_the_tpm_solver(pool: SqlitePool) {
     for (uuid, status) in [("expired-session", 403), ("unimplemented-core", 501)] {
         let registration = Registration::new(&pool, uuid, true).await;
@@ -150,7 +150,7 @@ async fn test_core_start_denial_retains_keys_without_invoking_the_tpm_solver(poo
     }
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_backend_and_ipc_errors_after_start_are_reported_without_losing_keys(
     pool: SqlitePool,
 ) {
@@ -202,7 +202,7 @@ async fn test_backend_and_ipc_errors_after_start_are_reported_without_losing_key
     }
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_failed_or_lost_finish_does_not_discard_or_automatically_replace_keys(
     pool: SqlitePool,
 ) {
@@ -258,7 +258,7 @@ async fn test_failed_or_lost_finish_does_not_discard_or_automatically_replace_ke
     }
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_successful_identity_is_not_recreated_or_reattested(pool: SqlitePool) {
     let registration = Registration::new(&pool, "no-reattest", true).await;
     registration
@@ -299,7 +299,7 @@ async fn test_successful_identity_is_not_recreated_or_reattested(pool: SqlitePoo
     );
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_registration_binding_rejects_another_instance_before_ipc(pool: SqlitePool) {
     let first = Registration::new(&pool, "core-one", true).await;
     let second = Registration::new(&pool, "core-two", true).await;
@@ -341,7 +341,7 @@ async fn test_registration_binding_rejects_another_instance_before_ipc(pool: Sql
     }
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_corrupt_identity_is_not_silently_regenerated(pool: SqlitePool) {
     let registration = Registration::new(&pool, "corrupt-material", true).await;
     DeviceIdentity::new(registration.instance.id, DEVICE_ID, material(1))
@@ -371,7 +371,7 @@ async fn test_corrupt_identity_is_not_silently_regenerated(pool: SqlitePool) {
     registration.assert_registration_retained(&pool).await;
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test(migrations = "../../migrations")]
 async fn test_failed_acknowledgement_write_retains_material_after_core_success(pool: SqlitePool) {
     let registration = Registration::new(&pool, "ack-write-failure", true).await;
     sqlx::query("CREATE TRIGGER fail_ack_write BEFORE UPDATE OF identity_id ON device_identity BEGIN SELECT RAISE(ABORT, 'simulated disk failure'); END")

@@ -17,3 +17,12 @@ serde_json.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
 tonic.workspace = true
+
+[dev-dependencies]
+futures-util.workspace = true
+hyper-util.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros"] }
+tokio-stream.workspace = true
+tower.workspace = true
+wiremock.workspace = true

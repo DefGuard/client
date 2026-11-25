@@ -1743,12 +1743,18 @@ version = "2.3.0"
 dependencies = [
  "defguard-client-core",
  "defguard-client-proto",
+ "futures-util",
+ "hyper-util",
  "log",
  "serde",
  "serde_json",
  "sqlx",
+ "tempfile",
  "tokio",
+ "tokio-stream",
  "tonic",
+ "tower",
+ "wiremock",
 ]
 
 [[package]]
