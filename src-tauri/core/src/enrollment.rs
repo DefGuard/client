@@ -19,6 +19,7 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::{
+    database::models::Id,
     proxy::{construct_platform_header, read_error_message},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
@@ -52,12 +53,54 @@ pub enum EnrollmentError {
     Other { message: String },
 }
 
+/// Identifies the device created during an enrollment session.
+#[derive(Clone, Debug)]
+pub struct CreatedDevice {
+    pub core_device_id: Id,
+    pub instance_uuid: String,
+    pub username: String,
+    pub wireguard_pubkey: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct EnrollmentSession {
     pub cookie: String,
     pub proxy_url: Url,
     pub client: Client,
-    created_device: Arc<Mutex<Option<attestation::CreatedDevice>>>,
+    created_device: Arc<Mutex<Option<CreatedDevice>>>,
+}
+
+impl EnrollmentSession {
+    /// Returns a snapshot of the registration shared by all clones of this session.
+    pub fn created_device(&self) -> Result<Option<CreatedDevice>, EnrollmentError> {
+        self.created_device
+            .lock()
+            .map(|created| created.clone())
+            .map_err(|_| EnrollmentError::Other {
+                message: "Failed to read the device created during enrollment".into(),
+            })
+    }
+
+    fn remember_created_device(&self, config: &DeviceConfigResponse, requested_pubkey: &str) {
+        let registration = match (&config.instance, &config.device) {
+            (Some(instance), Some(device))
+                if device.id > 0
+                    && device.pubkey == requested_pubkey
+                    && !instance.id.is_empty() =>
+            {
+                Some(CreatedDevice {
+                    core_device_id: device.id,
+                    instance_uuid: instance.id.clone(),
+                    username: instance.username.clone(),
+                    wireguard_pubkey: device.pubkey.clone(),
+                })
+            }
+            _ => None,
+        };
+        if let Ok(mut created) = self.created_device.lock() {
+            *created = registration;
+        }
+    }
 }
 
 /// Send a JSON POST request to an enrollment endpoint with the session
@@ -204,7 +247,7 @@ pub async fn enrollment_create_device(
     let config = response.json().await.map_err(|e| EnrollmentError::Other {
         message: format!("Failed to parse create_device response: {e}"),
     })?;
-    attestation::remember_created_device(&session, &config, &pubkey);
+    session.remember_created_device(&config, &pubkey);
     Ok(config)
 }
 

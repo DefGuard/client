@@ -1,5 +1,5 @@
 use defguard_client_proto::defguard::{
-    client_types::{Device, InstanceInfo},
+    client_types::{Device, DeviceConfigResponse, InstanceInfo},
     device_identity::v2::{
         attestation_challenge, CredentialChallenge, IdentityState, TpmAttestationIdentity,
         TpmAttestationResponse,
@@ -246,8 +246,8 @@ async fn test_created_registration_is_shared_by_session_clones_but_not_other_ses
         }),
         ..Default::default()
     };
-    remember_created_device(&enrollment_session, &config, "wg-public");
-    let registration = clone.created_device.lock().unwrap().clone().unwrap();
+    enrollment_session.remember_created_device(&config, "wg-public");
+    let registration = clone.created_device().unwrap().unwrap();
     let local = Instance::<NoId>::from(config.instance.clone().unwrap());
     let mut value = serde_json::to_value(local).unwrap();
     value["id"] = json!(7);
@@ -258,20 +258,20 @@ async fn test_created_registration_is_shared_by_session_clones_but_not_other_ses
         pubkey: "wg-public".into(),
         prvkey: "unused".into(),
     };
-    assert!(registration.matches(&local, &keys));
+    assert!(registration_matches(&registration, &local, &keys));
     local.uuid = "another-core".into();
-    assert!(!registration.matches(&local, &keys));
+    assert!(!registration_matches(&registration, &local, &keys));
     local.uuid = "core-uuid".into();
     local.username = "bob".into();
-    assert!(!registration.matches(&local, &keys));
+    assert!(!registration_matches(&registration, &local, &keys));
     local.username = "alice".into();
     keys.pubkey = "another-key".into();
-    assert!(!registration.matches(&local, &keys));
+    assert!(!registration_matches(&registration, &local, &keys));
     keys.pubkey = "wg-public".into();
     keys.instance_id = 8;
-    assert!(!registration.matches(&local, &keys));
+    assert!(!registration_matches(&registration, &local, &keys));
     let other_session = session(&server);
-    assert!(other_session.created_device.lock().unwrap().is_none());
-    remember_created_device(&enrollment_session, &config, "mismatched-request-key");
-    assert!(clone.created_device.lock().unwrap().is_none());
+    assert!(other_session.created_device().unwrap().is_none());
+    enrollment_session.remember_created_device(&config, "mismatched-request-key");
+    assert!(clone.created_device().unwrap().is_none());
 }

@@ -4,7 +4,7 @@ use defguard_client_proto::defguard::{
     client::v1::{
         desktop_daemon_service_client::DesktopDaemonServiceClient, AttestDeviceIdentityRequest,
     },
-    client_types::{AttestationFinishResponse, AttestationStartResponse, DeviceConfigResponse},
+    client_types::{AttestationFinishResponse, AttestationStartResponse},
     device_identity::v2::{
         attestation_challenge_solution, attestation_identity, AttestationChallenge,
         AttestationChallengeSolution, AttestationIdentity, AttestationStatus, IdentityErrorCode,
@@ -15,7 +15,7 @@ use serde_json::json;
 use sqlx::SqlitePool;
 use tonic::{transport::Channel, Code, Status};
 
-use super::{enrollment_post, EnrollmentError, EnrollmentSession};
+use super::{enrollment_post, CreatedDevice, EnrollmentError, EnrollmentSession};
 use crate::database::models::{
     device_identity::DeviceIdentity, instance::Instance, wireguard_keys::WireguardKeys, Id,
 };
@@ -36,45 +36,16 @@ pub enum AttestationOutcome {
     Failed,
 }
 
-#[derive(Clone, Debug)]
-pub(super) struct CreatedDevice {
-    core_device_id: Id,
-    instance_uuid: String,
-    username: String,
-    wireguard_pubkey: String,
-}
-
-impl CreatedDevice {
-    fn matches(&self, instance: &Instance<Id>, keys: &WireguardKeys<Id>) -> bool {
-        self.core_device_id > 0
-            && self.instance_uuid == instance.uuid
-            && self.username == instance.username
-            && keys.instance_id == instance.id
-            && self.wireguard_pubkey == keys.pubkey
-    }
-}
-
-pub(super) fn remember_created_device(
-    session: &EnrollmentSession,
-    config: &DeviceConfigResponse,
-    requested_pubkey: &str,
-) {
-    let registration = match (&config.instance, &config.device) {
-        (Some(instance), Some(device))
-            if device.id > 0 && device.pubkey == requested_pubkey && !instance.id.is_empty() =>
-        {
-            Some(CreatedDevice {
-                core_device_id: device.id,
-                instance_uuid: instance.id.clone(),
-                username: instance.username.clone(),
-                wireguard_pubkey: device.pubkey.clone(),
-            })
-        }
-        _ => None,
-    };
-    if let Ok(mut created) = session.created_device.lock() {
-        *created = registration;
-    }
+fn registration_matches(
+    registration: &CreatedDevice,
+    instance: &Instance<Id>,
+    keys: &WireguardKeys<Id>,
+) -> bool {
+    registration.core_device_id > 0
+        && registration.instance_uuid == instance.uuid
+        && registration.username == instance.username
+        && keys.instance_id == instance.id
+        && registration.wireguard_pubkey == keys.pubkey
 }
 
 #[derive(Debug)]
@@ -113,10 +84,8 @@ async fn attest(
     mut daemon: DesktopDaemonServiceClient<Channel>,
 ) -> Result<AttestationOutcome, Failure> {
     let registration = session
-        .created_device
-        .lock()
+        .created_device()
         .map_err(|_| Failure::Registration)?
-        .clone()
         .ok_or(Failure::Registration)?;
     let instance = Instance::find_by_id(pool, instance_id)
         .await
@@ -126,7 +95,7 @@ async fn attest(
         .await
         .map_err(|_| Failure::Database)?
         .ok_or(Failure::Registration)?;
-    if !registration.matches(&instance, &keys) {
+    if !registration_matches(&registration, &instance, &keys) {
         return Err(Failure::Registration);
     }
     if let Some(existing) = DeviceIdentity::find_by_instance_id(pool, instance_id)
