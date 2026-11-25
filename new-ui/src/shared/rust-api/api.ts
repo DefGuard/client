@@ -9,6 +9,8 @@ import type {
   Connection,
   ConnectionArgs,
   CreateDeviceResponse,
+  DeviceVerificationCode,
+  DeviceVerificationInfo,
   EnrollmentStartResult,
   InitiateConfigureFactorScreenArgs,
   InstanceInfo,
@@ -345,6 +347,15 @@ const mfaConfigSetupFido2 = (
 const mfaConfigCancel = (sessionId: string): Promise<void> =>
   invoke(TauriCommand.MfaConfigCancel, { sessionId });
 
+const startDeviceVerification = (instanceId: number): Promise<DeviceVerificationInfo> =>
+  invoke(TauriCommand.StartDeviceVerification, { instanceId });
+
+const getDeviceVerificationCode = (instanceId: number): Promise<DeviceVerificationCode> =>
+  invoke(TauriCommand.GetDeviceVerificationCode, { instanceId });
+
+const cancelDeviceVerification = (instanceId: number): Promise<void> =>
+  invoke(TauriCommand.CancelDeviceVerification, { instanceId });
+
 export const api = {
   closeWelcomeWindow,
   // Instances
@@ -427,4 +438,7 @@ export const api = {
   mfaConfigSetupFinish,
   mfaConfigSetupFido2,
   mfaConfigCancel,
+  startDeviceVerification,
+  getDeviceVerificationCode,
+  cancelDeviceVerification,
 };

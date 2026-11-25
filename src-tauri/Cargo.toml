@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations", "enterprise/device-identity"]
+members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations", "enterprise/device-identity", "enterprise/device-verification"]
 default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
@@ -138,6 +138,7 @@ defguard-client-proto.path = "client-proto"
 defguard-client-core.path = "core"
 defguard-client-posture.path = "enterprise/posture"
 defguard-client-config-sync.path = "enterprise/config-sync"
+defguard-client-device-verification.path = "enterprise/device-verification"
 defguard-client-provisioning.path = "enterprise/provisioning"
 defguard-client-common.path = "common"
 defguard_wireguard_rs = { workspace = true, features = ["check_dependencies"] }

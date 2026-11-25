@@ -76,12 +76,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".defguard.client_types.EnrollmentStartResponse",
             "#[serde(default)]",
         )
+        // [2.3] Device identity proofs, skipped when empty so requests stay identical for older
+        // Edges.
+        .field_attribute(
+            ".defguard.client_types.InstanceInfoRequest.possession_challenge_solution",
+            "#[serde(default, skip_serializing_if = \"Option::is_none\")]",
+        )
+        .field_attribute(
+            ".defguard.client_types.MfaFlowStartRequest.possession_challenge_solution",
+            "#[serde(default, skip_serializing_if = \"Option::is_none\")]",
+        )
+        .field_attribute(
+            ".defguard.enterprise.posture.v2.DevicePostureCheckRequest.possession_challenge_solution",
+            "#[serde(default, skip_serializing_if = \"Option::is_none\")]",
+        )
         .compile_protos(
             &[
                 "../proto/v1/client/client.proto",
                 "../proto/v1/core/proxy.proto",
                 "../proto/enterprise/v2/posture/posture.proto",
                 "../proto/common/client_types.proto",
+                "../proto/common/device_identity.proto",
             ],
             &["../proto"],
         )?;

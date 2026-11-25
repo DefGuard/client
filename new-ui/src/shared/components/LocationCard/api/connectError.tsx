@@ -18,7 +18,13 @@ const conflictingConnectionSchema = z.object({
 });
 
 const connectErrorSchema = z.object({
-  kind: z.enum(['postureCheckFailed', 'serviceUnavailable', 'routeConflict', 'other']),
+  kind: z.enum([
+    'postureCheckFailed',
+    'serviceUnavailable',
+    'routeConflict',
+    'deviceBlocked',
+    'other',
+  ]),
   message: z.string(),
   conflicts: z.array(conflictingConnectionSchema).default([]),
 });

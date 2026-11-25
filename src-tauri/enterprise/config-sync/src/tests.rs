@@ -125,6 +125,7 @@ fn instance_with_token(token: Option<&str>) -> Instance<Id> {
         mfa_capabilities: None,
         smtp_configured: None,
         openid_available: None,
+        device_blocked: false,
     }
 }
 
@@ -209,6 +210,7 @@ async fn seed_instance(
         mfa_capabilities: None,
         smtp_configured: None,
         openid_available: None,
+        device_blocked: false,
     }
     .save(pool)
     .await
@@ -919,4 +921,32 @@ async fn test_poll_instances_payment_required_disables_enterprise(pool: SqlitePo
         .unwrap()
         .unwrap();
     assert_eq!(reloaded.client_traffic_policy, ClientTrafficPolicy::None);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_blocked_device_syncs_no_service_locations(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response
+        .configs
+        .push(service_config(2, "service", "10.0.0.0/24"));
+    update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    let synced = commands::service_locations_to_sync(&pool, &instance)
+        .await
+        .unwrap();
+    assert_eq!(
+        synced
+            .iter()
+            .map(|location| location.name.as_str())
+            .collect::<Vec<_>>(),
+        ["service"]
+    );
+
+    instance.device_blocked = true;
+    assert!(commands::service_locations_to_sync(&pool, &instance)
+        .await
+        .unwrap()
+        .is_empty());
 }

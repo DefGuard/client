@@ -27,6 +27,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".defguard.client_types.MfaConfigStartRequest",
             "#[allow(unused)]",
         )
+        // [2.3] Skipped when empty, so requests stay identical for older Edges.
+        .field_attribute(
+            ".defguard.client_types.InstanceInfoRequest.possession_challenge_solution",
+            "#[serde(default, skip_serializing_if = \"Option::is_none\")]",
+        )
         .compile_protos(&["../proto/v1/core/proxy.proto"], &["../proto"])?;
 
     Ok(())

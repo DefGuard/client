@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\", smtp_configured, openid_available FROM instance WHERE name = $1;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, device_blocked FROM instance WHERE name = $1;",
   "describe": {
     "columns": [
       {
@@ -189,6 +189,17 @@
             "name": "openid_available"
           }
         }
+      },
+      {
+        "name": "device_blocked",
+        "ordinal": 17,
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "device_blocked"
+          }
+        }
       }
     ],
     "parameters": {
@@ -211,8 +222,9 @@
       true,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "c0792f6ec11b67e5f9f42cf055a9e5f96c2557fd682bc42c87ca9a23753f743b"
+  "hash": "58cb64d2befbd6ab49b6f05f5e1002da563975f2e2c0126fff8994bd468769a4"
 }

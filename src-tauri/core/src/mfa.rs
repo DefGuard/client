@@ -329,6 +329,7 @@ pub async fn mfa_start(
                 pubkey: request.pubkey,
                 posture_data: request.posture_data,
                 selected_methods: selected_methods.clone(),
+                possession_challenge_solution: None,
             };
             client.post(url).json(&request)
         }
@@ -384,6 +385,13 @@ pub async fn mfa_start(
                         .collect::<Vec<_>>();
                     return Err(MfaError::MfaRejected {
                         message: messages.join(" "),
+                    });
+                }
+                Some(mfa_flow_start_response::Outcome::PossessionChallenge(_)) => {
+                    return Err(MfaError::Other {
+                        message: "Core requires a device identity proof, which this client does \
+                            not support yet"
+                            .into(),
                     });
                 }
                 None => {

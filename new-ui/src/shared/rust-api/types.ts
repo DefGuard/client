@@ -163,6 +163,9 @@ export const TauriCommand = {
   GetSessionState: 'get_session_state',
   PatchSessionState: 'patch_session_state',
   CloseWelcomeWindow: 'close_welcome_window',
+  StartDeviceVerification: 'start_device_verification',
+  GetDeviceVerificationCode: 'get_device_verification_code',
+  CancelDeviceVerification: 'cancel_device_verification',
 } as const;
 
 export type TauriCommand = (typeof TauriCommand)[keyof typeof TauriCommand];
@@ -198,6 +201,8 @@ export const TauriEvent = {
   MfaConfigFido2Touch: 'mfa-config-fido2-touch',
   TunnelsDisabled: 'tunnel-disabled-by-policy',
   TunnelsEnabled: 'tunnel-enabled-by-policy',
+  DeviceVerificationResolved: 'device-verification-resolved',
+  DeviceVerificationError: 'device-verification-error',
   // The compact view emits this event to the full view.
   RouteConflict: 'route-conflict',
 } as const;
@@ -309,6 +314,8 @@ export type InstanceInfo = {
   smtp_configured: boolean | null;
   /** Null when Core predates the report, read as available. */
   openid_available: boolean | null;
+  /** Set only by device verification, every connect is refused while true. */
+  device_blocked: boolean;
 };
 
 /** What Core accepts, static per Core version. Offer only what this client also drives. */
@@ -664,4 +671,59 @@ export type UpdateInstanceRequest = { instanceId: number; url: string; token: st
 export type UpdateInstanceResult = {
   error?: string;
   errorKind?: EnrollmentErrorKind;
+};
+
+/** 'unknown' is an outcome from a newer Core, wait on it like 'pending'. */
+export type DeviceVerificationOutcome =
+  | 'pending'
+  | 'verified'
+  | 'blocked'
+  | 'cancelled'
+  | 'expired'
+  | 'unknown';
+
+export type DeviceVerificationCode = {
+  code: string;
+  /** Seconds, ask for a new code when it runs out. */
+  expires_in: number;
+};
+
+export type DeviceVerificationInfo = {
+  session_id: number;
+  digits: number;
+  /** Seconds. */
+  period: number;
+  /** Unix timestamp in seconds. */
+  expires_at: number;
+  code: DeviceVerificationCode;
+};
+
+/** Commands reject with it as a JSON string, see parseDeviceVerificationError. */
+export type DeviceVerificationError =
+  | { type: 'network'; message: string }
+  | { type: 'license_required' }
+  /** The device was removed or enrolled again. */
+  | { type: 'device_token_invalid' }
+  | { type: 'user_inactive' }
+  | { type: 'device_blocked' }
+  /** The session is gone, start a new one. */
+  | { type: 'session_not_found' }
+  | { type: 'unsupported_algorithm' }
+  | { type: 'invalid_response'; message: string }
+  | { type: 'proxy'; status: number; message: string }
+  | { type: 'cancelled' }
+  | { type: 'other'; message: string };
+
+export type DeviceVerificationResolvedPayload = {
+  instance_id: number;
+  session_id: number;
+  outcome: DeviceVerificationOutcome;
+  /** Unix timestamp in seconds, set only for an administrator decision. */
+  resolved_at: number | null;
+};
+
+export type DeviceVerificationErrorPayload = {
+  instance_id: number;
+  session_id: number;
+  error: DeviceVerificationError;
 };

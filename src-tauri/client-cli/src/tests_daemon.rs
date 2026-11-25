@@ -179,6 +179,7 @@ async fn test_active_state_lists_interfaces(pool: DbPool) {
         mfa_capabilities: None,
         smtp_configured: None,
         openid_available: None,
+        device_blocked: false,
     }
     .save(&pool)
     .await

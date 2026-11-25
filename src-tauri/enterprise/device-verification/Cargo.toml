@@ -1,0 +1,31 @@
+[package]
+name = "defguard-client-device-verification"
+description = "Device verification by administrators for the Defguard desktop client"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license = "LicenseRef-Proprietary"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+base64.workspace = true
+defguard-client-core = { path = "../../core" }
+futures-util.workspace = true
+log.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+tokio-util.workspace = true
+# Same crate Core generates the codes with, so both sides agree on every edge case.
+totp-lite = "2.0"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+wiremock.workspace = true
+
+[lints]
+workspace = true

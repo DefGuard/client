@@ -33,7 +33,9 @@ enum Attempt {
 fn is_retryable(error: &ConnectError) -> bool {
     !matches!(
         error,
-        ConnectError::RouteConflict { .. } | ConnectError::PostureCheckFailed { .. }
+        ConnectError::RouteConflict { .. }
+            | ConnectError::PostureCheckFailed { .. }
+            | ConnectError::DeviceBlocked { .. }
     )
 }
 

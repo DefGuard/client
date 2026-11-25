@@ -151,16 +151,17 @@ async fn generate_tray_menu(app: &AppHandle) -> Result<Menu<impl Runtime>, Error
         .map_err(crate::tauri_err_to_app_err)
 }
 
-/// Leaves out a location the user cannot connect to, unless it is connected and has to stay
-/// listed for its disconnect.
+/// Leaves out what cannot be connected, everything while the device is blocked, but keeps
+/// connected locations listed for their disconnect.
 fn tray_locations(instance: &InstanceInfo<Id>, locations: Vec<LocationInfo>) -> Vec<LocationInfo> {
     let mfa_state = InstanceMfaState::from(instance);
     locations
         .into_iter()
         .filter(|location| {
             location.active
-                || connection_ability(&location.mfa_steps, &mfa_state)
-                    != ConnectionAbility::Unavailable
+                || (!instance.device_blocked
+                    && connection_ability(&location.mfa_steps, &mfa_state)
+                        != ConnectionAbility::Unavailable)
         })
         .collect()
 }
@@ -311,8 +312,9 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
 async fn is_connectable(location: &Location<Id>) -> bool {
     match Instance::find_by_id(&*DB_POOL, location.instance_id).await {
         Ok(Some(instance)) => {
-            connection_ability(&location.mfa_steps.0, &InstanceMfaState::from(&instance))
-                != ConnectionAbility::Unavailable
+            !instance.device_blocked
+                && connection_ability(&location.mfa_steps.0, &InstanceMfaState::from(&instance))
+                    != ConnectionAbility::Unavailable
         }
         Ok(None) => false,
         Err(err) => {

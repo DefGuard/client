@@ -98,12 +98,17 @@ pub enum ConnectError {
         conflicts: Vec<ConflictingConnection>,
     },
     #[error("{message}")]
+    DeviceBlocked { message: String },
+    #[error("{message}")]
     Other { message: String },
 }
 
 impl From<Error> for ConnectError {
     fn from(error: Error) -> Self {
         match error {
+            Error::DeviceBlocked => Self::DeviceBlocked {
+                message: error.to_string(),
+            },
             Error::PostureCheckFailed(message) => Self::PostureCheckFailed { message },
             Error::ServiceUnavailable(message) => Self::ServiceUnavailable { message },
             Error::RouteConflict { ref conflicts, .. } => Self::RouteConflict {
@@ -126,7 +131,7 @@ impl From<sqlx::Error> for ConnectError {
 /// Serialize a structured error (e.g. `MfaError`, `EnrollmentError`) to JSON so
 /// the frontend can match on its tagged `type`, falling back to the Display
 /// string if serialization somehow fails.
-fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
+pub(crate) fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
     serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
 }
 
@@ -248,6 +253,18 @@ fn mfa_code_error_is_terminal(error: &mfa::MfaError) -> bool {
     }) && mfa_error_is_terminal(error)
 }
 
+/// Every way of bringing a location up passes through here, so this is the one block check.
+async fn ensure_device_not_blocked(location: &Location<Id>) -> Result<(), Error> {
+    let blocked = Instance::find_by_id(&*DB_POOL, location.instance_id)
+        .await?
+        .is_some_and(|instance| instance.device_blocked);
+    if blocked {
+        warn!("Refusing to connect location {location}: the device is blocked");
+        return Err(Error::DeviceBlocked);
+    }
+    Ok(())
+}
+
 /// Bring up a location connection with an already-obtained preshared key and
 /// refresh the tray. Shared by `connect` and the MFA finish flows so the
 /// preshared key never has to cross back into the frontend.
@@ -256,6 +273,7 @@ async fn connect_location_with_psk(
     preshared_key: Option<String>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
+    ensure_device_not_blocked(&location).await?;
     handle_connection_for_location(location.clone(), preshared_key, handle).await?;
     reload_tray_menu(handle).await;
     info!("Connected to location {location}");
@@ -750,6 +768,7 @@ pub(crate) async fn build_instance_info(
         mfa_capabilities: instance.mfa_capabilities.map(|json| json.0),
         smtp_configured: instance.smtp_configured,
         openid_available: instance.openid_available,
+        device_blocked: instance.device_blocked,
     })
 }
 

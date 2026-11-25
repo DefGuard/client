@@ -1,4 +1,5 @@
 pub use defguard_client_core::events::EventKey;
+use defguard_client_device_verification::{Error as DeviceVerificationError, Outcome};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_notification::NotificationExt;
@@ -202,6 +203,40 @@ pub fn handle_deep_link(app_handle: &AppHandle, urls: &[Url]) {
                     error!("Event AddInstance was not emitted. Reason: {err}");
                 }
             }
+        }
+    }
+}
+
+/// Mirrors DeviceVerificationResolvedPayload in rust-api/types.ts.
+#[derive(Clone, Serialize)]
+pub struct DeviceVerificationResolvedPayload {
+    pub instance_id: Id,
+    pub session_id: i64,
+    pub outcome: Outcome,
+    /// Unix timestamp in seconds, set only for an administrator decision.
+    pub resolved_at: Option<i64>,
+}
+
+impl DeviceVerificationResolvedPayload {
+    pub(crate) fn emit(self, app_handle: &AppHandle) {
+        if let Err(err) = app_handle.emit(EventKey::DeviceVerificationResolved.into(), self) {
+            error!("Event Device Verification Resolved was not emitted. Reason: {err}");
+        }
+    }
+}
+
+/// Mirrors DeviceVerificationErrorPayload in rust-api/types.ts.
+#[derive(Clone, Serialize)]
+pub struct DeviceVerificationErrorPayload {
+    pub instance_id: Id,
+    pub session_id: i64,
+    pub error: DeviceVerificationError,
+}
+
+impl DeviceVerificationErrorPayload {
+    pub(crate) fn emit(self, app_handle: &AppHandle) {
+        if let Err(err) = app_handle.emit(EventKey::DeviceVerificationError.into(), self) {
+            error!("Event Device Verification Error was not emitted. Reason: {err}");
         }
     }
 }

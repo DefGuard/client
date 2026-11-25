@@ -350,6 +350,7 @@ fn build_request(instance: &Instance<Id>) -> Result<InstanceInfoRequest, Error> 
 
     Ok(InstanceInfoRequest {
         token: (*token).clone(),
+        possession_challenge_solution: None,
     })
 }
 
