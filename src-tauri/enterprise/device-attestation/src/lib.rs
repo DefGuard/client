@@ -15,16 +15,13 @@ use serde_json::json;
 use sqlx::SqlitePool;
 use tonic::{transport::Channel, Code, Status};
 
-use super::{enrollment_post, CreatedDevice, EnrollmentError, EnrollmentSession};
-use crate::database::models::{
-    device_identity::DeviceIdentity, instance::Instance, wireguard_keys::WireguardKeys, Id,
+use defguard_client_core::{
+    database::models::{
+        device_identity::DeviceIdentity, instance::Instance, wireguard_keys::WireguardKeys, Id,
+    },
+    enrollment::{enrollment_post, CreatedDevice, EnrollmentError, EnrollmentSession},
 };
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(all(test, target_os = "linux"))]
-mod integration_tests;
+use log::{debug, warn};
 
 const DAEMON_OPERATION_TIMEOUT: Duration = Duration::from_secs(60);
 

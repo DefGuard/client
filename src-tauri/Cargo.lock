@@ -1737,6 +1737,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard-client-device-attestation"
+version = "2.3.0"
+dependencies = [
+ "defguard-client-core",
+ "defguard-client-proto",
+ "log",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
 name = "defguard-client-fido2"
 version = "2.3.0"
 dependencies = [

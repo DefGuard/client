@@ -24,8 +24,6 @@ use crate::{
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
 
-pub mod attestation;
-
 // generous because self-hosted instances can sit behind slow or distant links
 const ENROLLMENT_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const ENROLLMENT_REQ_TIMEOUT: Duration = Duration::from_secs(30);
@@ -105,7 +103,7 @@ impl EnrollmentSession {
 
 /// Send a JSON POST request to an enrollment endpoint with the session
 /// cookie and standard client headers.
-async fn enrollment_post(
+pub async fn enrollment_post(
     session: &EnrollmentSession,
     path: &str,
     body: serde_json::Value,
