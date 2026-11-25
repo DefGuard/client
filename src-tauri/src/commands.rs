@@ -1777,9 +1777,9 @@ pub async fn enrollment_attest_device(
     session_id: String,
     instance_id: Id,
     state: State<'_, AppState>,
-) -> Result<enrollment::attestation::AttestationOutcome, String> {
+) -> Result<defguard_client_device_attestation::AttestationOutcome, String> {
     let session = get_enrollment_session(&state, &session_id)?;
-    Ok(enrollment::attestation::attest_device(
+    Ok(defguard_client_device_attestation::attest_device(
         &session,
         &DB_POOL,
         instance_id,

@@ -1608,6 +1608,7 @@ dependencies = [
  "defguard-client-common",
  "defguard-client-config-sync",
  "defguard-client-core",
+ "defguard-client-device-attestation",
  "defguard-client-fido2",
  "defguard-client-posture",
  "defguard-client-proto",
