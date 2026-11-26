@@ -5,7 +5,7 @@
   # add development-related cargo tooling
   rustToolchain = pkgs.rust-bin.stable.latest.default.override {
     extensions = ["rust-analyzer" "rust-src" "rustfmt" "clippy"];
-    targets = ["x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-pc-windows-gnu"];
+    targets = ["x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-pc-windows-gnu" "x86_64-pc-windows-msvc"];
   };
 
   # nightly rustfmt, needed only for the unstable import-grouping options that
@@ -52,6 +52,7 @@ in
         fmtImports
         sqlx-cli
         cargo-nextest
+        cargo-xwin
         vtsls
         trivy
         desktop-file-utils

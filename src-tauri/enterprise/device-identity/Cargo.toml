@@ -11,11 +11,21 @@ version.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
 picky-asn1 = "0.10"
 picky-asn1-der = "0.5"
 picky-asn1-x509 = "0.15"
 sha2 = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+tracing.workspace = true
+tpm2-protocol = "1.2.3"
+windows-sys = { workspace = true, features = [
+    "Win32_Security_Cryptography",
+    "Win32_System_TpmBaseServices",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
 tss-esapi = "7.7"
 
 [lints]

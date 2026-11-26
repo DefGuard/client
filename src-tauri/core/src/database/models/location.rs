@@ -754,7 +754,7 @@ impl<I> Location<I> {
             };
         crate::routed_networks(&self.address, &self.allowed_ips, forced)
             .iter()
-            .any(|network| network.cidr == 0)
+            .any(crate::is_default_route)
     }
 }
 

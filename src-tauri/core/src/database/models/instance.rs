@@ -461,7 +461,8 @@ impl From<ProtoOpenIdProviderKind> for OpenIdProviderKind {
         match value {
             ProtoOpenIdProviderKind::Unspecified
             | ProtoOpenIdProviderKind::Custom
-            | ProtoOpenIdProviderKind::Zitadel => Self::Custom,
+            | ProtoOpenIdProviderKind::Zitadel
+            | ProtoOpenIdProviderKind::Keycloak => Self::Custom,
             ProtoOpenIdProviderKind::Google => Self::Google,
             ProtoOpenIdProviderKind::Microsoft => Self::Microsoft,
             ProtoOpenIdProviderKind::Okta => Self::Okta,

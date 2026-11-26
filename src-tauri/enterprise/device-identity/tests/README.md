@@ -12,8 +12,7 @@ cargo test -p defguard-client-device-identity
 cargo test -p defguard-client-device-identity --test contract -- --ignored
 ```
 
-All Linux operations are implemented. Run a single scenario by adding its name
-before `-- --ignored`. The macOS and Windows backends remain stubs.
+Run a single scenario by adding its name before `-- --ignored`.
 
 ## Contracts
 
@@ -30,7 +29,7 @@ before `-- --ignored`. The macOS and Windows backends remain stubs.
 The library receives only opaque challenge data. Session expiry and single-use
 challenge bookkeeping belong to Core and need separate Core tests.
 
-## Linux and Windows
+## TPM tests
 
 Use a dedicated test TPM or an isolated software TPM. TPM identity data consists of
 the SRK input template, separate public/private blobs for the AK and identity key,
@@ -38,8 +37,21 @@ and EK data: its input template, public area, and available certificates.
 The caller retains these fields and supplies them to subsequent operations. Private
 blobs are protected by the TPM parent, not exported private keys. The library does
 not create identity files, database records, or persistent TPM handles.
+The stored EK template allows later recreation for credential activation.
+`attestation_identity()` projects the stored public data without accessing the TPM.
 
-On Linux, creation assumes empty Owner and Endorsement authorization. It creates a
+Do not clear a TPM used for other applications to clean up these tests.
+
+The independent software MakeCredential fixture supports standard RSA-2048 and
+NIST P-256 EKs with SHA-256 and AES-128-CFB. AK and identity keys must use ECDSA
+P-256/SHA-256. The verifier checks key attributes, TPM Names, Certify structure and
+signature, challenge binding, and the recovered activation secret. EK manufacturer
+CA policy belongs to Core; these facade tests do not validate the EK certificate
+chain. An absent EK certificate is allowed for software TPM fixtures.
+
+## Linux
+
+Creation assumes empty Owner and Endorsement authorization. It creates a
 transient EK using a default tss-esapi profile, preferring ECC P-256 when its NV
 certificate is present, otherwise RSA-2048 when its certificate is present. Without
 either certificate it uses ECC P-256 and returns an empty certificate list. Other NV
@@ -47,13 +59,9 @@ read errors are propagated. A certificate whose public key differs from the defa
 EK is unsupported. Manufacturer-specific templates and nonces are not handled.
 
 Only the EK certificate from NV is currently returned. The backend does not fetch CA
-certificates or contact manufacturer services. Certificate trust belongs to Core.
-The stored EK template allows later recreation for credential activation.
-`attestation_identity()` projects the stored public data without accessing the TPM.
+certificates or contact manufacturer services.
 
-Do not clear a TPM used for other applications to clean up these tests.
-
-For Linux, `swtpm` is the preferred fixture. The backend reads `TSS2_TCTI`, defaulting
+`swtpm` is the preferred fixture. The backend reads `TSS2_TCTI`, defaulting
 to `device:/dev/tpmrm0`. To select an emulator:
 
 ```sh
@@ -62,14 +70,6 @@ export TSS2_TCTI='swtpm:host=127.0.0.1,port=2321'
 
 This test suite does not start an emulator, provision a persistent EK handle, or
 configure OS permissions. These are responsibilities of the runner and backend.
-Windows needs a suitable TPM accessible through its transport.
-
-The independent software MakeCredential fixture supports standard RSA-2048 and
-NIST P-256 EKs with SHA-256 and AES-128-CFB. AK and identity keys must use ECDSA
-P-256/SHA-256. The verifier checks key attributes, TPM Names, Certify structure and
-signature, challenge binding, and the recovered activation secret. EK manufacturer
-CA policy belongs to Core and is outside these facade tests. An absent EK certificate
-is allowed for software TPM fixtures.
 
 The Linux key-creation test reloads both keys in new TPM contexts using only the
 returned blobs and SRK input template, checks their profiles, and uses empty
@@ -77,6 +77,20 @@ authorization:
 
 ```sh
 cargo test -p defguard-client-device-identity --lib test_create_identity_returns_reloadable_key_blobs -- --ignored
+```
+
+## Windows
+
+The backend uses Windows TPM Base Services (TBS) and assumes empty Owner and
+Endorsement authorization. It selects an EK certificate in this order: ECC P-256
+from TPM NV, ECC P-256 from the Windows cache, RSA-2048 from NV, then RSA-2048
+from the Windows cache. If none is available it uses ECC P-256 without a
+certificate. The selected certificate must match the EK public key.
+
+From `src-tauri`, run the hardware tests in an elevated PowerShell:
+
+```powershell
+cargo test -p device-identity --test contract -- --ignored --test-threads=1
 ```
 
 ## macOS
