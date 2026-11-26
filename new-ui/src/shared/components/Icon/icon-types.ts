@@ -144,6 +144,8 @@ export const IconKind = {
   Question: 'question',
   Report: 'report',
   Sent: 'sent',
+  NotVerified: 'not-verified',
+  Time: 'time',
 } as const;
 
 export type IconKindValue = (typeof IconKind)[keyof typeof IconKind];

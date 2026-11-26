@@ -1,0 +1,64 @@
+#device-verification-page {
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: calc(100dvh - var(--window-decorations-height));
+  padding: var(--spacing-md) var(--spacing-lg);
+
+  & > .title {
+    text-align: center;
+    font: var(--t-h4);
+    color: var(--fg-white-100);
+  }
+
+  & > .subtitle {
+    max-width: 380px;
+    text-align: center;
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-70);
+  }
+
+  & > .error {
+    max-width: 380px;
+    text-align: center;
+    font: var(--t-body-sm-400);
+    color: var(--fg-critical);
+  }
+
+  & > .divider {
+    width: 100%;
+    max-width: 386px;
+    height: 1px;
+    background-color: var(--border-muted);
+  }
+
+  & > .refresh {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    column-gap: var(--spacing-sm);
+
+    & > p {
+      font: var(--t-body-xs-400);
+      color: var(--fg-white-70);
+
+      & > span {
+        font: var(--t-body-xs-600);
+        color: var(--fg-white-100);
+      }
+    }
+  }
+
+  & > .actions {
+    display: flex;
+    flex-flow: column;
+    row-gap: var(--spacing-md);
+    width: 181px;
+
+    .btn {
+      width: 100%;
+    }
+  }
+}

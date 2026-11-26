@@ -155,11 +155,21 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     }
   }, [selection, handleDelete]);
 
+  const handleVerify = useCallback(() => {
+    if (!instance) return;
+    navigate({ to: '/full/device-verification', search: { instanceId: instance.id } });
+  }, [instance, navigate]);
+
   const menuConfig = useMemo(() => {
     const isInstance = selection?.kind === 'instance';
+    const canVerify =
+      isInstance && !!instance?.enterprise_enabled && !instance.device_blocked;
     const config: MenuItemsGroup[] = [
       {
         items: [
+          ...(canVerify
+            ? [{ text: 'Verify', icon: 'check' as const, onClick: handleVerify }]
+            : []),
           {
             text: isInstance ? 'Refresh configuration' : 'Edit tunnel',
             icon: 'refresh',
@@ -174,7 +184,14 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
       },
     ];
     return config;
-  }, [handleUpdate, selection?.kind, handleDeleteIntent]);
+  }, [
+    handleUpdate,
+    selection?.kind,
+    handleDeleteIntent,
+    handleVerify,
+    instance?.enterprise_enabled,
+    instance?.device_blocked,
+  ]);
 
   const text = () => {
     switch (selection?.kind) {
