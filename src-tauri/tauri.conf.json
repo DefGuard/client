@@ -49,7 +49,14 @@
           "../control/prerm": "../resources-linux/prerm",
           "../control/postrm": "../resources-linux/postrm"
         },
-        "depends": ["desktop-file-utils"]
+        "depends": [
+          "desktop-file-utils",
+          "libtss2-esys-3.0.2-0 | libtss2-esys-3.0.2-0t64",
+          "libtss2-sys1 | libtss2-sys1t64",
+          "libtss2-mu0 | libtss2-mu-4.0.1-0t64",
+          "libtss2-tctildr0 | libtss2-tctildr0t64",
+          "libtss2-tcti-device0 | libtss2-tcti-device0t64"
+        ]
       },
       "rpm": {
         "files": {
@@ -57,7 +64,7 @@
           "/usr/sbin/defguard-service": "target/release/defguard-service",
           "/lib/systemd/system/defguard-service.service": "../resources-linux/defguard-service.service"
         },
-        "depends": ["desktop-file-utils"],
+        "depends": ["desktop-file-utils", "tpm2-tss"],
         "postInstallScript": "../resources-linux/postinst",
         "preRemoveScript": "../resources-linux/prerm",
         "postRemoveScript": "../resources-linux/postrm"
