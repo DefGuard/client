@@ -2,6 +2,12 @@ pub mod conversions;
 pub mod posture_ext;
 
 pub mod defguard {
+    pub mod device_identity {
+        pub mod v2 {
+            tonic::include_proto!("defguard.device_identity.v2");
+        }
+    }
+
     #[allow(clippy::enum_variant_names)]
     pub mod client_types {
         tonic::include_proto!("defguard.client_types");
