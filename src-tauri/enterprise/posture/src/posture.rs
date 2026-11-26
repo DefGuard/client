@@ -71,6 +71,7 @@ pub async fn request_posture_authorization(
         pubkey: device_pubkey,
         device_posture_data: Some(posture_data),
         token: Some(token),
+        possession_challenge_solution: None,
     };
 
     let url = Url::parse(proxy_url)

@@ -37,6 +37,13 @@ use tracing_subscriber::EnvFilter;
 
 mod proto {
     pub mod defguard {
+        #[allow(dead_code)]
+        pub mod device_identity {
+            pub mod v2 {
+                include!(concat!(env!("OUT_DIR"), "/defguard.device_identity.v2.rs"));
+            }
+        }
+
         #[allow(clippy::enum_variant_names, dead_code)]
         pub mod client_types {
             include!(concat!(env!("OUT_DIR"), "/defguard.client_types.rs"));
@@ -399,7 +406,10 @@ const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 async fn fetch_config(client: &Client, url: Url, token: String) -> Result<DeviceConfig, CliError> {
     let result = client
         .post(url.clone())
-        .json(&InstanceInfoRequest { token })
+        .json(&InstanceInfoRequest {
+            token,
+            possession_challenge_solution: None,
+        })
         .timeout(HTTP_REQ_TIMEOUT)
         .send()
         .await?;
