@@ -1,6 +1,6 @@
 [package]
 name = "defguard-client-device-attestation"
-description = "Device identity attestation during Defguard client enrollment"
+description = "Device identity attestation"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true

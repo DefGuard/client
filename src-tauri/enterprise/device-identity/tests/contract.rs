@@ -1,6 +1,6 @@
 mod support;
 
-use device_identity::{
+use defguard_client_device_identity::{
     attest_identity, attestation_identity, capabilities, create_identity, prove_possession,
     AttestationChallenge, AttestationIdentity, AttestationMethod, AttestationResponse, BackendKind,
     DeviceIdentityError, Identity, PlatformCapabilities, PossessionChallenge, PossessionProof,

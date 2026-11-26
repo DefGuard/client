@@ -1,7 +1,7 @@
 pub mod apple;
 pub mod tpm;
 
-use device_identity::{
+use defguard_client_device_identity::{
     attest_identity, attestation_identity, create_identity, AttestationChallenge,
     AttestationIdentity, AttestationRequest, AttestationResponse, Identity, PossessionProof,
     SignatureAlgorithm,

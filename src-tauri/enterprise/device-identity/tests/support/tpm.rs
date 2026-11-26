@@ -1,6 +1,6 @@
 use aes::Aes128;
 use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
-use device_identity::{
+use defguard_client_device_identity::{
     CredentialChallenge, SignatureAlgorithm, TpmAttestationIdentity, TpmEvidence,
 };
 use hmac::{Hmac, Mac};

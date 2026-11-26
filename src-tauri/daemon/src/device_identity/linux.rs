@@ -1,5 +1,5 @@
+use defguard_client_device_identity as backend;
 use defguard_client_proto::defguard::{client::v1 as ipc, device_identity::v2 as proto};
-use device_identity as backend;
 use tonic::Status;
 
 #[cfg(test)]

@@ -25,7 +25,7 @@ tracing-appender.workspace = true
 tracing-subscriber.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-device-identity = { path = "../enterprise/device-identity" }
+defguard-client-device-identity = { path = "../enterprise/device-identity" }
 
 [target.'cfg(unix)'.dependencies]
 nix.workspace = true
