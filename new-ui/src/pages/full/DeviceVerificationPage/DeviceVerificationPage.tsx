@@ -2,23 +2,24 @@ import './style.scss';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { error as logError } from '@tauri-apps/plugin-log';
-import dayjs from 'dayjs';
 import { useCallback } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
 import { Icon, IconKind } from '../../../shared/components/Icon';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
+import { TooltipButton } from '../../../shared/components/TooltipButton/TooltipButton';
 import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { useAppData } from '../../../shared/providers/AppDataContext';
 import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
 import { ThemeSpacing, ThemeVariable } from '../../../shared/types';
-import { formatDuration } from '../../../shared/utils/formatDuration';
 import { VerificationCode } from './components/VerificationCode/VerificationCode';
 import { deviceVerificationErrorMessage } from './errorMessage';
 import { useDeviceVerification } from './hooks/useDeviceVerification';
 import { DEVICE_BLOCKED_MESSAGE } from './startVerification';
 
 const routeApi = getRouteApi('/full/device-verification');
+
+const formatSeconds = (seconds: number) => `${seconds} seconds`;
 
 export const DeviceVerificationPage = () => {
   const { instanceId } = routeApi.useSearch();
@@ -45,9 +46,9 @@ export const DeviceVerificationPage = () => {
 
   const handleCopy = useCallback(() => {
     if (!code) return;
-    writeText(code)
-      .then(() => Snackbar.default('Code copied to clipboard'))
-      .catch((e) => logError(`Failed to copy device verification code: ${String(e)}`));
+    writeText(code).catch((e) =>
+      logError(`Failed to copy device verification code: ${String(e)}`),
+    );
   }, [code]);
 
   const closeButton = (
@@ -108,23 +109,35 @@ export const DeviceVerificationPage = () => {
           <div className="divider" />
           <SizedBox height={ThemeSpacing.Xl2} />
           <div className="refresh">
-            <Icon icon={IconKind.Time} size={16} staticColor={ThemeVariable.FgWhite60} />
-            <p>
-              Code refreshes in:{' '}
-              <span>
-                {secondsLeft !== null
-                  ? formatDuration(dayjs.duration(secondsLeft, 'seconds'))
-                  : '–'}
-              </span>
-            </p>
+            <div className="label">
+              <Icon
+                icon={IconKind.Time}
+                size={16}
+                staticColor={ThemeVariable.FgWhite60}
+              />
+              <p>Code refreshes in:</p>
+            </div>
+            <div className="timer">
+              <p className="value">
+                {secondsLeft !== null ? formatSeconds(secondsLeft) : '–'}
+              </p>
+              {start.ok && (
+                <p className="placeholder" aria-hidden>
+                  {formatSeconds(start.info.period)}
+                </p>
+              )}
+            </div>
           </div>
           <SizedBox height={ThemeSpacing.Xl2} />
           <div className="actions">
-            <Button
-              text="Copy code to clipboard"
-              variant={ButtonVariant.Outlined}
-              disabled={!code}
-              onClick={handleCopy}
+            <TooltipButton
+              tooltipText="Code copied to clipboard"
+              buttonProps={{
+                text: 'Copy code to clipboard',
+                variant: ButtonVariant.Outlined,
+                disabled: !code,
+                onClick: handleCopy,
+              }}
             />
             {closeButton}
           </div>

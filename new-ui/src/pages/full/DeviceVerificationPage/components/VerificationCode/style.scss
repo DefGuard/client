@@ -4,6 +4,7 @@
   align-items: center;
   justify-content: center;
   column-gap: var(--spacing-md);
+  user-select: none;
 
   & > .digit {
     display: flex;
@@ -15,6 +16,5 @@
     background-color: var(--fg-white-100);
     color: var(--fg-action);
     font: var(--t-h5);
-    user-select: text;
   }
 }

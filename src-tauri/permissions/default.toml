@@ -73,4 +73,7 @@ commands.allow = [
   "get_posture_data",
   "get_session_state",
   "patch_session_state",
+  "start_device_verification",
+  "get_device_verification_code",
+  "cancel_device_verification",
 ]

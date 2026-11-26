@@ -38,15 +38,38 @@
     display: flex;
     flex-flow: row nowrap;
     align-items: center;
-    column-gap: var(--spacing-sm);
+    justify-content: center;
+    column-gap: var(--spacing-xs);
 
-    & > p {
-      font: var(--t-body-xs-400);
-      color: var(--fg-white-70);
+    & > .label {
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: flex-start;
+      column-gap: var(--spacing-sm);
 
-      & > span {
-        font: var(--t-body-xs-600);
+      & > p {
+        font: var(--t-body-xs-400);
+        color: var(--fg-white-60);
+      }
+    }
+
+    // the hidden full-period text reserves the widest width so the row never recenters
+    & > .timer {
+      display: grid;
+      grid-template-columns: auto;
+      grid-template-rows: 1fr;
+
+      & > p {
+        grid-row: 1;
+        grid-column: 1 / 2;
+        font: var(--t-body-xs-500);
         color: var(--fg-white-100);
+        font-variant-numeric: tabular-nums;
+      }
+
+      & > .placeholder {
+        visibility: hidden;
       }
     }
   }
