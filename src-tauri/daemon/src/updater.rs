@@ -52,7 +52,6 @@ use windows_sys::Win32::{
 
 use crate::win_util::{to_wide, SecurityDescriptor};
 
-/// Same asset naming the Chocolatey package relies on.
 const DOWNLOAD_URL_BASE: &str = "https://github.com/DefGuard/client/releases/download";
 const MAX_PACKAGE_SIZE: u64 = 512 * 1024 * 1024;
 const POLICY_KEY: &str = r"SOFTWARE\Policies\Defguard";
@@ -157,7 +156,7 @@ async fn prepare_and_launch() -> Result<String, UpdateError> {
     let msi_path = dir.join(&msi_name);
     let file = download(&client, &url, &msi_path).await?;
 
-    // Flushing and revocation checks block, so keep them off the async workers.
+    // Revocation checks block, so keep them off the async workers.
     let verify_path = msi_path.clone();
     let file = tokio::task::spawn_blocking(move || verify_publisher(file, &verify_path))
         .await
@@ -255,10 +254,8 @@ fn parse_release_version(value: &str) -> Result<Version, UpdateError> {
     Ok(version)
 }
 
-/// Streams the installer to `path` and returns the still-open file.
-///
-/// The handle denies writes and deletes to others, so the file can't be swapped between
-/// verification and installation. Keep it open until msiexec is done with the file.
+/// Downloads the installer and returns a read-only handle that blocks writes by others.
+/// Keep it open until msiexec exits so the file can't be swapped after verification.
 async fn download(client: &Client, url: &str, path: &Path) -> Result<File, UpdateError> {
     debug!("Downloading installer from {url}");
     let fail = |err: reqwest::Error| UpdateError::Download(err.to_string());
@@ -291,15 +288,27 @@ async fn download(client: &Client, url: &str, path: &Path) -> Result<File, Updat
         file.write_all(&chunk)?;
     }
     debug!("Downloaded {total} bytes to {}", path.display());
+
+    // Only SYSTEM and Administrators can write here between close and reopen.
+    let path = path.to_owned();
+    let file = tokio::task::spawn_blocking(move || {
+        file.sync_all()?;
+        drop(file);
+        OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ)
+            .open(&path)
+    })
+    .await
+    .map_err(|err| UpdateError::Download(err.to_string()))??;
     Ok(file)
 }
 
-/// Flushes the installer and accepts it only if its Authenticode signer matches this service's.
+/// Accepts the installer only if its Authenticode signer matches this service's.
 ///
 /// Matching the subject instead of pinning a certificate keeps updates working across certificate
 /// renewals. Unsigned (development) builds can't update themselves.
 fn verify_publisher(file: File, path: &Path) -> Result<File, UpdateError> {
-    file.sync_all()?;
     // Only the subject is needed from our own signature, so skip its revocation round trip.
     let service_exe = std::env::current_exe()?;
     let expected = signer_subject(&service_exe, None, WTD_REVOKE_NONE)
