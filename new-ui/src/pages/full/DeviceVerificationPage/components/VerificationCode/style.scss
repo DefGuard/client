@@ -8,12 +8,13 @@
 
   & > .digit {
     display: flex;
+    flex-flow: row nowrap;
     align-items: center;
     justify-content: center;
     width: 40px;
     height: 40px;
     border-radius: var(--radius-md);
-    background-color: var(--fg-white-100);
+    background-color: var(--bg-white-100);
     color: var(--fg-action);
     font: var(--t-h5);
   }

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { interval } from 'rxjs';
 import { api } from '../../../../shared/rust-api/api';
 import { getInstancesQueryOptions } from '../../../../shared/rust-api/query';
@@ -12,15 +12,13 @@ import {
   type DeviceVerificationResolvedPayload,
   TauriEvent,
 } from '../../../../shared/rust-api/types';
-import {
-  type DeviceVerificationStart,
-  toDeviceVerificationError,
-} from '../startVerification';
+import { isPresent } from '../../../../shared/utils/isPresent';
+import type { DeviceVerificationStart } from '../types';
+import { toDeviceVerificationError } from '../utils/toDeviceVerificationError';
 
 export type DeviceVerificationStatus =
   | { kind: 'pending' }
-  /** The administrator cancelled the session. */
-  | { kind: 'stopped' }
+  | { kind: 'cancelled' }
   | { kind: 'expired' }
   | { kind: 'error'; error: DeviceVerificationError };
 
@@ -33,7 +31,7 @@ type Args = {
 };
 
 /** Codes are fetched a moment after they expire so the backend is past the boundary. */
-const REFETCH_MARGIN_MS = 250;
+const refetchMarginMs = 250;
 
 export const useDeviceVerification = ({
   instanceId,
@@ -43,8 +41,10 @@ export const useDeviceVerification = ({
 }: Args) => {
   const queryClient = useQueryClient();
   const [resolved, setResolved] = useState<DeviceVerificationStatus | null>(null);
-  const callbacks = useRef({ onVerified, onBlocked });
-  callbacks.current = { onVerified, onBlocked };
+  const callbacksRef = useRef({ onVerified, onBlocked });
+  useEffect(() => {
+    callbacksRef.current = { onVerified, onBlocked };
+  }, [onVerified, onBlocked]);
 
   const code = useQuery({
     queryKey: ['device-verification-code', instanceId, start.ok && start.info.session_id],
@@ -58,20 +58,22 @@ export const useDeviceVerification = ({
     retry: false,
     refetchOnWindowFocus: false,
     refetchInterval: (query) =>
-      (query.state.data?.expires_in ?? 1) * 1000 + REFETCH_MARGIN_MS,
+      (query.state.data?.expires_in ?? 1) * 1000 + refetchMarginMs,
   });
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const sub = interval(1_000).subscribe(() => setNow(Date.now()));
-    return () => sub.unsubscribe();
+    return () => {
+      sub.unsubscribe();
+    };
   }, []);
-  const secondsLeft = code.data
-    ? Math.max(
-        0,
-        Math.ceil((code.dataUpdatedAt + code.data.expires_in * 1000 - now) / 1000),
-      )
-    : null;
+
+  const secondsLeft = useMemo(() => {
+    if (!isPresent(code.data)) return null;
+    const expiresAt = code.dataUpdatedAt + code.data.expires_in * 1000;
+    return Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  }, [code.data, code.dataUpdatedAt, now]);
 
   useEffect(() => {
     // The next instances refetch reconciles this with the backend.
@@ -87,7 +89,7 @@ export const useDeviceVerification = ({
       switch (error.type) {
         case 'device_blocked':
           setDeviceStatus(DeviceStatus.Blocked);
-          callbacks.current.onBlocked();
+          callbacksRef.current.onBlocked();
           return;
         case 'cancelled':
           return;
@@ -104,14 +106,14 @@ export const useDeviceVerification = ({
           switch (payload.outcome) {
             case 'verified':
               setDeviceStatus(DeviceStatus.Verified);
-              callbacks.current.onVerified();
+              callbacksRef.current.onVerified();
               break;
             case 'blocked':
               setDeviceStatus(DeviceStatus.Blocked);
-              callbacks.current.onBlocked();
+              callbacksRef.current.onBlocked();
               break;
             case 'cancelled':
-              setResolved({ kind: 'stopped' });
+              setResolved({ kind: 'cancelled' });
               break;
             case 'expired':
               setResolved({ kind: 'expired' });
@@ -135,11 +137,13 @@ export const useDeviceVerification = ({
   }, [instanceId, queryClient]);
 
   // Events win: a failed code fetch right before an outcome must not mask it.
-  let status: DeviceVerificationStatus = { kind: 'pending' };
-  if (resolved) status = resolved;
-  else if (!start.ok) status = { kind: 'error', error: start.error };
-  else if (code.isError)
-    status = { kind: 'error', error: toDeviceVerificationError(code.error) };
+  const status = useMemo((): DeviceVerificationStatus => {
+    if (isPresent(resolved)) return resolved;
+    if (!start.ok) return { kind: 'error', error: start.error };
+    if (code.isError)
+      return { kind: 'error', error: toDeviceVerificationError(code.error) };
+    return { kind: 'pending' };
+  }, [resolved, start, code.isError, code.error]);
 
   return {
     status,

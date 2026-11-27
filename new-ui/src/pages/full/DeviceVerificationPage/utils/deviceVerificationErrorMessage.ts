@@ -1,5 +1,6 @@
-import type { DeviceVerificationError } from '../../../shared/rust-api/types';
-import { DEVICE_BLOCKED_MESSAGE } from './startVerification';
+import type { DeviceVerificationError } from '../../../../shared/rust-api/types';
+
+export const deviceBlockedMessage = 'This device has been blocked by your administrator.';
 
 export const deviceVerificationErrorMessage = (
   error: DeviceVerificationError,
@@ -14,7 +15,7 @@ export const deviceVerificationErrorMessage = (
     case 'user_inactive':
       return 'Your account is inactive. Contact your administrator.';
     case 'device_blocked':
-      return DEVICE_BLOCKED_MESSAGE;
+      return deviceBlockedMessage;
     case 'session_not_found':
       return 'The verification session has ended. Start the verification again.';
     case 'unsupported_algorithm':

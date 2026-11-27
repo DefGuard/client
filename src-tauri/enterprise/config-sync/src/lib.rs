@@ -283,7 +283,7 @@ async fn apply_fetched_config(
 }
 
 /// Written apart from the config so it applies while connections are active and never prompts a
-/// reconnect. Callers react to a block on their own, see [`Instance::is_device_blocked`].
+/// reconnect. Callers react to a block on their own through Instance::is_device_blocked.
 async fn sync_device_status(
     transaction: &mut Transaction<'_, Sqlite>,
     instance: &mut Instance<Id>,

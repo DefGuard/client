@@ -2,9 +2,9 @@ import './style.scss';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { error as logError } from '@tauri-apps/plugin-log';
-import { useCallback } from 'react';
 import { Button } from '../../../shared/components/Button/Button';
 import { ButtonVariant } from '../../../shared/components/Button/types';
+import { Divider } from '../../../shared/components/Divider/Divider';
 import { Icon, IconKind } from '../../../shared/components/Icon';
 import { SizedBox } from '../../../shared/components/SizedBox/SizedBox';
 import { TooltipButton } from '../../../shared/components/TooltipButton/TooltipButton';
@@ -12,10 +12,13 @@ import { FullPage } from '../../../shared/layouts/FullPage/FullPage';
 import { useAppData } from '../../../shared/providers/AppDataContext';
 import { Snackbar } from '../../../shared/providers/snackbar/snackbar';
 import { ThemeSpacing, ThemeVariable } from '../../../shared/types';
+import { isPresent } from '../../../shared/utils/isPresent';
 import { VerificationCode } from './components/VerificationCode/VerificationCode';
-import { deviceVerificationErrorMessage } from './errorMessage';
 import { useDeviceVerification } from './hooks/useDeviceVerification';
-import { DEVICE_BLOCKED_MESSAGE } from './startVerification';
+import {
+  deviceBlockedMessage,
+  deviceVerificationErrorMessage,
+} from './utils/deviceVerificationErrorMessage';
 
 const routeApi = getRouteApi('/full/device-verification');
 
@@ -28,10 +31,10 @@ export const DeviceVerificationPage = () => {
   const { setViewSelection } = useAppData();
 
   // The route's onLeave stops waiting for the decision.
-  const leave = useCallback(async () => {
+  const leave = async () => {
     setViewSelection({ kind: 'instance', id: instanceId });
     await navigate({ to: '/full/overview', replace: true });
-  }, [instanceId, navigate, setViewSelection]);
+  };
 
   const { status, code, secondsLeft } = useDeviceVerification({
     instanceId,
@@ -40,16 +43,16 @@ export const DeviceVerificationPage = () => {
       void leave().then(() => Snackbar.success('Device successfully verified'));
     },
     onBlocked: () => {
-      void leave().then(() => Snackbar.error(DEVICE_BLOCKED_MESSAGE));
+      void leave().then(() => Snackbar.error(deviceBlockedMessage));
     },
   });
 
-  const handleCopy = useCallback(() => {
-    if (!code) return;
+  const handleCopy = () => {
+    if (!isPresent(code)) return;
     writeText(code).catch((e) =>
       logError(`Failed to copy device verification code: ${String(e)}`),
     );
-  }, [code]);
+  };
 
   const closeButton = (
     <Button
@@ -61,7 +64,7 @@ export const DeviceVerificationPage = () => {
     />
   );
 
-  if (status.kind === 'stopped' || status.kind === 'expired') {
+  if (status.kind === 'cancelled' || status.kind === 'expired') {
     return (
       <FullPage id="device-verification-page" hideScrollContainer>
         <Icon
@@ -71,11 +74,11 @@ export const DeviceVerificationPage = () => {
         />
         <SizedBox height={ThemeSpacing.Xl2} />
         <p className="title">
-          {status.kind === 'stopped' ? 'Verification stopped' : 'Verification expired'}
+          {status.kind === 'cancelled' ? 'Verification stopped' : 'Verification expired'}
         </p>
         <SizedBox height={ThemeSpacing.Sm} />
         <p className="subtitle">
-          {status.kind === 'stopped'
+          {status.kind === 'cancelled'
             ? 'The verification process was stopped by your administrator. You can close this window.'
             : 'The verification time limit has passed. Start the verification again from the instance settings when your administrator asks for it.'}
         </p>
@@ -96,17 +99,18 @@ export const DeviceVerificationPage = () => {
         code below or send it to your administrator.
       </p>
       <SizedBox height={ThemeSpacing.Xl2} />
-      {status.kind === 'error' ? (
+      {status.kind === 'error' && (
         <>
           <p className="error">{deviceVerificationErrorMessage(status.error)}</p>
           <SizedBox height={ThemeSpacing.Xl2} />
           <div className="actions">{closeButton}</div>
         </>
-      ) : (
+      )}
+      {status.kind === 'pending' && (
         <>
-          {code && <VerificationCode code={code} />}
+          {isPresent(code) && <VerificationCode code={code} />}
           <SizedBox height={ThemeSpacing.Xl2} />
-          <div className="divider" />
+          <Divider />
           <SizedBox height={ThemeSpacing.Xl2} />
           <div className="refresh">
             <div className="label">
@@ -119,7 +123,7 @@ export const DeviceVerificationPage = () => {
             </div>
             <div className="timer">
               <p className="value">
-                {secondsLeft !== null ? formatSeconds(secondsLeft) : '–'}
+                {isPresent(secondsLeft) ? formatSeconds(secondsLeft) : '–'}
               </p>
               {start.ok && (
                 <p className="placeholder" aria-hidden>
@@ -135,7 +139,7 @@ export const DeviceVerificationPage = () => {
               buttonProps={{
                 text: 'Copy code to clipboard',
                 variant: ButtonVariant.Outlined,
-                disabled: !code,
+                disabled: !isPresent(code),
                 onClick: handleCopy,
               }}
             />

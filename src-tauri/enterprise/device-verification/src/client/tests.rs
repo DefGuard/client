@@ -134,12 +134,9 @@ fn test_await_url() {
 
 #[derive(Clone)]
 enum Reply {
-    /// Upgrades, then sends this frame.
-    Frame(serde_json::Value),
-    /// Upgrades, then drops the connection without a frame.
-    Drop,
-    /// Refuses the upgrade with this status and JSON body.
-    Refuse(u16, serde_json::Value),
+    UpgradeAndSend(serde_json::Value),
+    UpgradeAndDrop,
+    RefuseUpgrade(u16, serde_json::Value),
 }
 
 /// Serves one reply per connection, in order, asserting on each request.
@@ -167,7 +164,7 @@ async fn fake_edge(replies: Vec<Reply>) -> (Url, Arc<AtomicUsize>, JoinHandle<()
                     &format!("Bearer {TOKEN}")
                 );
                 assert!(request.headers().contains_key(CLIENT_VERSION_HEADER));
-                if let Reply::Refuse(status, body) = &reply {
+                if let Reply::RefuseUpgrade(status, body) = &reply {
                     let mut error = ErrorResponse::new(Some(body.to_string()));
                     *error.status_mut() = (*status).try_into().unwrap();
                     return Err(error);
@@ -178,15 +175,15 @@ async fn fake_edge(replies: Vec<Reply>) -> (Url, Arc<AtomicUsize>, JoinHandle<()
                 continue;
             };
             match reply {
-                Reply::Frame(frame) => {
+                Reply::UpgradeAndSend(frame) => {
                     socket
                         .send(Message::Text(frame.to_string().into()))
                         .await
                         .unwrap();
                     let _ = socket.close(None).await;
                 }
-                Reply::Drop => drop(socket),
-                Reply::Refuse(..) => unreachable!(),
+                Reply::UpgradeAndDrop => drop(socket),
+                Reply::RefuseUpgrade(..) => unreachable!(),
             }
         }
     });
@@ -206,7 +203,7 @@ fn status_frame(outcome: &str) -> serde_json::Value {
 
 #[tokio::test]
 async fn test_await_returns_the_decision() {
-    let (url, _, edge) = fake_edge(vec![Reply::Frame(status_frame("blocked"))]).await;
+    let (url, _, edge) = fake_edge(vec![Reply::UpgradeAndSend(status_frame("blocked"))]).await;
     let status = await_decision(&url, TOKEN, SESSION_ID, CancellationToken::new())
         .await
         .unwrap();
@@ -218,9 +215,9 @@ async fn test_await_returns_the_decision() {
 #[tokio::test(start_paused = true)]
 async fn test_await_reconnects_after_a_dropped_connection() {
     let (url, served, edge) = fake_edge(vec![
-        Reply::Drop,
-        Reply::Frame(status_frame("pending")),
-        Reply::Frame(status_frame("verified")),
+        Reply::UpgradeAndDrop,
+        Reply::UpgradeAndSend(status_frame("pending")),
+        Reply::UpgradeAndSend(status_frame("verified")),
     ])
     .await;
     let status = await_decision(&url, TOKEN, SESSION_ID, CancellationToken::new())
@@ -233,7 +230,7 @@ async fn test_await_reconnects_after_a_dropped_connection() {
 
 #[tokio::test]
 async fn test_await_errors_before_upgrade_are_final() {
-    let (url, served, edge) = fake_edge(vec![Reply::Refuse(
+    let (url, served, edge) = fake_edge(vec![Reply::RefuseUpgrade(
         404,
         json!({"error": "verification session not found", "code": "verification_session_not_found"}),
     )])
@@ -248,7 +245,7 @@ async fn test_await_errors_before_upgrade_are_final() {
 
 #[tokio::test]
 async fn test_await_error_frames() {
-    let (url, _, edge) = fake_edge(vec![Reply::Frame(json!({
+    let (url, _, edge) = fake_edge(vec![Reply::UpgradeAndSend(json!({
         "type": "error",
         "error": "invalid token",
         "code": "device_token_invalid",

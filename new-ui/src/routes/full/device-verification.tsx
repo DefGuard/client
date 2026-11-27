@@ -1,10 +1,8 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 import { DeviceVerificationPage } from '../../pages/full/DeviceVerificationPage/DeviceVerificationPage';
-import {
-  DEVICE_BLOCKED_MESSAGE,
-  startVerification,
-} from '../../pages/full/DeviceVerificationPage/startVerification';
+import { deviceBlockedMessage } from '../../pages/full/DeviceVerificationPage/utils/deviceVerificationErrorMessage';
+import { startVerification } from '../../pages/full/DeviceVerificationPage/utils/startVerification';
 import { Snackbar } from '../../shared/providers/snackbar/snackbar';
 import { api } from '../../shared/rust-api/api';
 
@@ -19,7 +17,7 @@ export const Route = createFileRoute('/full/device-verification')({
   loader: async ({ deps }) => {
     const start = await startVerification(deps.instanceId);
     if (!start.ok && start.error.type === 'device_blocked') {
-      Snackbar.error(DEVICE_BLOCKED_MESSAGE);
+      Snackbar.error(deviceBlockedMessage);
       throw redirect({ to: '/full/overview', replace: true });
     }
     return start;
