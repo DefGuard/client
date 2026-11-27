@@ -87,6 +87,14 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Threading",
     # Network address change notifications (NotifyAddrChange)
     "Win32_NetworkManagement_IpHelper",
+    # Self-update: Authenticode checks, policy registry, relaunching the client in a user session
+    "Win32_Security_Cryptography",
+    "Win32_Security_Cryptography_Catalog",
+    "Win32_Security_Cryptography_Sip",
+    "Win32_Security_WinTrust",
+    "Win32_System_Environment",
+    "Win32_System_Registry",
+    "Win32_System_RemoteDesktop",
 ] }
 wiremock = "0.6"
 wmi = {version = "0.18", default-features = false}
