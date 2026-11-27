@@ -3,7 +3,12 @@ import type {
   DeviceVerificationInfo,
 } from '../../../shared/rust-api/types';
 
+export type DeviceVerificationSession = {
+  info: DeviceVerificationInfo;
+  // anchors the countdown of the first code
+  fetchedAt: number;
+};
+
 export type DeviceVerificationStart =
-  /** fetchedAt anchors the countdown of the first code. */
-  | { ok: true; info: DeviceVerificationInfo; fetchedAt: number }
+  | ({ ok: true } & DeviceVerificationSession)
   | { ok: false; error: DeviceVerificationError };

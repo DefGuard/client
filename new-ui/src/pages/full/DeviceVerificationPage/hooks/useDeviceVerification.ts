@@ -13,7 +13,7 @@ import {
   TauriEvent,
 } from '../../../../shared/rust-api/types';
 import { isPresent } from '../../../../shared/utils/isPresent';
-import type { DeviceVerificationStart } from '../types';
+import type { DeviceVerificationSession } from '../types';
 import { toDeviceVerificationError } from '../utils/toDeviceVerificationError';
 
 export type DeviceVerificationStatus =
@@ -25,7 +25,7 @@ export type DeviceVerificationStatus =
 type Args = {
   instanceId: number;
   /** Started by the route loader before the page shows. */
-  start: DeviceVerificationStart;
+  start: DeviceVerificationSession;
   onVerified: () => void;
   onBlocked: () => void;
 };
@@ -47,11 +47,11 @@ export const useDeviceVerification = ({
   }, [onVerified, onBlocked]);
 
   const code = useQuery({
-    queryKey: ['device-verification-code', instanceId, start.ok && start.info.session_id],
+    queryKey: ['device-verification-code', instanceId, start.info.session_id],
     queryFn: () => api.getDeviceVerificationCode(instanceId),
-    enabled: start.ok && resolved === null,
-    initialData: start.ok ? start.info.code : undefined,
-    initialDataUpdatedAt: start.ok ? start.fetchedAt : undefined,
+    enabled: resolved === null,
+    initialData: start.info.code,
+    initialDataUpdatedAt: start.fetchedAt,
     // The code changes on its own schedule, refetchInterval alone drives it.
     staleTime: Infinity,
     gcTime: 0,
@@ -139,11 +139,10 @@ export const useDeviceVerification = ({
   // Events win: a failed code fetch right before an outcome must not mask it.
   const status = useMemo((): DeviceVerificationStatus => {
     if (isPresent(resolved)) return resolved;
-    if (!start.ok) return { kind: 'error', error: start.error };
     if (code.isError)
       return { kind: 'error', error: toDeviceVerificationError(code.error) };
     return { kind: 'pending' };
-  }, [resolved, start, code.isError, code.error]);
+  }, [resolved, code.isError, code.error]);
 
   return {
     status,

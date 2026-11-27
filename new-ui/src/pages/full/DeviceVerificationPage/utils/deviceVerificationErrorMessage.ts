@@ -1,6 +1,7 @@
 import type { DeviceVerificationError } from '../../../../shared/rust-api/types';
 
-export const deviceBlockedMessage = 'This device has been blocked by your administrator.';
+export const deviceBlockedMessage =
+  'Your access to all locations is currently blocked. Please contact your administrator to resolve this issue.';
 
 export const deviceVerificationErrorMessage = (
   error: DeviceVerificationError,
@@ -25,6 +26,12 @@ export const deviceVerificationErrorMessage = (
     case 'invalid_response':
     case 'proxy':
     case 'other':
-      return `Device verification failed: ${error.message}`;
+      return error.message;
   }
+};
+
+export const deviceVerificationStartErrorMessage = (
+  error: DeviceVerificationError,
+): string => {
+  return `Could not start device verification. ${deviceVerificationErrorMessage(error)}`;
 };

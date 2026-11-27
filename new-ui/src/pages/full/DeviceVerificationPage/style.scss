@@ -1,6 +1,5 @@
 #device-verification-page {
   --content-max-width: 380px;
-  --actions-width: 181px;
 
   display: flex;
   flex-flow: column;
@@ -21,13 +20,10 @@
     text-align: center;
     font: var(--t-body-sm-400);
     color: var(--fg-white-70);
-  }
 
-  & > .error {
-    max-width: var(--content-max-width);
-    text-align: center;
-    font: var(--t-body-sm-400);
-    color: var(--fg-critical);
+    & > span {
+      display: block;
+    }
   }
 
   & > .divider {
@@ -79,13 +75,12 @@
   & > .actions {
     display: flex;
     flex-flow: column;
-    align-items: stretch;
+    align-items: center;
     justify-content: flex-start;
     row-gap: var(--spacing-md);
-    width: var(--actions-width);
+  }
 
-    & > .btn {
-      width: 100%;
-    }
+  &.outcome {
+    --content-max-width: 440px;
   }
 }

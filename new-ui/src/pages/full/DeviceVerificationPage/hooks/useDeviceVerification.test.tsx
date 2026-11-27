@@ -12,7 +12,7 @@ import {
   type InstanceInfo,
   TauriEvent,
 } from '../../../../shared/rust-api/types';
-import type { DeviceVerificationStart } from '../types';
+import type { DeviceVerificationSession } from '../types';
 import { useDeviceVerification } from './useDeviceVerification';
 
 type Handler = (event: { payload: unknown }) => void;
@@ -40,7 +40,7 @@ const info: DeviceVerificationInfo = {
   code: { code: '755224', expires_in: 42 },
 };
 
-const started: DeviceVerificationStart = { ok: true, info, fetchedAt: Date.now() };
+const started: DeviceVerificationSession = { info, fetchedAt: Date.now() };
 
 const otherInstanceId = instanceId + 1;
 
@@ -63,7 +63,7 @@ const resolved = (
   ...overrides,
 });
 
-const render = async (start: DeviceVerificationStart = started) => {
+const render = async (start: DeviceVerificationSession = started) => {
   const onVerified = vi.fn();
   const onBlocked = vi.fn();
   const queryClient = new QueryClient();
@@ -177,16 +177,7 @@ describe('useDeviceVerification', () => {
     expectStatuses(deviceStatuses, DeviceStatus.Unverified);
   });
 
-  it('reports a failed start and wait errors', async () => {
-    const failed = await render({ ok: false, error: { type: 'license_required' } });
-    expect(failed.hook.result.current.status).toEqual({
-      kind: 'error',
-      error: { type: 'license_required' },
-    });
-    expect(failed.hook.result.current.code).toBeNull();
-    expect(mocks.getDeviceVerificationCode).not.toHaveBeenCalled();
-    failed.hook.unmount();
-
+  it('reports wait errors', async () => {
     const waiting = await render();
     emit(TauriEvent.DeviceVerificationError, {
       instance_id: instanceId,
@@ -197,5 +188,6 @@ describe('useDeviceVerification', () => {
       kind: 'error',
       error: { type: 'proxy', status: 502, message: 'core timeout' },
     });
+    expect(waiting.hook.result.current.code).toBeNull();
   });
 });

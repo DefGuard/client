@@ -146,6 +146,8 @@ export const IconKind = {
   Sent: 'sent',
   NotVerified: 'not-verified',
   Time: 'time',
+  Expired: 'expired',
+  Denied: 'denied',
 } as const;
 
 export type IconKindValue = (typeof IconKind)[keyof typeof IconKind];
