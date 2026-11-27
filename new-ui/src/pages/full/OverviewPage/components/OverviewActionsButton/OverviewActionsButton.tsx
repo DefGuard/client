@@ -23,9 +23,10 @@ import { openModal } from '../../../../../shared/hooks/modalControls/modalsSubje
 import { ModalName } from '../../../../../shared/hooks/modalControls/modalTypes';
 import { useAppData } from '../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../shared/rust-api/api';
-import type {
-  InstanceInfo,
-  OverviewViewSelection,
+import {
+  DeviceStatus,
+  type InstanceInfo,
+  type OverviewViewSelection,
 } from '../../../../../shared/rust-api/types';
 
 type Props = {
@@ -155,11 +156,23 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     }
   }, [selection, handleDelete]);
 
+  const handleVerify = useCallback(() => {
+    if (!instance) return;
+    navigate({ to: '/full/device-verification', search: { instanceId: instance.id } });
+  }, [instance, navigate]);
+
   const menuConfig = useMemo(() => {
     const isInstance = selection?.kind === 'instance';
+    const canVerify =
+      isInstance &&
+      !!instance?.device_verification_available &&
+      instance.device_status !== DeviceStatus.Blocked;
     const config: MenuItemsGroup[] = [
       {
         items: [
+          ...(canVerify
+            ? [{ text: 'Verify', icon: 'check' as const, onClick: handleVerify }]
+            : []),
           {
             text: isInstance ? 'Refresh configuration' : 'Edit tunnel',
             icon: 'refresh',
@@ -174,7 +187,14 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
       },
     ];
     return config;
-  }, [handleUpdate, selection?.kind, handleDeleteIntent]);
+  }, [
+    handleUpdate,
+    selection?.kind,
+    handleDeleteIntent,
+    handleVerify,
+    instance?.device_verification_available,
+    instance?.device_status,
+  ]);
 
   const text = () => {
     switch (selection?.kind) {

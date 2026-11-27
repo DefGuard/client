@@ -1,17 +1,23 @@
 import './style.scss';
 import { TruncatedText } from '../../../../../shared/components/TruncatedText/TruncatedText';
+import type { DeviceStatusValue } from '../../../../../shared/rust-api/types';
+import { DeviceStatusBadge } from './components/DeviceStatusBadge/DeviceStatusBadge';
 
 type Props = {
   name: string;
+  deviceStatus: DeviceStatusValue | null;
 };
 
-export const OverviewInstanceName = ({ name }: Props) => {
+export const OverviewInstanceName = ({ name, deviceStatus }: Props) => {
   return (
-    <TruncatedText
-      className="overview-instance-name"
-      text={name}
-      tooltipPlacement="bottom-start"
-      delayTooltip
-    />
+    <div className="overview-instance-name">
+      <TruncatedText
+        className="name"
+        text={name}
+        tooltipPlacement="bottom-start"
+        delayTooltip
+      />
+      <DeviceStatusBadge status={deviceStatus} />
+    </div>
   );
 };

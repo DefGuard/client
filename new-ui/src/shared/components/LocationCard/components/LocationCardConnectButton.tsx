@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { error as logError } from '@tauri-apps/plugin-log';
 import { useConfigureFactorsScreen } from '../../../hooks/useConfigureFactorsScreen';
 import { api } from '../../../rust-api/api';
+import { DeviceStatus } from '../../../rust-api/types';
 import { connectConfigureFactorsSource } from '../../../utils/configureFactorsSource';
 import { ConnectionAbility, shouldStartMfa } from '../../../utils/mfa';
 import { IconKind } from '../../Icon';
@@ -10,13 +11,22 @@ import { openRouteConflictInFullView, parseConnectError } from '../api/connectEr
 import { useLocationCardContext } from '../context/context';
 import { LocationCardViews } from '../context/types';
 import { ConnectButton } from './ConnectButton/ConnectButton';
-import { connectBlockedTooltip } from './ConnectButton/consts';
+import { connectButtonTooltip } from './ConnectButton/consts';
 
 export const LocationCardConnectButton = () => {
-  const { location, connectionAbility, setPostureError, setView, showError, startMfa } =
-    useLocationCardContext();
+  const {
+    location,
+    instance,
+    connectionAbility,
+    setPostureError,
+    setView,
+    showError,
+    startMfa,
+  } = useLocationCardContext();
 
   const canConfigureMfa = connectionAbility === ConnectionAbility.Configurable;
+  const isDeviceBlocked =
+    !location.active && instance?.device_status === DeviceStatus.Blocked;
   const isBlocked =
     !location.active && connectionAbility === ConnectionAbility.Unavailable;
 
@@ -102,9 +112,9 @@ export const LocationCardConnectButton = () => {
       text={canConfigureMfa ? 'Configure MFA' : null}
       active={location.active}
       onClick={handleClick}
-      disabled={isBusy || isBlocked}
+      disabled={isBusy || isBlocked || isDeviceBlocked}
       loading={isDisconnecting}
-      tooltip={isBlocked ? connectBlockedTooltip : null}
+      tooltip={connectButtonTooltip({ isDeviceBlocked, isBlocked })}
     />
   );
 };

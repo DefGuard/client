@@ -14,7 +14,7 @@ import { useConnectionAbility } from '../../hooks/useConnectionAbility';
 import { useUpdateLocationRouting } from '../../hooks/useUpdateLocationRouting';
 import { api } from '../../rust-api/api';
 import { getAppConfigQueryOptions } from '../../rust-api/query';
-import type { InstanceInfo, LocationInfo } from '../../rust-api/types';
+import { DeviceStatus, type InstanceInfo, type LocationInfo } from '../../rust-api/types';
 import { ThemeSpacing } from '../../types';
 import { connectConfigureFactorsSource } from '../../utils/configureFactorsSource';
 import { isPresent } from '../../utils/isPresent';
@@ -27,7 +27,7 @@ import {
   openRouteConflictModal,
 } from '../LocationCard/api/connectError';
 import { ConnectButton } from '../LocationCard/components/ConnectButton/ConnectButton';
-import { connectBlockedTooltip } from '../LocationCard/components/ConnectButton/consts';
+import { connectButtonTooltip } from '../LocationCard/components/ConnectButton/consts';
 import { LocationCardConnectionInfo } from '../LocationCard/components/LocationCardConnectionInfo/LocationCardConnectionInfo';
 import { LocationCardConnectionTiles } from '../LocationCard/components/LocationCardConnectionTiles/LocationCardConnectionTiles';
 import { LocationCardHeaderInfo } from '../LocationCard/components/LocationCardHeaderInfo/LocationCardHeaderInfo';
@@ -115,6 +115,8 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
   };
 
   const canConfigureMfa = connectionAbility === ConnectionAbility.Configurable;
+  const isDeviceBlocked =
+    !location.active && instance?.device_status === DeviceStatus.Blocked;
   const isBlocked =
     !location.active && connectionAbility === ConnectionAbility.Unavailable;
 
@@ -148,9 +150,9 @@ export const OverviewLocationCard = ({ location, instance }: Props) => {
             text={canConfigureMfa ? 'Configure MFA' : null}
             active={location.active}
             onClick={handleConnectClick}
-            disabled={isBusy || isBlocked}
+            disabled={isBusy || isBlocked || isDeviceBlocked}
             loading={isDisconnecting}
-            tooltip={isBlocked ? connectBlockedTooltip : null}
+            tooltip={connectButtonTooltip({ isDeviceBlocked, isBlocked })}
           />
         </div>
       </div>

@@ -1,4 +1,18 @@
 .overview-instance-name {
-  font: var(--t-h5);
-  color: var(--fg-white-100);
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  column-gap: var(--spacing-sm);
+  min-width: 0;
+
+  & > .name {
+    min-width: 0;
+    font: var(--t-h5);
+    color: var(--fg-white-100);
+  }
+
+  & > .badge {
+    flex-shrink: 0;
+  }
 }

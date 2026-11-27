@@ -48,6 +48,8 @@ pub enum Error {
     TunnelsDisabled,
     #[error("Instance has no config polling token")]
     NoToken,
+    #[error("This device was blocked by the server administrator")]
+    DeviceBlocked,
     #[error("Failed to lock app state member.")]
     StateLockFail,
     #[error("Failed to convert value. {0}")]

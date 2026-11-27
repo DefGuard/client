@@ -18,6 +18,15 @@
 
   @include animate(background-color);
 
+  &.variant-success {
+    --text-color: var(--fg-success);
+  }
+
+  &.variant-critical {
+    --bg-color: var(--bg-critical);
+    --text-color: var(--fg-white-100);
+  }
+
   &.disabled {
     --bg-color: var(--bg-white-5);
     --text-color: var(--fg-white-50);

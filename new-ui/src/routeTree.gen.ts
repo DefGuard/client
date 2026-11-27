@@ -17,6 +17,7 @@ import { Route as CompactIndexRouteImport } from './routes/compact/index'
 import { Route as FullIndexRouteImport } from './routes/full/index'
 import { Route as FullDefaultRouteImport } from './routes/full/_default'
 import { Route as FullConfigureMfaRouteImport } from './routes/full/configure-mfa'
+import { Route as FullDeviceVerificationRouteImport } from './routes/full/device-verification'
 import { Route as FullEnrollmentRouteImport } from './routes/full/enrollment'
 import { Route as FullSessionTimeoutRouteImport } from './routes/full/session-timeout'
 import { Route as FullTunnelWizardRouteImport } from './routes/full/tunnel-wizard'
@@ -69,6 +70,11 @@ const FullDefaultRoute = FullDefaultRouteImport.update({
 const FullConfigureMfaRoute = FullConfigureMfaRouteImport.update({
   id: '/configure-mfa',
   path: '/configure-mfa',
+  getParentRoute: () => FullRoute,
+} as any)
+const FullDeviceVerificationRoute = FullDeviceVerificationRouteImport.update({
+  id: '/device-verification',
+  path: '/device-verification',
   getParentRoute: () => FullRoute,
 } as any)
 const FullEnrollmentRoute = FullEnrollmentRouteImport.update({
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/full': typeof FullRouteWithChildren
   '/welcome': typeof WelcomeRoute
   '/full/configure-mfa': typeof FullConfigureMfaRoute
+  '/full/device-verification': typeof FullDeviceVerificationRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
   '/full': typeof FullIndexRoute
   '/full/configure-mfa': typeof FullConfigureMfaRoute
+  '/full/device-verification': typeof FullDeviceVerificationRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
@@ -196,6 +204,7 @@ export interface FileRoutesById {
   '/welcome': typeof WelcomeRoute
   '/full/_default': typeof FullDefaultRouteWithChildren
   '/full/configure-mfa': typeof FullConfigureMfaRoute
+  '/full/device-verification': typeof FullDeviceVerificationRoute
   '/full/enrollment': typeof FullEnrollmentRoute
   '/full/session-timeout': typeof FullSessionTimeoutRoute
   '/full/tunnel-wizard': typeof FullTunnelWizardRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/full'
     | '/welcome'
     | '/full/configure-mfa'
+    | '/full/device-verification'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/full/tunnel-wizard'
@@ -244,6 +254,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/full'
     | '/full/configure-mfa'
+    | '/full/device-verification'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/full/tunnel-wizard'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/full/_default'
     | '/full/configure-mfa'
+    | '/full/device-verification'
     | '/full/enrollment'
     | '/full/session-timeout'
     | '/full/tunnel-wizard'
@@ -350,6 +362,13 @@ declare module '@tanstack/react-router' {
       path: '/configure-mfa'
       fullPath: '/full/configure-mfa'
       preLoaderRoute: typeof FullConfigureMfaRouteImport
+      parentRoute: typeof FullRoute
+    }
+    '/full/device-verification': {
+      id: '/full/device-verification'
+      path: '/device-verification'
+      fullPath: '/full/device-verification'
+      preLoaderRoute: typeof FullDeviceVerificationRouteImport
       parentRoute: typeof FullRoute
     }
     '/full/enrollment': {
@@ -486,6 +505,7 @@ const FullDefaultRouteWithChildren = FullDefaultRoute._addFileChildren(
 interface FullRouteChildren {
   FullDefaultRoute: typeof FullDefaultRouteWithChildren
   FullConfigureMfaRoute: typeof FullConfigureMfaRoute
+  FullDeviceVerificationRoute: typeof FullDeviceVerificationRoute
   FullEnrollmentRoute: typeof FullEnrollmentRoute
   FullSessionTimeoutRoute: typeof FullSessionTimeoutRoute
   FullTunnelWizardRoute: typeof FullTunnelWizardRoute
@@ -495,6 +515,7 @@ interface FullRouteChildren {
 const FullRouteChildren: FullRouteChildren = {
   FullDefaultRoute: FullDefaultRouteWithChildren,
   FullConfigureMfaRoute: FullConfigureMfaRoute,
+  FullDeviceVerificationRoute: FullDeviceVerificationRoute,
   FullEnrollmentRoute: FullEnrollmentRoute,
   FullSessionTimeoutRoute: FullSessionTimeoutRoute,
   FullTunnelWizardRoute: FullTunnelWizardRoute,

@@ -34,6 +34,7 @@ use crate::{
         models::{location_stats::LocationStats, tunnel::TunnelStats},
         DB_POOL,
     },
+    device_verification,
     events::handle_deep_link,
     periodic::run_periodic_tasks,
     provisioning::handle_client_initialization,
@@ -237,6 +238,9 @@ pub fn run_app() {
             session_state::patch_session_state,
             autostart::get_autostart_enabled,
             autostart::set_autostart_enabled,
+            device_verification::start_device_verification,
+            device_verification::get_device_verification_code,
+            device_verification::cancel_device_verification,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::ThemeChanged(_theme) = event {

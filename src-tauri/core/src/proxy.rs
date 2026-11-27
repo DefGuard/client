@@ -12,11 +12,26 @@ const HTTP_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Shared across every proxy request, so the connection pool and TLS session cache survive
 /// between them. Carries no timeout of its own: callers set their own per request.
-static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
+static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(build_http_client);
 
 /// The platform does not change while the process runs, and `os_info::get` is a registry probe
 /// on Windows and a file read elsewhere - not something to repeat per request.
 static PLATFORM_HEADER: LazyLock<String> = LazyLock::new(build_platform_header);
+
+#[cfg(not(test))]
+fn build_http_client() -> Client {
+    Client::new()
+}
+
+// Each tokio test has its own runtime, and a pooled connection dies with the runtime that
+// opened it while wiremock hands its port to the next test, which would then reuse it.
+#[cfg(test)]
+fn build_http_client() -> Client {
+    Client::builder()
+        .pool_max_idle_per_host(0)
+        .build()
+        .expect("test HTTP client should build")
+}
 
 #[must_use]
 pub fn http_client() -> &'static Client {

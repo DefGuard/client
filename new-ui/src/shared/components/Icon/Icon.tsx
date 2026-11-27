@@ -43,6 +43,7 @@ import { IconCustomize } from './icons/IconCustomize';
 import { IconDarkTheme } from './icons/IconDarkTheme';
 import { IconDebian } from './icons/IconDebian';
 import { IconDelete } from './icons/IconDelete';
+import { IconDenied } from './icons/IconDenied';
 import { IconDeploy } from './icons/IconDeploy';
 import { IconDesktop } from './icons/IconDesktop';
 import { IconDevices } from './icons/IconDevices';
@@ -55,6 +56,7 @@ import { IconEdit } from './icons/IconEdit';
 import { IconEmptyPoint } from './icons/IconEmptyPoint';
 import { IconEnrollment } from './icons/IconEnrollment';
 import { IconEnter } from './icons/IconEnter';
+import { IconExpired } from './icons/IconExpired';
 import { IconExternalMfa } from './icons/IconExternalMFA';
 import { IconFile } from './icons/IconFile';
 import { IconFileAdd } from './icons/IconFileAdd';
@@ -89,6 +91,7 @@ import { IconMobile } from './icons/IconMobile';
 import { IconMobileLock } from './icons/IconMobileLock';
 import { IconNetworkSettings } from './icons/IconNetworkSettings';
 import { IconNotification } from './icons/IconNotification';
+import { IconNotVerified } from './icons/IconNotVerified';
 import { IconOneTimePassword } from './icons/IconOneTimePassword';
 import { IconOnline } from './icons/IconOnline';
 import { IconOpenId } from './icons/IconOpenId';
@@ -122,6 +125,7 @@ import { IconStatusPremium } from './icons/IconStatusPremium';
 import { IconStatusSimple } from './icons/IconStatusSimple';
 import { IconSupport } from './icons/IconSupport';
 import { IconSync } from './icons/IconSync';
+import { IconTime } from './icons/IconTime';
 import { IconToken } from './icons/IconToken';
 import { IconTransactions } from './icons/IconTransactions';
 import { IconTutorial } from './icons/IconTutorial';
@@ -471,6 +475,14 @@ export const Icon = <T extends IconKindValue>({
         return IconReport;
       case 'sent':
         return IconSent;
+      case 'not-verified':
+        return IconNotVerified;
+      case 'time':
+        return IconTime;
+      case 'expired':
+        return IconExpired;
+      case 'denied':
+        return IconDenied;
     }
   }, [iconKind]);
 

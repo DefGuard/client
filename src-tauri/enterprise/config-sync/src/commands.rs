@@ -16,6 +16,7 @@ use defguard_client_core::{
     error::Error,
     into_location,
 };
+use defguard_client_proto::defguard::client::v1::ServiceLocation;
 #[cfg(not(target_os = "macos"))]
 use defguard_client_proto::defguard::client::v1::{
     DeleteServiceLocationsRequest, SaveServiceLocationsRequest,
@@ -214,19 +215,21 @@ async fn disable_invalid_auto_connect(
     Ok(disabled)
 }
 
-/// Synchronizes the daemon's persisted service-location state from the current database state.
-///
-/// Sends all currently persisted service locations for the instance to the daemon, or asks the
-/// daemon to delete its service-location state when none remain.
-///
-/// Takes a pool rather than a transaction deliberately: this performs gRPC calls that can each take
-/// seconds, and holding a SQLite write transaction open across them would block every other writer.
-/// **Call it after the surrounding transaction has committed**, so what is pushed is committed state
-/// and a slow or unavailable daemon cannot roll back the database.
-pub async fn sync_service_locations(pool: &DbPool, instance: &Instance<Id>) -> Result<(), Error> {
+/// Empty for a blocked device, so the daemon drops its service locations until it is verified
+/// again.
+pub(crate) async fn service_locations_to_sync(
+    pool: &DbPool,
+    instance: &Instance<Id>,
+) -> Result<Vec<ServiceLocation>, Error> {
+    if instance.is_device_blocked() {
+        debug!(
+            "Device of instance {}({}) is blocked, removing its service locations from the daemon.",
+            instance.name, instance.id
+        );
+        return Ok(Vec::new());
+    }
     let mut service_locations = Vec::new();
-    let current_locations = Location::find_by_instance_id(pool, instance.id, true).await?;
-    for location in current_locations {
+    for location in Location::find_by_instance_id(pool, instance.id, true).await? {
         if location.is_service_location() {
             debug!(
                 "Adding service location {}({}) for instance {}({}) to be saved to the daemon.",
@@ -235,6 +238,13 @@ pub async fn sync_service_locations(pool: &DbPool, instance: &Instance<Id>) -> R
             service_locations.push(to_service_location(&location)?);
         }
     }
+    Ok(service_locations)
+}
+
+/// Takes a pool, not a transaction, as its gRPC calls can take seconds. Call it after the
+/// transaction commits, so a slow daemon neither blocks other writers nor rolls back the database.
+pub async fn sync_service_locations(pool: &DbPool, instance: &Instance<Id>) -> Result<(), Error> {
+    let service_locations = service_locations_to_sync(pool, instance).await?;
 
     if service_locations.is_empty() {
         debug!(

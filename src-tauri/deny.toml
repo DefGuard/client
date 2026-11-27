@@ -152,6 +152,9 @@ exceptions = [
     { allow = [
         "LicenseRef-Proprietary",
     ], crate = "defguard-client-fido2" },
+    { allow = [
+        "LicenseRef-Proprietary",
+    ], crate = "defguard-client-device-verification" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

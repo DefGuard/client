@@ -1,7 +1,6 @@
 import { type HTMLInputTypeAttribute, useId, useMemo, useRef, useState } from 'react';
 import './style.scss';
 import clsx from 'clsx';
-import { isNumber } from 'radashi';
 import { isPresent } from '../../utils/isPresent';
 import { mergeRefs } from '../../utils/mergeRefs';
 import { FieldBox } from '../FieldBox/FieldBox';
@@ -147,7 +146,7 @@ export const Input = ({
                 } else {
                   if (inputTypeInner === 'number') {
                     const parsed = parseInt(changeValue, 10);
-                    if (!isNumber(parsed)) return;
+                    if (Number.isNaN(parsed)) return;
                     changeValue = parsed;
                   }
                 }

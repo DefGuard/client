@@ -90,6 +90,16 @@ pub async fn request_posture_authorization(
                 .json()
                 .await
                 .map_err(|e| Error::HttpError(e.to_string()))?;
+            if body.possession_challenge.is_some() {
+                // Core withholds the PSK until the device proves possession of its identity key.
+                error!(
+                    "Core requires a device identity proof for location {location_id}, which this \
+                    client does not support yet"
+                );
+                return Err(Error::PostureCheckFailed(
+                    "Device identity proof required, not supported by this client yet".into(),
+                ));
+            }
             info!("Posture check approved for location {location_id}");
             Ok((!body.preshared_key.is_empty()).then_some(body.preshared_key))
         }

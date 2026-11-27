@@ -97,12 +97,17 @@ pub enum ConnectError {
         conflicts: Vec<ConflictingConnection>,
     },
     #[error("{message}")]
+    DeviceBlocked { message: String },
+    #[error("{message}")]
     Other { message: String },
 }
 
 impl From<Error> for ConnectError {
     fn from(error: Error) -> Self {
         match error {
+            Error::DeviceBlocked => Self::DeviceBlocked {
+                message: error.to_string(),
+            },
             Error::PostureCheckFailed(message) => Self::PostureCheckFailed { message },
             Error::ServiceUnavailable(message) => Self::ServiceUnavailable { message },
             Error::RouteConflict { ref conflicts, .. } => Self::RouteConflict {
@@ -125,7 +130,7 @@ impl From<sqlx::Error> for ConnectError {
 /// Serialize a structured error (e.g. `MfaError`, `EnrollmentError`) to JSON so
 /// the frontend can match on its tagged `type`, falling back to the Display
 /// string if serialization somehow fails.
-fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
+pub(crate) fn err_to_json<E: Serialize + fmt::Display>(e: E) -> String {
     serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
 }
 
@@ -277,6 +282,7 @@ pub(crate) async fn connect_location(
         ))
         .into());
     }
+    Instance::ensure_device_not_blocked(&*DB_POOL, location.instance_id).await?;
     // MFA flows bring the tunnel up themselves, only posture-only locations resolve a PSK here
     let preshared_key = if location.posture_check_required {
         authorize_posture_session(&location).await?
@@ -592,13 +598,10 @@ fn clear_provisioning_after_instance_save(handle: &AppHandle, saved_instance_uui
         Err(_) => warn!("Failed to clear in-memory provisioning config"),
     }
 
-    let mut provisioning_instance_id =
-        if let Ok(provisioning_instance_id) = app_state.provisioning_instance_id.lock() {
-            provisioning_instance_id
-        } else {
-            warn!("Failed to check provisioning instance id");
-            return;
-        };
+    let Ok(mut provisioning_instance_id) = app_state.provisioning_instance_id.lock() else {
+        warn!("Failed to check provisioning instance id");
+        return;
+    };
     if provisioning_instance_id.as_deref() == Some(saved_instance_uuid) {
         match handle.path().app_data_dir() {
             Ok(app_data_dir) => {
@@ -732,6 +735,7 @@ pub(crate) async fn build_instance_info(
     let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance.id)
         .await?
         .ok_or(Error::NotFound)?;
+    let device_verification_available = instance.enterprise_enabled && instance.token.is_some();
     Ok(InstanceInfo {
         id: instance.id,
         uuid: instance.uuid,
@@ -749,6 +753,8 @@ pub(crate) async fn build_instance_info(
         mfa_capabilities: instance.mfa_capabilities.map(|json| json.0),
         smtp_configured: instance.smtp_configured,
         openid_available: instance.openid_available,
+        device_status: instance.device_status,
+        device_verification_available,
     })
 }
 

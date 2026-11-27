@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token \"token?\", client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\", smtp_configured, openid_available FROM instance WHERE id = $1;",
+  "query": "SELECT id \"id: _\", name, uuid, url, proxy_url, username, token, client_traffic_policy, enterprise_enabled, disable_tunnels, openid_display_name, openid_provider_kind \"openid_provider_kind: _\", mfa_configured_methods \"mfa_configured_methods: _\", mfa_capabilities \"mfa_capabilities: _\", mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, device_status \"device_status: _\" FROM instance WHERE token IS NOT NULL ORDER BY name ASC;",
   "describe": {
     "columns": [
       {
@@ -70,7 +70,7 @@
         }
       },
       {
-        "name": "token?",
+        "name": "token",
         "ordinal": 6,
         "type_info": "Text",
         "origin": {
@@ -189,10 +189,21 @@
             "name": "openid_available"
           }
         }
+      },
+      {
+        "name": "device_status: _",
+        "ordinal": 17,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instance",
+            "name": "device_status"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       false,
@@ -211,8 +222,9 @@
       true,
       false,
       true,
+      true,
       true
     ]
   },
-  "hash": "d3e98d5eccb1006a5baeba66f94464a44e3cbad6fc446435f639885a7204f27a"
+  "hash": "63ddcb5d4d3cf24cd14669cab853847866368221ec475bfe64ff75e77fd885f5"
 }

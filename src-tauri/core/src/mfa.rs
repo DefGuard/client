@@ -389,7 +389,8 @@ pub async fn mfa_start(
                 }
                 Some(mfa_flow_start_response::Outcome::PossessionChallenge(_)) => {
                     return Err(MfaError::Other {
-                        message: "Device identity possession challenges are not supported yet"
+                        message: "Core requires a device identity proof, which this client does \
+                            not support yet"
                             .into(),
                     });
                 }

@@ -18,6 +18,7 @@ use uuid::Uuid;
 use crate::{
     app_config::AppConfig,
     database::models::{connection::ActiveConnection, Id},
+    device_verification::ActiveVerification,
     events::AddInstancePayload,
     session_state::SessionState,
     utils::stats_handler,
@@ -40,6 +41,8 @@ pub struct AppState {
     pub mfa_config_ceremonies: Mutex<HashMap<Uuid, Ceremony>>,
     pub log_watchers: Mutex<HashMap<String, CancellationToken>>,
     pub mfa_tasks: Mutex<HashMap<String, CancellationToken>>,
+    /// Keyed by instance, one waiting verification session per device.
+    pub device_verifications: Mutex<HashMap<Id, ActiveVerification>>,
     pub app_config: Mutex<AppConfig>,
     pub tray_click_position: Mutex<Option<PhysicalPosition<f64>>>,
     stat_threads: Mutex<HashMap<Id, JoinHandle<()>>>, // location ID is the key
@@ -67,6 +70,7 @@ impl AppState {
             mfa_config_ceremonies: Mutex::new(HashMap::new()),
             log_watchers: Mutex::new(HashMap::new()),
             mfa_tasks: Mutex::new(HashMap::new()),
+            device_verifications: Mutex::new(HashMap::new()),
             app_config: Mutex::new(config),
             tray_click_position: Mutex::new(None),
             stat_threads: Mutex::new(HashMap::new()),

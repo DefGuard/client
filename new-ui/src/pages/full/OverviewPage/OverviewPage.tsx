@@ -78,7 +78,10 @@ export const OverviewPage = () => {
           >
             <div className="header">
               {isPresent(selectedInstance) && (
-                <OverviewInstanceName name={selectedInstance.name} />
+                <OverviewInstanceName
+                  name={selectedInstance.name}
+                  deviceStatus={selectedInstance.device_status}
+                />
               )}
               <div className="right">
                 <OverviewActionsButton

@@ -1,3 +1,4 @@
+import { deviceBlockedMessage } from '../../../../pages/full/DeviceVerificationPage/utils/deviceVerificationErrorMessage';
 import {
   isAttemptLimit,
   isConnectFailure,
@@ -73,6 +74,9 @@ export const connectErrorToCard = (
 ): LocationCardError => {
   if (connectError?.kind === 'serviceUnavailable') {
     return { message: DEFAULT_CONNECTION_ERROR, icon: IconKind.ServiceUnavailable };
+  }
+  if (connectError?.kind === 'deviceBlocked') {
+    return { message: deviceBlockedMessage, icon: IconKind.WarningOutlined };
   }
   return {
     message: `Failed to connect to ${location.name}. Please try again.`,

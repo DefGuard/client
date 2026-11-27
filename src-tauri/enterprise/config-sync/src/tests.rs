@@ -8,7 +8,7 @@ use std::{
 
 use defguard_client_core::{
     database::models::{
-        instance::{ClientTrafficPolicy, MfaCapabilities, OpenIdProviderKind},
+        instance::{ClientTrafficPolicy, DeviceStatus, MfaCapabilities, OpenIdProviderKind},
         location::{
             AutoConnectContext, Location, LocationMfaMethod, LocationMfaMode, ServiceLocationMode,
         },
@@ -17,9 +17,9 @@ use defguard_client_core::{
     mfa_contract::MfaContract,
 };
 use defguard_client_proto::defguard::client_types::{
-    DeviceConfig, DeviceConfigResponse, InstanceInfo, LocationMfaMode as ProtoLocationMfaMode,
-    MfaCapabilities as ProtoMfaCapabilities, MfaMethod, MfaUserState,
-    ServiceLocationMode as ProtoServiceLocationMode,
+    DeviceConfig, DeviceConfigResponse, DeviceStatus as ProtoDeviceStatus, InstanceInfo,
+    LocationMfaMode as ProtoLocationMfaMode, MfaCapabilities as ProtoMfaCapabilities, MfaMethod,
+    MfaUserState, ServiceLocationMode as ProtoServiceLocationMode,
 };
 use sqlx::SqlitePool;
 
@@ -125,6 +125,7 @@ fn instance_with_token(token: Option<&str>) -> Instance<Id> {
         mfa_capabilities: None,
         smtp_configured: None,
         openid_available: None,
+        device_status: None,
     }
 }
 
@@ -209,6 +210,7 @@ async fn seed_instance(
         mfa_capabilities: None,
         smtp_configured: None,
         openid_available: None,
+        device_status: None,
     }
     .save(pool)
     .await
@@ -919,4 +921,128 @@ async fn test_poll_instances_payment_required_disables_enterprise(pool: SqlitePo
         .unwrap()
         .unwrap();
     assert_eq!(reloaded.client_traffic_policy, ClientTrafficPolicy::None);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_blocked_device_syncs_no_service_locations(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    let mut response =
+        device_config_response(&instance, device_config(1, "first", "1.2.3.4:51820"));
+    response
+        .configs
+        .push(service_config(2, "service", "10.0.0.0/24"));
+    update_and_read_auto_connect(&pool, &mut instance, response).await;
+
+    let synced = commands::service_locations_to_sync(&pool, &instance)
+        .await
+        .unwrap();
+    assert_eq!(
+        synced
+            .iter()
+            .map(|location| location.name.as_str())
+            .collect::<Vec<_>>(),
+        ["service"]
+    );
+
+    instance.device_status = Some(DeviceStatus::Blocked);
+    assert!(commands::service_locations_to_sync(&pool, &instance)
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+async fn poll_with_device_status(
+    pool: &SqlitePool,
+    instance: &mut Instance<Id>,
+    endpoint: &str,
+    has_active_connections: bool,
+    device_status: Option<i32>,
+) -> PollInstanceResult {
+    let mut response = device_config_response(instance, device_config(1, "office", endpoint));
+    response.instance.as_mut().unwrap().device_status = device_status;
+    let fetched = Ok(FetchedConfig {
+        response: InstanceInfoResponse {
+            device_config: Some(response),
+        },
+        version_mismatch: None,
+    });
+    let mut transaction = pool.begin().await.unwrap();
+    let result = apply_fetched_config(&mut transaction, instance, has_active_connections, fetched)
+        .await
+        .unwrap();
+    transaction.commit().await.unwrap();
+    result
+}
+
+async fn stored_device_status(pool: &SqlitePool, id: Id) -> Option<DeviceStatus> {
+    Instance::find_by_id(pool, id)
+        .await
+        .unwrap()
+        .unwrap()
+        .device_status
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_poll_persists_device_status_when_config_is_unchanged(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
+
+    let result = poll_with_device_status(
+        &pool,
+        &mut instance,
+        "1.2.3.4:51820",
+        false,
+        Some(ProtoDeviceStatus::Verified as i32),
+    )
+    .await;
+
+    assert!(matches!(result, PollInstanceResult::Unchanged { .. }));
+    assert_eq!(instance.device_status, Some(DeviceStatus::Verified));
+    assert_eq!(
+        stored_device_status(&pool, instance.id).await,
+        Some(DeviceStatus::Verified)
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_poll_persists_device_block_while_active(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
+
+    let result = poll_with_device_status(
+        &pool,
+        &mut instance,
+        "5.6.7.8:51820",
+        true,
+        Some(ProtoDeviceStatus::Blocked as i32),
+    )
+    .await;
+
+    assert!(matches!(
+        result,
+        PollInstanceResult::ChangedWhileActive { .. }
+    ));
+    assert!(instance.is_device_blocked());
+    assert_eq!(
+        stored_device_status(&pool, instance.id).await,
+        Some(DeviceStatus::Blocked)
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn test_poll_keeps_device_status_when_not_reported(pool: SqlitePool) {
+    let mut instance = seed_instance(&pool, "acme", "https://proxy.example", Some("tok")).await;
+    seed_location(&pool, instance.id, 1, "office", "1.2.3.4:51820").await;
+    Instance::set_device_status(&pool, instance.id, DeviceStatus::Blocked)
+        .await
+        .unwrap();
+    instance.device_status = Some(DeviceStatus::Blocked);
+
+    for reported in [None, Some(ProtoDeviceStatus::Unknown as i32)] {
+        poll_with_device_status(&pool, &mut instance, "5.6.7.8:51820", false, reported).await;
+        assert_eq!(
+            stored_device_status(&pool, instance.id).await,
+            Some(DeviceStatus::Blocked)
+        );
+    }
 }

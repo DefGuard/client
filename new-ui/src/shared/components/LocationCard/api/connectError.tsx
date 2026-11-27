@@ -1,5 +1,6 @@
 import { emitTo } from '@tauri-apps/api/event';
 import z from 'zod';
+import { openDeviceBlockedModal } from '../../../../pages/full/DeviceVerificationPage/utils/openDeviceBlockedModal';
 import { ConnectModalView } from '../../../../pages/full/OverviewPage/components/ConnectModal/hooks/types';
 import { useConnectModal } from '../../../../pages/full/OverviewPage/components/ConnectModal/hooks/useConnectModal';
 import { WindowId } from '../../../consts';
@@ -18,7 +19,13 @@ const conflictingConnectionSchema = z.object({
 });
 
 const connectErrorSchema = z.object({
-  kind: z.enum(['postureCheckFailed', 'serviceUnavailable', 'routeConflict', 'other']),
+  kind: z.enum([
+    'postureCheckFailed',
+    'serviceUnavailable',
+    'routeConflict',
+    'deviceBlocked',
+    'other',
+  ]),
   message: z.string(),
   conflicts: z.array(conflictingConnectionSchema).default([]),
 });
@@ -62,6 +69,8 @@ export const handleFullViewConnectError = (
       location,
       view: ConnectModalView.ConnectionError,
     });
+  } else if (connectError?.kind === 'deviceBlocked') {
+    openDeviceBlockedModal();
   }
 };
 

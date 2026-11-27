@@ -1,0 +1,86 @@
+#device-verification-page {
+  --content-max-width: 380px;
+
+  display: flex;
+  flex-flow: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: calc(100dvh - var(--window-decorations-height));
+  padding: var(--spacing-md) var(--spacing-lg);
+
+  & > .title {
+    text-align: center;
+    font: var(--t-h4);
+    color: var(--fg-white-100);
+  }
+
+  & > .subtitle {
+    max-width: var(--content-max-width);
+    text-align: center;
+    font: var(--t-body-sm-400);
+    color: var(--fg-white-70);
+
+    & > span {
+      display: block;
+    }
+  }
+
+  & > .divider {
+    --divider-color: var(--border-muted);
+
+    max-width: var(--content-max-width);
+  }
+
+  & > .refresh {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: center;
+    column-gap: var(--spacing-xs);
+
+    & > .label {
+      display: flex;
+      flex-flow: row nowrap;
+      align-items: center;
+      justify-content: flex-start;
+      column-gap: var(--spacing-sm);
+
+      & > p {
+        font: var(--t-body-xs-400);
+        color: var(--fg-white-60);
+      }
+    }
+
+    // the hidden full-period text reserves the widest width so the row never recenters
+    & > .timer {
+      display: grid;
+      grid-template-columns: auto;
+      grid-template-rows: 1fr;
+
+      & > p {
+        grid-row: 1;
+        grid-column: 1 / 2;
+        font: var(--t-body-xs-500);
+        color: var(--fg-white-100);
+        font-variant-numeric: tabular-nums;
+      }
+
+      & > .placeholder {
+        visibility: hidden;
+      }
+    }
+  }
+
+  & > .actions {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: flex-start;
+    row-gap: var(--spacing-md);
+  }
+
+  &.outcome {
+    --content-max-width: 440px;
+  }
+}

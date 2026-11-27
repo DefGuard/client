@@ -7,6 +7,7 @@ pub mod appstate;
 pub mod auto_connect;
 pub mod autostart;
 pub mod commands;
+pub mod device_verification;
 pub mod events;
 pub mod fido2_window;
 pub mod gui;

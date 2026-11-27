@@ -2,10 +2,11 @@ mod support;
 
 use device_identity::{
     attest_identity, attestation_identity, capabilities, create_identity, prove_possession,
-    AttestationChallenge, AttestationIdentity, AttestationMethod, AttestationResponse, BackendKind,
-    DeviceIdentityError, Identity, PlatformCapabilities, PossessionChallenge, PossessionProof,
-    ProfileId, SupportStatus,
+    AttestationIdentity, AttestationMethod, AttestationResponse, BackendKind, Identity,
+    PlatformCapabilities, PossessionChallenge, PossessionProof, ProfileId, SupportStatus,
 };
+#[cfg(any(target_os = "linux", windows))]
+use device_identity::{AttestationChallenge, DeviceIdentityError};
 use support::{challenge_data, enroll, prepare_attestation, verify_attestation};
 
 // Hardware operations share limited TPM slots and App Attest service quotas.

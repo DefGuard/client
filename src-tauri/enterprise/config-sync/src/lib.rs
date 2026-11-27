@@ -8,7 +8,7 @@ pub mod commands;
 use defguard_client_core::{
     database::{
         models::{
-            instance::{mfa_contract_from_instance_info, Instance},
+            instance::{mfa_contract_from_instance_info, reported_device_status, Instance},
             Id,
         },
         DbPool,
@@ -17,7 +17,9 @@ use defguard_client_core::{
     proxy::post_with_headers,
     version::{CORE_VERSION_HEADER, MIN_CORE_VERSION, MIN_PROXY_VERSION, PROXY_VERSION_HEADER},
 };
-use defguard_client_proto::defguard::client_types::{InstanceInfoRequest, InstanceInfoResponse};
+use defguard_client_proto::defguard::client_types::{
+    InstanceInfo, InstanceInfoRequest, InstanceInfoResponse,
+};
 use futures_util::future::join_all;
 use reqwest::{StatusCode, Url};
 use semver::Version;
@@ -203,6 +205,7 @@ async fn apply_fetched_config(
         .instance
         .as_ref()
         .ok_or_else(|| Error::InternalError("Instance info not present in response".to_string()))?;
+    sync_device_status(transaction, instance, instance_info).await?;
     let mfa_contract = mfa_contract_from_instance_info(instance_info);
     let mfa_contract_changed = instance.mfa_contract != mfa_contract;
     if !config_changed(transaction, instance, device_config).await? {
@@ -277,6 +280,28 @@ async fn apply_fetched_config(
         auto_connect_disabled,
         version_mismatch,
     })
+}
+
+/// Written apart from the config so it applies while connections are active and never prompts a
+/// reconnect. Callers react to a block on their own through Instance::is_device_blocked.
+async fn sync_device_status(
+    transaction: &mut Transaction<'_, Sqlite>,
+    instance: &mut Instance<Id>,
+    instance_info: &InstanceInfo,
+) -> Result<(), Error> {
+    let Some(status) = reported_device_status(instance_info) else {
+        return Ok(());
+    };
+    if instance.device_status == Some(status) {
+        return Ok(());
+    }
+    info!(
+        "Device status of instance {}({}) changed from {:?} to {status:?}",
+        instance.name, instance.id, instance.device_status
+    );
+    Instance::set_device_status(transaction.as_mut(), instance.id, status).await?;
+    instance.device_status = Some(status);
+    Ok(())
 }
 
 /// Polls all instances that have a polling token and commits any safe configuration updates.
