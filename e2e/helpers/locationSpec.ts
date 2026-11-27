@@ -15,7 +15,7 @@ export const locationSpec = () => ({
 	name: process.env.NETWORK_NAME ?? "e2e",
 	address: process.env.NETWORK_ADDRESS ?? "10.10.10.1/24",
 	endpoint: requireEnv("NETWORK_ENDPOINT"),
-	port: Number(process.env.NETWORK_PORT ?? 50051),
+	port: Number(process.env.NETWORK_PORT ?? 51820),
 	allowed_ips: process.env.NETWORK_ALLOWED_IPS ?? "10.10.10.0/24",
 	dns: null as string | null,
 	mtu: 1420,

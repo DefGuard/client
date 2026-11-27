@@ -37,7 +37,7 @@ The variables are:
 | `NETWORK_ENDPOINT` | Endpoint advertised by the test network |
 | `NETWORK_NAME` | Test network name, `e2e` |
 | `NETWORK_ADDRESS` | Test network address |
-| `NETWORK_PORT` | WireGuard port, default `50051` |
+| `NETWORK_PORT` | WireGuard port, default `51820` |
 | `NETWORK_ALLOWED_IPS` | Allowed IP ranges for the test network |
 
 Keep `e2e/.env` local and do not commit it.
