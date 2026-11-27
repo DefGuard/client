@@ -1739,7 +1739,6 @@ dependencies = [
  "log",
  "nix 0.32.0",
  "objc2",
- "objc2-app-kit",
  "objc2-foundation",
  "objc2-network-extension",
  "os_info",

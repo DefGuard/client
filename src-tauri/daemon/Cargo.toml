@@ -13,7 +13,6 @@ anyhow.workspace = true
 clap.workspace = true
 defguard-client-common = { path = "../common" }
 defguard-client-proto = { path = "../client-proto" }
-defguard-client-posture = { path = "../enterprise/posture" }
 defguard-client-service-locations = { path = "../enterprise/service-locations" }
 defguard_wireguard_rs.workspace = true
 thiserror.workspace = true
@@ -28,6 +27,7 @@ tracing-subscriber.workspace = true
 nix.workspace = true
 
 [target.'cfg(windows)'.dependencies]
+defguard-client-posture = { path = "../enterprise/posture" }
 async-stream.workspace = true
 futures-core.workspace = true
 windows-service.workspace = true
