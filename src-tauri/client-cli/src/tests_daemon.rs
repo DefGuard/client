@@ -27,7 +27,10 @@ use defguard_core::{
         DbPool,
     },
     mfa_contract::MfaContract,
-    proto::{client::v1::ListInterfacesResponse, enterprise::posture::v2::DevicePostureData},
+    proto::{
+        client::v1::{ListInterfacesResponse, StartUpdateResponse},
+        enterprise::posture::v2::DevicePostureData,
+    },
     ConnectionType,
 };
 use tempfile::{tempdir, TempDir};
@@ -126,6 +129,13 @@ impl DesktopDaemonService for MockDaemon {
             })
             .collect::<Vec<_>>();
         Ok(Response::new(ListInterfacesResponse { interfaces }))
+    }
+
+    async fn start_update(
+        &self,
+        _req: Request<()>,
+    ) -> Result<Response<StartUpdateResponse>, Status> {
+        Err(Status::unimplemented("not mocked"))
     }
 }
 

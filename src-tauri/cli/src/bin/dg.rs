@@ -37,6 +37,13 @@ use tracing_subscriber::EnvFilter;
 
 mod proto {
     pub mod defguard {
+        #[allow(dead_code)]
+        pub mod device_identity {
+            pub mod v2 {
+                include!(concat!(env!("OUT_DIR"), "/defguard.device_identity.v2.rs"));
+            }
+        }
+
         #[allow(clippy::enum_variant_names, dead_code)]
         pub mod client_types {
             include!(concat!(env!("OUT_DIR"), "/defguard.client_types.rs"));
