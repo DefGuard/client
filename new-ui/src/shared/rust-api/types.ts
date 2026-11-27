@@ -148,6 +148,7 @@ export const TauriCommand = {
   TakePendingAddInstance: 'take_pending_add_instance',
   GetPlatformHeader: 'get_platform_header',
   GetLatestAppVersion: 'get_latest_app_version',
+  StartUpdate: 'start_update',
   GetClientBuildVersion: 'get_client_build_version',
   OpenLink: 'open_link',
   StartGlobalLogWatcher: 'start_global_logwatcher',

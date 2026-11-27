@@ -20,7 +20,7 @@ use defguard_client_proto::{
             AttestDeviceIdentityRequest, CreateDeviceIdentityResponse, CreateInterfaceRequest,
             DeleteServiceLocationsRequest, InterfaceData, ListInterfacesResponse,
             ManagedInterfaceData, ReadInterfaceDataRequest, RemoveInterfaceRequest,
-            SaveServiceLocationsRequest,
+            SaveServiceLocationsRequest, StartUpdateResponse,
         },
         device_identity::v2::AttestationChallengeSolution,
         enterprise::posture::v2::DevicePostureData,
@@ -641,6 +641,26 @@ impl DesktopDaemonService for DaemonService {
         Ok(Response::new(device_posture_data(
             DiskEncryptionTarget::ClientDatabase,
         )))
+    }
+
+    #[cfg(windows)]
+    async fn start_update(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<StartUpdateResponse>, Status> {
+        info!("Start update request received");
+        let version = crate::updater::start_update().await?;
+        Ok(Response::new(StartUpdateResponse { version }))
+    }
+
+    #[cfg(not(windows))]
+    async fn start_update(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<StartUpdateResponse>, Status> {
+        Err(Status::unimplemented(
+            "self-update is only supported on Windows",
+        ))
     }
 }
 

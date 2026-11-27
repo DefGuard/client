@@ -7,6 +7,15 @@ use std::{
 /// Package version from the workspace (shared across all binaries).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Endpoint reporting the latest released client version.
+pub const UPDATE_CHECK_URL: &str = "https://pkgs.defguard.net/api/update/check";
+
+/// Product name sent to the update check endpoint.
+pub const UPDATE_CHECK_PRODUCT: &str = "defguard-client";
+
+/// Folder under ProgramData where the Windows service keeps its data.
+pub const PROGRAM_DATA_DIR: &str = "Defguard";
+
 /// Build a `--version` output string for a given binary name.
 ///
 /// Uses the `DEFGUARD_CLIENT_BUILD_VERSION` environment variable when set (CI pre-release
