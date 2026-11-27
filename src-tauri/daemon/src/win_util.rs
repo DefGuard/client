@@ -1,12 +1,33 @@
 //! Win32 helpers shared by the Windows service code.
 
-use std::{ffi::OsStr, io, iter::once, mem::size_of, os::windows::ffi::OsStrExt, ptr::null_mut};
+use std::{
+    ffi::OsStr,
+    fs::{File, OpenOptions},
+    io,
+    iter::once,
+    mem::size_of,
+    os::windows::{
+        ffi::OsStrExt,
+        fs::{MetadataExt, OpenOptionsExt},
+        io::AsRawHandle,
+    },
+    path::Path,
+    ptr::null_mut,
+};
 
 use windows_sys::Win32::{
-    Foundation::LocalFree,
+    Foundation::{LocalFree, ERROR_SUCCESS},
     Security::{
-        Authorization::{ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1},
-        PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
+        Authorization::{
+            ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo, SDDL_REVISION_1,
+            SE_FILE_OBJECT,
+        },
+        IsWellKnownSid, WinLocalSystemSid, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
+        SECURITY_ATTRIBUTES,
+    },
+    Storage::FileSystem::{
+        FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE, READ_CONTROL,
     },
 };
 
@@ -52,4 +73,46 @@ impl Drop for SecurityDescriptor {
         // SAFETY: allocated by ConvertStringSecurityDescriptorToSecurityDescriptorW.
         unsafe { LocalFree(self.0) };
     }
+}
+
+/// Opens a real directory (not a link) and blocks renaming or deleting it while open.
+pub(crate) fn pin_dir(path: &Path) -> io::Result<File> {
+    let dir = OpenOptions::new()
+        // Sharing is only enforced against handles with data access, hence FILE_LIST_DIRECTORY.
+        .access_mode(FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | READ_CONTROL)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)?;
+    let metadata = dir.metadata()?;
+    if !metadata.is_dir() || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        return Err(io::Error::other(format!(
+            "{} is not a plain directory",
+            path.display()
+        )));
+    }
+    Ok(dir)
+}
+
+pub(crate) fn owned_by_local_system(file: &File) -> io::Result<bool> {
+    let mut owner: PSID = null_mut();
+    let mut descriptor: PSECURITY_DESCRIPTOR = null_mut();
+    // SAFETY: the out-pointers are valid locals; on success `descriptor` is freed below.
+    let status = unsafe {
+        GetSecurityInfo(
+            file.as_raw_handle(),
+            SE_FILE_OBJECT,
+            OWNER_SECURITY_INFORMATION,
+            &mut owner,
+            null_mut(),
+            null_mut(),
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    if status != ERROR_SUCCESS {
+        return Err(io::Error::from_raw_os_error(status as i32));
+    }
+    let _descriptor = SecurityDescriptor(descriptor);
+    // SAFETY: `owner` points into the descriptor, which is still alive.
+    Ok(unsafe { IsWellKnownSid(owner, WinLocalSystemSid) } != 0)
 }

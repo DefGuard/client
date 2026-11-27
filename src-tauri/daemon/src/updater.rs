@@ -50,7 +50,7 @@ use windows_sys::Win32::{
     },
 };
 
-use crate::win_util::{to_wide, SecurityDescriptor};
+use crate::win_util::{owned_by_local_system, pin_dir, to_wide, SecurityDescriptor};
 
 const DOWNLOAD_URL_BASE: &str = "https://github.com/DefGuard/client/releases/download";
 const MAX_PACKAGE_SIZE: u64 = 512 * 1024 * 1024;
@@ -123,16 +123,24 @@ pub async fn start_update() -> Result<String, UpdateError> {
     if UPDATE_IN_PROGRESS.swap(true, Ordering::SeqCst) {
         return Err(UpdateError::InProgress);
     }
-    let result = prepare_and_launch().await;
-    // On success the installer watcher clears the flag once msiexec exits.
+    // tonic drops this future if the client disconnects, which drops the guard too.
+    let result = prepare_and_launch(InProgressGuard).await;
     if let Err(err) = &result {
         error!("Update failed: {err}");
-        UPDATE_IN_PROGRESS.store(false, Ordering::SeqCst);
     }
     result
 }
 
-async fn prepare_and_launch() -> Result<String, UpdateError> {
+/// Clears `UPDATE_IN_PROGRESS` on drop. The installer watcher holds it until msiexec exits.
+struct InProgressGuard;
+
+impl Drop for InProgressGuard {
+    fn drop(&mut self) {
+        UPDATE_IN_PROGRESS.store(false, Ordering::SeqCst);
+    }
+}
+
+async fn prepare_and_launch(guard: InProgressGuard) -> Result<String, UpdateError> {
     let arch = msi_arch()?;
     let client = Client::builder()
         .connect_timeout(Duration::from_secs(30))
@@ -148,8 +156,7 @@ async fn prepare_and_launch() -> Result<String, UpdateError> {
     let version = latest.to_string();
     info!("Updating from {current} to {version}");
 
-    let dir = updates_dir()?;
-    recreate_updates_dir(&dir)?;
+    let dir = UpdatesDir::recreate()?;
 
     let msi_name = format!("Defguard_{version}_{arch}_en-US.msi");
     let url = format!("{DOWNLOAD_URL_BASE}/v{version}/{msi_name}");
@@ -169,7 +176,7 @@ async fn prepare_and_launch() -> Result<String, UpdateError> {
     .map_err(io::Error::other)?;
     fs::write(dir.join(MARKER_FILE), marker)?;
 
-    launch_installer(file, &msi_path, &dir.join(INSTALL_LOG_FILE))?;
+    launch_installer(guard, dir, file, &msi_path)?;
     Ok(version)
 }
 
@@ -177,13 +184,14 @@ async fn prepare_and_launch() -> Result<String, UpdateError> {
 ///
 /// Called on service start. The marker only exists if this service started the installer.
 pub fn finish_pending_update() {
-    report_and_relaunch(POST_UPDATE_DELAY);
+    match UpdatesDir::open() {
+        Ok(dir) => report_and_relaunch(dir, POST_UPDATE_DELAY),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+        Err(err) => warn!("Ignoring updates directory: {err}"),
+    }
 }
 
-fn report_and_relaunch(delay: Duration) {
-    let Ok(dir) = updates_dir() else {
-        return;
-    };
+fn report_and_relaunch(dir: UpdatesDir, delay: Duration) {
     let marker = dir.join(MARKER_FILE);
     let Ok(contents) = fs::read(&marker) else {
         return;
@@ -208,7 +216,7 @@ fn report_and_relaunch(delay: Duration) {
     thread::spawn(move || {
         thread::sleep(delay);
         relaunch_client();
-        remove_packages(&dir);
+        dir.remove_packages();
     });
 }
 
@@ -402,7 +410,13 @@ unsafe fn subject_from_state(state: HANDLE) -> Result<String, UpdateError> {
     Ok(String::from_utf16_lossy(&buf[..len as usize - 1]))
 }
 
-fn launch_installer(package: File, msi_path: &Path, log_path: &Path) -> Result<(), UpdateError> {
+fn launch_installer(
+    guard: InProgressGuard,
+    dir: UpdatesDir,
+    package: File,
+    msi_path: &Path,
+) -> Result<(), UpdateError> {
+    let log_path = dir.join(INSTALL_LOG_FILE);
     let system = get_known_folder_path(KnownFolder::System)
         .ok_or_else(|| io::Error::other("System32 folder not found"))?;
     info!(
@@ -415,7 +429,7 @@ fn launch_installer(package: File, msi_path: &Path, log_path: &Path) -> Result<(
         .arg("/i")
         .arg(msi_path)
         .args(["/qn", "/norestart", "/l*v"])
-        .arg(log_path)
+        .arg(&log_path)
         .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
         .spawn()?;
 
@@ -428,9 +442,9 @@ fn launch_installer(package: File, msi_path: &Path, log_path: &Path) -> Result<(
             Err(err) => error!("Failed to wait for the installer: {err}"),
         }
         drop(package);
-        UPDATE_IN_PROGRESS.store(false, Ordering::SeqCst);
+        drop(guard);
         // The client already quit, so report the failure and bring it back now.
-        report_and_relaunch(Duration::ZERO);
+        report_and_relaunch(dir, Duration::ZERO);
     });
     Ok(())
 }
@@ -455,49 +469,82 @@ fn disabled_by_policy() -> bool {
     status == ERROR_SUCCESS && data != 0
 }
 
-fn updates_dir() -> Result<PathBuf, UpdateError> {
-    let mut path = get_known_folder_path(KnownFolder::ProgramData)
-        .ok_or_else(|| io::Error::other("ProgramData folder not found"))?;
-    path.push(PROGRAM_DATA_DIR);
-    path.push(UPDATES_SUBDIR);
-    Ok(path)
+/// Pinned without following links or delete sharing, since users can write to ProgramData.
+struct UpdatesDir {
+    path: PathBuf,
+    _parent: File,
+    _dir: File,
 }
 
-/// Starts from an empty directory, created with its restrictive ACL in one step.
-///
-/// Users can create folders in ProgramData, so an existing directory can't be trusted.
-fn recreate_updates_dir(dir: &Path) -> Result<(), UpdateError> {
-    if dir.exists() {
-        fs::remove_dir_all(dir)?;
-    }
-    if let Some(parent) = dir.parent() {
-        fs::create_dir_all(parent)?;
+impl UpdatesDir {
+    fn parent_path() -> io::Result<PathBuf> {
+        get_known_folder_path(KnownFolder::ProgramData)
+            .map(|path| path.join(PROGRAM_DATA_DIR))
+            .ok_or_else(|| io::Error::other("ProgramData folder not found"))
     }
 
-    let descriptor = SecurityDescriptor::from_sddl(UPDATES_DIR_SDDL)?;
-    let attributes = descriptor.attributes();
-    let wide_dir = to_wide(dir);
-    // SAFETY: both pointers are valid for the duration of the call.
-    // Fails if someone recreated the directory in the meantime.
-    if unsafe { CreateDirectoryW(wide_dir.as_ptr(), &attributes) } == 0 {
-        return Err(io::Error::last_os_error().into());
+    fn pin(parent: File, path: PathBuf) -> io::Result<Self> {
+        let dir = pin_dir(&path)?;
+        // Only SYSTEM (or an admin) can create a directory owned by SYSTEM.
+        if !owned_by_local_system(&dir)? {
+            return Err(io::Error::other(format!(
+                "{} is not owned by SYSTEM",
+                path.display()
+            )));
+        }
+        Ok(Self {
+            path,
+            _parent: parent,
+            _dir: dir,
+        })
     }
-    Ok(())
-}
 
-/// Removes downloaded packages but keeps the installer log for troubleshooting.
-fn remove_packages(dir: &Path) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("msi"))
-        {
-            if let Err(err) = fs::remove_file(&path) {
-                warn!("Failed to remove installer {}: {err}", path.display());
+    fn open() -> io::Result<Self> {
+        let parent = Self::parent_path()?;
+        Self::pin(pin_dir(&parent)?, parent.join(UPDATES_SUBDIR))
+    }
+
+    /// Starts from an empty directory, created with its restrictive ACL in one step.
+    fn recreate() -> io::Result<Self> {
+        let parent_path = Self::parent_path()?;
+        fs::create_dir_all(&parent_path)?;
+        let parent = pin_dir(&parent_path)?;
+        let path = parent_path.join(UPDATES_SUBDIR);
+        // An existing directory can't be trusted. This removes a link itself, not its target.
+        match fs::remove_dir_all(&path) {
+            Err(err) if err.kind() != io::ErrorKind::NotFound => return Err(err),
+            _ => {}
+        }
+
+        let descriptor = SecurityDescriptor::from_sddl(UPDATES_DIR_SDDL)?;
+        let attributes = descriptor.attributes();
+        let wide_path = to_wide(&path);
+        // SAFETY: both pointers are valid for the duration of the call.
+        // Fails if someone recreated the directory in the meantime.
+        if unsafe { CreateDirectoryW(wide_path.as_ptr(), &attributes) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Self::pin(parent, path)
+    }
+
+    fn join(&self, name: impl AsRef<Path>) -> PathBuf {
+        self.path.join(name)
+    }
+
+    /// Removes downloaded packages but keeps the installer log for troubleshooting.
+    fn remove_packages(&self) {
+        let Ok(entries) = fs::read_dir(&self.path) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("msi"))
+            {
+                if let Err(err) = fs::remove_file(&path) {
+                    warn!("Failed to remove installer {}: {err}", path.display());
+                }
             }
         }
     }
