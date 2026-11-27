@@ -1,3 +1,8 @@
+//! Best-effort device attestation after the client saves the enrollment configuration.
+//!
+//! The daemon performs TPM operations. This module owns local identity persistence and
+//! sends public metadata and attestation evidence to Core through the enrollment session.
+
 use std::time::Duration;
 
 use defguard_client_proto::defguard::{
@@ -31,6 +36,7 @@ mod integration_tests;
 
 const DAEMON_OPERATION_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// The attestation result reported to the UI without exposing key material or evidence.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AttestationOutcome {
@@ -61,6 +67,7 @@ enum Failure {
     Unverified,
 }
 
+/// Attempts attestation for a newly registered device without rolling back enrollment.
 pub async fn attest_device(
     session: &EnrollmentSession,
     pool: &SqlitePool,
@@ -73,7 +80,7 @@ pub async fn attest_device(
     match attest(session, pool, instance_id, daemon).await {
         Ok(outcome) => outcome,
         Err(stage) => {
-            // proxy and daemon error messages can contain the submitted evidence
+            // Log only the failing stage because upstream errors can contain submitted evidence.
             warn!("Device attestation did not complete at stage {stage:?}");
             AttestationOutcome::Failed
         }
@@ -86,6 +93,8 @@ async fn attest(
     instance_id: Id,
     mut daemon: DesktopDaemonServiceClient<Channel>,
 ) -> Result<AttestationOutcome, Failure> {
+    // Bind the request to the registration in this session before using the daemon.
+    // The local instance ID alone does not identify the device registered with Core.
     let registration = session
         .created_device()
         .map_err(|_| Failure::Registration)?
@@ -101,6 +110,9 @@ async fn attest(
     if !registration_matches(&registration, &instance, &keys) {
         return Err(Failure::Registration);
     }
+
+    // Keep existing blobs even without a Core identity ID. A previous Finish may
+    // have succeeded without the client receiving or saving its acknowledgement.
     if let Some(existing) = DeviceIdentity::find_by_instance_id(pool, instance_id)
         .await
         .map_err(|_| Failure::Database)?
@@ -111,6 +123,8 @@ async fn attest(
         return Ok(AttestationOutcome::Skipped);
     }
 
+    // An unavailable or older daemon can prevent key creation. Skip before opening
+    // a challenge on Core so enrollment can still complete.
     let created =
         match tokio::time::timeout(DAEMON_OPERATION_TIMEOUT, daemon.create_device_identity(()))
             .await
@@ -139,8 +153,12 @@ async fn attest(
         created.identity.ok_or(Failure::DaemonResponse)?,
     )
     .map_err(|_| Failure::DaemonResponse)?;
-    // a lost finish response may hide success, so keep the keys before contacting Core
+    // Persist the caller-owned blobs before Start. If Core later accepts Finish,
+    // the registered key must remain usable even if the response is lost.
     identity.save(pool).await.map_err(|_| Failure::Database)?;
+
+    // Send only the public enrollment metadata to Start. The daemon receives the
+    // local key blobs and the exact challenge returned by Core.
     let challenge = start(session, registration.core_device_id, public)
         .await
         .map_err(|_| Failure::Start)?;
@@ -157,6 +175,9 @@ async fn attest(
     )
     .await
     .unwrap_or_else(|_| Err(Status::deadline_exceeded("Device attestation timed out")));
+
+    // Once Start succeeds, report a daemon failure to Core as a failed solution
+    // for that attempt. It is not evidence that can register an identity.
     let solution = daemon_solution(&challenge_id, response.map(tonic::Response::into_inner));
     let evidence_available = matches!(
         &solution.result,
@@ -165,6 +186,9 @@ async fn attest(
     let response = finish(session, registration.core_device_id, solution)
         .await
         .map_err(|_| Failure::Finish)?;
+
+    // An HTTP success alone cannot acknowledge a key. Require TPM evidence and
+    // an explicit Attested result before recording the Core identity ID.
     let identity_id = verified_identity_id(&response, evidence_available)?;
     identity
         .record_identity_id(pool, identity_id)
@@ -215,6 +239,8 @@ fn daemon_solution(
     session_id: &str,
     response: Result<AttestationChallengeSolution, Status>,
 ) -> AttestationChallengeSolution {
+    // Accept evidence only for the attempt sent to the daemon. If the response is
+    // unusable, report failure under Core's original challenge ID.
     let code = match response {
         Ok(solution)
             if solution.session_id == session_id

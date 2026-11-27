@@ -77,7 +77,8 @@ export const enrollmentCreateDevice = async (
       privateKey,
       response: deviceResponse,
     });
-    // attestation failure must not turn a persisted registration into an enrollment error
+    // Attest the persisted instance before enrollment advances. A failed attempt
+    // must leave the WireGuard registration usable.
     await api.enrollmentAttestDevice(sessionId, saved.instance.id).catch(() => {});
     return {};
   } catch (e) {

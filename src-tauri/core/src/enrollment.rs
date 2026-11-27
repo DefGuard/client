@@ -60,6 +60,7 @@ pub struct CreatedDevice {
     pub wireguard_pubkey: String,
 }
 
+/// Shares the enrollment cookie and the last created device across session clones.
 #[derive(Clone, Debug)]
 pub struct EnrollmentSession {
     pub cookie: String,
@@ -80,6 +81,8 @@ impl EnrollmentSession {
     }
 
     fn remember_created_device(&self, config: &DeviceConfigResponse, requested_pubkey: &str) {
+        // Retain a registration only when the response identifies the submitted WireGuard key.
+        // Clear the snapshot for incomplete responses so they cannot reuse an older device.
         let registration = match (&config.instance, &config.device) {
             (Some(instance), Some(device))
                 if device.id > 0

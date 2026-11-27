@@ -2,7 +2,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=../proto");
 
     tonic_prost_build::configure()
-        // These types contain sensitive data.
+        // Suppress generated Debug output for messages carrying protected key
+        // material or activation secrets, including their enclosing requests.
         .skip_debug([
             "SaveServiceLocationsRequest",
             "DeviceIdentityMaterial",

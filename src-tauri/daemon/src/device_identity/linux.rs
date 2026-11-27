@@ -1,3 +1,5 @@
+//! Converts daemon IPC messages to and from the Linux TPM backend.
+
 use defguard_client_device_identity as backend;
 use defguard_client_proto::defguard::{client::v1 as ipc, device_identity::v2 as proto};
 use tonic::Status;
@@ -19,6 +21,8 @@ pub(super) async fn create() -> Result<ipc::CreateDeviceIdentityResponse, Status
     let backend::AttestationIdentity::Tpm(public) = public else {
         return Err(Status::unimplemented("Only TPM identities are supported"));
     };
+    // Return reloadable material to the local caller separately from the public
+    // EK and AK metadata it may send to Core.
     Ok(ipc::CreateDeviceIdentityResponse {
         identity: Some(encode_identity(identity)?),
         attestation_identity: Some(proto::AttestationIdentity {
@@ -114,6 +118,8 @@ pub(super) fn prepare(
     if challenge.session_id.is_empty() {
         return Err(Status::invalid_argument("Missing attestation challenge ID"));
     }
+    // The backend hashes the exact context bytes for Certify. Core owns the
+    // deadline check, so the daemon does not use its own clock here.
     let data = require_bytes(challenge.data, "attestation challenge data")?;
     let Some(proto::attestation_challenge::Challenge::Tpm(credential)) = challenge.challenge else {
         return Err(Status::invalid_argument(
@@ -137,6 +143,8 @@ pub(super) fn prepare(
 pub(super) async fn attest(
     request: PreparedAttestation,
 ) -> Result<proto::AttestationChallengeSolution, Status> {
+    // A backend failure after accepting the request is an enrollment result.
+    // Echo the challenge ID so the caller can report that failure to Core.
     let result = match backend::attest_identity(&request.identity, &request.request).await {
         Ok(response) => encode_attestation(response)?,
         Err(error) => {
@@ -161,6 +169,8 @@ fn encode_attestation(
             "TPM attestation returned an unexpected backend",
         ));
     };
+    // Preserve the backend's signature encoding. Core verifies it against the
+    // original attestation bytes and the declared algorithm.
     let algorithm = match evidence.signature.algorithm {
         backend::SignatureAlgorithm::EcdsaSha256 => proto::SignatureAlgorithm::EcdsaSha256,
         backend::SignatureAlgorithm::RsaSsaSha256 => proto::SignatureAlgorithm::RsaSsaSha256,

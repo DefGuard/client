@@ -1830,6 +1830,7 @@ pub async fn enrollment_create_device(
     Ok(result)
 }
 
+/// Attempts attestation for the saved instance and returns only the outcome to the WebView.
 #[tauri::command(async)]
 pub async fn enrollment_attest_device(
     session_id: String,

@@ -7,6 +7,7 @@ use tonic::Status;
 #[cfg(target_os = "linux")]
 mod linux;
 
+/// Serializes local TPM operations without retaining identity material between RPCs.
 #[derive(Default)]
 pub(crate) struct DeviceIdentityService {
     #[cfg(target_os = "linux")]
@@ -24,6 +25,7 @@ impl DeviceIdentityService {
         &self,
         request: AttestDeviceIdentityRequest,
     ) -> Result<AttestationChallengeSolution, Status> {
+        // Reject incomplete IPC requests before taking the TPM operation lock.
         let request = linux::prepare(request)?;
         self.run(linux::attest(request)).await
     }

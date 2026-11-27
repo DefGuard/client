@@ -12,13 +12,16 @@ mod tests;
 
 const MATERIAL_VERSION: i64 = 1;
 
-// private key blobs must not enter debug logs or webview responses
+/// The locally persisted TPM identity for an enrolled instance.
+///
+/// This type has no `Debug` or Serde implementation because it contains private blobs.
 #[derive(Clone, PartialEq)]
 pub struct DeviceIdentity {
     pub instance_id: Id,
     pub core_device_id: Id,
-    /// missing after a lost finish response, even when Core accepted attestation
+    /// The identity ID acknowledged by Core. `None` does not rule out a successful Finish.
     pub identity_id: Option<String>,
+    /// Parent-protected key blobs and templates used by the daemon to reload the identity.
     pub material: DeviceIdentityMaterial,
 }
 
@@ -60,6 +63,7 @@ impl DeviceIdentity {
         Ok(identity)
     }
 
+    /// Inserts new material before the client starts remote attestation.
     pub async fn save<'e, E: SqliteExecutor<'e>>(
         &self,
         executor: E,
@@ -99,6 +103,7 @@ impl DeviceIdentity {
         stored.map(Self::try_from).transpose()
     }
 
+    /// Records Core's acknowledgement for the exact material used in the attestation.
     pub async fn record_identity_id<'e, E: SqliteExecutor<'e>>(
         &mut self,
         executor: E,
@@ -111,6 +116,8 @@ impl DeviceIdentity {
             ));
         }
         let material = self.material.encode_to_vec();
+        // A delayed acknowledgement must not attach to a replacement registration.
+        // Repeating the same acknowledgement is safe.
         let result = sqlx::query!(
             "UPDATE device_identity SET identity_id = $1 \
              WHERE instance_id = $2 AND core_device_id = $3 \
@@ -175,6 +182,8 @@ impl TryFrom<StoredIdentity> for DeviceIdentity {
     type Error = DeviceIdentityError;
 
     fn try_from(stored: StoredIdentity) -> Result<Self, Self::Error> {
+        // The stored protobuf is a local persistence format. Reject unknown versions
+        // before interpreting their bytes as templates or key blobs.
         if stored.material_version != MATERIAL_VERSION {
             return Err(DeviceIdentityError::UnsupportedMaterialVersion(
                 stored.material_version,

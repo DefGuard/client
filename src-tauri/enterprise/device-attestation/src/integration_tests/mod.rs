@@ -177,7 +177,7 @@ async fn test_backend_and_ipc_errors_after_start_are_reported_without_losing_key
             session_id: SESSION_ID.into(),
             result: Some(Proof::Error(expected.into())),
         };
-        // even a success response cannot acknowledge an identity when the client sent no proof
+        // A success response cannot acknowledge an identity when the client sent no proof.
         registration
             .expect_attestation(start_response(), reported, verified())
             .await;
