@@ -2,8 +2,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=../proto");
 
     tonic_prost_build::configure()
-        // These types contain sensitive data.
-        .skip_debug(["SaveServiceLocationsRequest"])
+        // Suppress generated Debug output for messages carrying protected key
+        // material or activation secrets, including their enclosing requests.
+        .skip_debug([
+            "SaveServiceLocationsRequest",
+            "DeviceIdentityMaterial",
+            "TpmIdentityMaterial",
+            "TpmKeyBlobs",
+            "CreateDeviceIdentityResponse",
+            "AttestDeviceIdentityRequest",
+            "AttestationChallengeSolution",
+            "TpmAttestationResponse",
+            "AttestationFinishRequest",
+        ])
         // Enable optional fields.
         .protoc_arg("--experimental_allow_proto3_optional")
         // Make sure empty DNS is deserialized correctly as `None`.

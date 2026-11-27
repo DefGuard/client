@@ -8,8 +8,8 @@ successful operations and cryptographically valid results. They do not accept
 From `src-tauri`:
 
 ```sh
-cargo test -p device-identity
-cargo test -p device-identity --test contract -- --ignored
+cargo test -p defguard-client-device-identity
+cargo test -p defguard-client-device-identity --test contract -- --ignored
 ```
 
 Run a single scenario by adding its name before `-- --ignored`.
@@ -76,7 +76,7 @@ returned blobs and SRK input template, checks their profiles, and uses empty
 authorization:
 
 ```sh
-cargo test -p device-identity --lib test_create_identity_returns_reloadable_key_blobs -- --ignored
+cargo test -p defguard-client-device-identity --lib test_create_identity_returns_reloadable_key_blobs -- --ignored
 ```
 
 ## Windows
@@ -141,9 +141,9 @@ They run without hardware or Apple service access.
 ## Linux attestation
 
 ```sh
-cargo test -p device-identity --test contract test_attestation_verifies_and_rejects_changed_data_or_evidence -- --ignored
-cargo test -p device-identity --test contract test_tpm_rejects_a_corrupted_credential_challenge -- --ignored
-cargo test -p device-identity --test contract test_attestation_rejects_damaged_identity_without_replacing_keys -- --ignored
+cargo test -p defguard-client-device-identity --test contract test_attestation_verifies_and_rejects_changed_data_or_evidence -- --ignored
+cargo test -p defguard-client-device-identity --test contract test_tpm_rejects_a_corrupted_credential_challenge -- --ignored
+cargo test -p defguard-client-device-identity --test contract test_attestation_rejects_damaged_identity_without_replacing_keys -- --ignored
 ```
 
 These scenarios use independent software MakeCredential and attestation verification.
@@ -162,9 +162,9 @@ certificates used only to test public-key matching. They are not trust anchors.
 ## Linux possession proof
 
 ```sh
-cargo test -p device-identity --test contract test_possession_proof_binds_the_exact_data_and_registered_key -- --ignored
-cargo test -p device-identity --test contract test_creating_another_identity_preserves_the_existing_identity -- --ignored
-cargo test -p device-identity --test contract test_tpm_possession_needs_no_ek_or_ak_and_rejects_damaged_identity -- --ignored
+cargo test -p defguard-client-device-identity --test contract test_possession_proof_binds_the_exact_data_and_registered_key -- --ignored
+cargo test -p defguard-client-device-identity --test contract test_creating_another_identity_preserves_the_existing_identity -- --ignored
+cargo test -p defguard-client-device-identity --test contract test_tpm_possession_needs_no_ek_or_ak_and_rejects_damaged_identity -- --ignored
 ```
 
 Possession restores only the SRK and identity key and signs SHA-256 of the unchanged

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE device_identity SET identity_id = $1 WHERE instance_id = $2 AND core_device_id = $3 AND material_version = $4 AND material = $5 AND (identity_id IS NULL OR identity_id = $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "abe062486d9073f943648de5b3ef97e48bc15e03e4e100e1a2f52b59f6737a9e"
+}

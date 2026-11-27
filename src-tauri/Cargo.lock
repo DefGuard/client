@@ -1638,6 +1638,7 @@ dependencies = [
  "defguard-client-common",
  "defguard-client-config-sync",
  "defguard-client-core",
+ "defguard-client-device-attestation",
  "defguard-client-fido2",
  "defguard-client-posture",
  "defguard-client-proto",
@@ -1766,6 +1767,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "defguard-client-device-attestation"
+version = "2.3.0"
+dependencies = [
+ "defguard-client-core",
+ "defguard-client-proto",
+ "futures-util",
+ "hyper-util",
+ "log",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tower",
+ "wiremock",
+]
+
+[[package]]
+name = "defguard-client-device-identity"
+version = "2.3.0"
+dependencies = [
+ "aes 0.8.4",
+ "base64 0.23.1",
+ "cfb-mode",
+ "ciborium",
+ "hmac 0.12.1",
+ "p256",
+ "picky-asn1",
+ "picky-asn1-der",
+ "picky-asn1-x509",
+ "rand_core 0.6.4",
+ "rsa",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tpm2-protocol",
+ "tracing",
+ "tss-esapi",
+ "windows-sys 0.61.2",
+ "x509-parser",
+]
+
+[[package]]
 name = "defguard-client-fido2"
 version = "2.3.0"
 dependencies = [
@@ -1835,6 +1882,7 @@ dependencies = [
  "async-stream",
  "clap",
  "defguard-client-common",
+ "defguard-client-device-identity",
  "defguard-client-posture",
  "defguard-client-proto",
  "defguard-client-service-locations",
@@ -2008,32 +2056,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "device-identity"
-version = "2.3.0"
-dependencies = [
- "aes 0.8.4",
- "base64 0.23.1",
- "cfb-mode",
- "ciborium",
- "hmac 0.12.1",
- "p256",
- "picky-asn1",
- "picky-asn1-der",
- "picky-asn1-x509",
- "rand_core 0.6.4",
- "rsa",
- "sha2 0.10.9",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tpm2-protocol",
- "tracing",
- "tss-esapi",
- "windows-sys 0.61.2",
- "x509-parser",
 ]
 
 [[package]]

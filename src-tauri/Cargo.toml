@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations", "enterprise/device-identity"]
+members = ["cli", "client-cli", "common", "client-proto", "core", "daemon", "enterprise/fido2", "enterprise/posture", "enterprise/provisioning", "enterprise/config-sync", "enterprise/service-locations", "enterprise/device-identity", "enterprise/device-attestation"]
 default-members = ["cli", "client-cli", "daemon", "."]
 
 [workspace.dependencies]
@@ -144,6 +144,7 @@ defguard-cli.path = "client-cli"
 defguard-client-fido2.path = "enterprise/fido2"
 defguard-client-proto.path = "client-proto"
 defguard-client-core.path = "core"
+defguard-client-device-attestation.path = "enterprise/device-attestation"
 defguard-client-posture.path = "enterprise/posture"
 defguard-client-config-sync.path = "enterprise/config-sync"
 defguard-client-provisioning.path = "enterprise/provisioning"

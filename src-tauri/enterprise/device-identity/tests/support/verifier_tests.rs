@@ -1,5 +1,7 @@
 use ciborium::Value;
-use device_identity::{Signature, SignatureAlgorithm, TpmAttestationIdentity, TpmEvidence};
+use defguard_client_device_identity::{
+    Signature, SignatureAlgorithm, TpmAttestationIdentity, TpmEvidence,
+};
 use p256::ecdsa::{signature::Signer, Signature as EcdsaSignature, SigningKey};
 use sha2::{Digest, Sha256};
 

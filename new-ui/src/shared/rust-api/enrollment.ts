@@ -73,10 +73,13 @@ export const enrollmentCreateDevice = async (
   try {
     const { publicKey, privateKey } = generateWGKeys();
     const deviceResponse = await api.enrollmentCreateDevice(sessionId, name, publicKey);
-    await saveDeviceConfig({
+    const saved = await saveDeviceConfig({
       privateKey,
       response: deviceResponse,
     });
+    // Attest the persisted instance before enrollment advances. A failed attempt
+    // must leave the WireGuard registration usable.
+    await api.enrollmentAttestDevice(sessionId, saved.instance.id).catch(() => {});
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };

@@ -37,4 +37,4 @@ jobs:
         working-directory: src-tauri/
         shell: cmd
         run: |
-          cargo test -p device-identity --locked
+          cargo test -p defguard-client-device-identity --locked

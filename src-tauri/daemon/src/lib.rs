@@ -1,5 +1,6 @@
 pub mod config;
 pub mod daemon;
+mod device_identity;
 pub mod error;
 pub mod utils;
 

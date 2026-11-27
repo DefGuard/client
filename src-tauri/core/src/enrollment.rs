@@ -4,7 +4,10 @@
 //! starting enrollment, creating a device, activating the user, registering
 //! MFA, and finishing the enrollment.
 
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use defguard_client_proto::defguard::client_types::{
     CodeMfaSetupFinishResponse, CodeMfaSetupStartResponse, DeviceConfigResponse,
@@ -16,6 +19,7 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::{
+    database::models::Id,
     proxy::{construct_platform_header, read_error_message},
     version::{CLIENT_PLATFORM_HEADER, CLIENT_VERSION_HEADER, PKG_VERSION},
 };
@@ -47,17 +51,62 @@ pub enum EnrollmentError {
     Other { message: String },
 }
 
-/// Holds the enrollment session state.
+/// Identifies the device created during an enrollment session.
+#[derive(Clone, Debug)]
+pub struct CreatedDevice {
+    pub core_device_id: Id,
+    pub instance_uuid: String,
+    pub username: String,
+    pub wireguard_pubkey: String,
+}
+
+/// Shares the enrollment cookie and the last created device across session clones.
 #[derive(Clone, Debug)]
 pub struct EnrollmentSession {
     pub cookie: String,
     pub proxy_url: Url,
     pub client: Client,
+    created_device: Arc<Mutex<Option<CreatedDevice>>>,
+}
+
+impl EnrollmentSession {
+    /// Returns a snapshot of the registration shared by all clones of this session.
+    pub fn created_device(&self) -> Result<Option<CreatedDevice>, EnrollmentError> {
+        self.created_device
+            .lock()
+            .map(|created| created.clone())
+            .map_err(|_| EnrollmentError::Other {
+                message: "Failed to read the device created during enrollment".into(),
+            })
+    }
+
+    fn remember_created_device(&self, config: &DeviceConfigResponse, requested_pubkey: &str) {
+        // Retain a registration only when the response identifies the submitted WireGuard key.
+        // Clear the snapshot for incomplete responses so they cannot reuse an older device.
+        let registration = match (&config.instance, &config.device) {
+            (Some(instance), Some(device))
+                if device.id > 0
+                    && device.pubkey == requested_pubkey
+                    && !instance.id.is_empty() =>
+            {
+                Some(CreatedDevice {
+                    core_device_id: device.id,
+                    instance_uuid: instance.id.clone(),
+                    username: instance.username.clone(),
+                    wireguard_pubkey: device.pubkey.clone(),
+                })
+            }
+            _ => None,
+        };
+        if let Ok(mut created) = self.created_device.lock() {
+            *created = registration;
+        }
+    }
 }
 
 /// Send a JSON POST request to an enrollment endpoint with the session
 /// cookie and standard client headers.
-async fn enrollment_post(
+pub async fn enrollment_post(
     session: &EnrollmentSession,
     path: &str,
     body: serde_json::Value,
@@ -173,6 +222,7 @@ pub async fn enrollment_start(
         cookie,
         proxy_url,
         client,
+        created_device: Arc::default(),
     };
 
     Ok((session, body))
@@ -195,9 +245,11 @@ pub async fn enrollment_create_device(
     )
     .await?;
 
-    response.json().await.map_err(|e| EnrollmentError::Other {
+    let config = response.json().await.map_err(|e| EnrollmentError::Other {
         message: format!("Failed to parse create_device response: {e}"),
-    })
+    })?;
+    session.remember_created_device(&config, &pubkey);
+    Ok(config)
 }
 
 /// Activate the user account during enrollment.
@@ -480,6 +532,7 @@ mod tests {
             cookie: "defguard_proxy=test-session-cookie".into(),
             proxy_url: mock_url(server),
             client: Client::new(),
+            created_device: Arc::default(),
         }
     }
 
@@ -527,11 +580,12 @@ mod tests {
             .await;
 
         let session = make_session(&server);
-        let result = enrollment_create_device(session, "my-device".into(), "pk".into())
+        let result = enrollment_create_device(session.clone(), "my-device".into(), "pk".into())
             .await
             .unwrap();
 
         assert_eq!(result.configs[0].config, "wg0");
+        assert!(session.created_device.lock().unwrap().is_some());
     }
 
     #[tokio::test]
@@ -635,5 +689,37 @@ mod tests {
             err,
             EnrollmentError::ProxyError { status: 404, .. }
         ));
+    }
+
+    #[tokio::test]
+    async fn test_created_registration_is_shared_by_session_clones_but_not_other_sessions() {
+        use defguard_client_proto::defguard::client_types::{Device, InstanceInfo};
+
+        let server = MockServer::start().await;
+        let session = make_session(&server);
+        let clone = session.clone();
+        let config = DeviceConfigResponse {
+            device: Some(Device {
+                id: 42,
+                pubkey: "wg-public".into(),
+                ..Default::default()
+            }),
+            instance: Some(InstanceInfo {
+                id: "core-uuid".into(),
+                username: "alice".into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        session.remember_created_device(&config, "wg-public");
+        let registration = clone.created_device().unwrap().unwrap();
+        assert_eq!(registration.core_device_id, 42);
+        assert_eq!(registration.instance_uuid, "core-uuid");
+        assert_eq!(registration.username, "alice");
+        assert_eq!(registration.wireguard_pubkey, "wg-public");
+        let other_session = make_session(&server);
+        assert!(other_session.created_device().unwrap().is_none());
+        session.remember_created_device(&config, "mismatched-request-key");
+        assert!(clone.created_device().unwrap().is_none());
     }
 }

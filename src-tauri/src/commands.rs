@@ -1830,6 +1830,23 @@ pub async fn enrollment_create_device(
     Ok(result)
 }
 
+/// Attempts attestation for the saved instance and returns only the outcome to the WebView.
+#[tauri::command(async)]
+pub async fn enrollment_attest_device(
+    session_id: String,
+    instance_id: Id,
+    state: State<'_, AppState>,
+) -> Result<defguard_client_device_attestation::AttestationOutcome, String> {
+    let session = get_enrollment_session(&state, &session_id)?;
+    Ok(defguard_client_device_attestation::attest_device(
+        &session,
+        &DB_POOL,
+        instance_id,
+        defguard_client_core::connection::daemon_client::DAEMON_CLIENT.clone(),
+    )
+    .await)
+}
+
 #[tauri::command(async)]
 pub async fn enrollment_activate_user(
     session_id: String,

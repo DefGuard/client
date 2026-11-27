@@ -1,0 +1,28 @@
+[package]
+name = "defguard-client-device-attestation"
+description = "Device identity attestation"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license = "LicenseRef-Proprietary"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+defguard-client-core = { path = "../../core" }
+defguard-client-proto = { path = "../../client-proto" }
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+
+[dev-dependencies]
+futures-util.workspace = true
+hyper-util.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros"] }
+tokio-stream.workspace = true
+tower.workspace = true
+wiremock.workspace = true

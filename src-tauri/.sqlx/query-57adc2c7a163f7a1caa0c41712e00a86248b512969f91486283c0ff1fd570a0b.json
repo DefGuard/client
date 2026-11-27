@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT instance_id, core_device_id, identity_id, material_version, material FROM device_identity WHERE instance_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "instance_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "device_identity",
+            "name": "instance_id"
+          }
+        }
+      },
+      {
+        "name": "core_device_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "device_identity",
+            "name": "core_device_id"
+          }
+        }
+      },
+      {
+        "name": "identity_id",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "device_identity",
+            "name": "identity_id"
+          }
+        }
+      },
+      {
+        "name": "material_version",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "device_identity",
+            "name": "material_version"
+          }
+        }
+      },
+      {
+        "name": "material",
+        "ordinal": 4,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "device_identity",
+            "name": "material"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "57adc2c7a163f7a1caa0c41712e00a86248b512969f91486283c0ff1fd570a0b"
+}
