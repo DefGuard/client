@@ -1,5 +1,3 @@
-const MIN_PEER_DISCONNECT_THRESHOLD_WITH_MFA = 120;
-
 const requireEnv = (name: string): string => {
 	const value = process.env[name];
 	if (!value) {
@@ -33,6 +31,26 @@ export interface EnrollmentFixture {
 	enrollmentToken: string;
 	enrollmentUrl: string;
 	ephemeral: boolean;
+}
+
+export interface CoreNetwork {
+	id: number;
+	name: string;
+	endpoint: string;
+	port: number;
+}
+
+export type MfaMethod =
+	| "totp"
+	| "email"
+	| "oidc"
+	| "biometric"
+	| "mobileapprove"
+	| "fido2";
+
+export interface MfaFlow {
+	id: number;
+	title: string;
 }
 
 export class CoreApi {
@@ -115,11 +133,8 @@ export class CoreApi {
 		await this.request("DELETE", `/api/v1/user/${username}`);
 	}
 
-	async listNetworks(): Promise<Array<{ id: number; name: string }>> {
-		return this.requestJson<Array<{ id: number; name: string }>>(
-			"GET",
-			"/api/v1/network",
-		);
+	async listNetworks(): Promise<CoreNetwork[]> {
+		return this.requestJson<CoreNetwork[]>("GET", "/api/v1/network");
 	}
 
 	async addUserDevice(name: string, pubkey: string): Promise<AddedUserDevice> {
@@ -138,99 +153,34 @@ export class CoreApi {
 		await this.request("DELETE", `/api/v1/device/${deviceId}`);
 	}
 
-	private async getNetworkDetails(
-		networkId: number,
-	): Promise<Record<string, unknown>> {
-		return this.requestJson<Record<string, unknown>>(
+	async createNetwork(data: unknown): Promise<CoreNetwork> {
+		return this.requestJson<CoreNetwork>("POST", "/api/v1/network", data);
+	}
+
+	async updateNetwork(networkId: number, data: unknown): Promise<void> {
+		await this.request("PUT", `/api/v1/network/${networkId}`, data);
+	}
+
+	async listGateways(networkId: number): Promise<Array<{ name: string }>> {
+		return this.requestJson<Array<{ name: string }>>(
 			"GET",
-			`/api/v1/network/${networkId}`,
+			`/api/v1/network/${networkId}/gateways`,
 		);
 	}
 
-	async setLocationMfaEnabled(
-		networkId: number,
-		enabled: boolean,
-	): Promise<boolean> {
-		const current = await this.getNetworkDetails(networkId);
-		const previous = current.mfa_enabled === true;
-		if (previous === enabled) {
-			return previous;
-		}
-		const mfaFlows = await this.requestJson<
-			Array<{ id: number; is_default: boolean; groups: Array<{ id: number }> }>
-		>("GET", `/api/v1/location/${networkId}/mfa-flows`);
-		const joinList = (value: unknown): string =>
-			Array.isArray(value)
-				? value.join(",")
-				: typeof value === "string"
-					? value
-					: "";
-		const peerDisconnectThreshold = Number(
-			current.peer_disconnect_threshold ?? 0,
-		);
-		await this.request("PUT", `/api/v1/network/${networkId}`, {
-			name: current.name,
-			address: joinList(current.address),
-			endpoint: current.endpoint,
-			port: current.port,
-			allowed_ips: joinList(current.allowed_ips) || null,
-			dns: typeof current.dns === "string" ? current.dns : null,
-			mtu: current.mtu,
-			fwmark: current.fwmark,
-			client_mtu: current.client_mtu ?? null,
-			allow_all_groups: current.allow_all_groups === true,
-			allowed_groups: Array.isArray(current.allowed_groups)
-				? current.allowed_groups
-				: [],
-			keepalive_interval: current.keepalive_interval,
-			peer_disconnect_threshold: enabled
-				? Math.max(
-						peerDisconnectThreshold,
-						MIN_PEER_DISCONNECT_THRESHOLD_WITH_MFA,
-					)
-				: peerDisconnectThreshold,
-			acl_enabled: current.acl_enabled === true,
-			acl_default_allow: current.acl_default_allow === true,
-			allowed_ips_from_acl: current.allowed_ips_from_acl === true,
-			mfa_enabled: enabled,
-			service_location_mode:
-				typeof current.service_location_mode === "string"
-					? current.service_location_mode
-					: "disabled",
-			posture_checks: Array.isArray(current.posture_checks)
-				? current.posture_checks
-				: [],
-			mfa_flows: mfaFlows.map((flow) => ({
-				flow_id: flow.id,
-				is_default: flow.is_default,
-				group_ids: flow.groups.map((group) => group.id),
-			})),
+	async listMfaFlows(): Promise<MfaFlow[]> {
+		return this.requestJson<MfaFlow[]>("GET", "/api/v1/mfa-flow");
+	}
+
+	async createMfaFlow(title: string, steps: MfaMethod[][]): Promise<MfaFlow> {
+		return this.requestJson<MfaFlow>("POST", "/api/v1/mfa-flow", {
+			title,
+			steps: steps.map((methods) => ({ methods })),
 		});
-		return previous;
 	}
 
-	// Core reports `mfa_required` during enrollment when any location on the instance enforces
-	// MFA, so a test that expects no MFA has to clear every location, not just its own.
-	async disableAllLocationMfa(): Promise<Map<number, boolean>> {
-		const previous = new Map<number, boolean>();
-		try {
-			for (const network of await this.listNetworks()) {
-				previous.set(
-					network.id,
-					await this.setLocationMfaEnabled(network.id, false),
-				);
-			}
-		} catch (error) {
-			await this.restoreLocationMfaEnabled(previous).catch(() => undefined);
-			throw error;
-		}
-		return previous;
-	}
-
-	async restoreLocationMfaEnabled(states: Map<number, boolean>): Promise<void> {
-		for (const [networkId, enabled] of states) {
-			await this.setLocationMfaEnabled(networkId, enabled);
-		}
+	async deleteMfaFlow(flowId: number): Promise<void> {
+		await this.request("DELETE", `/api/v1/mfa-flow/${flowId}`);
 	}
 
 	private async startEnrollment(

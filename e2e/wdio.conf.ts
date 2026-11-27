@@ -2,11 +2,13 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { loggedInCoreApi } from "./helpers/coreApi.js";
 import {
 	assertLaunchConfigSpecsExist,
 	getLaunchConfig,
 	writeLaunchFiles,
 } from "./helpers/launchConfig.js";
+import { resetTestNetwork } from "./helpers/locationSpec.js";
 
 const here = import.meta.dirname;
 
@@ -134,6 +136,10 @@ export const config: WebdriverIO.Config = {
 			process.exit(1);
 		});
 		return new Promise((resolve) => setTimeout(resolve, DRIVER_READY_DELAY_MS));
+	},
+
+	beforeTest: async () => {
+		await resetTestNetwork(await loggedInCoreApi());
 	},
 
 	afterTest: () => cleanupWireguardInterfaces(),

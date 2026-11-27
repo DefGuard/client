@@ -18,6 +18,7 @@ import {
 	selectTotpIfNeeded,
 	setPassword,
 } from "../helpers/enrollment.js";
+import { updateTestNetwork } from "../helpers/locationSpec.js";
 import { switchToTrayView } from "../helpers/windows.js";
 
 const refreshInstanceConfiguration = async (token: string) => {
@@ -38,28 +39,14 @@ const refreshInstanceConfiguration = async (token: string) => {
 
 describe("enrollment", () => {
 	let core: CoreApi;
-	let networkId: number;
-	let previousMfaStates: Map<number, boolean> | undefined;
 	let fixture: EnrollmentFixture | undefined;
 
 	beforeEach(async () => {
-		previousMfaStates = undefined;
 		fixture = undefined;
 		core = await loggedInCoreApi();
-		const networkName = process.env.NETWORK_NAME ?? "e2e";
-		const network = (await core.listNetworks()).find(
-			(item) => item.name === networkName,
-		);
-		if (!network) {
-			throw new Error(`Core network "${networkName}" was not found`);
-		}
-		networkId = network.id;
 	});
 
 	afterEach(async () => {
-		if (previousMfaStates) {
-			await core.restoreLocationMfaEnabled(previousMfaStates);
-		}
 		await resetInstances();
 		if (fixture?.ephemeral) {
 			await core.deleteUser(fixture.username);
@@ -67,7 +54,6 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user without MFA and connects from the full and tray views", async () => {
-		previousMfaStates = await core.disableAllLocationMfa();
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);
@@ -83,8 +69,7 @@ describe("enrollment", () => {
 	});
 
 	it("enrolls a user with TOTP MFA and connects from the full and tray views", async () => {
-		previousMfaStates = await core.disableAllLocationMfa();
-		await core.setLocationMfaEnabled(networkId, true);
+		await updateTestNetwork(core, { mfa_enabled: true });
 		fixture = await core.createEnrollmentFixture();
 
 		await addInstance(fixture);

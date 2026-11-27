@@ -6,6 +6,7 @@ import {
 	TRAY_MFA_VIEW,
 } from "../helpers/connection.js";
 import { type CoreApi, loggedInCoreApi } from "../helpers/coreApi.js";
+import { resetTestNetwork } from "../helpers/locationSpec.js";
 import {
 	selectTunnel,
 	switchToFullView,
@@ -86,27 +87,15 @@ const submitTunnelEdit = async () => {
 describe("WireGuard tunnel", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfaEnabled: boolean | undefined;
 	let config: TunnelConfig;
 
 	before(async () => {
 		core = await loggedInCoreApi();
-		const networkName = process.env.NETWORK_NAME ?? "e2e";
-		const network = (await core.listNetworks()).find(
-			(item) => item.name === networkName,
-		);
-		if (!network) {
-			throw new Error(`Core network "${networkName}" was not found`);
-		}
-		networkId = network.id;
-		previousMfaEnabled = await core.setLocationMfaEnabled(networkId, false);
+		networkId = await resetTestNetwork(core);
 		config = await provisionTunnel(core, networkId, `e2e-tunnel-${Date.now()}`);
 	});
 
 	after(async () => {
-		if (previousMfaEnabled) {
-			await core.setLocationMfaEnabled(networkId, previousMfaEnabled);
-		}
 		if (config) {
 			await deleteTunnel(config.name);
 			await core.deleteDevice(config.deviceId);

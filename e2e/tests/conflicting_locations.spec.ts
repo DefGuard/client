@@ -7,6 +7,7 @@ import {
 	waitForGatewayPing,
 } from "../helpers/connection.js";
 import { type CoreApi, loggedInCoreApi } from "../helpers/coreApi.js";
+import { resetTestNetwork } from "../helpers/locationSpec.js";
 import {
 	selectTunnel,
 	switchToFullView,
@@ -83,22 +84,13 @@ const closeConflictModal = async (buttonText: string) => {
 describe("conflicting locations", () => {
 	let core: CoreApi;
 	let networkId: number;
-	let previousMfaEnabled: boolean | undefined;
 	let first: TunnelConfig;
 	let second: TunnelConfig;
 	let split: Omit<TunnelConfig, "deviceId">;
 
 	before(async () => {
 		core = await loggedInCoreApi();
-		const networkName = process.env.NETWORK_NAME ?? "e2e";
-		const network = (await core.listNetworks()).find(
-			(item) => item.name === networkName,
-		);
-		if (!network) {
-			throw new Error(`Core network "${networkName}" was not found`);
-		}
-		networkId = network.id;
-		previousMfaEnabled = await core.setLocationMfaEnabled(networkId, false);
+		networkId = await resetTestNetwork(core);
 
 		const stamp = Date.now();
 		first = await provisionTunnel(core, networkId, `e2e-conflict-a-${stamp}`);
@@ -123,9 +115,6 @@ describe("conflicting locations", () => {
 	});
 
 	after(async () => {
-		if (previousMfaEnabled) {
-			await core.setLocationMfaEnabled(networkId, previousMfaEnabled);
-		}
 		await switchToFullView();
 		for (const tunnel of await listTunnels()) {
 			await invoke("delete_tunnel", { tunnelId: tunnel.id });

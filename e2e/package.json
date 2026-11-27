@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"test": "wdio run ./wdio.conf.ts",
-		"provision": "node scripts/provision.mjs",
+		"provision": "tsx scripts/provision.ts",
 		"fix": "biome check --fix",
 		"lint": "biome check"
 	},

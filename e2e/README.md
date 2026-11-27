@@ -11,6 +11,7 @@ Defguard services to be running separately.
 - The Gateway connected to the test network and reachable through WireGuard.
 - An administrator account whose login does not require MFA. The password is supplied through `e2e/.env`.
 - A dedicated deployment with exactly one test network named `e2e`. The connection checks use the first visible connect button.
+- Before every test the suite resets that location to the spec in `helpers/locationSpec.ts` and assigns the `e2e-totp` MFA flow as its default, creating the flow if needed. Other MFA flows whose titles start with `e2e-` are deleted. Change test locations through `updateTestNetwork` so the next reset restores them.
 - Root `defguard-service` running with `/var/run/defguard.socket` available.
 - Rust/Cargo with the Tauri CLI, Node.js, `pnpm`, `just`, `WebKitWebDriver`, `xvfb-run`, and `dbus-run-session` available.
 - `tauri-driver` available at `~/.cargo/bin/tauri-driver`, or at the path set by `TAURI_DRIVER`.
