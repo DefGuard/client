@@ -28,6 +28,8 @@ use crate::{
 pub struct ActiveVerification {
     session: VerificationSession,
     cancel: CancellationToken,
+    /// Kept until the page leaves, its listeners may miss an event sent before they registered.
+    ended: Option<VerificationError>,
 }
 
 /// Mirrors DeviceVerificationInfo in rust-api/types.ts.
@@ -101,7 +103,7 @@ pub async fn start_device_verification(
             .expect("device_verifications mutex poisoned");
         if verifications
             .get(&instance_id)
-            .is_some_and(|active| active.session.session_id == session_id)
+            .is_some_and(|active| active.session.session_id == session_id && active.ended.is_none())
         {
             false
         } else {
@@ -110,6 +112,7 @@ pub async fn start_device_verification(
                 ActiveVerification {
                     session,
                     cancel: cancel.clone(),
+                    ended: None,
                 },
             );
             if let Some(previous) = previous {
@@ -126,6 +129,7 @@ pub async fn start_device_verification(
             proxy_url,
             token,
             session_id,
+            info.expires_at,
             cancel,
         ));
     } else {
@@ -146,10 +150,23 @@ pub fn get_device_verification_code(
         .device_verifications
         .lock()
         .expect("device_verifications mutex poisoned");
-    verifications
+    let active = verifications
         .get(&instance_id)
-        .map(|active| active.session.current_code())
-        .ok_or_else(|| err_to_json(VerificationError::SessionNotFound))
+        .ok_or_else(|| err_to_json(VerificationError::SessionNotFound))?;
+    code_of(active).map_err(err_to_json)
+}
+
+fn code_of(active: &ActiveVerification) -> Result<VerificationCode, VerificationError> {
+    if let Some(ended) = &active.ended {
+        return Err(ended.clone());
+    }
+    if active.session.is_expired() {
+        return Err(VerificationError::Resolved {
+            outcome: Outcome::Expired,
+            resolved_at: None,
+        });
+    }
+    Ok(active.session.current_code())
 }
 
 /// Stops waiting for the decision. The session itself lives on in Core until it expires or the
@@ -177,21 +194,25 @@ async fn wait_for_decision(
     proxy_url: Url,
     token: String,
     session_id: i64,
+    expires_at: i64,
     cancel: CancellationToken,
 ) {
-    let result = await_decision(&proxy_url, &token, session_id, cancel).await;
-    {
+    let result = await_decision(&proxy_url, &token, session_id, expires_at, cancel).await;
+    if !matches!(result, Err(VerificationError::Cancelled)) {
         let state = handle.state::<AppState>();
         let mut verifications = state
             .device_verifications
             .lock()
             .expect("device_verifications mutex poisoned");
         // A newer session may have taken the place of this one.
-        if verifications
-            .get(&instance_id)
-            .is_some_and(|active| active.session.session_id == session_id)
+        if let Some(active) = verifications
+            .get_mut(&instance_id)
+            .filter(|active| active.session.session_id == session_id)
         {
-            verifications.remove(&instance_id);
+            active.ended = Some(match &result {
+                Ok(status) => VerificationError::resolved(status),
+                Err(err) => err.clone(),
+            });
         }
     }
 

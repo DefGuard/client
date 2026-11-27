@@ -24,7 +24,10 @@ use tokio::time::sleep;
 use crate::{
     connection::active_connections::active_connection_ids,
     database::{
-        models::{connection::ActiveConnection, location::Location, tunnel::Tunnel, Id},
+        models::{
+            connection::ActiveConnection, instance::Instance, location::Location, tunnel::Tunnel,
+            Id,
+        },
         DbPool,
     },
     error::Error,
@@ -124,6 +127,9 @@ pub async fn bring_up(
     pool: &DbPool,
     route_all_traffic: Option<bool>,
 ) -> Result<String, Error> {
+    if let ConnectionTarget::Location(location) = &target {
+        Instance::ensure_device_not_blocked(pool, location.instance_id).await?;
+    }
     target
         .ensure_no_route_conflict(pool, route_all_traffic)
         .await?;

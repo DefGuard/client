@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { deviceBlockedMessage } from '../../../../pages/full/DeviceVerificationPage/utils/deviceVerificationErrorMessage';
 import { MfaFailureText } from '../../../rust-api/mfaError';
 import type { LocationInfo } from '../../../rust-api/types';
 import { IconKind } from '../../Icon';
@@ -108,6 +109,15 @@ describe('connectErrorToCard', () => {
         location,
       ),
     ).toEqual({ message: DEFAULT_CONNECTION_ERROR, icon: IconKind.ServiceUnavailable });
+  });
+
+  it('explains a blocked device', () => {
+    expect(
+      connectErrorToCard(
+        { kind: 'deviceBlocked', message: 'blocked', conflicts: [] },
+        location,
+      ),
+    ).toEqual({ message: deviceBlockedMessage, icon: IconKind.WarningOutlined });
   });
 
   it.each([

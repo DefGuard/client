@@ -46,12 +46,20 @@ impl VerificationSession {
 
     #[must_use]
     pub fn current_code(&self) -> VerificationCode {
-        let unix_secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        self.code_at(unix_secs)
+        self.code_at(unix_now())
     }
+
+    #[must_use]
+    pub fn is_expired(&self) -> bool {
+        i64::try_from(unix_now()).unwrap_or(i64::MAX) >= self.expires_at
+    }
+}
+
+pub(crate) fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 impl TryFrom<StartResponse> for VerificationSession {
@@ -170,6 +178,14 @@ mod tests {
             VerificationSession::try_from(response),
             Err(Error::InvalidResponse { .. })
         ));
+    }
+
+    #[test]
+    fn test_expiry() {
+        let mut session = VerificationSession::try_from(start_response(RFC_SECRET, 6, 60)).unwrap();
+        assert!(session.is_expired());
+        session.expires_at = i64::try_from(unix_now()).unwrap() + 60;
+        assert!(!session.is_expired());
     }
 
     #[test]

@@ -9,6 +9,7 @@ import {
   type DeviceStatusValue,
   type DeviceVerificationError,
   type DeviceVerificationErrorPayload,
+  type DeviceVerificationOutcome,
   type DeviceVerificationResolvedPayload,
   TauriEvent,
 } from '../../../../shared/rust-api/types';
@@ -75,7 +76,9 @@ export const useDeviceVerification = ({
     return Math.max(0, Math.ceil((expiresAt - now) / 1000));
   }, [code.data, code.dataUpdatedAt, now]);
 
-  useEffect(() => {
+  const hasLeftRef = useRef(false);
+
+  const settle = useMemo(() => {
     // The next instances refetch reconciles this with the backend.
     const setDeviceStatus = (status: DeviceStatusValue) => {
       queryClient.setQueryData(getInstancesQueryOptions.queryKey, (instances) =>
@@ -85,47 +88,62 @@ export const useDeviceVerification = ({
       );
     };
 
+    const leave = (status: DeviceStatusValue, callback: () => void) => {
+      if (hasLeftRef.current) return;
+      hasLeftRef.current = true;
+      setDeviceStatus(status);
+      callback();
+    };
+
+    const applyOutcome = (outcome: DeviceVerificationOutcome) => {
+      switch (outcome) {
+        case 'verified':
+          leave(DeviceStatus.Verified, callbacksRef.current.onVerified);
+          break;
+        case 'blocked':
+          leave(DeviceStatus.Blocked, callbacksRef.current.onBlocked);
+          break;
+        case 'cancelled':
+          setResolved({ kind: 'cancelled' });
+          break;
+        case 'expired':
+          setResolved({ kind: 'expired' });
+          break;
+      }
+    };
+
     const handleError = (error: DeviceVerificationError) => {
       switch (error.type) {
         case 'device_blocked':
-          setDeviceStatus(DeviceStatus.Blocked);
-          callbacksRef.current.onBlocked();
+          leave(DeviceStatus.Blocked, callbacksRef.current.onBlocked);
           return;
         case 'cancelled':
+          return;
+        case 'resolved':
+          applyOutcome(error.outcome);
           return;
         default:
           setResolved({ kind: 'error', error });
       }
     };
 
+    return { applyOutcome, handleError };
+  }, [instanceId, queryClient]);
+
+  useEffect(() => {
     const unlisteners = Promise.all([
       listen<DeviceVerificationResolvedPayload>(
         TauriEvent.DeviceVerificationResolved,
         ({ payload }) => {
           if (payload.instance_id !== instanceId) return;
-          switch (payload.outcome) {
-            case 'verified':
-              setDeviceStatus(DeviceStatus.Verified);
-              callbacksRef.current.onVerified();
-              break;
-            case 'blocked':
-              setDeviceStatus(DeviceStatus.Blocked);
-              callbacksRef.current.onBlocked();
-              break;
-            case 'cancelled':
-              setResolved({ kind: 'cancelled' });
-              break;
-            case 'expired':
-              setResolved({ kind: 'expired' });
-              break;
-          }
+          settle.applyOutcome(payload.outcome);
         },
       ),
       listen<DeviceVerificationErrorPayload>(
         TauriEvent.DeviceVerificationError,
         ({ payload }) => {
           if (payload.instance_id !== instanceId) return;
-          handleError(payload.error);
+          settle.handleError(payload.error);
         },
       ),
     ]);
@@ -134,15 +152,19 @@ export const useDeviceVerification = ({
         for (const unlisten of fns) unlisten();
       });
     };
-  }, [instanceId, queryClient]);
+  }, [instanceId, settle]);
 
-  // Events win: a failed code fetch right before an outcome must not mask it.
-  const status = useMemo((): DeviceVerificationStatus => {
-    if (isPresent(resolved)) return resolved;
-    if (code.isError)
-      return { kind: 'error', error: toDeviceVerificationError(code.error) };
-    return { kind: 'pending' };
-  }, [resolved, code.isError, code.error]);
+  // The session can end before the listeners above exist, the code fetch then reports how.
+  // Events win: a failed code fetch right after an outcome must not mask it.
+  useEffect(() => {
+    if (!code.isError || isPresent(resolved)) return;
+    settle.handleError(toDeviceVerificationError(code.error));
+  }, [code.isError, code.error, resolved, settle]);
+
+  const status = useMemo(
+    (): DeviceVerificationStatus => resolved ?? { kind: 'pending' },
+    [resolved],
+  );
 
   return {
     status,

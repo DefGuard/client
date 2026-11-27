@@ -23,6 +23,8 @@ export const deviceVerificationErrorMessage = (
       return 'The server uses a verification method this client does not support. Update the client.';
     case 'cancelled':
       return 'Verification was cancelled.';
+    case 'resolved':
+      return 'The verification session has ended. Start the verification again.';
     case 'invalid_response':
     case 'proxy':
     case 'other':

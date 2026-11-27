@@ -177,6 +177,42 @@ describe('useDeviceVerification', () => {
     expectStatuses(deviceStatuses, DeviceStatus.Unverified);
   });
 
+  describe('when the outcome event came before the listeners', () => {
+    const expiringStart = (): DeviceVerificationSession => ({
+      info: { ...info, code: { ...info.code, expires_in: 0 } },
+      fetchedAt: Date.now(),
+    });
+
+    const endedWith = (outcome: DeviceVerificationResolvedPayload['outcome']) => {
+      mocks.getDeviceVerificationCode.mockRejectedValue(
+        JSON.stringify({ type: 'resolved', outcome, resolved_at: null }),
+      );
+    };
+
+    it('verifies once from the code fetch', async () => {
+      endedWith('verified');
+      const { onVerified, deviceStatuses } = await render(expiringStart());
+
+      await vi.waitFor(() => {
+        expect(onVerified).toHaveBeenCalled();
+      });
+      emit(TauriEvent.DeviceVerificationResolved, resolved({ outcome: 'verified' }));
+
+      expect(onVerified).toHaveBeenCalledTimes(1);
+      expectStatuses(deviceStatuses, DeviceStatus.Verified);
+    });
+
+    it('shows the expired state from the code fetch', async () => {
+      endedWith('expired');
+      const { hook } = await render(expiringStart());
+
+      await vi.waitFor(() => {
+        expect(hook.result.current.status).toEqual({ kind: 'expired' });
+      });
+      expect(hook.result.current.code).toBeNull();
+    });
+  });
+
   it('reports wait errors', async () => {
     const waiting = await render();
     emit(TauriEvent.DeviceVerificationError, {

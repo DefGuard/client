@@ -165,7 +165,7 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     const isInstance = selection?.kind === 'instance';
     const canVerify =
       isInstance &&
-      !!instance?.enterprise_enabled &&
+      !!instance?.device_verification_available &&
       instance.device_status !== DeviceStatus.Blocked;
     const config: MenuItemsGroup[] = [
       {
@@ -192,7 +192,7 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     selection?.kind,
     handleDeleteIntent,
     handleVerify,
-    instance?.enterprise_enabled,
+    instance?.device_verification_available,
     instance?.device_status,
   ]);
 

@@ -325,6 +325,7 @@ export type InstanceInfo = {
   openid_available: boolean | null;
   /** Null when Core predates device verification. Every connect is refused while blocked. */
   device_status: DeviceStatusValue | null;
+  device_verification_available: boolean;
 };
 
 /** What Core accepts, static per Core version. Offer only what this client also drives. */
@@ -721,6 +722,8 @@ export type DeviceVerificationError =
   | { type: 'invalid_response'; message: string }
   | { type: 'proxy'; status: number; message: string }
   | { type: 'cancelled' }
+  /** Codes are asked for after the session ended, it carries the outcome the event had. */
+  | { type: 'resolved'; outcome: DeviceVerificationOutcome; resolved_at: number | null }
   | { type: 'other'; message: string };
 
 export type DeviceVerificationResolvedPayload = {

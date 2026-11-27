@@ -28,6 +28,10 @@ fn proxy_url(server: &MockServer) -> Url {
     Url::parse(&server.uri()).unwrap()
 }
 
+fn in_an_hour() -> i64 {
+    i64::try_from(unix_now()).unwrap() + 3600
+}
+
 #[tokio::test]
 async fn test_start_sends_token_and_decodes_session() {
     let server = MockServer::start().await;
@@ -204,9 +208,15 @@ fn status_frame(outcome: &str) -> serde_json::Value {
 #[tokio::test]
 async fn test_await_returns_the_decision() {
     let (url, _, edge) = fake_edge(vec![Reply::UpgradeAndSend(status_frame("blocked"))]).await;
-    let status = await_decision(&url, TOKEN, SESSION_ID, CancellationToken::new())
-        .await
-        .unwrap();
+    let status = await_decision(
+        &url,
+        TOKEN,
+        SESSION_ID,
+        in_an_hour(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
     assert_eq!(status.outcome, Outcome::Blocked);
     assert_eq!(status.resolved_at, Some(50));
     edge.await.unwrap();
@@ -220,9 +230,15 @@ async fn test_await_reconnects_after_a_dropped_connection() {
         Reply::UpgradeAndSend(status_frame("verified")),
     ])
     .await;
-    let status = await_decision(&url, TOKEN, SESSION_ID, CancellationToken::new())
-        .await
-        .unwrap();
+    let status = await_decision(
+        &url,
+        TOKEN,
+        SESSION_ID,
+        in_an_hour(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
     assert_eq!(status.outcome, Outcome::Verified);
     assert_eq!(served.load(Ordering::SeqCst), 3);
     edge.await.unwrap();
@@ -235,9 +251,15 @@ async fn test_await_errors_before_upgrade_are_final() {
         json!({"error": "verification session not found", "code": "verification_session_not_found"}),
     )])
     .await;
-    let err = await_decision(&url, TOKEN, SESSION_ID, CancellationToken::new())
-        .await
-        .unwrap_err();
+    let err = await_decision(
+        &url,
+        TOKEN,
+        SESSION_ID,
+        in_an_hour(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap_err();
     assert_eq!(err, Error::SessionNotFound);
     assert_eq!(served.load(Ordering::SeqCst), 1);
     edge.await.unwrap();
@@ -251,9 +273,15 @@ async fn test_await_error_frames() {
         "code": "device_token_invalid",
     }))])
     .await;
-    let err = await_decision(&url, TOKEN, SESSION_ID, CancellationToken::new())
-        .await
-        .unwrap_err();
+    let err = await_decision(
+        &url,
+        TOKEN,
+        SESSION_ID,
+        in_an_hour(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap_err();
     assert_eq!(err, Error::DeviceTokenInvalid);
     edge.await.unwrap();
 }
@@ -268,9 +296,30 @@ async fn test_await_can_be_cancelled_while_retrying() {
     let cancel = CancellationToken::new();
     let wait = tokio::spawn({
         let cancel = cancel.clone();
-        async move { await_decision(&url, TOKEN, SESSION_ID, cancel).await }
+        async move { await_decision(&url, TOKEN, SESSION_ID, in_an_hour(), cancel).await }
     });
     sleep(Duration::from_secs(30)).await;
     cancel.cancel();
     assert_eq!(wait.await.unwrap().unwrap_err(), Error::Cancelled);
+}
+
+#[tokio::test(start_paused = true)]
+async fn test_await_expires_while_edge_is_unreachable() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+    drop(listener);
+
+    let expires_at = i64::try_from(unix_now()).unwrap() + 30;
+    let status = await_decision(
+        &url,
+        TOKEN,
+        SESSION_ID,
+        expires_at,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(status.outcome, Outcome::Expired);
+    assert_eq!(status.expires_at, expires_at);
+    assert_eq!(status.resolved_at, None);
 }

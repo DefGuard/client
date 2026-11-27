@@ -54,8 +54,11 @@ pub async fn handle(
 
     let target = resolve_connect_target(&spec, &state.pool).await?;
 
-    if matches!(&target, ResolvedTarget::Tunnel(_)) {
-        Instance::ensure_tunnels_enabled(&state.pool).await?;
+    match &target {
+        ResolvedTarget::Tunnel(_) => Instance::ensure_tunnels_enabled(&state.pool).await?,
+        ResolvedTarget::Location(location) => {
+            Instance::ensure_device_not_blocked(&state.pool, location.instance_id).await?;
+        }
     }
 
     // Idempotency: if the target is already connected, report and exit 0.
@@ -265,7 +268,101 @@ impl CommandOutput for ConnectResult {
 
 #[cfg(test)]
 mod tests {
+    use defguard_core::{
+        app_config::AppConfig,
+        database::{
+            models::{
+                instance::{ClientTrafficPolicy, DeviceStatus, OpenIdProviderKind},
+                location::{Location, LocationMfaMode, ServiceLocationMode},
+                NoId,
+            },
+            DbPool,
+        },
+        mfa_contract::MfaContract,
+    };
+    use sqlx::types::Json;
+
     use super::*;
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn test_blocked_device_is_refused_before_mfa(pool: DbPool) {
+        let instance = Instance {
+            id: NoId,
+            name: "acme".into(),
+            uuid: "uuid-acme".into(),
+            url: "https://acme.example".into(),
+            proxy_url: "https://proxy.acme.example".into(),
+            username: "alice".into(),
+            token: None,
+            client_traffic_policy: ClientTrafficPolicy::None,
+            enterprise_enabled: true,
+            disable_tunnels: false,
+            openid_display_name: None,
+            openid_provider_kind: OpenIdProviderKind::Custom,
+            mfa_configured_methods: None,
+            mfa_contract: MfaContract::Legacy,
+            mfa_capabilities: None,
+            smtp_configured: None,
+            openid_available: None,
+            device_status: Some(DeviceStatus::Blocked),
+        }
+        .save(&pool)
+        .await
+        .unwrap();
+        Location {
+            id: NoId,
+            instance_id: instance.id,
+            network_id: 1,
+            name: "office".into(),
+            address: "10.0.0.2/24".into(),
+            pubkey: "pk-loc-office".into(),
+            endpoint: "1.2.3.4:51820".into(),
+            allowed_ips: "10.0.0.0/24".into(),
+            dns: None,
+            route_all_traffic: false,
+            keepalive_interval: 25,
+            location_mfa_mode: LocationMfaMode::Internal,
+            service_location_mode: ServiceLocationMode::Disabled,
+            mfa_method: None,
+            posture_check_required: false,
+            mfa_steps: Json::default(),
+            mfa_step_plan: Json::default(),
+            client_mtu: None,
+            auto_connect: false,
+        }
+        .save(&pool)
+        .await
+        .unwrap();
+        let state = State {
+            pool,
+            app_config: AppConfig::default(),
+        };
+
+        let result = handle(
+            &state,
+            Some("office"),
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            &[],
+            None,
+            false,
+            false,
+            true,
+        )
+        .await;
+
+        match result {
+            Err(err) => assert_eq!(
+                err.to_string(),
+                defguard_core::error::Error::DeviceBlocked.to_string()
+            ),
+            Ok(_) => panic!("a blocked device must not connect"),
+        }
+    }
 
     #[test]
     fn test_connected_human() {

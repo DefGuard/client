@@ -1,6 +1,8 @@
 use serde::Serialize;
 use thiserror::Error;
 
+use crate::{Outcome, VerificationStatus};
+
 /// Serialized tagged by type so the frontend can match on it.
 #[derive(Clone, Debug, Error, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -37,6 +39,13 @@ pub enum Error {
     #[error("Device verification cancelled")]
     Cancelled,
 
+    /// No more codes, the session ended with this outcome.
+    #[error("Device verification ended with outcome {outcome:?}")]
+    Resolved {
+        outcome: Outcome,
+        resolved_at: Option<i64>,
+    },
+
     /// A failure in this client rather than in Edge or Core.
     #[error("{message}")]
     Other { message: String },
@@ -69,6 +78,14 @@ impl Error {
             "verification_session_not_found" => Some(Self::SessionNotFound),
             "license_required" => Some(Self::LicenseRequired),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn resolved(status: &VerificationStatus) -> Self {
+        Self::Resolved {
+            outcome: status.outcome,
+            resolved_at: status.resolved_at,
         }
     }
 
@@ -155,6 +172,14 @@ mod tests {
             })
             .unwrap(),
             json!({"type": "proxy", "status": 500, "message": "boom"})
+        );
+        assert_eq!(
+            serde_json::to_value(Error::Resolved {
+                outcome: Outcome::Expired,
+                resolved_at: None,
+            })
+            .unwrap(),
+            json!({"type": "resolved", "outcome": "expired", "resolved_at": null})
         );
     }
 }

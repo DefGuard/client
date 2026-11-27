@@ -376,6 +376,25 @@ impl Instance<Id> {
         }
         Ok(())
     }
+
+    pub async fn ensure_device_not_blocked<'e, E>(
+        executor: E,
+        instance_id: Id,
+    ) -> Result<(), crate::error::Error>
+    where
+        E: SqliteExecutor<'e>,
+    {
+        let blocked = Self::find_by_id(executor, instance_id)
+            .await?
+            .is_some_and(|instance| instance.is_device_blocked());
+        if blocked {
+            warn!(
+                "Refusing to connect a location of instance {instance_id}: the device is blocked"
+            );
+            return Err(crate::error::Error::DeviceBlocked);
+        }
+        Ok(())
+    }
 }
 
 // This compares proto::InstanceInfo, not to be confused with regular InstanceInfo defined below
@@ -478,6 +497,8 @@ pub struct InstanceInfo<I = NoId> {
     pub smtp_configured: Option<bool>,
     pub openid_available: Option<bool>,
     pub device_status: Option<DeviceStatus>,
+    /// Verification needs the polling token, which is never sent to the frontend.
+    pub device_verification_available: bool,
 }
 
 impl<I> InstanceInfo<I> {

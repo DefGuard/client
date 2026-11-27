@@ -252,18 +252,6 @@ fn mfa_code_error_is_terminal(error: &mfa::MfaError) -> bool {
     }) && mfa_error_is_terminal(error)
 }
 
-/// Every way of bringing a location up passes through here, so this is the one block check.
-async fn ensure_device_not_blocked(location: &Location<Id>) -> Result<(), Error> {
-    let blocked = Instance::find_by_id(&*DB_POOL, location.instance_id)
-        .await?
-        .is_some_and(|instance| instance.is_device_blocked());
-    if blocked {
-        warn!("Refusing to connect location {location}: the device is blocked");
-        return Err(Error::DeviceBlocked);
-    }
-    Ok(())
-}
-
 /// Bring up a location connection with an already-obtained preshared key and
 /// refresh the tray. Shared by `connect` and the MFA finish flows so the
 /// preshared key never has to cross back into the frontend.
@@ -272,7 +260,6 @@ async fn connect_location_with_psk(
     preshared_key: Option<String>,
     handle: &AppHandle,
 ) -> Result<(), Error> {
-    ensure_device_not_blocked(&location).await?;
     handle_connection_for_location(location.clone(), preshared_key, handle).await?;
     reload_tray_menu(handle).await;
     info!("Connected to location {location}");
@@ -295,6 +282,7 @@ pub(crate) async fn connect_location(
         ))
         .into());
     }
+    Instance::ensure_device_not_blocked(&*DB_POOL, location.instance_id).await?;
     // MFA flows bring the tunnel up themselves, only posture-only locations resolve a PSK here
     let preshared_key = if location.posture_check_required {
         authorize_posture_session(&location).await?
@@ -747,6 +735,7 @@ pub(crate) async fn build_instance_info(
     let keys = WireguardKeys::find_by_instance_id(&*DB_POOL, instance.id)
         .await?
         .ok_or(Error::NotFound)?;
+    let device_verification_available = instance.enterprise_enabled && instance.token.is_some();
     Ok(InstanceInfo {
         id: instance.id,
         uuid: instance.uuid,
@@ -765,6 +754,7 @@ pub(crate) async fn build_instance_info(
         smtp_configured: instance.smtp_configured,
         openid_available: instance.openid_available,
         device_status: instance.device_status,
+        device_verification_available,
     })
 }
 

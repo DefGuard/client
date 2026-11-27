@@ -7,7 +7,10 @@ use defguard_client_core::{
 use futures_util::{SinkExt, StreamExt};
 use reqwest::{Response, Url};
 use serde::de::DeserializeOwned;
-use tokio::{select, time::sleep};
+use tokio::{
+    select,
+    time::{sleep, sleep_until, Instant},
+};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
@@ -19,8 +22,9 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    session::unix_now,
     types::{SocketMessage, StartRequest, StartResponse, StatusRequest},
-    Error, VerificationSession, VerificationStatus,
+    Error, Outcome, VerificationSession, VerificationStatus,
 };
 
 const START_PATH: &str = "api/v1/client/verification/start";
@@ -32,6 +36,9 @@ const AWAIT_PATH: &str = "api/v1/client/verification/await";
 const PING_INTERVAL: Duration = Duration::from_secs(20);
 const INITIAL_BACKOFF: Duration = Duration::from_secs(2);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
+const EXPIRY_GRACE: Duration = Duration::from_secs(5);
+/// Caps an absurd expires_at from Edge so the deadline cannot overflow.
+const MAX_SESSION_WAIT: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
 fn endpoint(proxy_url: &Url, path: &str) -> Result<Url, Error> {
     proxy_url.join(path).map_err(|err| Error::Network {
@@ -83,19 +90,31 @@ pub async fn status(
 }
 
 /// Edge answers a decided session right away, so reconnecting cannot miss the decision.
-/// Transient failures are retried until cancelled.
+/// Transient failures are retried until cancelled or until the session expires.
 pub async fn await_decision(
     proxy_url: &Url,
     token: &str,
     session_id: i64,
+    expires_at: i64,
     cancel: CancellationToken,
 ) -> Result<VerificationStatus, Error> {
     let url = await_url(proxy_url, session_id)?;
+    let deadline = expiry_deadline(expires_at);
+    let expired = || {
+        info!("Device verification {session_id} expired without an outcome from Edge");
+        VerificationStatus {
+            session_id,
+            outcome: Outcome::Expired,
+            expires_at,
+            resolved_at: None,
+        }
+    };
     let mut backoff = INITIAL_BACKOFF;
     loop {
         let mut connected = false;
         let result = select! {
             () = cancel.cancelled() => return Err(Error::Cancelled),
+            () = sleep_until(deadline) => return Ok(expired()),
             result = wait_once(&url, token, &mut connected) => result,
         };
         match result {
@@ -117,10 +136,20 @@ pub async fn await_decision(
         }
         select! {
             () = cancel.cancelled() => return Err(Error::Cancelled),
+            () = sleep_until(deadline) => return Ok(expired()),
             () = sleep(backoff) => {}
         }
         backoff = (backoff * 2).min(MAX_BACKOFF);
     }
+}
+
+/// The grace lets an outcome Edge sends right at expiry win over the local deadline.
+fn expiry_deadline(expires_at: i64) -> Instant {
+    let remaining = u64::try_from(expires_at)
+        .unwrap_or(0)
+        .saturating_sub(unix_now());
+    let wait = Duration::from_secs(remaining).min(MAX_SESSION_WAIT) + EXPIRY_GRACE;
+    Instant::now() + wait
 }
 
 fn await_url(proxy_url: &Url, session_id: i64) -> Result<Url, Error> {
