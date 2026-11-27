@@ -159,7 +159,7 @@ fn tray_locations(instance: &InstanceInfo<Id>, locations: Vec<LocationInfo>) -> 
         .into_iter()
         .filter(|location| {
             location.active
-                || (!instance.device_blocked
+                || (!instance.is_device_blocked()
                     && connection_ability(&location.mfa_steps, &mfa_state)
                         != ConnectionAbility::Unavailable)
         })
@@ -312,7 +312,7 @@ pub async fn configure_tray_icon(app_handle: &AppHandle) -> Result<(), Error> {
 async fn is_connectable(location: &Location<Id>) -> bool {
     match Instance::find_by_id(&*DB_POOL, location.instance_id).await {
         Ok(Some(instance)) => {
-            !instance.device_blocked
+            !instance.is_device_blocked()
                 && connection_ability(&location.mfa_steps.0, &InstanceMfaState::from(&instance))
                     != ConnectionAbility::Unavailable
         }

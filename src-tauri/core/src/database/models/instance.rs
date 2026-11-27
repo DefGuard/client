@@ -6,7 +6,12 @@ use sqlx::{prelude::Type, query, query_as, query_scalar, types::Json, SqliteExec
 use super::{location::LocationMfaMethod, Id, NoId};
 use crate::{
     mfa_contract::MfaContract,
-    proto::{self, client_types::OpenIdProviderKind as ProtoOpenIdProviderKind},
+    proto::{
+        self,
+        client_types::{
+            DeviceStatus as ProtoDeviceStatus, OpenIdProviderKind as ProtoOpenIdProviderKind,
+        },
+    },
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,9 +37,8 @@ pub struct Instance<I = NoId> {
     pub smtp_configured: Option<bool>,
     /// None when Core predates the report, read as available.
     pub openid_available: Option<bool>,
-    /// Set when an administrator blocked this device during device verification. Core does not
-    /// report device state when polling, so only device verification changes it.
-    pub device_blocked: bool,
+    /// None until Core reports it or device verification decides it.
+    pub device_status: Option<DeviceStatus>,
 }
 
 /// Factors a Core accepts in an MFA configuration session, static per Core version. Only
@@ -91,7 +95,25 @@ pub fn mfa_capabilities(
         })
 }
 
+/// None when Core sends no status or one this client does not know, both read as no report.
+#[must_use]
+pub fn reported_device_status(
+    instance_info: &proto::client_types::InstanceInfo,
+) -> Option<DeviceStatus> {
+    match ProtoDeviceStatus::try_from(instance_info.device_status?).ok()? {
+        ProtoDeviceStatus::Unknown => None,
+        ProtoDeviceStatus::Unverified => Some(DeviceStatus::Unverified),
+        ProtoDeviceStatus::Verified => Some(DeviceStatus::Verified),
+        ProtoDeviceStatus::Blocked => Some(DeviceStatus::Blocked),
+    }
+}
+
 impl<I> Instance<I> {
+    #[must_use]
+    pub fn is_device_blocked(&self) -> bool {
+        self.device_status == Some(DeviceStatus::Blocked)
+    }
+
     /// Returns whether any MFA field changed, factor availability included.
     pub fn sync_mfa_state(&mut self, instance_info: &proto::client_types::InstanceInfo) -> bool {
         let configured_methods = mfa_configured_methods(instance_info);
@@ -133,6 +155,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
         let mfa_contract = mfa_contract_from_instance_info(&instance_info);
         let mfa_capabilities = mfa_capabilities(&instance_info).map(Json);
         let openid_provider_kind = instance_info.openid_provider_kind().into();
+        let device_status = reported_device_status(&instance_info);
         Self {
             id: NoId,
             name: instance_info.name,
@@ -151,7 +174,7 @@ impl From<proto::client_types::InstanceInfo> for Instance<NoId> {
             mfa_capabilities,
             smtp_configured: instance_info.smtp_configured,
             openid_available: instance_info.openid_available,
-            device_blocked: false,
+            device_status,
         }
     }
 }
@@ -208,18 +231,19 @@ impl Instance<Id> {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Written on its own, save leaves it alone so a concurrent poll cannot undo a block.
-    pub async fn set_device_blocked<'e, E>(
+    /// Written on its own, save leaves it alone so a poll saving a stale instance cannot undo a
+    /// verification decision.
+    pub async fn set_device_status<'e, E>(
         executor: E,
         id: Id,
-        device_blocked: bool,
+        device_status: DeviceStatus,
     ) -> Result<bool, sqlx::Error>
     where
         E: SqliteExecutor<'e>,
     {
         let result = query!(
-            "UPDATE instance SET device_blocked = $1 WHERE id = $2;",
-            device_blocked,
+            "UPDATE instance SET device_status = $1 WHERE id = $2;",
+            device_status,
             id
         )
         .execute(executor)
@@ -238,7 +262,8 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, device_blocked \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, \
+            device_status \"device_status: _\" \
             FROM instance ORDER BY name ASC;"
         )
         .fetch_all(executor)
@@ -257,7 +282,8 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, device_blocked \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, \
+            device_status \"device_status: _\" \
             FROM instance WHERE id = $1;",
             id
         )
@@ -277,7 +303,8 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, device_blocked \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, \
+            device_status \"device_status: _\" \
             FROM instance WHERE name = $1;",
             name
         )
@@ -316,7 +343,8 @@ impl Instance<Id> {
             openid_provider_kind \"openid_provider_kind: _\", \
             mfa_configured_methods \"mfa_configured_methods: _\", \
             mfa_capabilities \"mfa_capabilities: _\", \
-            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, device_blocked \
+            mfa_contract \"mfa_contract: _\", smtp_configured, openid_available, \
+            device_status \"device_status: _\" \
             FROM instance \
             WHERE token IS NOT NULL ORDER BY name ASC;"
         )
@@ -384,7 +412,7 @@ impl Instance<NoId> {
             "INSERT INTO instance (name, uuid, url, proxy_url, username, token, \
             client_traffic_policy , enterprise_enabled, disable_tunnels, openid_display_name, \
             openid_provider_kind, mfa_configured_methods, mfa_capabilities, mfa_contract, \
-            smtp_configured, openid_available, device_blocked) \
+            smtp_configured, openid_available, device_status) \
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) \
             RETURNING id;",
             self.name,
@@ -403,7 +431,7 @@ impl Instance<NoId> {
             self.mfa_contract,
             self.smtp_configured,
             self.openid_available,
-            self.device_blocked
+            self.device_status
         )
         .fetch_one(executor)
         .await?;
@@ -425,7 +453,7 @@ impl Instance<NoId> {
             mfa_capabilities: self.mfa_capabilities,
             smtp_configured: self.smtp_configured,
             openid_available: self.openid_available,
-            device_blocked: self.device_blocked,
+            device_status: self.device_status,
         })
     }
 }
@@ -449,7 +477,14 @@ pub struct InstanceInfo<I = NoId> {
     pub mfa_capabilities: Option<MfaCapabilities>,
     pub smtp_configured: Option<bool>,
     pub openid_available: Option<bool>,
-    pub device_blocked: bool,
+    pub device_status: Option<DeviceStatus>,
+}
+
+impl<I> InstanceInfo<I> {
+    #[must_use]
+    pub fn is_device_blocked(&self) -> bool {
+        self.device_status == Some(DeviceStatus::Blocked)
+    }
 }
 
 impl fmt::Display for InstanceInfo<Id> {
@@ -480,6 +515,15 @@ pub enum OpenIdProviderKind {
     Microsoft = 3,
     Okta = 4,
     JumpCloud = 5,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Type)]
+#[repr(u32)]
+#[serde(rename_all = "lowercase")]
+pub enum DeviceStatus {
+    Unverified = 1,
+    Verified = 2,
+    Blocked = 3,
 }
 
 impl From<ProtoOpenIdProviderKind> for OpenIdProviderKind {
@@ -562,7 +606,7 @@ mod tests {
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
-            device_blocked: false,
+            device_status: None,
         }
     }
 
@@ -634,18 +678,21 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../migrations")]
-    async fn test_device_blocked_survives_save(pool: SqlitePool) {
+    async fn test_device_status_survives_save(pool: SqlitePool) {
         let instance = new_instance().save(&pool).await.unwrap();
-        assert!(!instance.device_blocked);
+        assert_eq!(instance.device_status, None);
+        assert!(!instance.is_device_blocked());
 
-        assert!(Instance::set_device_blocked(&pool, instance.id, true)
-            .await
-            .unwrap());
+        assert!(
+            Instance::set_device_status(&pool, instance.id, DeviceStatus::Blocked)
+                .await
+                .unwrap()
+        );
         let blocked = Instance::find_by_id(&pool, instance.id)
             .await
             .unwrap()
             .unwrap();
-        assert!(blocked.device_blocked);
+        assert!(blocked.is_device_blocked());
 
         // A poll saves an instance it loaded before the block, the block must stay.
         let mut stale = instance;
@@ -656,22 +703,50 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(saved.name, "renamed");
-        assert!(saved.device_blocked);
-        assert!(Instance::all(&pool).await.unwrap()[0].device_blocked);
+        assert!(saved.is_device_blocked());
+        assert!(Instance::all(&pool).await.unwrap()[0].is_device_blocked());
 
-        assert!(Instance::set_device_blocked(&pool, saved.id, false)
-            .await
-            .unwrap());
         assert!(
-            !Instance::find_by_id(&pool, saved.id)
+            Instance::set_device_status(&pool, saved.id, DeviceStatus::Verified)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            Instance::find_by_id(&pool, saved.id)
                 .await
                 .unwrap()
                 .unwrap()
-                .device_blocked
+                .device_status,
+            Some(DeviceStatus::Verified)
         );
-        assert!(!Instance::set_device_blocked(&pool, 999, true)
-            .await
-            .unwrap());
+        assert!(
+            !Instance::set_device_status(&pool, 999, DeviceStatus::Blocked)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_reported_device_status() {
+        let mut info = proto::client_types::InstanceInfo::default();
+        assert_eq!(reported_device_status(&info), None);
+        info.device_status = Some(ProtoDeviceStatus::Unknown as i32);
+        assert_eq!(reported_device_status(&info), None);
+        info.device_status = Some(99);
+        assert_eq!(reported_device_status(&info), None);
+        info.device_status = Some(ProtoDeviceStatus::Unverified as i32);
+        assert_eq!(
+            reported_device_status(&info),
+            Some(DeviceStatus::Unverified)
+        );
+        info.device_status = Some(ProtoDeviceStatus::Verified as i32);
+        assert_eq!(reported_device_status(&info), Some(DeviceStatus::Verified));
+        info.device_status = Some(ProtoDeviceStatus::Blocked as i32);
+        assert_eq!(reported_device_status(&info), Some(DeviceStatus::Blocked));
+        assert_eq!(
+            Instance::from(info).device_status,
+            Some(DeviceStatus::Blocked)
+        );
     }
 
     #[sqlx::test(migrations = "../migrations")]
@@ -795,7 +870,7 @@ mod tests {
         assert_eq!(instance.client_traffic_policy, ClientTrafficPolicy::None);
         assert!(!instance.disable_tunnels);
         assert_eq!(instance.mfa_contract, MfaContract::Legacy);
-        assert!(!instance.device_blocked);
+        assert_eq!(instance.device_status, None);
     }
 
     fn new_instance_with_tunnels_disabled(disable: bool) -> Instance<NoId> {
@@ -890,7 +965,7 @@ mod tests {
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
-            device_blocked: false,
+            device_status: None,
         };
         // Model has false, proto has true → not equal.
         assert_ne!(instance, info);
@@ -960,7 +1035,7 @@ mod tests {
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
-            device_blocked: false,
+            device_status: None,
         };
         // Never reported vs reported as [totp], a change the poller has to persist.
         assert_ne!(instance, info);
@@ -999,7 +1074,7 @@ mod tests {
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
-            device_blocked: false,
+            device_status: None,
         };
         // The same factors in another order are not a change worth a full config update.
         assert_eq!(instance, info);
@@ -1081,7 +1156,7 @@ mod tests {
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
-            device_blocked: false,
+            device_status: None,
         };
         // a Core upgraded to configure MFA from the client
         assert_ne!(instance, info);

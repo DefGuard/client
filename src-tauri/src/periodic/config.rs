@@ -28,6 +28,7 @@ use tokio::time::sleep;
 
 use crate::{
     commands::disconnect_all_tunnels,
+    device_verification::disconnect_instance_locations,
     events::{notify_auto_connect_disabled, TunnelsEnabledPayload},
     tray::reload_tray_menu,
 };
@@ -47,6 +48,7 @@ pub async fn poll_config(handle: AppHandle) {
     // Polling starts sooner than app's frontend may load in dev builds, causing events (toasts)
     // to be lost; you may want to wait here before starting if you want to debug it.
     let mut last_tunnels_disabled = false;
+    let mut last_blocked_ids = HashSet::new();
     loop {
         let active_instance_ids = match active_instance_ids().await {
             Ok(ids) => ids,
@@ -111,6 +113,11 @@ pub async fn poll_config(handle: AppHandle) {
                 }
             }
         }
+
+        let blocked_ids =
+            enforce_device_blocks(&handle, &active_instance_ids, &last_blocked_ids).await;
+        tray_stale |= blocked_ids != last_blocked_ids;
+        last_blocked_ids = blocked_ids;
 
         if let Err(err) = handle.emit(EventKey::InstanceUpdate.into(), ()) {
             error!("Failed to emit instance update event to the frontend: {err}");
@@ -253,6 +260,33 @@ fn version_mismatch(result: &PollInstanceResult) -> Option<&VersionMismatchPaylo
             version_mismatch, ..
         } => version_mismatch.as_ref(),
     }
+}
+
+/// A poll may block a device that still has tunnels up, whichever path wrote the status. Returns
+/// the blocked instances, or the previous ones when they cannot be read.
+async fn enforce_device_blocks(
+    handle: &AppHandle,
+    active_instance_ids: &HashSet<Id>,
+    last_blocked_ids: &HashSet<Id>,
+) -> HashSet<Id> {
+    let instances = match Instance::all(&*DB_POOL).await {
+        Ok(instances) => instances,
+        Err(err) => {
+            error!("Failed to load instances to check blocked devices: {err}");
+            return last_blocked_ids.clone();
+        }
+    };
+    let mut blocked_ids = HashSet::new();
+    for instance in instances
+        .iter()
+        .filter(|instance| instance.is_device_blocked())
+    {
+        blocked_ids.insert(instance.id);
+        if active_instance_ids.contains(&instance.id) {
+            disconnect_instance_locations(handle, instance).await;
+        }
+    }
+    blocked_ids
 }
 
 async fn active_instance_ids() -> Result<HashSet<Id>, Error> {

@@ -257,7 +257,7 @@ fn mfa_code_error_is_terminal(error: &mfa::MfaError) -> bool {
 async fn ensure_device_not_blocked(location: &Location<Id>) -> Result<(), Error> {
     let blocked = Instance::find_by_id(&*DB_POOL, location.instance_id)
         .await?
-        .is_some_and(|instance| instance.device_blocked);
+        .is_some_and(|instance| instance.is_device_blocked());
     if blocked {
         warn!("Refusing to connect location {location}: the device is blocked");
         return Err(Error::DeviceBlocked);
@@ -768,7 +768,7 @@ pub(crate) async fn build_instance_info(
         mfa_capabilities: instance.mfa_capabilities.map(|json| json.0),
         smtp_configured: instance.smtp_configured,
         openid_available: instance.openid_available,
-        device_blocked: instance.device_blocked,
+        device_status: instance.device_status,
     })
 }
 

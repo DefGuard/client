@@ -221,7 +221,7 @@ pub(crate) async fn service_locations_to_sync(
     pool: &DbPool,
     instance: &Instance<Id>,
 ) -> Result<Vec<ServiceLocation>, Error> {
-    if instance.device_blocked {
+    if instance.is_device_blocked() {
         debug!(
             "Device of instance {}({}) is blocked, removing its service locations from the daemon.",
             instance.name, instance.id

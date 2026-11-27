@@ -291,6 +291,14 @@ export type AppConfig = {
 
 export type AppConfigPatch = Partial<AppConfig>;
 
+export const DeviceStatus = {
+  Unverified: 'unverified',
+  Verified: 'verified',
+  Blocked: 'blocked',
+} as const;
+
+export type DeviceStatusValue = (typeof DeviceStatus)[keyof typeof DeviceStatus];
+
 export type InstanceInfo = {
   id: number;
   name: string;
@@ -314,8 +322,8 @@ export type InstanceInfo = {
   smtp_configured: boolean | null;
   /** Null when Core predates the report, read as available. */
   openid_available: boolean | null;
-  /** Set only by device verification, every connect is refused while true. */
-  device_blocked: boolean;
+  /** Null when Core predates device verification. Every connect is refused while blocked. */
+  device_status: DeviceStatusValue | null;
 };
 
 /** What Core accepts, static per Core version. Offer only what this client also drives. */

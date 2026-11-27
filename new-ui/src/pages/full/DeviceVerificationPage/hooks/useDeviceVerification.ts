@@ -1,9 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef, useState } from 'react';
 import { interval } from 'rxjs';
 import { api } from '../../../../shared/rust-api/api';
+import { getInstancesQueryOptions } from '../../../../shared/rust-api/query';
 import {
+  DeviceStatus,
+  type DeviceStatusValue,
   type DeviceVerificationError,
   type DeviceVerificationErrorPayload,
   type DeviceVerificationResolvedPayload,
@@ -38,6 +41,7 @@ export const useDeviceVerification = ({
   onVerified,
   onBlocked,
 }: Args) => {
+  const queryClient = useQueryClient();
   const [resolved, setResolved] = useState<DeviceVerificationStatus | null>(null);
   const callbacks = useRef({ onVerified, onBlocked });
   callbacks.current = { onVerified, onBlocked };
@@ -70,9 +74,19 @@ export const useDeviceVerification = ({
     : null;
 
   useEffect(() => {
+    // The next instances refetch reconciles this with the backend.
+    const setDeviceStatus = (status: DeviceStatusValue) => {
+      queryClient.setQueryData(getInstancesQueryOptions.queryKey, (instances) =>
+        instances?.map((instance) =>
+          instance.id === instanceId ? { ...instance, device_status: status } : instance,
+        ),
+      );
+    };
+
     const handleError = (error: DeviceVerificationError) => {
       switch (error.type) {
         case 'device_blocked':
+          setDeviceStatus(DeviceStatus.Blocked);
           callbacks.current.onBlocked();
           return;
         case 'cancelled':
@@ -89,9 +103,11 @@ export const useDeviceVerification = ({
           if (payload.instance_id !== instanceId) return;
           switch (payload.outcome) {
             case 'verified':
+              setDeviceStatus(DeviceStatus.Verified);
               callbacks.current.onVerified();
               break;
             case 'blocked':
+              setDeviceStatus(DeviceStatus.Blocked);
               callbacks.current.onBlocked();
               break;
             case 'cancelled':
@@ -116,7 +132,7 @@ export const useDeviceVerification = ({
         for (const unlisten of fns) unlisten();
       });
     };
-  }, [instanceId]);
+  }, [instanceId, queryClient]);
 
   // Events win: a failed code fetch right before an outcome must not mask it.
   let status: DeviceVerificationStatus = { kind: 'pending' };

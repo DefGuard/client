@@ -322,7 +322,7 @@ const instanceOf = (id: number, overrides: Partial<InstanceInfo> = {}): Instance
   },
   smtp_configured: null,
   openid_available: null,
-  device_blocked: false,
+  device_status: null,
   ...overrides,
 });
 

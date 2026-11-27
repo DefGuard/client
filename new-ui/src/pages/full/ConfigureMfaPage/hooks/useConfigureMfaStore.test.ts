@@ -37,7 +37,7 @@ const instance: InstanceInfo = {
   openid_provider_kind: 'custom',
   smtp_configured: null,
   openid_available: null,
-  device_blocked: false,
+  device_status: null,
   mfa_configured_methods: [],
   mfa_capabilities: {
     setup_methods: [MfaMethod.Totp, MfaMethod.Fido2],

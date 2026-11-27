@@ -151,7 +151,7 @@ mod tests {
             mfa_capabilities: None,
             smtp_configured: None,
             openid_available: None,
-            device_blocked: false,
+            device_status: None,
         }
     }
 

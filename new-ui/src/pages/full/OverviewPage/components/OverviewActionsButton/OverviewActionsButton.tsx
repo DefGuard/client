@@ -23,9 +23,10 @@ import { openModal } from '../../../../../shared/hooks/modalControls/modalsSubje
 import { ModalName } from '../../../../../shared/hooks/modalControls/modalTypes';
 import { useAppData } from '../../../../../shared/providers/AppDataContext';
 import { api } from '../../../../../shared/rust-api/api';
-import type {
-  InstanceInfo,
-  OverviewViewSelection,
+import {
+  DeviceStatus,
+  type InstanceInfo,
+  type OverviewViewSelection,
 } from '../../../../../shared/rust-api/types';
 
 type Props = {
@@ -163,7 +164,9 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
   const menuConfig = useMemo(() => {
     const isInstance = selection?.kind === 'instance';
     const canVerify =
-      isInstance && !!instance?.enterprise_enabled && !instance.device_blocked;
+      isInstance &&
+      !!instance?.enterprise_enabled &&
+      instance.device_status !== DeviceStatus.Blocked;
     const config: MenuItemsGroup[] = [
       {
         items: [
@@ -190,7 +193,7 @@ export const OverviewActionsButton = ({ selection, instance }: Props) => {
     handleDeleteIntent,
     handleVerify,
     instance?.enterprise_enabled,
-    instance?.device_blocked,
+    instance?.device_status,
   ]);
 
   const text = () => {

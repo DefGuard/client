@@ -13,7 +13,11 @@ use crate::{
     appstate::AppState,
     commands::{disconnect_locations, err_to_json},
     database::{
-        models::{instance::Instance, location::Location, Id},
+        models::{
+            instance::{DeviceStatus, Instance},
+            location::Location,
+            Id,
+        },
         DB_POOL,
     },
     events::{DeviceVerificationErrorPayload, DeviceVerificationResolvedPayload, EventKey},
@@ -79,13 +83,12 @@ pub async fn start_device_verification(
         Ok(session) => session,
         Err(err) => {
             if err == VerificationError::DeviceBlocked {
-                set_device_blocked(&handle, instance_id, true).await;
+                set_device_status(&handle, instance_id, DeviceStatus::Blocked).await;
             }
             return Err(err_to_json(err));
         }
     };
-    // Core starts sessions only for enabled devices, so an earlier block was lifted.
-    set_device_blocked(&handle, instance_id, false).await;
+    lift_device_block(&handle, instance_id).await;
     let info = DeviceVerificationInfo::from(&session);
 
     let session_id = session.session_id;
@@ -200,8 +203,12 @@ async fn wait_for_decision(
                 status.outcome
             );
             match status.outcome {
-                Outcome::Blocked => set_device_blocked(&handle, instance_id, true).await,
-                Outcome::Verified => set_device_blocked(&handle, instance_id, false).await,
+                Outcome::Blocked => {
+                    set_device_status(&handle, instance_id, DeviceStatus::Blocked).await;
+                }
+                Outcome::Verified => {
+                    set_device_status(&handle, instance_id, DeviceStatus::Verified).await;
+                }
                 _ => {}
             }
             DeviceVerificationResolvedPayload {
@@ -218,7 +225,7 @@ async fn wait_for_decision(
         Err(err) => {
             warn!("Failed to wait for device verification {session_id}: {err}");
             if err == VerificationError::DeviceBlocked {
-                set_device_blocked(&handle, instance_id, true).await;
+                set_device_status(&handle, instance_id, DeviceStatus::Blocked).await;
             }
             DeviceVerificationErrorPayload {
                 instance_id,
@@ -230,13 +237,30 @@ async fn wait_for_decision(
     }
 }
 
+pub(crate) async fn set_device_status(handle: &AppHandle, instance_id: Id, status: DeviceStatus) {
+    update_device_status(handle, instance_id, |_| Some(status)).await;
+}
+
+/// Core starts sessions only for enabled devices, so an earlier block was lifted. A verified
+/// device stays verified until Core reports otherwise.
+async fn lift_device_block(handle: &AppHandle, instance_id: Id) {
+    update_device_status(handle, instance_id, |current| {
+        (current == Some(DeviceStatus::Blocked)).then_some(DeviceStatus::Unverified)
+    })
+    .await;
+}
+
 /// A blocked device keeps no tunnel up, so blocking disconnects its locations and removes its
 /// service locations from the daemon. Unblocking pushes the service locations back.
-pub(crate) async fn set_device_blocked(handle: &AppHandle, instance_id: Id, blocked: bool) {
+async fn update_device_status(
+    handle: &AppHandle,
+    instance_id: Id,
+    next: impl FnOnce(Option<DeviceStatus>) -> Option<DeviceStatus>,
+) {
     let mut instance = match Instance::find_by_id(&*DB_POOL, instance_id).await {
         Ok(Some(instance)) => instance,
         Ok(None) => {
-            warn!("Instance {instance_id} not found, not recording its device as blocked");
+            warn!("Instance {instance_id} not found, not recording its device status");
             return;
         }
         Err(err) => {
@@ -244,34 +268,45 @@ pub(crate) async fn set_device_blocked(handle: &AppHandle, instance_id: Id, bloc
             return;
         }
     };
-    if instance.device_blocked == blocked {
+    let Some(status) = next(instance.device_status) else {
+        return;
+    };
+    if instance.device_status == Some(status) {
         return;
     }
     // Saved first, so connects and polls that start from here on see it.
-    if let Err(err) = Instance::set_device_blocked(&*DB_POOL, instance_id, blocked).await {
-        error!("Failed to record the blocked state of the device of {instance}: {err}");
+    if let Err(err) = Instance::set_device_status(&*DB_POOL, instance_id, status).await {
+        error!("Failed to record the device status of {instance}: {err}");
         return;
     }
-    instance.device_blocked = blocked;
+    let was_blocked = instance.is_device_blocked();
+    instance.device_status = Some(status);
+    info!("Device status of {instance} is now {status:?}");
 
-    if blocked {
-        warn!("The administrator blocked this device for {instance}, disconnecting its locations");
-        match Location::find_by_instance_id(&*DB_POOL, instance_id, false).await {
-            Ok(locations) => {
-                let ids = locations.iter().map(|location| location.id).collect();
-                if let Err(err) = disconnect_locations(ids, handle.clone()).await {
-                    error!("Failed to disconnect the locations of {instance}: {err}");
-                }
-            }
-            Err(err) => error!("Failed to load the locations of {instance}: {err}"),
+    if was_blocked != instance.is_device_blocked() {
+        if was_blocked {
+            info!("This device is no longer blocked for {instance}");
+        } else {
+            disconnect_instance_locations(handle, &instance).await;
         }
-    } else {
-        info!("This device is no longer blocked for {instance}");
+        sync_service_locations_best_effort(&DB_POOL, &instance).await;
+        reload_tray_menu(handle).await;
     }
-    sync_service_locations_best_effort(&DB_POOL, &instance).await;
 
-    reload_tray_menu(handle).await;
     if let Err(err) = handle.emit(EventKey::InstanceUpdate.into(), ()) {
         error!("Event Instance Update was not emitted. Reason: {err}");
+    }
+}
+
+pub(crate) async fn disconnect_instance_locations(handle: &AppHandle, instance: &Instance<Id>) {
+    warn!("The administrator blocked this device for {instance}, disconnecting its locations");
+    match Location::find_by_instance_id(&*DB_POOL, instance.id, false).await {
+        Ok(locations) => {
+            let ids = locations.iter().map(|location| location.id).collect();
+            if let Err(err) = disconnect_locations(ids, handle.clone()).await {
+                error!("Failed to disconnect the locations of {instance}: {err}");
+            }
+        }
+        Err(err) => error!("Failed to load the locations of {instance}: {err}"),
     }
 }
