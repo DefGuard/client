@@ -50,13 +50,6 @@ mod proto {
         }
 
         #[allow(dead_code)]
-        pub mod device_identity {
-            pub mod v2 {
-                include!(concat!(env!("OUT_DIR"), "/defguard.device_identity.v2.rs"));
-            }
-        }
-
-        #[allow(dead_code)]
         pub mod enterprise {
             pub mod posture {
                 pub mod v2 {
