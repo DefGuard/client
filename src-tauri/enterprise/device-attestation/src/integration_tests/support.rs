@@ -428,4 +428,10 @@ impl DesktopDaemonService for MockDaemon {
     ) -> Result<Response<ipc::ListInterfacesResponse>, Status> {
         Err(Status::unimplemented("unused"))
     }
+    async fn start_update(
+        &self,
+        _: Request<()>,
+    ) -> Result<Response<ipc::StartUpdateResponse>, Status> {
+        Err(Status::unimplemented("unused"))
+    }
 }
