@@ -3,10 +3,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Enable a protoc experimental feature.
         .protoc_arg("--experimental_allow_proto3_optional")
         // Serialize empty DNS as None.
-        .type_attribute(".DeviceConfig", "#[serde_as]")
+        .type_attribute(
+            ".defguard.client_types.DeviceConfig",
+            "#[serde_with::serde_as]",
+        )
         .field_attribute(
-            ".DeviceConfig.dns",
-            "#[serde_as(deserialize_as = \"NoneAsEmptyString\")]",
+            ".defguard.client_types.DeviceConfig.dns",
+            "#[serde(default)] #[serde_as(deserialize_as = \"serde_with::NoneAsEmptyString\")]",
         )
         // Make all messages serde-serializable.
         .type_attribute(".", "#[derive(serde::Deserialize,serde::Serialize)]")

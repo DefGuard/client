@@ -18,7 +18,7 @@ serde_json.workspace = true
 tonic.workspace = true
 
 [target.'cfg(any(target_os = "macos", target_os = "linux", windows))'.dependencies]
-sysinfo = { version = "0.39", default-features = false, features = ["system"] }
+sysinfo = { version = "0.40", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]
 time = { version = "0.3", features = ["formatting", "macros", "serde"] }
@@ -27,3 +27,6 @@ wmi = { version = "0.18", default-features = false }
 [dev-dependencies]
 tokio.workspace = true
 wiremock.workspace = true
+
+[lints]
+workspace = true

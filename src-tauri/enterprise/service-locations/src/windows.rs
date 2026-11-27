@@ -416,8 +416,7 @@ impl ServiceLocationManager {
             .load_service_location(instance_id, location_pubkey)?
             .ok_or_else(|| {
                 ServiceLocationError::LoadError(format!(
-                    "Service location with pubkey {} for instance {} not found",
-                    location_pubkey, instance_id
+                    "Service location with pubkey {location_pubkey} for instance {instance_id} not found"
                 ))
             })?;
 

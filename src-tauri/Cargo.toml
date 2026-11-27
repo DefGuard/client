@@ -19,11 +19,11 @@ hyper-util = "0.1"
 image = "0.25"
 known-folders = "1.3"
 log = { version = "0.4", features = ["serde"] }
-nix = { version = "0.31", features = ["fs", "user"] }
+nix = { version = "0.32", features = ["fs", "user"] }
 owo-colors = { version = "4", features = ["supports-colors"] }
 os_info = { version = "3.15", default-features = false }
 prost = "0.14"
-qrcode = { version = "0.14", features = ["image"] }
+qrcode = { version = "0.15", features = ["image"] }
 regex = "1.13"
 reqwest = { version = "0.13", features = ["cookies", "json"] }
 rust-ini = "0.21"
@@ -33,9 +33,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "3.23"
 sqlx = { version = "0.9", features = ["chrono", "json", "runtime-tokio", "sqlite", "uuid", "macros"] }
-struct-patch = "0.12"
+struct-patch = "0.14"
 strum = { version = "0.28", features = ["derive"] }
-sysinfo = { version = "0.39", default-features = false, features = ["apple-app-store", "system"] }
 tempfile = "3"
 thiserror = "2.0"
 time = { version = "0.3", features = ["formatting", "macros"] }
@@ -59,7 +58,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 url = "2"
 uuid = { version = "1", features = ["v4"] }
-vergen-git2 = { version = "10.0", features = ["build"] }
+vergen-git2 = { version = "10.1", features = ["build"] }
 webbrowser = "1.2"
 windows = { version = "0.62", features = [
     "Win32",
@@ -70,7 +69,6 @@ windows = { version = "0.62", features = [
     "Win32_Foundation",
 ] }
 windows-acl = "0.3"
-windows-core = "0.100"
 windows-service = "0.8"
 windows-sys = { version = "0.61", features = [
     # Core Win32 types
@@ -101,7 +99,7 @@ authors = ["Defguard"]
 edition = "2021"
 homepage = "https://github.com/DefGuard/client"
 license-file = "../LICENSE.md"
-rust-version = "1.95"
+rust-version = "1.100"
 version = "2.3.0"
 
 [package]
@@ -121,7 +119,7 @@ version.workspace = true
 name = "defguard-client"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.7", features = [] }
 vergen-git2.workspace = true
 
 [workspace.lints.clippy]
@@ -153,22 +151,22 @@ serde_with.workspace = true
 sqlx.workspace = true
 struct-patch.workspace = true
 # Tauri dependencies: must match Tauri plugins in package.json.
-tauri = { version = "2", features = [
+tauri = { version = "2.12", features = [
     "native-tls-vendored",
     "image-png",
     "tray-icon",
 ] }
-tauri-plugin-clipboard-manager = "2"
-tauri-plugin-deep-link = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-http = { version = "2", features = ["unsafe-headers", "native-tls"] }
-tauri-plugin-log = "2"
-tauri-plugin-notification = "2"
-tauri-plugin-opener = "2"
-tauri-plugin-os = "2"
-tauri-plugin-process = "2"
-tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-clipboard-manager = "2.5"
+tauri-plugin-deep-link = "2.6"
+tauri-plugin-dialog = "2.8"
+tauri-plugin-fs = "2.7"
+tauri-plugin-http = { version = "2.9", features = ["unsafe-headers", "native-tls"] }
+tauri-plugin-log = "2.10"
+tauri-plugin-notification = "2.8"
+tauri-plugin-opener = "2.7"
+tauri-plugin-os = "2.4"
+tauri-plugin-process = "2.4"
+tauri-plugin-single-instance = { version = "2.5", features = ["deep-link"] }
 time.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
@@ -190,14 +188,13 @@ objc2-network-extension = "0.3"
 objc2-system-extensions = { version = "0.3", optional = true }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-tauri-plugin-autostart = "2"
+tauri-plugin-autostart = "2.7"
 
 [target.'cfg(unix)'.dependencies]
 nix.workspace = true
 tokio-stream.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-async-stream.workspace = true
 futures-core.workspace = true
 known-folders.workspace = true
 windows.workspace = true
@@ -223,3 +220,6 @@ codegen-units = 1
 lto = "thin"
 panic = "abort"
 strip = true
+
+[lints]
+workspace = true
