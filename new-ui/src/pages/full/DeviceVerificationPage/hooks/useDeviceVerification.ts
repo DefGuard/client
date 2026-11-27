@@ -47,8 +47,13 @@ export const useDeviceVerification = ({
     callbacksRef.current = { onVerified, onBlocked };
   }, [onVerified, onBlocked]);
 
+  const sessionId = start.info.session_id;
+  const codeQueryKey = useMemo(
+    () => ['device-verification-code', instanceId, sessionId] as const,
+    [instanceId, sessionId],
+  );
   const code = useQuery({
-    queryKey: ['device-verification-code', instanceId, start.info.session_id],
+    queryKey: codeQueryKey,
     queryFn: () => api.getDeviceVerificationCode(instanceId),
     enabled: resolved === null,
     initialData: start.info.code,
@@ -131,6 +136,7 @@ export const useDeviceVerification = ({
   }, [instanceId, queryClient]);
 
   useEffect(() => {
+    let isSubscribed = true;
     const unlisteners = Promise.all([
       listen<DeviceVerificationResolvedPayload>(
         TauriEvent.DeviceVerificationResolved,
@@ -147,14 +153,19 @@ export const useDeviceVerification = ({
         },
       ),
     ]);
+    // The backend keeps an outcome sent before the listeners existed, one fetch reports it.
+    void unlisteners.then(() => {
+      if (!isSubscribed) return;
+      void queryClient.refetchQueries({ queryKey: codeQueryKey, exact: true });
+    });
     return () => {
+      isSubscribed = false;
       void unlisteners.then((fns) => {
         for (const unlisten of fns) unlisten();
       });
     };
-  }, [instanceId, settle]);
+  }, [instanceId, codeQueryKey, settle, queryClient]);
 
-  // The session can end before the listeners above exist, the code fetch then reports how.
   // Events win: a failed code fetch right after an outcome must not mask it.
   useEffect(() => {
     if (!code.isError || isPresent(resolved)) return;

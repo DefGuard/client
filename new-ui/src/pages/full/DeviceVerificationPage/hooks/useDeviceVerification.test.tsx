@@ -111,8 +111,15 @@ describe('useDeviceVerification', () => {
     expect(hook.result.current.code).toBe('755224');
     expect(hook.result.current.status).toEqual({ kind: 'pending' });
     expect(hook.result.current.secondsLeft).toBeGreaterThan(40);
-    // The first code comes from the loader, refreshing waits for it to expire.
-    expect(mocks.getDeviceVerificationCode).not.toHaveBeenCalled();
+  });
+
+  it('checks the session once the listeners are registered', async () => {
+    const { hook } = await render();
+
+    expect(mocks.getDeviceVerificationCode).toHaveBeenCalledTimes(1);
+    expect(mocks.getDeviceVerificationCode).toHaveBeenCalledWith(instanceId);
+    expect(hook.result.current.code).toBe('755224');
+    expect(hook.result.current.status).toEqual({ kind: 'pending' });
   });
 
   it('calls onVerified when the administrator verifies the device', async () => {
@@ -178,20 +185,16 @@ describe('useDeviceVerification', () => {
   });
 
   describe('when the outcome event came before the listeners', () => {
-    const expiringStart = (): DeviceVerificationSession => ({
-      info: { ...info, code: { ...info.code, expires_in: 0 } },
-      fetchedAt: Date.now(),
-    });
-
     const endedWith = (outcome: DeviceVerificationResolvedPayload['outcome']) => {
       mocks.getDeviceVerificationCode.mockRejectedValue(
         JSON.stringify({ type: 'resolved', outcome, resolved_at: null }),
       );
     };
 
-    it('verifies once from the code fetch', async () => {
+    // The loader's code is valid for another 42 seconds, so nothing waits for its rollover.
+    it('verifies once, right after mounting', async () => {
       endedWith('verified');
-      const { onVerified, deviceStatuses } = await render(expiringStart());
+      const { onVerified, deviceStatuses } = await render();
 
       await vi.waitFor(() => {
         expect(onVerified).toHaveBeenCalled();
@@ -202,9 +205,9 @@ describe('useDeviceVerification', () => {
       expectStatuses(deviceStatuses, DeviceStatus.Verified);
     });
 
-    it('shows the expired state from the code fetch', async () => {
+    it('shows the expired state right after mounting', async () => {
       endedWith('expired');
-      const { hook } = await render(expiringStart());
+      const { hook } = await render();
 
       await vi.waitFor(() => {
         expect(hook.result.current.status).toEqual({ kind: 'expired' });
